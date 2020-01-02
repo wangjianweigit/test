@@ -1,0 +1,19 @@
+package com.tk.analysis.home.dao;
+
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.stereotype.Repository;
+
+import com.tk.oms.basicinfo.dao.BaseDao;
+
+@Repository
+public interface HomeAnalysisDao extends BaseDao<Map<String, Object>> {
+	/**
+	 * 根据用户ID查询用户权限信息
+	 * @param paramMap
+	 * @return
+	 */
+	List<String> r_queryByUserId(Map<String, Object> paramMap);
+	
+}

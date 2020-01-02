@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.returns.dao.UserMbrCardCacheKeyDao">
+    <sql id="all_column">
+        user_name,
+		cache_key,
+		create_time
+	</sql>
+	<!-- 更新key -->
+	<update id="update" parameterType ="java.util.Map">
+		UPDATE TBL_USER_MBR_CARD_CACHE_KEY
+		set cache_key = #{cache_key,jdbcType=VARCHAR},
+		create_time=sysdate
+		WHERE user_name = #{user_name,jdbcType=VARCHAR}
+	</update>
+</mapper>

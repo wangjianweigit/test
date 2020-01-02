@@ -1,0 +1,36 @@
+package com.tk.oms.marketing.dao;
+
+import java.util.Map;
+
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface SaleActivityDao {
+	/**
+	 * 获取促销活动-限时折扣信息
+	 */
+	public Map<String, Object> querySaleActivityDetail(Map<String,Object> paramMap);
+	/**
+	 * 插入限时折扣活动信息
+	 */
+	public int insertSaleActivity(Map<String, Object> saleParamMap);
+	/**
+	 * 更新限时折扣活动信息
+	 */
+	public int updateSaleActivity(Map<String, Object> paramMap);
+
+	/**
+	 * 更新是否推荐至首页状态
+	 * @param paramMap
+	 * @return
+	 */
+	public int updateSaleActivityRecommen(Map<String, Object> paramMap);
+	/**
+	 * 更新限时折扣活动信息
+	 */
+	public int updateSaleActivityDecorate(Map<String, Object> paramMap);
+	/**
+	 * 删除限时折扣活动信息
+	 */
+	public int deleteSaleActivity(Map<String, Object> paramMap);
+}

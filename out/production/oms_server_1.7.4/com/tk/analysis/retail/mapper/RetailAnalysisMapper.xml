@@ -1,0 +1,1643 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tk.analysis.retail.dao.RetailAnalysisDao">
+	<!-- DW:平台+业务的权限条件 -->
+	<sql id="dw_public_py_where">
+	   <!-- 童库平台 -->
+	   <if test="public_user_platform_type ==1">
+	   		and dm.stationed_user_id = 1
+	   		<if test="public_user_type != null and public_user_type == 2"><!-- 管理员 -->
+	   			<!-- 业务权限 -->
+	   			and dm.store_id in 
+	   			<foreach collection="ids" item="item" open="(" close=")" separator=",">
+				 	#{item,jdbcType=INTEGER}
+				 </foreach>
+       		</if>
+       		<if test="public_user_type != null and public_user_type == 3"><!-- 业务员 -->
+			    and dm.ywy_user_id = #{public_user_id,jdbcType=INTEGER}
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 4"><!-- 业务经理 -->
+			    and dm.ywjl_user_id = #{public_user_id,jdbcType=INTEGER}
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 5"><!-- 店长 -->
+			    and dm.dz_user_id = #{public_user_id,jdbcType=INTEGER}
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 6"><!-- 营业员 -->
+	        	and dm.store_id in 
+	        	<foreach collection="ids" item="item" open="(" close=")" separator=",">
+				 	#{item,jdbcType=INTEGER}
+				 </foreach>
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 9"><!-- 销售管理 -->
+	        	and dm.ywjl_user_id in 
+	        	<foreach collection="ids" item="item" open="(" close=")" separator=",">
+				 	#{item,jdbcType=INTEGER}
+				 </foreach>
+	        </if>
+	   </if>
+	   <!-- 私有平台 -->
+	   <if test="public_user_platform_type ==2">
+			and dm.stationed_user_id = #{public_user_stationed_user_id,jdbcType=INTEGER}
+	   </if>
+	   <!-- 全部 -->
+	   <if test="public_user_platform_type ==9">
+	   		and dm.member_key > 0
+	   		<if test="public_user_type != null and public_user_type == 2"><!-- 管理员 -->
+	   			<!-- 业务权限 -->
+	   			and dm.store_id in 
+	   			<foreach collection="ids" item="item" open="(" close=")" separator=",">
+				 	#{item,jdbcType=INTEGER}
+				 </foreach>
+       		</if>
+	   </if>
+	</sql>
+							<!-- #################        公用         ################ -->
+	<resultMap id="storeMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="store_name" property="name"/>
+    </resultMap>
+	<!-- 所属门店 -->
+	<select id="queryStoreOption" parameterType="java.util.Map" resultMap="storeMap">
+		select id,
+			   store_name
+		  from tbl_store_info tsi 
+		<where>
+			<!-- 【通用】登录用户为【系统用户】,需要门店权限-->
+			<if test="public_user_type == 2">
+				and exists (
+					select 1 from tbl_sys_user_store a where a.store_id = tsi.id and a.user_id = #{public_user_id,jdbcType=INTEGER}
+				)
+			</if>
+			<!-- 【通用】登录用户为【业务员】 -->
+			<if test="public_user_type == 3">
+				and exists (select 1 from tbl_store_user_rel tsui where tsui.store_id=tsi.id and type = 3 and tsui.user_id=#{public_user_id,jdbcType=INTEGER})
+			</if>
+			<!-- 【通用】登录用户为【业务经理】 -->
+			<if test="public_user_type == 4">
+				and tsi.manager_user_id=#{public_user_id,jdbcType=INTEGER}
+			</if>
+			<!-- 【通用】登录用户为【店长】 -->
+			<if test="public_user_type == 5">
+				and tsi.shopkeeper_user_id=#{public_user_id,jdbcType=INTEGER}
+			</if>
+			<!-- 【通用】登录用户为【营业员】-->
+			<if test="public_user_type == 6">
+				and exists (select 1 from tbl_store_user_rel tsui where tsui.store_id=tsi.id and type = 6 and tsui.user_id=#{public_user_id,jdbcType=INTEGER})
+			</if>
+			<!-- 【通用】登录用户为【销售管理】-->
+			<if test="public_user_type == 9">
+				and exists (
+					select 1 from tbl_sys_user_info b where organization_id in (
+						select id from tbl_sys_organization_info where connect_by_isleaf=1
+						start with parent_id = #{public_user_organization_id,jdbcType=INTEGER} connect by prior id = parent_id 
+					)
+					and b.user_type = 4
+					and tsi.manager_user_id = b.id
+				)
+			</if>
+		</where>
+	</select>
+	<resultMap type="java.util.Map" id="ywyOptionMap">
+		<result column="id" property="id" />
+		<result column="name" property="name" />
+	</resultMap>
+	<!-- 业务员【下拉框】 -->
+	<select id="queryYwyOption" parameterType="java.util.Map" resultMap="ywyOptionMap">
+		select  id,(user_name||'   '||user_realname) name
+		  from  tbl_sys_user_info sui
+		 	<where>
+		 		sui.state=2
+				and sui.user_type = 3
+				<!-- 【通用】登录用户为【系统用户】,需要门店权限-->
+				<if test="public_user_type==2">
+					and exists (
+						select 1 from tbl_sys_user_store a,tbl_store_user_rel b where a.store_id = b.store_id and b.type=3 and sui.id = b.user_id and a.user_id = #{public_user_id,jdbcType=INTEGER}
+					)
+				</if>
+		        <!-- 【通用】登录用户为【业务员】 -->
+		        <if test="public_user_type==3">
+					and sui.id = #{public_user_id,jdbcType=INTEGER}
+				</if>
+				<!-- 【通用】登录用户为【业务经理】 -->
+				<if test="public_user_type==4">
+					and	exists (select 1 from tbl_store_user_rel tt3 
+					             where tt3.user_id=sui.id 
+					              	   and tt3.type='3' 
+					                   and exists(select 1 from tbl_store_info tsi 
+					                               where tsi.manager_user_id = #{public_user_id,jdbcType=INTEGER} and tsi.id = tt3.store_id))
+				</if>
+				<!-- 【通用】登录用户为【店长】 -->
+				<if test="public_user_type==5">
+					and	exists (select 1 from tbl_store_user_rel tt3 
+					             where tt3.user_id=sui.id 
+					              	   and tt3.type='3' 
+					                   and exists(select 1 from tbl_store_info tsi 
+					                               where tsi.shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER} and tsi.id = tt3.store_id))
+				</if>
+				<!-- 【通用】登录用户为【营业员】-->
+				<if test="public_user_type==6">
+					and	exists (select 1 from tbl_store_user_rel tt3 
+					             where tt3.user_id=sui.id 
+					              	   and tt3.type='3' 
+					                   and exists(select 1 from tbl_store_user_rel tsui 
+					                               where tsui.user_id = #{public_user_id,jdbcType=INTEGER} and tsui.store_id = tt3.store_id))
+				</if>
+				<!-- 【通用】登录用户为【销售管理】-->
+				<if test="public_user_type==9">
+				 	and exists (select 1 from tbl_store_user_rel tt3 
+					             where tt3.user_id=sui.id 
+					              	   and tt3.type='3' 
+					                   and exists(
+					                   		select 1 from tbl_store_info tsi where 
+					                   			exists
+						                   		(
+													select 1 from tbl_sys_user_info b where organization_id in (
+														select id from tbl_sys_organization_info where connect_by_isleaf=1
+														start with parent_id = #{public_user_organization_id,jdbcType=INTEGER} connect by prior id = parent_id 
+													)
+													and b.user_type = 4
+													and tsi.manager_user_id = b.id
+												)
+												and tsi.id = tt3.store_id
+										)
+								)
+				</if>
+			</where>
+	</select>
+							<!-- #################        经销商概况         ################ -->
+	<!-- 经销商总数 -->
+	<select id="r_queryAgentCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from dim_ag_agent ag,dim_member dm
+		 where ag.account = dm.user_id||''
+		   <if test="store_user_type != null and store_user_type != ''">
+		   	and dm.store_user_type = #{store_user_type,jdbcType=INTEGER}
+		   </if>
+		   <if test="user_name != null and user_name != ''">
+		   	and (dm.login_name like '%'||#{user_name}||'%'
+		   	or dm.user_manage_name like '%'||#{user_name}||'%')
+		   </if>
+		   <if test="store_id != null and store_id != ''">
+		   	and dm.store_id = #{store_id,jdbcType=INTEGER}
+		   </if>
+		   <if test="ywy_user_id != null and ywy_user_id != ''">
+		   	and dm.ywy_user_id = #{ywy_user_id,jdbcType=INTEGER}
+		   </if>
+		   <if test="is_pos != null and is_pos != ''">
+		   	and dm.is_pos = #{is_pos,jdbcType=INTEGER}
+		   </if>
+		   <if test="is_wechat != null and is_wechat != ''">
+		   	and dm.is_wechat = #{is_wechat,jdbcType=INTEGER}
+		   </if>
+		 <include refid="dw_public_py_where"/>
+	</select>
+	<!-- 小程序开通数 -->
+	<select id="r_queryAgentProgramCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(1)
+		  from dim_ag_agent ag,dim_member dm
+		 where ag.account = dm.user_id||''
+		   and dm.is_wechat = 1
+		 <include refid="dw_public_py_where"/>
+	</select>
+	<!-- 零售客户总数 -->
+	<select id="r_queryAgentCustomerTotal" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(1)
+  		  from dim_us_user_agent dua,dim_ag_agent ag,dim_member dm
+		 where dua.agent_id = ag.agent_id
+		   and ag.account = dm.user_id||''
+		 <include refid="dw_public_py_where"/>
+	</select>
+	<!-- 今日新增零售客户 -->
+	<select id="r_queryAgentAddCustomerCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(1)
+  		  from dim_us_user_agent dua,dim_ag_agent ag,dim_member dm
+		 where dua.agent_id = ag.agent_id
+		   and ag.account = dm.user_id||''
+		   and to_char(dua.create_time,'yyyy-mm-dd') = to_char(sysdate,'yyyy-mm-dd')
+		 <include refid="dw_public_py_where"/>
+	</select>
+	<!-- 日活跃客户数 -->
+	<select id="r_queryAgentCustomerLivelyCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(distinct t1.user_agent_key)
+		  from fact_us_user_brow t1,dim_date dt,dim_ag_agent ag,dim_member dm
+		 where t1.log_date_key = dt.date_key
+		   and dt.date_short = to_char(sysdate,'yyyymmdd')
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = dm.user_id||''
+		   <include refid="dw_public_py_where"/>
+	</select>
+	<!-- 实时汇总 支付买家数、销售件数、支付单笔数、订单销售总额 -->
+	<select id="r_queryAgentRealTime_PurchaseNumberCountMoney" parameterType="java.util.Map" resultType="java.util.Map">
+		select count(distinct t1.user_agent_key) purchase_number,count(1) pay_num,nvl(sum(t1.order_total),0) as pay_money,
+        		nvl(sum(t1.product_count),0) pay_count
+		  from fact_od_order t1,dim_date dt,dim_ag_agent ag,dim_member dm
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short = #{date_short,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = dm.user_id||''
+		   <include refid="dw_public_py_where"/>
+	</select>
+	<!-- 实时汇总 访客数 -->
+	<select id="r_queryAgentRealTime_VisitorCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(distinct t1.user_agent_key) 
+		  from fact_us_user_brow t1,dim_date dt,dim_ag_agent ag,dim_member dm
+		 where t1.log_date_key = dt.date_key
+		   and dt.date_short = #{date_short,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = dm.user_id||''
+		   <include refid="dw_public_py_where"/>
+	</select>
+	<!-- 实时汇总 订单笔数 -->
+	<select id="r_queryAgentRealTime_OrderNum" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(1) 
+		  from fact_od_order t1,dim_date dt,dim_ag_agent ag,dim_member dm
+		 where t1.create_date_key = dt.date_key
+		   and dt.date_short = #{date_short,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = dm.user_id||''
+		   <include refid="dw_public_py_where"/>
+	</select>
+	<!-- 折线图 订单销售总额 -->
+	<select id="r_queryAgentRealTime_PayMoney_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_value as create_date,nvl(sum(a.pay_money),0) pay_money
+		  from
+		(select t1.payment_date_time_key,t1.order_total as pay_money
+		  from fact_od_order t1,dim_date dt,dim_ag_agent ag,dim_member dm
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short = #{date_short,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = dm.user_id||''
+		   <include refid="dw_public_py_where"/>) a,dim_time dt
+           where a.payment_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+	</select>
+	<!-- 实时汇总 总订单量 -->
+	<select id="r_queryAgentRealTime_PayNum" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(1) 
+		  from fact_od_order t1,dim_date dt,dim_ag_agent ag,dim_member dm
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short = #{date_short,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = dm.user_id||''
+		   <include refid="dw_public_py_where"/>
+	</select>
+	<!-- 实时汇总 线上订单量 -->
+	<select id="r_queryAgentRealTime_OnlinePayNum" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(1) 
+		  from fact_od_order t1,dim_od_order do,dim_date dt,dim_ag_agent ag,dim_member dm
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short = #{date_short,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = dm.user_id||''
+		   and t1.order_key = do.order_key
+		   and do.order_source = 0
+		   <include refid="dw_public_py_where"/>
+	</select>
+	<!-- 实时汇总 总交易额 -->
+	<select id="r_queryAgentRealTime_PayMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t1.order_total),0)
+		  from fact_od_order t1,dim_date dt,dim_ag_agent ag,dim_member dm
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short = #{date_short,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = dm.user_id||''
+		   <include refid="dw_public_py_where"/>
+	</select>
+	<!-- 实时汇总 线上交易额 -->
+	<select id="r_queryAgentRealTime_OnlinePayMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t1.order_total),0)
+		  from fact_od_order t1,dim_od_order do,dim_date dt,dim_ag_agent ag,dim_member dm
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short = #{date_short,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = dm.user_id||''
+		   and t1.order_key = do.order_key
+		   and do.order_source = 0
+		   <include refid="dw_public_py_where"/>
+	</select>
+	<!-- 实时汇总 自营交易额 -->
+	<select id="r_queryAgentRealTime_ZyPayMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t1.order_total),0)
+		  from fact_od_order t1,dim_date dt,dim_ag_agent ag,dim_member dm
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short = #{date_short,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = dm.user_id||''
+	</select>
+	<!-- 排序获取某一页的经销商排行-支付买家数 -->
+	<select id="r_queryAgent_PurchaseNumber_Agent" parameterType="java.util.Map" resultType="string">
+		select user_id
+		  from (
+		select a.*,rownum rn
+		  from (
+		select t.user_id,nvl(t1.purchase_number,0) purchase_number
+		  from (select dm.user_id
+		  		  from dim_ag_agent ag,dim_member dm
+		  		 where ag.account = dm.user_id||''
+		  		 <include refid="dw_public_py_where"/>) t,
+			  	(select dm.user_id,count(distinct t1.user_agent_key) purchase_number
+				  from fact_od_order t1,dim_date dt,dim_ag_agent ag,dim_member dm
+				 where t1.payment_date_key = dt.date_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.agent_key = ag.agent_key
+		   		   and ag.account = dm.user_id||''
+				   <include refid="dw_public_py_where"/>
+				   group by dm.user_id) t1
+		   where t.user_id = t1.user_id(+)
+		   order by ${sort} ${sort_by}) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 排序获取某一页的经销商排行-支付单数 -->
+	<select id="r_queryAgent_PayNum_Agent" parameterType="java.util.Map" resultType="string">
+		select user_id
+		  from (
+		select a.*,rownum rn
+		  from (
+		select t.user_id,nvl(t1.pay_num,0) pay_num
+		  from (select dm.user_id
+		  		  from dim_ag_agent ag,dim_member dm
+		  		 where ag.account = dm.user_id||''
+		  		 <include refid="dw_public_py_where"/>) t,
+			  	(select dm.user_id,count(1) pay_num
+				  from fact_od_order t1,dim_date dt,dim_ag_agent ag,dim_member dm
+				 where t1.payment_date_key = dt.date_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.agent_key = ag.agent_key
+		   		   and ag.account = dm.user_id||''
+				   <include refid="dw_public_py_where"/>
+				   group by dm.user_id) t1
+		   where t.user_id = t1.user_id(+)
+		   order by ${sort} ${sort_by}) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 排序获取某一页的经销商排行-成交额 -->
+	<select id="r_queryAgent_PayMoney_Agent" parameterType="java.util.Map" resultType="string">
+		select user_id
+		  from (
+		select a.*,rownum rn
+		  from (
+		select t.user_id,nvl(t1.pay_money,0) pay_money
+		  from (select dm.user_id
+		  		  from dim_ag_agent ag,dim_member dm
+		  		 where ag.account = dm.user_id||''
+		  		 <include refid="dw_public_py_where"/>) t,
+			  	(select dm.user_id,nvl(sum(t1.order_total),0) pay_money
+				  from fact_od_order t1,dim_date dt,dim_ag_agent ag,dim_member dm
+				 where t1.payment_date_key = dt.date_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.agent_key = ag.agent_key
+		   	       and ag.account = dm.user_id||''
+				   <include refid="dw_public_py_where"/>
+				   group by dm.user_id) t1
+		   where t.user_id = t1.user_id(+)
+		   order by ${sort} ${sort_by}) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 排序获取某一页的经销商排行-线上支付笔数 -->
+	<select id="r_queryAgent_OnlinePayNum_Agent" parameterType="java.util.Map" resultType="string">
+		select user_id
+		  from (
+		select a.*,rownum rn
+		  from (
+		select t.user_id,nvl(t1.online_pay_num,0) online_pay_num
+		  from (select dm.user_id
+		  		  from dim_ag_agent ag,dim_member dm
+		  		 where ag.account = dm.user_id||''
+		  		 <include refid="dw_public_py_where"/>) t,
+			  	(select dm.user_id,count(1) online_pay_num
+				  from fact_od_order t1,dim_od_order do,dim_date dt,dim_ag_agent ag,dim_member dm
+				 where t1.payment_date_key = dt.date_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.agent_key = ag.agent_key
+		   	       and ag.account = dm.user_id||''
+				   and t1.order_key = do.order_key
+		   		   and do.order_source = 0
+				   <include refid="dw_public_py_where"/>
+				   group by dm.user_id) t1
+		   where t.user_id = t1.user_id(+)
+		   order by ${sort} ${sort_by}) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 排序获取某一页的经销商排行-线上成交额 -->
+	<select id="r_queryAgent_OnlinePayMoney_Agent" parameterType="java.util.Map" resultType="string">
+		select user_id
+		  from (
+		select a.*,rownum rn
+		  from (
+		select t.user_id,nvl(t1.online_pay_money,0) online_pay_money
+		  from (select dm.user_id
+		  		  from dim_ag_agent ag,dim_member dm
+		  		 where ag.account = dm.user_id||''
+		  		 <include refid="dw_public_py_where"/>) t,
+			  	(select dm.user_id,nvl(sum(t1.order_total),0) online_pay_money
+				  from fact_od_order t1,dim_od_order do,dim_date dt,dim_ag_agent ag,dim_member dm
+				 where t1.payment_date_key = dt.date_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.agent_key = ag.agent_key
+		   	       and ag.account = dm.user_id||''
+				   and t1.order_key = do.order_key
+		   		   and do.order_source = 0
+				   <include refid="dw_public_py_where"/>
+				   group by dm.user_id) t1
+		   where t.user_id = t1.user_id(+)
+		   order by ${sort} ${sort_by}) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 查询默认排序的经销商列表 -->
+	<select id="r_queryAgentListBy_Default" parameterType="java.util.Map" resultType="string">
+		select user_id
+		  from (
+		select a.*,rownum rn
+		  from (
+		select t.user_id,nvl(t1.pay_money,0) pay_money
+		  from (select dm.user_id
+		  		  from dim_ag_agent ag,dim_member dm
+		  		 where ag.account = dm.user_id||''
+		  		 <include refid="dw_public_py_where"/>) t,
+			  	(select dm.user_id,nvl(sum(t1.order_total),0) pay_money
+				  from fact_od_order t1,dim_date dt,dim_ag_agent ag,dim_member dm
+				 where t1.payment_date_key = dt.date_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.agent_key = ag.agent_key
+		   	       and ag.account = dm.user_id||''
+				   <include refid="dw_public_py_where"/>
+				   group by dm.user_id) t1
+		   where t.user_id = t1.user_id(+)
+		   order by pay_money desc) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 经销商列表 -->
+	<select id="r_queryAgentList" parameterType="java.util.Map" resultType="java.util.Map">
+	  	select dm.user_id,
+	  		   dm.user_manage_name,
+	  		   dm.store_user_type,
+	  		   dm.login_name
+		  from dim_member dm
+		 where dm.user_id in
+		 <foreach collection="userList" item="item" open="(" close=")" separator=",">
+		 	#{item,jdbcType=INTEGER}
+		 </foreach>
+		 order by decode(dm.user_id
+		 <foreach collection="userList" item="item" index="_index" open="," close="" separator=",">
+            #{item},${_index}
+         </foreach>)
+	</select>
+	<!-- 经销商列表-支付单数，成交额，支付买家数 -->
+	<select id="r_queryAgent_PurchaseNumberMoneyNum" parameterType="java.util.Map" resultType="java.util.Map">
+		select ag.account as user_id,count(1) pay_num,nvl(sum(t1.order_total),0) pay_money,count(distinct t1.user_agent_key) purchase_number
+		  from fact_od_order t1,dim_date dt,dim_ag_agent ag
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account in
+		 <foreach collection="userList" item="item" open="(" close=")" separator=",">
+		 	#{item,jdbcType=INTEGER}
+		 </foreach>
+		 group by ag.account
+	</select>
+	<!-- 经销商列表-线上支付笔数，线上成交额 -->
+	<select id="r_queryAgent_OnlinePayMoneyNum" parameterType="java.util.Map" resultType="java.util.Map">
+		select ag.account as user_id,count(1) online_pay_num,nvl(sum(t1.order_total),0) online_pay_money
+		  from fact_od_order t1,dim_od_order do,dim_date dt,dim_ag_agent ag
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and t1.order_key = do.order_key
+		   and do.order_source = 0
+		   and ag.account in
+		 <foreach collection="userList" item="item" open="(" close=")" separator=",">
+		 	#{item,jdbcType=INTEGER}
+		 </foreach>
+		 group by ag.account
+	</select>
+							<!-- #################        经销商分析         ################ -->
+	<!-- 经销商分析 -->
+	<select id="r_queryAgentSearch" parameterType="java.util.Map" resultType="java.util.Map">
+		select *
+		  from (
+		select a.*,rownum rn
+		  from (
+		select dm.user_id,
+			   dm.user_manage_name,
+			   dm.store_user_type,
+			   dm.login_name,
+			   dm.store_name,
+			   dm.ywy_user_name,
+			   dm.is_pos,
+			   dm.is_wechat,
+			   dm.is_program
+		  from dim_ag_agent ag,dim_member dm
+		 where ag.account = dm.user_id||''
+		   <if test="store_user_type != null and store_user_type != ''">
+		   	and dm.store_user_type = #{store_user_type,jdbcType=INTEGER}
+		   </if>
+		   <if test="user_name != null and user_name != ''">
+		   	and (dm.login_name like '%'||#{user_name}||'%'
+		   	or dm.user_manage_name like '%'||#{user_name}||'%')
+		   </if>
+		   <if test="store_id != null and store_id != ''">
+		   	and dm.store_id = #{store_id,jdbcType=INTEGER}
+		   </if>
+		   <if test="ywy_user_id != null and ywy_user_id != ''">
+		   	and dm.ywy_user_id = #{ywy_user_id,jdbcType=INTEGER}
+		   </if>
+		   <if test="is_pos != null and is_pos != ''">
+		   	and dm.is_pos = #{is_pos,jdbcType=INTEGER}
+		   </if>
+		   <if test="is_wechat != null and is_wechat != ''">
+		   	and dm.is_wechat = #{is_wechat,jdbcType=INTEGER}
+		   </if>
+		   	<include refid="dw_public_py_where"/>
+		   <if test="sort!=null and sort!='' and sort_by!=null and sort_by!=''">
+			order by ${sort} ${sort_by}
+			</if>
+			<if test="sort==null and sort_by==null">
+				order by create_date desc
+		    </if>) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) 
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+							<!-- #################        经销商分析详情         ################ -->
+	<!-- 基本信息 -->
+	<select id="r_queryAgentDetailBasic" parameterType="java.util.Map" resultType="java.util.Map">
+		select dm.user_id,
+			   dm.login_name,
+			   dm.user_manage_name,
+			   dm.store_user_type,
+			   dm.is_pos,
+			   dm.is_wechat,
+			   dm.is_program,
+			   dm.ywy_user_name,
+			   dm.store_name
+		  from dim_member dm
+		 where dm.user_id = #{user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 实时汇总 支付买家数、销售件数、支付单笔数、订单销售总额 -->
+	<select id="r_queryAgentDetail_RealTime_PurchaseNumberCountMoney" parameterType="java.util.Map" resultType="java.util.Map">
+		select count(distinct t1.user_agent_key) purchase_number,count(1) pay_num,nvl(sum(t1.order_total),0) as pay_money,
+        		nvl(sum(t1.product_count),0) pay_count
+		  from fact_od_order t1,dim_date dt,dim_ag_agent ag
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short = #{date_short,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 实时汇总 访客数 -->
+	<select id="r_queryAgentDetail_RealTime_VisitorCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(distinct t1.user_agent_key) 
+		  from fact_us_user_brow t1,dim_date dt,dim_ag_agent ag
+		 where t1.log_date_key = dt.date_key
+		   and dt.date_short = #{date_short,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 实时汇总 订单笔数 -->
+	<select id="r_queryAgentDetail_RealTime_OrderNum" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(1) 
+		  from fact_od_order t1,dim_date dt,dim_ag_agent ag
+		 where t1.create_date_key = dt.date_key
+		   and dt.date_short = #{date_short,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 折线图 订单销售总额 -->
+	<select id="r_queryAgentDetail_RealTime_PayMoney_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_value as create_date,nvl(sum(a.pay_money),0) pay_money
+		  from
+		(select t1.payment_date_time_key,t1.order_total as pay_money
+		  from fact_od_order t1,dim_date dt,dim_ag_agent ag
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short = #{date_short,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}) a,dim_time dt
+           where a.payment_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+	</select>
+	<!-- 实时汇总 总订单量 -->
+	<select id="r_queryAgentDetail_RealTime_PayNum" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(1) 
+		  from fact_od_order t1,dim_date dt,dim_ag_agent ag
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short = #{date_short,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 实时汇总 线上订单量 -->
+	<select id="r_queryAgentDetail_RealTime_OnlinePayNum" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(1) 
+		  from fact_od_order t1,dim_od_order do,dim_date dt,dim_ag_agent ag
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short = #{date_short,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.order_key = do.order_key
+		   and do.order_source = 0
+	</select>
+	<!-- 实时汇总 总交易额 -->
+	<select id="r_queryAgentDetail_RealTime_PayMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t1.order_total),0)
+		  from fact_od_order t1,dim_date dt,dim_ag_agent ag
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short = #{date_short,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 实时汇总 线上交易额 -->
+	<select id="r_queryAgentDetail_RealTime_OnlinePayMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t1.order_total),0)
+		  from fact_od_order t1,dim_od_order do,dim_date dt,dim_ag_agent ag
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short = #{date_short,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.order_key = do.order_key
+		   and do.order_source = 0
+	</select>
+	<!-- 实时汇总 新客户 -->
+	<select id="r_queryAgentDetail_RealTime_NewCustomer" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(1)
+		  from
+		(select t1.user_agent_key,count(1) pay_num
+		  from fact_od_order t1,dim_date dt,dim_ag_agent ag
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short = #{date_short,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   group by t1.user_agent_key)
+		   where pay_num &lt;=1
+	</select>
+	<!-- 客户数 -->
+	<select id="r_queryAgentDetail_CustomerCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from dim_us_user_agent dua,dim_ag_agent ag
+		 where dua.agent_id = ag.agent_id
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 今日新增零售客户 -->
+	<select id="r_queryAgentDetail_AddCustomerCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(1)
+  		  from dim_us_user_agent dua,dim_ag_agent ag
+		 where dua.agent_id = ag.agent_id
+		   and to_char(dua.create_time,'yyyy-mm-dd') = to_char(sysdate,'yyyy-mm-dd')
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 日活跃客户数 -->
+	<select id="r_queryAgentDetail_CustomerLivelyCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(distinct t1.user_agent_key)
+		  from fact_us_user_brow t1,dim_date dt,dim_ag_agent ag
+		 where t1.log_date_key = dt.date_key
+		   and dt.date_short = to_char(sysdate,'yyyymmdd')
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 累计购买客户数 -->
+	<select id="r_queryAgentDetail_SupCustomerCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(1)
+		  from
+		(select t1.user_agent_key,count(1) pay_num
+		  from fact_od_order t1,dim_ag_agent ag
+		 where t1.payment_date_key > 0
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   group by t1.user_agent_key)
+		   where pay_num > 0
+	</select>
+	<!-- 复购客户数 -->
+	<select id="r_queryAgentDetail_RpCustomerCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(1)
+		  from
+		(select t1.user_agent_key,count(1) pay_num
+		  from fact_od_order t1,dim_ag_agent ag
+		 where t1.payment_date_key > 0
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   group by t1.user_agent_key)
+		   where pay_num > 1
+	</select>
+	<!-- 客户来源 -->
+	<select id="r_queryAgentDetail_CustomerSource" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(1)
+  		  from dim_us_user_agent dua,dim_ag_agent ag
+		 where dua.agent_id = ag.agent_id
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   <if test="type == 1">
+		   and (dua.type is null or dua.type = 0 or dua.type = 1)
+		   </if>
+		   <if test="type == 2">
+		   and dua.type = 2
+		   </if>
+	</select>
+	<!-- 排序获取某一页的客户排行-购买次数 -->
+	<select id="r_queryCustomer_PayNum_Customer" parameterType="java.util.Map" resultType="string">
+		select user_id
+		  from (
+		select a.*,rownum rn
+		  from (
+		select dua.user_id,nvl(t1.pay_num,0) pay_num
+		  from dim_us_user_agent dua,
+			  	(select t1.user_agent_key,count(1) pay_num
+				  from fact_od_order t1,dim_ag_agent ag
+				 where t1.payment_date_key > 0
+				   and t1.agent_key = ag.agent_key
+		   		   and ag.account = #{user_id,jdbcType=INTEGER}
+				   group by t1.user_agent_key) t1,dim_ag_agent ag
+		   where dua.user_agent_key = t1.user_agent_key(+)
+		     and dua.agent_id = ag.agent_id
+		     and ag.account = #{user_id,jdbcType=INTEGER}
+		   order by ${sort} ${sort_by}) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 排序获取某一页的客户排行-成交额 -->
+	<select id="r_queryCustomer_PayMoney_Customer" parameterType="java.util.Map" resultType="string">
+		select user_id
+		  from (
+		select a.*,rownum rn
+		  from (
+		select dua.user_id,nvl(t1.pay_money,0) pay_money
+		  from dim_us_user_agent dua,
+			  	(select t1.user_agent_key,nvl(sum(t1.order_total),0) pay_money
+				  from fact_od_order t1,dim_ag_agent ag
+				 where t1.payment_date_key > 0
+				   and t1.agent_key = ag.agent_key
+		     	   and ag.account = #{user_id,jdbcType=INTEGER}
+				   group by t1.user_agent_key) t1,dim_ag_agent ag
+		   where dua.user_agent_key = t1.user_agent_key(+)
+		     and dua.agent_id = ag.agent_id
+		     and ag.account = #{user_id,jdbcType=INTEGER}
+		   order by ${sort} ${sort_by}) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 查询默认排序的客户列表 -->
+	<select id="r_queryCustomerListBy_Default" parameterType="java.util.Map" resultType="string">
+		select user_id
+		  from (
+		select a.*,rownum rn
+		  from (
+		select dua.user_id,nvl(t1.pay_money,0) pay_money
+		  from dim_us_user_agent dua,
+			  	(select t1.user_agent_key,nvl(sum(t1.order_total),0) pay_money
+				  from fact_od_order t1,dim_ag_agent ag
+				 where t1.payment_date_key > 0
+				   and t1.agent_key = ag.agent_key
+		     	   and ag.account = #{user_id,jdbcType=INTEGER}
+				   group by t1.user_agent_key) t1,dim_ag_agent ag
+		   where dua.user_agent_key = t1.user_agent_key(+)
+		     and dua.agent_id = ag.agent_id
+		     and ag.account = #{user_id,jdbcType=INTEGER}
+		   order by pay_money desc) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 查询客户列表 -->
+	<select id="r_queryCustomerList" parameterType="java.util.Map" resultType="java.util.Map">
+		select dua.user_id,
+	  		   dua.real_name,
+	  		   dua.user_name
+		  from dim_us_user_agent dua,dim_ag_agent ag
+		 where dua.agent_id = ag.agent_id
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and dua.user_id in
+		 <foreach collection="userList" item="item" open="(" close=")" separator=",">
+		 	#{item,jdbcType=INTEGER}
+		 </foreach>
+		 order by decode(dua.user_id
+		 <foreach collection="userList" item="item" index="_index" open="," close="" separator=",">
+            #{item},${_index}
+         </foreach>)
+	</select>
+	<!-- 客户-购买次数，成交额 -->
+	<select id="r_queryCustomer_PayMoneyNum" parameterType="java.util.Map" resultType="java.util.Map">
+		select dua.user_id,count(1) pay_num,nvl(sum(t1.order_total),0) pay_money
+		  from fact_od_order t1,dim_us_user_agent dua,dim_ag_agent ag
+		 where t1.payment_date_key > 0
+		   and t1.user_agent_key = dua.user_agent_key
+		   and dua.agent_id = ag.agent_id
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and dua.user_id in
+		 <foreach collection="userList" item="item" open="(" close=")" separator=",">
+		 	#{item,jdbcType=INTEGER}
+		 </foreach>
+		 group by dua.user_id
+	</select>
+	<!-- 销售分析-下单笔数 -->
+	<select id="r_queryAgentDetail_Sale_OrderNum" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(1)
+		  from fact_od_order t1,dim_od_order do,dim_date dt,dim_ag_agent ag
+		 where t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.order_key = do.order_key
+		   <if test="order_source ==1">
+		   	and do.order_source = 0
+		   </if>
+		   <if test="order_source ==2">
+		   	and do.order_source > 0
+		   </if>
+	</select>
+	<!-- 销售分析-支付笔数 -->
+	<select id="r_queryAgentDetail_Sale_PayNum" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(1)
+		  from fact_od_order t1,dim_od_order do,dim_date dt,dim_ag_agent ag
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.order_key = do.order_key
+		   <if test="order_source ==1">
+		   	and do.order_source = 0
+		   </if>
+		   <if test="order_source ==2">
+		   	and do.order_source > 0
+		   </if>
+	</select>
+	<!-- 销售分析-成交额 -->
+	<select id="r_queryAgentDetail_Sale_PayMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t1.order_total),0)
+		  from fact_od_order t1,dim_od_order do,dim_date dt,dim_ag_agent ag
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.order_key = do.order_key
+		   <if test="order_source ==1">
+		   	and do.order_source = 0
+		   </if>
+		   <if test="order_source ==2">
+		   	and do.order_source > 0
+		   </if>
+	</select>
+	<!-- 销售分析-商品销售总额 -->
+	<select id="r_queryAgentDetail_Sale_ProductMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t1.order_total-t1.order_logistics),0)
+		  from fact_od_order t1,dim_od_order do,dim_date dt,dim_ag_agent ag
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.order_key = do.order_key
+		   <if test="order_source ==1">
+		   	and do.order_source = 0
+		   </if>
+		   <if test="order_source ==2">
+		   	and do.order_source > 0
+		   </if>
+	</select>
+	<!-- 销售分析-商品销量 -->
+	<select id="r_queryAgentDetail_Sale_PayCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t1.product_count),0)
+		  from fact_od_order t1,dim_od_order do,dim_date dt,dim_ag_agent ag
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.order_key = do.order_key
+		   <if test="order_source ==1">
+		   	and do.order_source = 0
+		   </if>
+		   <if test="order_source ==2">
+		   	and do.order_source > 0
+		   </if>
+	</select>
+	<!-- 销售分析-退款金额 -->
+	<select id="r_queryAgentDetail_Sale_ReturnMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t1.act_money),0)
+		  from fact_od_order_refund t1,dim_od_order_refund t2,dim_od_order do,dim_date dt,dim_ag_agent ag
+		 where t1.aso_refund_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.after_sales_order_key = t2.after_sales_order_key
+		   and t2.order_number = do.order_number
+		   <if test="order_source ==1">
+		   	and do.order_source = 0
+		   </if>
+		   <if test="order_source ==2">
+		   	and do.order_source > 0
+		   </if>
+	</select>
+	<!-- 销售分析-未发退货数 -->
+	<select id="r_queryAgentDetail_Sale_UnsentReturnCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t1.refund_num),0)
+		  from fact_od_order_refund t1,dim_od_order_refund t2,dim_od_order do,dim_date dt,dim_ag_agent ag
+		 where t1.aso_refund_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.after_sales_order_key = t2.after_sales_order_key
+		   and t2.refund_type = 1
+		   and t2.order_number = do.order_number
+		   <if test="order_source ==1">
+		   	and do.order_source = 0
+		   </if>
+		   <if test="order_source ==2">
+		   	and do.order_source > 0
+		   </if>
+	</select>
+	<!-- 销售分析-已发退货数 -->
+	<select id="r_queryAgentDetail_Sale_SentReturnCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t1.refund_num),0)
+		  from fact_od_order_refund t1,dim_od_order_refund t2,dim_od_order do,dim_date dt,dim_ag_agent ag
+		 where t1.aso_refund_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.after_sales_order_key = t2.after_sales_order_key
+		   and t2.refund_type = 2
+		   and t2.order_number = do.order_number
+		   <if test="order_source ==1">
+		   	and do.order_source = 0
+		   </if>
+		   <if test="order_source ==2">
+		   	and do.order_source > 0
+		   </if>
+	</select>
+	<!-- 销售分析-支付买家数 -->
+	<select id="r_queryAgentDetail_Sale_PurchaseNumber" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(distinct t1.user_agent_key)
+		  from fact_od_order t1,dim_od_order do,dim_date dt,dim_ag_agent ag
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.order_key = do.order_key
+		   <if test="order_source ==1">
+		   	and do.order_source = 0
+		   </if>
+		   <if test="order_source ==2">
+		   	and do.order_source > 0
+		   </if>
+	</select>
+	<!-- 销售分析-访客数 -->
+	<select id="r_queryAgentDetail_Sale_VisitorCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(distinct t1.user_agent_key) 
+		  from fact_us_user_brow t1,dim_date dt,dim_ag_agent ag
+		 where t1.log_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 折线图 下单笔数<天> -->
+	<select id="r_queryAgentDetail_OrderNumD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_value as create_date,count(1) order_num
+		  from
+		(select t1.create_date_time_key,t1.order_key
+		  from fact_od_order t1,dim_od_order do,dim_date dt,dim_ag_agent ag
+		 where t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.order_key = do.order_key
+		   <if test="order_source ==1">
+		   	and do.order_source = 0
+		   </if>
+		   <if test="order_source ==2">
+		   	and do.order_source > 0
+		   </if>) a,dim_time dt
+           where a.create_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+	</select>
+	<!-- 折线图 支付笔数<天> -->
+	<select id="r_queryAgentDetail_PayNumD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_value as create_date,count(1) order_num
+		  from
+		(select t1.payment_date_time_key,t1.order_key
+		  from fact_od_order t1,dim_od_order do,dim_date dt,dim_ag_agent ag
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.order_key = do.order_key
+		   <if test="order_source ==1">
+		   	and do.order_source = 0
+		   </if>
+		   <if test="order_source ==2">
+		   	and do.order_source > 0
+		   </if>) a,dim_time dt
+           where a.payment_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+	</select>
+	<!-- 折线图 支付买家数、支付件数、成交额<天> -->
+	<select id="r_queryAgentDetail_PurchaseNumberCountMoneyD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_value as create_date,count(distinct a.user_agent_key) purchase_number,nvl(sum(a.order_total),0) as pay_money,nvl(sum(a.product_count),0) pay_count
+		  from
+		(select t1.payment_date_time_key,t1.user_agent_key,t1.order_total,t1.product_count
+		  from fact_od_order t1,dim_od_order do,dim_date dt,dim_ag_agent ag
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.order_key = do.order_key
+		   <if test="order_source ==1">
+		   	and do.order_source = 0
+		   </if>
+		   <if test="order_source ==2">
+		   	and do.order_source > 0
+		   </if>) a,dim_time dt
+           where a.payment_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+	</select>
+	<!-- 折线图 退款金额<天> -->
+	<select id="r_queryAgentDetail_ReturnMoneyD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_value as create_date,nvl(sum(a.act_money),0) return_money
+		  from
+		(select t1.aso_refund_date_time_key,t1.act_money
+		  from fact_od_order_refund t1,dim_od_order_refund t2,dim_od_order do,dim_date dt,dim_ag_agent ag
+		 where t1.aso_refund_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.after_sales_order_key = t2.after_sales_order_key
+		   and t2.order_number = do.order_number
+		   <if test="order_source ==1">
+		   	and do.order_source = 0
+		   </if>
+		   <if test="order_source ==2">
+		   	and do.order_source > 0
+		   </if>) a,dim_time dt
+           where a.aso_refund_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+	</select>
+	<!-- 折线图 未发退货数<天> -->
+	<select id="r_queryAgentDetail_UnsentReturnCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_value as create_date,nvl(sum(a.refund_num),0) unsent_return_count
+		  from
+		(select t1.aso_refund_date_time_key,t1.refund_num
+		  from fact_od_order_refund t1,dim_od_order_refund t2,dim_od_order do,dim_date dt,dim_ag_agent ag
+		 where t1.aso_refund_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.after_sales_order_key = t2.after_sales_order_key
+		   and t2.refund_type = 1
+		   and t2.order_number = do.order_number
+		   <if test="order_source ==1">
+		   	and do.order_source = 0
+		   </if>
+		   <if test="order_source ==2">
+		   	and do.order_source > 0
+		   </if>) a,dim_time dt
+           where a.aso_refund_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+	</select>
+	<!-- 折线图 已发退货数<天> -->
+	<select id="r_queryAgentDetail_SentReturnCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_value as create_date,nvl(sum(a.refund_num),0) sent_return_count
+		  from
+		(select t1.aso_refund_date_time_key,t1.refund_num
+		  from fact_od_order_refund t1,dim_od_order_refund t2,dim_od_order do,dim_date dt,dim_ag_agent ag
+		 where t1.aso_refund_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.after_sales_order_key = t2.after_sales_order_key
+		   and t2.refund_type = 2
+		   and t2.order_number = do.order_number
+		   <if test="order_source ==1">
+		   	and do.order_source = 0
+		   </if>
+		   <if test="order_source ==2">
+		   	and do.order_source > 0
+		   </if>) a,dim_time dt
+           where a.aso_refund_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+	</select>
+	<!-- 折线图 访客数<天> -->
+	<select id="r_queryAgentDetail_VisitorCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_value as create_date,count(distinct a.user_agent_key) visitor_count
+		  from
+		(select t1.log_time_key,t1.user_agent_key
+		  from fact_us_user_brow t1,dim_date dt,dim_ag_agent ag
+		 where t1.log_date_key = dt.date_key
+		   and dt.date_short = #{date_short,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}) a,dim_time dt
+           where a.log_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+	</select>
+	<!-- 折线图 下单笔数 -->
+	<select id="r_queryAgentDetail_OrderNum_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.date_values as create_date,count(1) order_num
+		  from fact_od_order t1,dim_od_order do,dim_date dt,dim_ag_agent ag
+		 where t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.order_key = do.order_key
+		   <if test="order_source ==1">
+		   	and do.order_source = 0
+		   </if>
+		   <if test="order_source ==2">
+		   	and do.order_source > 0
+		   </if>
+		   group by dt.date_values
+	</select>
+	<!-- 折线图 支付笔数 -->
+	<select id="r_queryAgentDetail_PayNum_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.date_values as create_date,count(1) order_num
+		  from fact_od_order t1,dim_od_order do,dim_date dt,dim_ag_agent ag
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.order_key = do.order_key
+		   <if test="order_source ==1">
+		   	and do.order_source = 0
+		   </if>
+		   <if test="order_source ==2">
+		   	and do.order_source > 0
+		   </if>
+		   group by dt.date_values
+	</select>
+	<!-- 折线图 支付买家数、支付件数、成交额 -->
+	<select id="r_queryAgentDetail_PurchaseNumberCountMoney_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.date_values as create_date,count(distinct t1.user_agent_key) purchase_number,
+			   nvl(sum(t1.order_total),0) as pay_money,nvl(sum(t1.product_count),0) pay_count,nvl(sum(t1.order_total-t1.order_logistics),0) product_money
+		  from fact_od_order t1,dim_od_order do,dim_date dt,dim_ag_agent ag
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.order_key = do.order_key
+		   <if test="order_source ==1">
+		   	and do.order_source = 0
+		   </if>
+		   <if test="order_source ==2">
+		   	and do.order_source > 0
+		   </if>
+		   group by dt.date_values
+	</select>
+	<!-- 折线图 退款金额 -->
+	<select id="r_queryAgentDetail_ReturnMoney_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.date_values as create_date,nvl(sum(t1.act_money),0) return_money
+		  from fact_od_order_refund t1,dim_od_order_refund t2,dim_od_order do,dim_date dt,dim_ag_agent ag
+		 where t1.aso_refund_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.after_sales_order_key = t2.after_sales_order_key
+		   and t2.order_number = do.order_number
+		   <if test="order_source ==1">
+		   	and do.order_source = 0
+		   </if>
+		   <if test="order_source ==2">
+		   	and do.order_source > 0
+		   </if>
+		   group by dt.date_values
+	</select>
+	<!-- 折线图 未发退货数 -->
+	<select id="r_queryAgentDetail_UnsentReturnCount_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.date_values as create_date,nvl(sum(t1.refund_num),0) unsent_return_count
+		  from fact_od_order_refund t1,dim_od_order_refund t2,dim_od_order do,dim_date dt,dim_ag_agent ag
+		 where t1.aso_refund_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.after_sales_order_key = t2.after_sales_order_key
+		   and t2.refund_type = 1
+		   and t2.order_number = do.order_number
+		   <if test="order_source ==1">
+		   	and do.order_source = 0
+		   </if>
+		   <if test="order_source ==2">
+		   	and do.order_source > 0
+		   </if>
+		   group by dt.date_values
+	</select>
+	<!-- 折线图 已发退货数 -->
+	<select id="r_queryAgentDetail_SentReturnCount_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.date_values as create_date,nvl(sum(t1.refund_num),0) sent_return_count
+		  from fact_od_order_refund t1,dim_od_order_refund t2,dim_od_order do,dim_date dt,dim_ag_agent ag
+		 where t1.aso_refund_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.after_sales_order_key = t2.after_sales_order_key
+		   and t2.refund_type = 2
+		   and t2.order_number = do.order_number
+		   <if test="order_source ==1">
+		   	and do.order_source = 0
+		   </if>
+		   <if test="order_source ==2">
+		   	and do.order_source > 0
+		   </if>
+		   group by dt.date_values
+	</select>
+	<!-- 折线图 访客数 -->
+	<select id="r_queryAgentDetail_VisitorCount_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.date_values as create_date,count(distinct t1.user_agent_key) visitor_count
+		  from fact_us_user_brow t1,dim_date dt,dim_ag_agent ag
+		 where t1.log_date_key = dt.date_key
+		   and dt.date_short = #{date_short,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   group by dt.date_values
+	</select>
+	<!-- 经销商商品总数 -->
+	<select id="r_queryAgentDetailProductCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from dim_pr_product dp,dim_ag_agent ag
+		 where dp.agent_id = ag.agent_id
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 排序获取某一页的商品排行-销量 -->
+	<select id="r_queryAgentDetail_PayCount_Product" parameterType="java.util.Map" resultType="string">
+		select itemnumber
+		  from (
+		select a.*,rownum rn
+		  from (
+		select dp.itemnumber,nvl(t1.pay_count,0) pay_count
+		  from dim_pr_product dp,
+			  	(select t1.product_key,nvl(sum(t1.sku_num),0) pay_count
+				  from fact_od_order_sku t1,dim_od_order do,dim_date dt,dim_ag_agent ag
+				 where t1.payment_date_key = dt.date_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.agent_key = ag.agent_key
+		   		   and ag.account = #{user_id,jdbcType=INTEGER}
+				   and t1.order_key = do.order_key
+				   <if test="order_source ==1">
+				   	and do.order_source = 0
+				   </if>
+				   <if test="order_source ==2">
+				   	and do.order_source > 0
+				   </if>
+				   group by t1.product_key) t1,dim_ag_agent ag
+		   where dp.product_key = t1.product_key(+)
+		     and dp.agent_id = ag.agent_id
+			 and ag.account = #{user_id,jdbcType=INTEGER}
+		   order by ${sort} ${sort_by}) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 排序获取某一页的商品排行-销售总额 -->
+	<select id="r_queryAgentDetail_PayMoney_Product" parameterType="java.util.Map" resultType="string">
+		select itemnumber
+		  from (
+		select a.*,rownum rn
+		  from (
+		select dp.itemnumber,nvl(t1.pay_money,0) pay_money
+		  from dim_pr_product dp,
+			  	(select t1.product_key,nvl(sum(t1.sku_num*t1.sku_price),0) pay_money
+				  from fact_od_order_sku t1,dim_od_order do,dim_date dt,dim_ag_agent ag
+				 where t1.payment_date_key = dt.date_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.agent_key = ag.agent_key
+		   		   and ag.account = #{user_id,jdbcType=INTEGER}
+				   and t1.order_key = do.order_key
+				   <if test="order_source ==1">
+				   	and do.order_source = 0
+				   </if>
+				   <if test="order_source ==2">
+				   	and do.order_source > 0
+				   </if>
+				   group by t1.product_key) t1,dim_ag_agent ag
+		   where dp.product_key = t1.product_key(+)
+		     and dp.agent_id = ag.agent_id
+			 and ag.account = #{user_id,jdbcType=INTEGER}
+		   order by ${sort} ${sort_by}) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 排序获取某一页的商品排行-未发退货数 -->
+	<select id="r_queryAgentDetail_UnsentReturnCount_Product" parameterType="java.util.Map" resultType="string">
+		select itemnumber
+		  from (
+		select a.*,rownum rn
+		  from (
+		select dp.itemnumber,nvl(t1.unsent_return_count,0) unsent_return_count
+		  from dim_pr_product dp,
+			  	(select t1.product_key,nvl(sum(t1.refund_num),0) unsent_return_count
+				  from fact_od_order_refund t1,dim_od_order_refund t2,dim_od_order do,dim_date dt,dim_ag_agent ag
+				 where t1.aso_refund_date_key = dt.date_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.agent_key = ag.agent_key
+		   		   and ag.account = #{user_id,jdbcType=INTEGER}
+				   and t1.after_sales_order_key = t2.after_sales_order_key
+				   and t2.refund_type = 1
+				   and t2.order_number = do.order_number
+				   <if test="order_source ==1">
+				   	and do.order_source = 0
+				   </if>
+				   <if test="order_source ==2">
+				   	and do.order_source > 0
+				   </if>
+				   group by t1.product_key) t1,dim_ag_agent ag
+		   where dp.product_key = t1.product_key(+)
+		     and dp.agent_id = ag.agent_id
+			 and ag.account = #{user_id,jdbcType=INTEGER}
+		   order by ${sort} ${sort_by}) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 排序获取某一页的商品排行-已发退货数 -->
+	<select id="r_queryAgentDetail_SentReturnCount_Product" parameterType="java.util.Map" resultType="string">
+		select itemnumber
+		  from (
+		select a.*,rownum rn
+		  from (
+		select dp.itemnumber,nvl(t1.sent_return_count,0) sent_return_count
+		  from dim_pr_product dp,
+			  	(select t1.product_key,nvl(sum(t1.refund_num),0) sent_return_count
+				  from fact_od_order_refund t1,dim_od_order_refund t2,dim_od_order do,dim_date dt,dim_ag_agent ag
+				 where t1.aso_refund_date_key = dt.date_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.agent_key = ag.agent_key
+		   		   and ag.account = #{user_id,jdbcType=INTEGER}
+				   and t1.after_sales_order_key = t2.after_sales_order_key
+				   and t2.refund_type = 2
+				   and t2.order_number = do.order_number
+				   <if test="order_source ==1">
+				   	and do.order_source = 0
+				   </if>
+				   <if test="order_source ==2">
+				   	and do.order_source > 0
+				   </if>
+				   group by t1.product_key) t1,dim_ag_agent ag
+		   where dp.product_key = t1.product_key(+)
+		     and dp.agent_id = ag.agent_id
+			 and ag.account = #{user_id,jdbcType=INTEGER}
+		   order by ${sort} ${sort_by}) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 查询默认排序的商品列表 -->
+	<select id="r_queryAgentDetailProductListBy_Default" parameterType="java.util.Map" resultType="string">
+		select itemnumber
+		  from (
+		select a.*,rownum rn
+		  from (
+		select dp.itemnumber,nvl(t1.pay_money,0) pay_money
+		  from dim_pr_product dp,
+			  	(select t1.product_key,nvl(sum(t1.sku_num*t1.sku_price),0) pay_money
+				  from fact_od_order_sku t1,dim_od_order do,dim_date dt,dim_ag_agent ag
+				 where t1.payment_date_key = dt.date_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.agent_key = ag.agent_key
+		   		   and ag.account = #{user_id,jdbcType=INTEGER}
+				   and t1.order_key = do.order_key
+				   <if test="order_source ==1">
+				   	and do.order_source = 0
+				   </if>
+				   <if test="order_source ==2">
+				   	and do.order_source > 0
+				   </if>
+				   group by t1.product_key) t1,dim_ag_agent ag
+		   where dp.product_key = t1.product_key(+)
+		     and dp.agent_id = ag.agent_id
+			 and ag.account = #{user_id,jdbcType=INTEGER}
+		   order by pay_money desc) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 查询经销商商品列表 -->
+	<select id="r_queryAgentDetailProductList" parameterType="java.util.Map" resultType="java.util.Map">
+		select dp.itemnumber,
+	  		   dp.product_name,
+	  		   dp.product_img_url,
+	  		   dp.brand_name
+		  from dim_pr_product dp,dim_ag_agent ag
+		 where dp.agent_id = ag.agent_id
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and dp.itemnumber in
+		 <foreach collection="productList" item="item" open="(" close=")" separator=",">
+		 	#{item,jdbcType=INTEGER}
+		 </foreach>
+		 order by decode(dp.itemnumber
+		 <foreach collection="productList" item="item" index="_index" open="," close="" separator=",">
+            #{item},${_index}
+         </foreach>)
+	</select>
+	<!-- 商品-销量，销售总额 -->
+	<select id="r_queryAgentDetail_Product_PayCountMoney" parameterType="java.util.Map" resultType="java.util.Map">
+		select dp.itemnumber,nvl(sum(t1.sku_num),0) pay_count ,nvl(sum(t1.sku_num*t1.sku_price),0) pay_money
+		  from fact_od_order_sku t1,dim_od_order do,dim_date dt,dim_pr_product dp,dim_ag_agent ag
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.product_key = dp.product_key
+		   and dp.agent_id = ag.agent_id
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.order_key = do.order_key
+		   <if test="order_source ==1">
+		   	and do.order_source = 0
+		   </if>
+		   <if test="order_source ==2">
+		   	and do.order_source > 0
+		   </if>
+		   and dp.itemnumber in
+		 <foreach collection="productList" item="item" open="(" close=")" separator=",">
+		 	#{item,jdbcType=INTEGER}
+		 </foreach>
+		   group by dp.itemnumber
+	</select>
+	<!-- 商品-未发退货数 -->
+	<select id="r_queryAgentDetail_Product_UnsentReturnCount" parameterType="java.util.Map" resultType="java.util.Map">
+		select dp.itemnumber,nvl(sum(t1.refund_num),0) unsent_return_count
+		  from fact_od_order_refund t1,dim_od_order_refund t2,dim_od_order do,dim_date dt,dim_pr_product dp,dim_ag_agent ag
+		 where t1.aso_refund_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.product_key = dp.product_key
+		   and dp.agent_id = ag.agent_id
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.after_sales_order_key = t2.after_sales_order_key
+		   and t2.refund_type = 1
+		   and t2.order_number = do.order_number
+		   <if test="order_source ==1">
+		   	and do.order_source = 0
+		   </if>
+		   <if test="order_source ==2">
+		   	and do.order_source > 0
+		   </if>
+		   and dp.itemnumber in
+		 <foreach collection="productList" item="item" open="(" close=")" separator=",">
+		 	#{item,jdbcType=INTEGER}
+		 </foreach>
+		   group by dp.itemnumber
+	</select>
+	<!-- 商品-已发退货数 -->
+	<select id="r_queryAgentDetail_Product_SentReturnCount" parameterType="java.util.Map" resultType="java.util.Map">
+		select dp.itemnumber,nvl(sum(t1.refund_num),0) unsent_return_count
+		  from fact_od_order_refund t1,dim_od_order_refund t2,dim_od_order do,dim_date dt,dim_pr_product dp,dim_ag_agent ag
+		 where t1.aso_refund_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.product_key = dp.product_key
+		   and dp.agent_id = ag.agent_id
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.after_sales_order_key = t2.after_sales_order_key
+		   and t2.refund_type = 2
+		   and t2.order_number = do.order_number
+		   <if test="order_source ==1">
+		   	and do.order_source = 0
+		   </if>
+		   <if test="order_source ==2">
+		   	and do.order_source > 0
+		   </if>
+		   and dp.itemnumber in
+		 <foreach collection="productList" item="item" open="(" close=")" separator=",">
+		 	#{item,jdbcType=INTEGER}
+		 </foreach>
+		   group by dp.itemnumber
+	</select>
+	<!-- 退款原因分析-商品退货数 -->
+	<select id="r_queryAgentDetail_AfterSale_ReturnCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t1.refund_num),0)
+		  from fact_od_order_refund t1,dim_od_order_refund t2,dim_od_order do,dim_date dt,dim_ag_agent ag
+		 where t1.aso_refund_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.after_sales_order_key = t2.after_sales_order_key
+		   and t2.refund_type = #{refund_type,jdbcType=INTEGER}
+		   and t2.order_number = do.order_number
+		   <if test="order_source ==1">
+		   	and do.order_source = 0
+		   </if>
+		   <if test="order_source ==2">
+		   	and do.order_source > 0
+		   </if>
+	</select>
+	<!-- 退款原因分析-退货总数 -->
+	<select id="r_queryAgentDetailAfterSaleReturnCount" parameterType="java.util.Map" resultType="int">
+		select nvl(sum(t1.refund_num),0)
+		  from fact_od_order_refund t1,dim_od_order_refund t2,dim_od_order do,dim_date dt,dim_ag_agent ag
+		 where t1.aso_refund_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.after_sales_order_key = t2.after_sales_order_key
+		   and t2.order_number = do.order_number
+		   <if test="order_source ==1">
+		   	and do.order_source = 0
+		   </if>
+		   <if test="order_source ==2">
+		   	and do.order_source > 0
+		   </if>
+	</select>
+	<!-- 退款原因分析-退货原因总数 -->
+	<select id="r_queryAgentDetailAfterSaleReturnReasonCount" parameterType="java.util.Map" resultType="int">
+		select count(distinct t2.refund_cause)
+		  from fact_od_order_refund t1,dim_od_order_refund t2,dim_od_order do,dim_date dt,dim_ag_agent ag
+		 where t1.aso_refund_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.after_sales_order_key = t2.after_sales_order_key
+		   and t2.order_number = do.order_number
+		   <if test="order_source ==1">
+		   	and do.order_source = 0
+		   </if>
+		   <if test="order_source ==2">
+		   	and do.order_source > 0
+		   </if>
+	</select>
+	<!-- 退款原因分析-退货原因 -->
+	<select id="r_queryAgentDetailAfterSaleReturnReason" parameterType="java.util.Map" resultType="java.util.Map">
+		select *
+		  from (
+		select a.*,rownum rn
+		  from (
+		select decode(t2.refund_cause,1,'缺货',2,'信息填写错误,重新拍',3,'协商不一致',4,'其他原因',5,'系统取消',6,'收银员主动关闭订单',7,'有更优惠的购买方案',8,'我不想买了',9,'退运费',10,'商品有破损/污渍/变形',11,'未按规定时间发货',12,'卖家缺货','没有原因') refund_reason,
+			   count(1) return_reason_count
+		  from fact_od_order_refund t1,dim_od_order_refund t2,dim_od_order do,dim_date dt,dim_ag_agent ag
+		 where t1.aso_refund_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_key = ag.agent_key
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   and t1.after_sales_order_key = t2.after_sales_order_key
+		   and t2.order_number = do.order_number
+		   <if test="order_source ==1">
+		   	and do.order_source = 0
+		   </if>
+		   <if test="order_source ==2">
+		   	and do.order_source > 0
+		   </if>
+		   group by t2.refund_cause) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 折线图 活动数 -->
+	<select id="r_queryAgentDetail_ActivityCount_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.date_values as create_date,
+			   (select count(1) from dim_od_activity t1,dim_ag_agent ag
+				where t1.activity_state = 1
+				  and to_char(t1.activity_start_date,'yyyymmdd') &lt;= dt.date_short 
+				  and to_char(t1.activity_end_date,'yyyymmdd') >= dt.date_short
+				  and t1.agent_id = ag.agent_id
+		   		  and ag.account = #{user_id,jdbcType=INTEGER}) activity_count
+             from dim_date dt
+            where dt.date_short >= #{start_date,jdbcType=VARCHAR}
+              and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+	</select>
+	<!-- 活动总数 -->
+	<select id="r_queryAgentDetailActivityCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from dim_od_activity t1,dim_ag_agent ag
+		 where t1.activity_state = 1
+		   and to_char(t1.activity_start_date,'yyyymmdd') >= #{start_date,jdbcType=VARCHAR}
+		   and to_char(t1.activity_end_date,'yyyymmdd') &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_id = ag.agent_id
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 活动列表 -->
+	<select id="r_queryAgentDetailActivityList" parameterType="java.util.Map" resultType="java.util.Map">
+		select *
+		  from (
+		select a.*,rownum rn
+		  from (
+		select to_char(t1.activity_start_date,'YYYY-MM-DD') activity_start_date,
+			   to_char(t1.activity_end_date,'YYYY-MM-DD') activity_end_date,
+			   t1.activity_name,
+			   t1.activity_type 
+		  from dim_od_activity t1,dim_ag_agent ag
+		 where t1.activity_state = 1
+		   and to_char(t1.activity_start_date,'yyyymmdd') >= #{start_date,jdbcType=VARCHAR}
+		   and to_char(t1.activity_end_date,'yyyymmdd') &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.agent_id = ag.agent_id
+		   and ag.account = #{user_id,jdbcType=INTEGER}
+		   order by t1.create_date desc) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+</mapper>

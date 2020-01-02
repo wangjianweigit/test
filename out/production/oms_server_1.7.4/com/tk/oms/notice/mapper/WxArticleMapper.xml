@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.notice.dao.WxArticleDao">
+	
+	<resultMap type="java.util.Map" id="resultWxArticleMap">
+		<result column="id" property="id"/>
+		<result column="name" property="name"/>
+		<result column="content" property="content" jdbcType="CLOB" javaType = "string"/>
+		<result column="img_url" property="img_url"/>
+	</resultMap>
+	<!-- 文章数量 -->
+	<select id="queryCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+	      from tbl_wx_article
+	      <where>
+	      	is_delete = '1'
+	      	<if test="name != null and name !=''">
+	      		and name like concat(concat('%', #{name,jdbcType=VARCHAR}),'%')
+	      	</if>
+	      	<if test="start_date!=null and start_date!=''">
+				and create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+			</if>
+			<if test="end_date!=null and end_date!=''">
+				and create_date &lt;=to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+			</if>
+	      </where>
+	</select>
+	<!-- 文章列表 -->
+	<select id="queryList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+			select a.*, rownum rn from (
+				select id,
+					   name,
+					   img_url,
+					   to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date
+			      from tbl_wx_article
+			     <where>
+			     	is_delete = '1'
+			      	<if test="name != null and name !=''">
+			      		and name like concat(concat('%', #{name,jdbcType=VARCHAR}),'%')
+			      	</if>
+			      	<if test="start_date!=null and start_date!=''">
+						and create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+					</if>
+					<if test="end_date!=null and end_date!=''">
+						and create_date &lt;=to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+					</if>
+			      </where>
+			     order by sort_id desc) a
+			where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	     
+	</select>
+	
+	<!-- 文章详情 -->
+	<select id="queryDetail" parameterType="java.util.Map" resultMap="resultWxArticleMap">
+		select id,
+			   name,
+			   content,
+			   img_url
+	      from tbl_wx_article
+	     where is_delete = '1' and id = #{id,jdbcType=INTEGER}
+	</select>
+	<!-- 文章标题是否重复 -->
+	<select id="isExist" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_wx_article
+		 where name=#{name,jdbcType=VARCHAR}
+		 	<if test="id!=null and id!=0">
+		 		and id!=#{id,jdbcType=INTEGER}
+		 	</if>
+	</select>
+	<!-- 新增文章 -->
+	<insert id="insert" parameterType="java.util.Map">
+		insert into tbl_wx_article
+		(
+			id,
+			name,
+			content,
+			img_url,
+			create_user_id,
+			sort_id
+		) 
+		values
+		(
+			seq_wx_article.nextval,
+			#{name,jdbcType=VARCHAR},
+			#{content,jdbcType=CLOB},
+			#{img_url,jdbcType=VARCHAR},
+			#{public_user_id,jdbcType=INTEGER},
+			(select nvl(max(sort_id),0) + 1 from tbl_wx_article)
+		)
+	</insert>
+	<!-- 编辑微信文章 -->
+	<update id="update" parameterType="java.util.Map">
+		update tbl_wx_article
+		   <set>
+    	   		<if test="name !=null and name !=''">name = #{name,jdbcType=VARCHAR},</if>
+    	   		<if test="content !=null and content !=''">content = #{content,jdbcType=CLOB},</if>
+    	   		<if test="img_url !=null and img_url !=''">img_url = #{img_url,jdbcType=VARCHAR}</if>
+    	   		<if test="is_delete != null and is_delete !=''">is_delete = #{is_delete,jdbcType=CHAR}</if>
+    	   	</set>
+    	 where id = #{id,jdbcType=INTEGER}
+	</update>
+	
+	<!-- 更新排序 -->
+	<update id="updateSort" parameterType="java.util.Map">
+		update tbl_wx_article
+		   <set>
+		   	<if test="sort_id!=null">
+				sort_id = #{sort_id,jdbcType=INTEGER}
+			</if>
+			<if test="type == 'top'">
+				sort_id = (select max(sort_id) + 1 from tbl_wx_article )
+			</if>
+			<if test="type == 'bottom'">
+				sort_id = (select min(sort_id) - 1 from tbl_wx_article)
+			</if>
+		   </set> 
+		 where is_delete = '1' and id = #{id,jdbcType=INTEGER}
+	</update>
+	
+	<select id="queryById" parameterType="long" resultType="java.util.Map">
+		select sort_id
+		  from tbl_wx_article
+		 where id = #{id,jdbcType=INTEGER}
+	</select>
+	
+</mapper>

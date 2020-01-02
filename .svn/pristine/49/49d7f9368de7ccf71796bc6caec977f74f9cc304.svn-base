@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.basicinfo.dao.ContractTemplateDao">
+
+    <sql id="all_column">
+        cti.id,
+        cti.template_number,
+        cti.template_name,
+        cti.type,
+        cti.organ_code,
+        to_char(cti.create_date,'YYYY-MM-DD HH24:MI:SS') create_date,
+        cti.state
+    </sql>
+
+    <select id="queryListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select a.*, rownum rn from (
+                SELECT <include refid="all_column"/>,
+                    (select user_realname from tbl_sys_user_info where id = cti.creater_id) creater_name
+                from tbl_contract_template_info cti
+                <where>
+                    is_delete = 1
+                    <if test="template_name!=null and template_name!='' ">
+                        and cti.template_name like '%'||#{template_name,jdbcType=VARCHAR}||'%'
+                    </if>
+                    <if test="type!=null and type!='' ">
+                        and cti.type = #{type, jdbcType=INTEGER}
+                    </if>
+                    <if test="state != null and state.size()>0">
+                        and cti.state IN
+                        <foreach item="item" collection="state" open="(" separator="," close=")">
+                            #{item}
+                        </foreach>
+                    </if>
+                </where>
+                order by create_date desc
+            ) a
+            where rownum &lt;= #{end_rownum, jdbcType=INTEGER}
+        )
+        where rn &gt; #{start_rownum, jdbcType=INTEGER}
+    </select>
+
+    <select id="queryCountForPage" parameterType="java.util.Map" resultType="int">
+        SELECT count(1)
+        from tbl_contract_template_info cti
+        <where>
+            is_delete = 1
+            <if test="template_name!=null and template_name!='' ">
+                and cti.template_name like '%'||#{template_name,jdbcType=VARCHAR}||'%'
+            </if>
+            <if test="type!=null and type!='' ">
+                and cti.type = #{type, jdbcType=INTEGER}
+            </if>
+            <if test="state != null and state.size()>0">
+                and cti.state IN
+                <foreach item="item" collection="state" open="(" separator="," close=")">
+                    #{item}
+                </foreach>
+            </if>
+        </where>
+    </select>
+
+    <resultMap id="templateMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="template_name" property="template_name"/>
+        <result column="type" property="type"/>
+        <result column="organ_code" property="organ_code"/>
+        <result column="detail_id" property="detail_id"/>
+        <result column="file_url" property="file_url"/>
+        <result column="contract_content" property="contract_content"/>
+    </resultMap>
+
+    <select id="queryById" parameterType="long" resultMap="templateMap">
+        select <include refid="all_column"/>,
+          ctd.id detail_id,
+          ctd.file_url,
+          ctd.contract_content
+        from tbl_contract_template_info cti, tbl_contract_template_detail ctd
+        where ctd.template_id = cti.id
+            and cti.id = #{id, jdbcType=INTEGER}
+    </select>
+
+    <insert id="insert" parameterType="java.util.Map">
+        <selectKey keyProperty="id" resultType="int" order="BEFORE">
+            select seq_contract_template_info.nextval from dual
+        </selectKey>
+        insert into tbl_contract_template_info
+        (
+            id,
+            template_number,
+            template_name,
+            type,
+            organ_code,
+            creater_id,
+            create_date,
+            state
+        ) values (
+            #{id, jdbcType=INTEGER},
+            getAutoNumberShort(63),
+            #{template_name, jdbcType=VARCHAR},
+            #{type, jdbcType=INTEGER},
+            #{organ_code, jdbcType=VARCHAR},
+            #{public_user_id,jdbcType=INTEGER},
+            sysdate,
+            #{state, jdbcType=INTEGER}
+        )
+    </insert>
+
+    <update id="update" parameterType="java.util.Map">
+        update tbl_contract_template_info
+        <set>
+            <if test="template_name != null and template_name != ''">
+                template_name =  #{template_name, jdbcType=VARCHAR},
+            </if>
+            <if test="type != null and type != ''">
+                type = #{type, jdbcType=INTEGER},
+            </if>
+            <if test="organ_code != null and organ_code != ''">
+                organ_code =  #{organ_code, jdbcType=VARCHAR},
+            </if>
+            <if test="state != null and state != ''">
+                state = #{state, jdbcType=VARCHAR},
+            </if>
+            update_date = sysdate,
+            update_id = #{public_user_id,jdbcType=INTEGER}
+        </set>
+        where id = #{id, jdbcType=INTEGER}
+    </update>
+
+    <update id="invalidOther" parameterType="java.util.Map">
+         update tbl_contract_template_info
+         set state = 3
+         where id != #{id, jdbcType=INTEGER}
+            and state = 2
+            and organ_code = #{organ_code, jdbcType=VARCHAR}
+            and type = #{type, jdbcType=INTEGER}
+    </update>
+
+    <update id="deleteById" parameterType="long" >
+        update tbl_contract_template_info
+        set is_delete = 2
+        where id = #{id, jdbcType=INTEGER}
+    </update>
+
+</mapper>

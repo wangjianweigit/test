@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.basicinfo.dao.FreightTemplateDao">
+    <sql id="all_column">
+        id,
+        name,
+        time,
+        is_default
+    </sql>
+
+    <select id="queryListAll" resultType="java.util.Map">
+        select <include refid="all_column"/> from tbl_freight_template
+        where state = '2'
+    </select>
+ 
+    <!-- 查询运费模板 -->
+	<sql id="freight_template_select_column">
+		id,
+		name,
+		time,
+		is_default,
+		state,
+		to_char(edit_date,'yyyy-mm-dd hh24:mi:ss') edit_date
+	</sql>
+	<sql id="freight_template_detail_select_column">
+		t1.id,
+		t1.user_id,
+		t1.template_id,
+		t1.logistics_company_id,
+		t1.range,
+		t1.first_count,
+		t1.first_money,
+		t1.continue_count,
+		t1.continue_money,
+		t1.logistics_company_name,
+		t1.range_names,
+		t1.warehouse_id,
+		(select name from tbl_warehouse_info where id = t1.warehouse_id) warehouse_name,
+		t2.type
+	</sql>
+	<!-- 通用模板通用条件 -->
+    <sql id="where_template">
+        <where>
+            <if test="id != null and id != ''">
+	            and T1.id = #{id}
+	        </if>
+	        <if test="name != null and name != ''">
+	            and T1.name = #{name}
+	        </if>
+	        <if test="state != null and state != ''">
+	            AND T1.STATE = #{state}
+	        </if>
+        </where>
+    </sql>
+    <!-- 查询运费列表 -->
+    <select id="queryFreightTemplateList" parameterType="java.util.Map" resultType="java.util.Map">
+       select * from (select rownum rn, tt.* from 	
+    	(select <include refid="freight_template_select_column"/>
+  			from tbl_freight_template T1
+  			<include refid="where_template"/>
+			order by is_default desc) tt
+			where rownum  &lt;= #{end_rownum,jdbcType=INTEGER})
+         where rn &gt;#{start_rownum,jdbcType=INTEGER}			     
+    </select>
+    <!-- 查询运费模板详情 -->  
+    <select id="queryFreightTemplateDetailList" parameterType="java.util.Map" resultType="java.util.Map">
+		select
+		<include refid="freight_template_detail_select_column" />
+		  from tbl_freight_template_detail t1,tbl_logistics_company t2
+		 where t1.template_id = #{template_id,jdbcType=INTEGER}
+		   and t1.logistics_company_id = t2.id
+		   <if test="warehouse_id !=null">
+		   		and t1.warehouse_id = #{warehouse_id,jdbcType=INTEGER}
+		   </if>
+		order by t1.id asc
+    </select>
+  	<!-- 查询运费模板总数 -->    
+    <select id="queryFreightTemplateCount" parameterType="java.util.Map" resultType="int">
+    	select count(1)
+  			from tbl_freight_template T1
+			<include refid="where_template"/> 
+    </select>
+    <!-- 新增运费模板 -->
+    <insert id="insert" parameterType="java.util.Map">
+    	<selectKey keyProperty="id" resultType="long" order="BEFORE">
+			select seq_freight_template.nextval from dual
+		</selectKey> 
+    	insert into tbl_freight_template
+	      	(id, 
+	      	 name, 
+	      	 time, 
+	      	 state, 
+	      	 is_default, 
+	      	 edit_date)
+	    	values
+	      	(#{id,jdbcType=INTEGER},
+	      	 #{name,jdbcType=VARCHAR}, 
+			 #{time,jdbcType=VARCHAR}, 
+			 '1', 
+			 '1', 
+			 sysdate)
+    </insert>
+    <!-- 新增运费模板详情 -->
+    <insert id="insertDetail" parameterType="java.util.List">
+    	insert into tbl_freight_template_detail
+	        select seq_freight_template_detail.nextval,A.* from(
+	        <foreach collection="list" item="item" index="index" separator="UNION">
+		          select
+				         #{item.user_id,jdbcType=INTEGER},
+				         #{item.template_id,jdbcType=INTEGER},
+				         #{item.logistics_company_id,jdbcType=INTEGER},
+				         #{item.logistics_company_name,jdbcType=VARCHAR},
+				         #{item.range,jdbcType=VARCHAR},
+				         #{item.first_count,jdbcType=INTEGER},
+				         #{item.first_money,jdbcType=INTEGER},
+				         #{item.continue_count,jdbcType=INTEGER},
+				         #{item.continue_money,jdbcType=INTEGER},
+				         #{item.range_names,jdbcType=VARCHAR},
+				         #{item.warehouse_id,jdbcType=INTEGER}
+			        from dual
+			 </foreach>
+			) A
+    </insert>
+    <!-- 删除运费模板 -->
+    <delete id="delete" parameterType="java.util.Map">
+    	delete from tbl_freight_template where id = #{id,jdbcType=INTEGER}
+    </delete>
+    <!-- 删除运费模板详情 -->
+    <delete id="deleteDetail" parameterType="java.util.Map">
+    	delete from tbl_freight_template_detail where template_id = #{id,jdbcType=INTEGER}
+    </delete>
+    <!-- 更新运费模板 -->
+    <update id="update" parameterType="java.util.Map">
+    	update tbl_freight_template 
+    	   set 
+    	   	   <if test="name!=null and name!=''">
+    	   	   	name = #{name,jdbcType=VARCHAR}, 
+    	   	   </if>
+    	   	   <if test="time!=null and time!=''">
+			   	time = #{time,jdbcType=VARCHAR},
+    	   	   </if>
+			   <if test="state!=null and state!=''">
+			   	state = #{state,jdbcType=CHAR},
+			   </if>
+			   <if test="is_default!=null and is_default!=''">
+			   	is_default = #{is_default,jdbcType=CHAR},
+			   </if>
+			   edit_date=sysdate
+	     where id=#{id,jdbcType=INTEGER}
+    </update>
+    <!-- 更新不等于模板ID的运费模板默认状态 -->
+    <update id="updateByDefault" parameterType="java.util.Map">
+    	update tbl_freight_template t 
+    	   set t.is_default = '1'
+    	 where exists(select 1 
+    	                from  tbl_freight_template_detail t1 
+    	               where t1.template_id != #{id,jdbcType=INTEGER} and t1.template_id=t.id)
+    </update>
+    <!-- 查询运费模板是否有商品在使用 -->
+    <select id="queryFreightTemplateProduct" parameterType="java.util.Map" resultType="int">
+    	select count(1)
+	      from tbl_product_info
+	     where freight_template_id = #{id,jdbcType=INTEGER}
+    </select>
+    
+    <!-- 查询仓库列表 -->
+	<select id="queryWarehouseList" resultType="java.util.Map">
+		   select id, name
+			 from tbl_warehouse_info
+			where id in
+			      (select parent_id
+			         from tbl_warehouse_info
+			        where id in (select warehouse_id from tbl_platform_warehouse))
+			order by create_date
+	</select>
+	<!-- 模板名称是否重复  -->
+	<select id="queryNameIsExist" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_freight_template
+		 where name = #{name,jdbcType=VARCHAR}
+		 <if test="id != null and id !=0">
+		 	and id != #{id,jdbcType=INTEGER}
+		 </if>
+	</select>
+</mapper>

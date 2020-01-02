@@ -1,0 +1,191 @@
+package com.tk.oms.marketing.dao;
+
+import java.util.List;
+import java.util.Map;
+
+import com.tk.sys.common.BaseDao;
+
+/**
+ * 
+ * Copyright (c), 2017, Tongku
+ * FileName : ProductControlDao
+ * 控货管理
+ *
+ * @author yejingquan
+ * @version 1.00
+ * @date 2017-7-6
+ */
+public interface ProductControlDao extends BaseDao<Map<String, Object>>{
+	/**
+	 * 查询控货数量
+	 * @param paramMap
+	 * @return
+	 */
+	public int queryProductControlCount(Map<String, Object> paramMap);
+	/**
+	 * 查询控货列表
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> queryProductControlList(Map<String, Object> paramMap);
+	/**
+	 * 控货开关
+	 * @param paramMap
+	 * @return
+	 */
+	public int updateState(Map<String, Object> paramMap);
+	/**
+	 * 控货详情
+	 * @param paramMap
+	 * @return
+	 */
+	public Map<String, Object> queryProductControlDetail(Map<String, Object> paramMap);
+	/**
+	 * 根据控货ID查询控货详情品牌列表
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> queryProductControlDetailListById(long id);
+	/**
+	 * 控货详情品牌列表
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> queryProductControlDetailList(Map<String, Object> paramMap);
+	/**
+	 * 查询控货申请ID
+	 * @param paramMap
+	 * @return
+	 */
+	public Map<String, Object> queryProductControlApplyByUserId(Map<String, Object> paramMap);
+	/**
+	 * 删除控货申请明细数据
+	 * @param product_control_id
+	 */
+	public int deleteProductControlDetailApply(long product_control_id);
+	/**
+	 * 新增控货申请数据
+	 * @param paramMap
+	 * @return
+	 */
+	public int insertProductControlApply(Map<String, Object> paramMap);
+	/**
+	 * 新增控货申请明细数据
+	 * @param list
+	 */
+	public int insertProductControlDetailApply(List<Map<String, Object>> list);
+	/**
+	 * 更新控货申请数据
+	 * @param paramMap
+	 * @return
+	 */
+	public int updateProductControlApply(Map<String, Object> paramMap);
+	/**
+	 * 申请控货详情
+	 * @param paramMap
+	 * @return
+	 */
+	public Map<String, Object> queryProductControlApplyDetail(Map<String, Object> paramMap);
+	/**
+	 * 申请控货明细详情
+	 * @param id
+	 * @return
+	 */
+	public List<Map<String, Object>> queryProductControlApplyDetailList(long id);
+	/**
+	 * 查询申请数量
+	 * @param paramMap
+	 * @return
+	 */
+	public int queryProductControlApplyCount(Map<String, Object> paramMap);
+	/**
+	 * 查询申请列表
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> queryProductControlApplyList(Map<String, Object> paramMap);
+	/**
+	 * 申请详情
+	 * @param paramMap
+	 * @return
+	 */
+	public Map<String, Object> queryApplyDetail(Map<String, Object> paramMap);
+	/**
+	 * 申请详情品牌列表
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> queryApplyDetailList(Map<String, Object> paramMap);
+	/**
+	 * 校验审批数据是否存在
+	 * @param paramMap
+	 * @return
+	 */
+	public int queryProductControlApplyById(Map<String, Object> paramMap);
+	/**
+	 * 更新审批状态
+	 * @param paramMap
+	 * @return
+	 */
+	public int updateProductControlApplyApprovalState(Map<String, Object> paramMap);
+	/**
+	 * 新增控货信息
+	 * @param paramMap
+	 * @return
+	 */
+	public int inserProductControl(Map<String, Object> paramMap);
+	/**
+	 * 新增控货明细
+	 * @param paramMap
+	 * @return
+	 */
+	public int insertProductControlDetail(Map<String, Object> paramMap);
+	/**
+	 * 删除控货明细
+	 * @param paramMap
+	 * @return
+	 */
+	public int deleteProductControlDetail(Map<String, Object> paramMap);
+	/**
+	 * 查询控货信息是否存在
+	 * @param paramMap
+	 * @return
+	 */
+	public int queryProductControlIsExist(Map<String, Object> paramMap);
+	/**
+	 * 更新控货信息
+	 * @param paramMap
+	 * @return
+	 */
+	public int updateProductControl(Map<String, Object> paramMap);
+	/**
+	 * 查询控货信息
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> queryPeripheryList(Map<String, Object> paramMap);
+	/**
+	 * 查询距离
+	 * @param paramMap
+	 * @return
+	 */
+	public double queryDistance(Map<String, Object> paramMap);
+	/**
+	 * 新增控货附件
+	 * @param paramMap
+	 */
+	public int insertProductControlAttachment(Map<String, Object> paramMap);
+	/**
+	 * 删除控货附件
+	 * @param paramMap
+	 * @return
+	 */
+	public int deleteProductControlAttachment(Map<String, Object> paramMap);
+	/**
+	 * 打开控货开关
+	 * @param paramMap
+	 * @return
+	 */
+	public int updateUserSAState(Map<String, Object> paramMap);
+	
+}

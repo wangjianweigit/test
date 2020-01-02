@@ -1,0 +1,968 @@
+package com.tk.store.store.service;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import com.tk.oms.basicinfo.dao.StoreInfoDao;
+import com.tk.oms.member.dao.DecorationUserManageDao;
+import com.tk.oms.member.dao.MemberInfoDao;
+import com.tk.store.store.dao.StoreManageDao;
+import com.tk.sys.config.EsbConfig;
+import com.tk.sys.security.Base64;
+import com.tk.sys.security.Crypt;
+import com.tk.sys.util.DoubleUtils;
+import com.tk.sys.util.FileUtils;
+import com.tk.sys.util.GridResult;
+import com.tk.sys.util.HttpClientUtil;
+import com.tk.sys.util.HttpUtil;
+import com.tk.sys.util.Jackson;
+import com.tk.sys.util.Packet;
+import com.tk.sys.util.PageUtil;
+import com.tk.sys.util.ProcessResult;
+import com.tk.sys.util.Transform;
+
+@Service("StoreManageService")
+public class StoreManageService {
+	private Log logger = LogFactory.getLog(this.getClass());
+	@Value("${store_service_url}")
+    private String store_service_url;
+	@Resource
+    private StoreManageDao storeManageDao;
+	@Resource
+	private MemberInfoDao memberInfoDao;
+	@Resource
+	private StoreInfoDao storeInfoDao;
+	
+	/**
+	 * 店铺新增
+	 * @param request
+	 * @return
+     */
+	@Transactional
+	public ProcessResult addStore(HttpServletRequest request) throws Exception{		
+		ProcessResult pr = new ProcessResult();
+		try {
+		    Map<String, Object> user = new HashMap<String, Object>();
+			String json = HttpUtil.getRequestInputStream(request);
+			user = (Map<String, Object>) Transform.GetPacket(json,Map.class);
+			
+			// 加密
+			byte[] encryptResult = Crypt.encrypt(user.get("user_pwd").toString(), FileUtils.getSecretKey(EsbConfig.SECRET_KEY_PATH, EsbConfig.USER_PWD_KEY));
+			// 编码
+			user.put("user_pwd", Base64.encode(encryptResult));
+			user.put("user_business_licence_imgurl", user.get("business_licence_imgurl"));
+			//获取合作商名称
+			String  partner_user_realna=memberInfoDao.querySysUserInfoById(Integer.parseInt(user.get("partner_user_id").toString()));
+			//获取业务经理名称
+			String market_supervision_user_realna=memberInfoDao.querySysUserInfoById(Integer.parseInt(user.get("market_supervision_user_id").toString()));
+			//获取门店名称
+			String store_name=storeInfoDao.queryStoreNameById(Integer.parseInt(user.get("store_id").toString()));
+			//获取督导名称
+			String supervisor_user_realna=memberInfoDao.querySysUserInfoById(Integer.parseInt(user.get("supervisor_user_id").toString()));
+			user.put("partner_user_realna", partner_user_realna);
+			user.put("market_supervision_user_realna", market_supervision_user_realna);
+			user.put("store_name", store_name);
+			user.put("supervisor_user_realna", supervisor_user_realna);
+			int ln = memberInfoDao.queryMemberInfoApplyByLoginName(user.get("login_name").toString());
+			user.put("commission_rate", Double.parseDouble(user.get("commission_rate").toString())/100);
+			int lp =memberInfoDao.queryMemberInfoApplyByMobilePhone(user);
+			int lc=0;
+			if(!StringUtils.isEmpty(user.get("user_manage_cardid"))){
+				lc =memberInfoDao.queryMemberInfoApplyByUserManageCardId(user);
+			}
+			if(ln==0&&lp==0&&lc==0){
+				//如果缺少大区数据，则根据省份查询
+				if(null==user.get("user_company_address_max")&&Integer.parseInt(user.get("province").toString())!=0){
+					Map<String, Object> dr = memberInfoDao.queryDicRegionById(Integer.parseInt(user.get("province").toString()));
+					user.put("user_company_address_max", Integer.parseInt(dr.get("PARENT_ID").toString()));
+				}
+				if(storeManageDao.addStore(user)>0){
+					pr.setState(true);
+					pr.setMessage("添加成功");
+					pr.setObj(user);
+				}else{
+					pr.setState(false);
+					pr.setMessage("添加失败");
+					throw new RuntimeException("添加失败");
+				}
+			}else if(ln!=0){
+				pr.setState(false);
+				pr.setMessage("添加失败,用户名已存在");
+			}else if(lp!=0){
+				pr.setState(false);
+				pr.setMessage("添加失败,手机号码已存在");
+			}else if(lc!=0){
+				pr.setState(false);
+				pr.setMessage("添加失败,身份证号已存在");
+			}
+		} catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e);
+        }
+		return pr;
+	}
+	/**
+	 * 重置物流公司信息，先清除，再插入
+	 * @param user
+     */
+	private int resetLogisticsCompany(Map<String, Object> user){
+		//添加物流公司信息
+		int l = 0;
+		if(!StringUtils.isEmpty(user.get("logistics_compamy_ids"))){
+			//清除物流公司信息
+			memberInfoDao.deleteByUserName(user.get("id").toString());
+			List <Map<String, Object>> clist = new ArrayList<Map<String, Object>>();
+			String logistics=user.get("logistics_compamy_ids").toString();
+			for(String id:logistics.split(",")){
+				Map<String, Object> ulc = new HashMap<String, Object>();
+				ulc.put("user_name", user.get("id"));
+				ulc.put("logistics_company_id",Integer.parseInt(id.trim()));
+				clist.add(ulc);
+			}
+			l = memberInfoDao.batchInsert(clist);
+		}
+		return l;
+	}
+	
+    /**
+     * 店铺编辑
+     * @param request
+     * @return
+     */
+    @Transactional
+    public ProcessResult editStore(HttpServletRequest request) throws Exception {
+  	  ProcessResult pr = new ProcessResult();
+  	  Map<String,Object> param = new HashMap<String,Object>();
+  	  try {
+		  String json = HttpUtil.getRequestInputStream(request);
+		  if(!StringUtils.isEmpty(json)){
+			param = (Map<String,Object>) Transform.GetPacket(json,Map.class);
+		  }
+		  if(StringUtils.isEmpty(param.get("id"))){
+			  pr.setState(false);
+			  pr.setMessage("缺少参数");
+			  return pr;
+		  }
+		  if(storeManageDao.editStore(param)>0){
+			  pr.setState(true);
+			  pr.setMessage("编辑成功!");
+		  }else{
+			  pr.setState(false);
+			  pr.setMessage("编辑失败!");
+		  }
+  	} catch (Exception e) {
+        pr.setState(false);
+        pr.setMessage(e.getMessage());
+        throw new RuntimeException(e);
+    }
+  	  return pr;
+   }
+    
+    /**
+	 * 店铺审批列表
+	 * @param request
+	 * @return
+	 */
+	public GridResult storeApprovalList(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			Map<String,Object> params = (Map<String,Object>)Transform.GetPacket(json, Map.class);
+			GridResult pageParamResult = PageUtil.handlePageParams(params);
+			if(pageParamResult!=null){
+				return pageParamResult;
+			}
+			if((!StringUtils.isEmpty(params.get("state")))&&params.get("state") instanceof String){
+				params.put("state",(params.get("state")+"").split(","));
+			}
+			int storeApprovalCount=storeManageDao.queryStoreApprovalCount(params);
+			List<Map<String,Object>> storeApprovalList = storeManageDao.queryStoreApprovalList(params);
+			if (storeApprovalList != null && storeApprovalList.size() > 0) {
+				gr.setState(true);
+				gr.setMessage("查询成功!");
+				gr.setObj(storeApprovalList);
+				gr.setTotal(storeApprovalCount);
+			} else {
+				gr.setState(true);
+				gr.setMessage("无数据");
+			}
+		} catch (Exception e) {
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+			logger.error(e);
+		}
+		return gr;
+	}
+    
+    /**
+	 * 店铺列表
+	 * @param request
+	 * @return
+	 */
+	public GridResult storeList(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			Map<String,Object> params = (Map<String,Object>)Transform.GetPacket(json, Map.class);
+			GridResult pageParamResult = PageUtil.handlePageParams(params);
+			if(pageParamResult!=null){
+				return pageParamResult;
+			}
+			if((!StringUtils.isEmpty(params.get("state")))&&params.get("state") instanceof String){
+				params.put("state",(params.get("state")+"").split(","));
+			}
+			int storeCount=storeManageDao.queryStoreCount(params);
+			List<Map<String,Object>> storeList = storeManageDao.queryStoreListForPage(params);
+			if (storeList != null && storeList.size() > 0) {
+				gr.setState(true);
+				gr.setMessage("查询成功!");
+				gr.setObj(storeList);
+				gr.setTotal(storeCount);
+			} else {
+				gr.setState(true);
+				gr.setMessage("无数据");
+			}
+		} catch (Exception e) {
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+			logger.error(e);
+		}
+		return gr;
+	}
+	
+	/**
+	 * 店铺详情
+	 * @param request
+	 * @return
+	 */
+	public GridResult storeDetail(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			Map<String,Object> params = (Map<String,Object>)Transform.GetPacket(json, Map.class);
+			if(StringUtils.isEmpty(params.get("id"))){
+				gr.setState(false);
+				gr.setMessage("缺少参数");
+                return gr;
+            }
+			Map<String,Object> detail = storeManageDao.queryStoreDetail(params);
+			if (detail != null ) {
+				gr.setMessage("查询成功!");
+				gr.setObj(detail);
+			} else {
+				gr.setMessage("无数据");
+			}
+			gr.setState(true);
+		} catch (Exception e) {
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+			logger.error(e);
+		}
+		return gr;
+	}
+	
+	/**
+	 * 店铺启用禁用
+	 * @param request
+	 * @return
+	 */
+	@Transactional
+	public ProcessResult updateStoreState(HttpServletRequest request) throws Exception  {
+		ProcessResult pr = new ProcessResult();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			Map<String,Object> params = (Map<String,Object>)Transform.GetPacket(json, Map.class);
+			if(StringUtils.isEmpty(params.get("id"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数id");
+                return pr;
+            }
+			if(StringUtils.isEmpty(params.get("user_state"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数user_state");
+                return pr;
+            }
+			if(storeManageDao.updateStoreState(params)<=0){
+				pr.setState(false);
+				throw new RuntimeException("修改状态失败");
+			} 
+			Map<String,Object> sendParam=new HashMap<String,Object>();
+			sendParam.put("AGENT_ID", params.get("id"));
+			sendParam.put("STATE", params.get("user_state"));
+			Map<String, Object> resPr=(Map<String, Object>)this.queryForPost(sendParam,store_service_url+"agent/Lyinit/esbCooperUpdate");
+            if (Integer.parseInt(resPr.get("state").toString()) != 1) {
+           	 	throw new RuntimeException(resPr.get("message").toString());
+            }
+            pr.setState(true);
+            pr.setMessage("状态修改成功");
+		} catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e);
+        }
+		return pr;
+	}
+	
+	/**
+	 * 店铺佣金比例设置
+	 * @param request
+	 * @return
+	 */
+	@Transactional
+	public ProcessResult updateStoreCommissionRate(HttpServletRequest request) throws Exception  {
+		ProcessResult pr = new ProcessResult();
+		Map<String,Object> sendParams=new HashMap<String,Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			Map<String,Object> params = (Map<String,Object>)Transform.GetPacket(json, Map.class);
+			if(StringUtils.isEmpty(params.get("id"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数id");
+                return pr;
+            }
+			if(StringUtils.isEmpty(params.get("commission_rate"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数commission_rate");
+                return pr;
+            }
+			float commission_rate=Integer.parseInt(params.get("commission_rate").toString());
+			commission_rate=(float)commission_rate/100;
+			params.put("commission_rate", commission_rate);
+			if(storeManageDao.storeCommissionRateSet(params)<0){
+				throw new RuntimeException("修改佣金比例失败");
+			}
+			sendParams.put("AGENT_ID", params.get("id"));
+			sendParams.put("COMMISSION_RATE", commission_rate);
+			Map<String, Object> resPr=(Map<String, Object>)this.queryForPost(sendParams,store_service_url+"agent/Lyinit/esbCooperUpdate");
+	        if (Integer.parseInt(resPr.get("state").toString()) == 1) {
+	        	pr.setState(true);
+	    		pr.setMessage("修改佣金比例成功");
+	        }else{
+	        	throw new RuntimeException("调用远程接口异常");
+	        }
+		} catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e);
+        }
+		return pr;
+	}
+	
+	/**
+	 * 商家支付服务费设置设置
+	 * @param request
+	 * @return
+	 */
+	@Transactional
+	public ProcessResult storePayServiceRateSet(HttpServletRequest request) throws Exception  {
+		ProcessResult pr = new ProcessResult();
+		Map<String,Object> sendParams=new HashMap<String,Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			Map<String,Object> params = (Map<String,Object>)Transform.GetPacket(json, Map.class);
+			if(StringUtils.isEmpty(params.get("id"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数id");
+                return pr;
+            }
+			if(StringUtils.isEmpty(params.get("pay_service_rate"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数pay_service_rate");
+                return pr;
+            }
+			double pay_service_rate = DoubleUtils.div(Double.parseDouble(params.get("pay_service_rate").toString()), 100d);
+			params.put("pay_service_rate", pay_service_rate);
+			if(storeManageDao.storePayServiceRateSet(params)<0){
+				throw new RuntimeException("修改支付服务费失败");
+			}
+			sendParams.put("AGENT_ID", storeManageDao.queryStoreDetail(params).get("AGENT_ID"));
+			sendParams.put("SERVICE_RATE", pay_service_rate);
+			Map<String, Object> resPr=(Map<String, Object>)this.queryForPost(sendParams,store_service_url+"agent/Lyinit/esbAgentInfoUpdate");
+	        if (Integer.parseInt(resPr.get("state").toString()) == 1) {
+	        	pr.setState(true);
+	    		pr.setMessage("修改支付服务费成功");
+	        }else{
+	        	throw new RuntimeException("调用远程接口异常");
+	        }
+		} catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e);
+        }
+		return pr;
+	}
+	 public Object queryForPost(Map<String,Object> obj,String url) throws Exception{
+	       String params = "";
+	       if(obj != null){
+	           Packet packet = Transform.GetResult(obj, EsbConfig.ERP_FORWARD_KEY_NAME);//加密数据
+	           params = Jackson.writeObject2Json(packet);//对象转json、字符串
+	       }
+	       //发送至服务端
+	       String json = HttpClientUtil.post(url, params,30000);
+	       return Transform.GetPacketJzb(json,Map.class);
+	   }
+	
+	/**
+	 * 店铺平台登入设置
+	 * @param request
+	 * @return
+	 */
+	@Transactional
+	public ProcessResult storePlatformLoginSet(HttpServletRequest request) throws Exception  {
+		ProcessResult pr = new ProcessResult();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			Map<String,Object> params = (Map<String,Object>)Transform.GetPacket(json, Map.class);
+			if(StringUtils.isEmpty(params.get("id"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数id");
+                return pr;
+            }
+			if(StringUtils.isEmpty(params.get("platform_login_state"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数platform_login_state");
+                return pr;
+            }
+			if(storeManageDao.storePlatformLoginSet(params)>0){
+				pr.setState(true);
+				pr.setMessage("店铺平台登入状态设置成功");
+			} else{
+				pr.setState(false);
+				pr.setMessage("店铺平台登入状态设置失败");
+			}
+		} catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e);
+        }
+		return pr;
+	}
+	
+	/**
+	 * 店铺会员认证审批列表
+	 * @param request
+	 * @return
+	 */
+	public GridResult queryStoreMemberAuthApprovalList(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			Map<String,Object> params = (Map<String,Object>)Transform.GetPacket(json, Map.class);
+			GridResult pageParamResult = PageUtil.handlePageParams(params);
+			if(pageParamResult!=null){
+				return pageParamResult;
+			}
+			if((!StringUtils.isEmpty(params.get("state")))&&params.get("state") instanceof String){
+				params.put("state",(params.get("state")+"").split(","));
+			}
+			int count=storeManageDao.queryStoreMemberAuthApprovalCount(params);
+			List<Map<String,Object>> list = storeManageDao.queryStoreMemberAuthApprovalList(params);
+			if (list != null && list.size() > 0) {
+				gr.setState(true);
+				gr.setMessage("查询成功!");
+				gr.setObj(list);
+				gr.setTotal(count);
+			} else {
+				gr.setState(true);
+				gr.setMessage("无数据");
+			}
+		} catch (Exception e) {
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+			logger.error(e);
+		}
+		return gr;
+	}
+	
+	/**
+	 * 店铺会员认证审批详情
+	 * @param request
+	 * @return
+	 */
+	public GridResult queryStoreMemberAuthApprovalDetail(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			Map<String,Object> params = (Map<String,Object>)Transform.GetPacket(json, Map.class);
+			if(StringUtils.isEmpty(params.get("id"))){
+				gr.setState(false);
+				gr.setMessage("缺少参数");
+                return gr;
+            }
+			Map<String,Object> detail = storeManageDao.queryStoreMemberAuthApprovalDetail(params);
+			if (detail != null ) {
+				gr.setMessage("查询成功!");
+				gr.setObj(detail);
+			} else {
+				gr.setMessage("无数据");
+			}
+			gr.setState(true);
+		} catch (Exception e) {
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+			logger.error(e);
+		}
+		return gr;
+	}
+	
+	/**
+     * 店铺会员密码重置
+     * @param request
+     * @return
+     */
+    public ProcessResult storeMemberResetPwd(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        Map<String,Object> params = new HashMap<String, Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            //校验是否传入参数
+            if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            
+            params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            //校验id参数
+            if(!params.containsKey("id")||StringUtils.isEmpty(params.get("id"))) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数id");
+            	return pr;
+            }
+            //校验state参数
+            if(!params.containsKey("user_pwd")||StringUtils.isEmpty(params.get("user_pwd"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数user_pwd");
+                return pr;
+            }
+
+            // 加密
+			byte[] encryptResult = Crypt.encrypt(params.get("user_pwd").toString(), FileUtils.getSecretKey(EsbConfig.SECRET_KEY_PATH, EsbConfig.USER_PWD_KEY));
+			// 编码
+			String ciphertext = Base64.encode(encryptResult);
+			params.put("user_pwd", ciphertext);
+            if(storeManageDao.updateStoreMemberPwd(params) > 0) {
+        		pr.setState(true);
+        		pr.setMessage("管理用户密码重置成功");
+            } else {
+                pr.setState(false);
+        		pr.setMessage("管理用户密码重置失败");
+            }
+        } catch (IOException e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+
+        return pr;
+    }
+    
+    /**
+	 * 获取合作商id
+	 * @param request
+	 * @return
+	 */
+	public GridResult queryPartnerUserId(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String,Object> resParam=new HashMap<String,Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			Map<String,Object> params = (Map<String,Object>)Transform.GetPacket(json, Map.class);
+			if(Integer.parseInt(params.get("public_user_type").toString())==9){
+				//查询当前合作商
+				List<Map<String,Object>> partnerUserIds=storeManageDao.queryPartnerUserIds(params);
+				resParam.put("public_user_type", params.get("public_user_type"));
+				resParam.put("public_user_id", params.get("public_user_id"));
+				resParam.put("partnerUserIds", partnerUserIds);
+				gr.setState(true);
+				gr.setMessage("查询成功");
+				gr.setObj(resParam);
+                return gr;
+            }else if(Integer.parseInt(params.get("public_user_type").toString())==4){
+            	//查询当前业务经理的合作商
+				List<Map<String,Object>> partnerUserIds=storeManageDao.queryPartnerUserIds(params);
+				resParam.put("public_user_type", params.get("public_user_type"));
+				resParam.put("public_user_id", params.get("public_user_id"));
+				resParam.put("partnerUserIds", partnerUserIds);
+				gr.setState(true);
+				gr.setMessage("查询成功");
+				gr.setObj(resParam);
+                return gr;
+            }else{
+            	List<Map<String,Object>> partnerUserIds=storeManageDao.queryPartnerUserIds(params);
+            	resParam.put("public_user_type", params.get("public_user_type"));
+            	resParam.put("public_user_id", params.get("public_user_id"));
+            	resParam.put("partnerUserIds", partnerUserIds);
+				gr.setState(true);
+				gr.setMessage("查询成功");
+				gr.setObj(resParam);
+                return gr;
+            }
+		} catch (Exception e) {
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+			logger.error(e);
+		}
+		return gr;
+	}
+	
+	/**
+	 * 查询商家经营门店列表
+	 * @param request
+	 * @return
+	 */
+	public GridResult queryStoreUserManageList(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			Map<String,Object> params = (Map<String,Object>)Transform.GetPacket(json, Map.class);
+			GridResult pageParamResult = PageUtil.handlePageParams(params);
+			if(pageParamResult!=null){
+				return pageParamResult;
+			}
+			if((!StringUtils.isEmpty(params.get("approval_state")))&&params.get("approval_state") instanceof String){
+				params.put("approval_state",(params.get("approval_state")+"").split(","));
+			}
+			int count=storeManageDao.queryStoreUserManageCount(params);
+			List<Map<String,Object>> list = storeManageDao.queryStoreUserManageList(params);
+			if (list != null && list.size() > 0) {
+				gr.setMessage("查询成功!");
+				gr.setObj(list);
+				gr.setTotal(count);
+			} else {
+				gr.setMessage("无数据");
+			}
+			gr.setState(true);
+		} catch (Exception e) {
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+			logger.error(e);
+		}
+		return gr;
+	}
+	
+	/**
+	 * 查询商家库列表
+	 * @param request
+	 * @return
+	 */
+	public GridResult queryStoreMemberLibraryList(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			Map<String,Object> params = (Map<String,Object>)Transform.GetPacket(json, Map.class);
+			GridResult pageParamResult = PageUtil.handlePageParams(params);
+			if(pageParamResult!=null){
+				return pageParamResult;
+			}
+			if((!StringUtils.isEmpty(params.get("state")))&&params.get("state") instanceof String){
+				params.put("state",(params.get("state")+"").split(","));
+			}
+			int count=storeManageDao.queryStoreMemberLibraryCount(params);
+			List<Map<String,Object>> list = storeManageDao.queryStoreMemberLibraryList(params);
+			if (list != null && list.size() > 0) {
+				gr.setMessage("查询成功!");
+				gr.setObj(list);
+				gr.setTotal(count);
+			} else {
+				gr.setMessage("无数据");
+			}
+			gr.setState(true);
+		} catch (Exception e) {
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+			logger.error(e);
+		}
+		return gr;
+	}
+	
+	/**
+	 * 商家经营店铺新增
+	 * @param request
+	 * @return
+	 */
+	@Transactional
+	public ProcessResult storeUserManageAdd(HttpServletRequest request) throws Exception  {
+		ProcessResult pr = new ProcessResult();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			Map<String,Object> params = (Map<String,Object>)Transform.GetPacket(json, Map.class);
+			if(StringUtils.isEmpty(params.get("user_id"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数user_id");
+                return pr;
+            }
+			if(StringUtils.isEmpty(params.get("store_name"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数store_name");
+                return pr;
+            }
+			if(StringUtils.isEmpty(params.get("store_mobilephone"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数store_mobilephone");
+                return pr;
+            }
+			if(StringUtils.isEmpty(params.get("store_duty_person"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数store_duty_person");
+                return pr;
+            }
+			if(StringUtils.isEmpty(params.get("province"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数province");
+                return pr;
+            }
+			if(StringUtils.isEmpty(params.get("city"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数city");
+                return pr;
+            }
+			if(StringUtils.isEmpty(params.get("area"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数area");
+                return pr;
+            }
+			//判断商家门店名称是否重复
+			int count =storeManageDao.queryStoreNameCount(params);
+			if(count>0){
+				pr.setState(false);
+				pr.setMessage("门店名称已存在");
+				return pr;
+			}
+			if(storeManageDao.storeUserManageAdd(params)<0){
+				pr.setState(false);
+				throw new RuntimeException("新增失败");
+			} 
+			pr.setState(true);
+			pr.setMessage("新增成功");
+		} catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e);
+        }
+		return pr;
+	}
+	
+	/**
+	 * 商家经营店铺编辑
+	 * @param request
+	 * @return
+	 */
+	@Transactional
+	public ProcessResult storeUserManageEdit(HttpServletRequest request) throws Exception  {
+		ProcessResult pr = new ProcessResult();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			Map<String,Object> params = (Map<String,Object>)Transform.GetPacket(json, Map.class);
+			if(StringUtils.isEmpty(params.get("id"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数id");
+                return pr;
+            }
+			if(StringUtils.isEmpty(params.get("user_id"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数user_id");
+                return pr;
+            }
+			if(StringUtils.isEmpty(params.get("STORE_NAME"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数STORE_NAME");
+                return pr;
+            }
+			if(StringUtils.isEmpty(params.get("STORE_MOBILEPHONE"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数STORE_MOBILEPHONE");
+                return pr;
+            }
+			if(StringUtils.isEmpty(params.get("STORE_DUTY_PERSON"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数STORE_DUTY_PERSON");
+                return pr;
+            }
+			if(StringUtils.isEmpty(params.get("province"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数province");
+                return pr;
+            }
+			if(StringUtils.isEmpty(params.get("city"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数city");
+                return pr;
+            }
+			if(StringUtils.isEmpty(params.get("area"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数area");
+                return pr;
+            }
+			Map<String,Object> detail = storeManageDao.queryStoreUserManageDetail(params);
+			if(Integer.parseInt(detail.get("APPROVAL_STATE")+"")==1){
+				params.put("approval_state", 1);
+			}else{
+				params.put("approval_state", 0);
+			}
+			//判断商家门店名称是否重复
+			int count =storeManageDao.queryStoreNameCount(params);
+			if(count>0){
+				pr.setState(false);
+				pr.setMessage("门店名称已存在");
+				return pr;
+			}
+			if(storeManageDao.storeUserManageEdit(params)<=0){
+				pr.setState(false);
+				throw new RuntimeException("编辑失败");
+			} 
+			Map<String,Object> detailParam = storeManageDao.queryStoreUserManageDetail(params);
+			//审批通过门店调用远程接口
+			if(Integer.parseInt(detail.get("APPROVAL_STATE")+"")==1){
+				Map<String,Object> sendParam=new HashMap<String,Object>();
+				Map<String,Object> addressParam=new HashMap<String,Object>();
+				sendParam.put("AGENT_ID", detailParam.get("USER_ID"));
+				sendParam.put("JOINT_STORE_ID", detailParam.get("ID"));
+				sendParam.put("JOINT_STORE_NAME", detailParam.get("STORE_NAME"));
+				sendParam.put("USER_MANAGE_NAME", detailParam.get("STORE_DUTY_PERSON"));
+				sendParam.put("USER_MANAGE_MOBILEPHONE", detailParam.get("STORE_MOBILEPHONE"));
+				addressParam.put("RECEIVING_NAME", detailParam.get("STORE_NAME")+"("+detailParam.get("STORE_DUTY_PERSON")+")");
+				addressParam.put("RECEIVING_PHONE", detailParam.get("STORE_MOBILEPHONE"));
+				addressParam.put("PROVINCE_ID", detailParam.get("PROVINCE"));
+				addressParam.put("CITY_ID", detailParam.get("CITY"));
+				addressParam.put("COUNTY_ID", detailParam.get("COUNTY"));
+				addressParam.put("DETAIL_ADDRESS", detailParam.get("STORE_DETAIL_ADDRESS"));
+				sendParam.put("ADDRESS_INFO", addressParam);
+				Map<String, Object> resPr=(Map<String, Object>)this.queryForPost(sendParam,store_service_url+"agent/Lyinit/esbCooperStoreUpdate");
+                if (Integer.parseInt(resPr.get("state").toString()) != 1) {
+               	 throw new RuntimeException("调用远程接口异常");
+                }
+			}
+			pr.setState(true);
+			pr.setMessage("编辑成功");
+		} catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e);
+        }
+		return pr;
+	}
+	
+	/**
+	 * 查询商家店铺详情
+	 * @param request
+	 * @return
+	 */
+	public GridResult queryStoreUserManageDetail(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			Map<String,Object> params = (Map<String,Object>)Transform.GetPacket(json, Map.class);
+			if(StringUtils.isEmpty(params.get("id"))){
+				gr.setState(false);
+				gr.setMessage("缺少参数");
+                return gr;
+            }
+			Map<String,Object> detail = storeManageDao.queryStoreUserManageDetail(params);
+			if (detail != null ) {
+				gr.setMessage("查询成功!");
+				gr.setObj(detail);
+			} else {
+				gr.setMessage("无数据");
+			}
+			gr.setState(true);
+		} catch (Exception e) {
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+			logger.error(e);
+		}
+		return gr;
+	}
+	
+	/**
+	 * 商家经营店铺审批
+	 * @param request
+	 * @return
+	 */
+	@Transactional
+	public ProcessResult storeUserManageApproval(HttpServletRequest request) throws Exception  {
+		ProcessResult pr = new ProcessResult();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			Map<String,Object> params = (Map<String,Object>)Transform.GetPacket(json, Map.class);
+			if(StringUtils.isEmpty(params.get("id"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数id");
+                return pr;
+            }
+			if(StringUtils.isEmpty(params.get("approval_state"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数approval_state");
+                return pr;
+            }
+			//修改审核状态
+			int count=storeManageDao.storeUserManageApproval(params);
+			if(count<=0){
+				pr.setState(false);
+	            throw new RuntimeException("审批失败");
+			}
+			if(Integer.parseInt(params.get("approval_state").toString())==1){
+				//审批通过操作
+				Map<String, Object> sendParams=storeManageDao.queryStoreUserManageInfo(params);
+				Map<String, Object> resPr=(Map<String, Object>)this.queryForPost(sendParams,store_service_url+"agent/Lyinit/addAgentStore");
+                if (Integer.parseInt(resPr.get("state").toString()) != 1) {
+               	 	throw new RuntimeException("调用远程接口异常");
+                }
+                Map<String,Object> resMap=(Map<String,Object>)resPr.get("data");
+                resMap.put("store_id", params.get("id"));
+                resMap.put("agent_store_id", resMap.get("STORE_ID"));
+                //更新本地php店铺id
+                int num=storeManageDao.updateStoreAgentStoreId(resMap);
+                if(num<=0){
+                	pr.setState(false);
+                	throw new RuntimeException("更新本地php店铺id失败");
+                }
+                pr.setState(true);
+				pr.setMessage("审批成功");
+			}else{
+				//驳回操作
+				pr.setState(true);
+				pr.setMessage("驳回成功");
+			}
+		} catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e);
+        }
+		return pr;
+	}
+	/**
+	 * 门店下拉框
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult storeSelect(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			Map<String,Object> paramMap = (Map<String,Object>)Transform.GetPacket(json, Map.class);
+			pr.setState(true);
+			pr.setMessage("查询成功");
+			pr.setObj(storeManageDao.storeSelect(paramMap));
+		} catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+		return pr;
+	}
+
+}

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tk.analysis.home.dao.HomeAnalysisDao">
+	<!-- 根据用户ID查询用户权限信息 -->
+	<select id="r_queryByUserId" parameterType="java.util.Map" resultType="string">
+		<!-- 童库平台 -->
+	    <if test="public_user_platform_type ==1">
+	    	<if test="public_user_type != null and public_user_type == 2"><!-- 管理员 -->
+	    		select store_id
+	    		  from qx_sys_user_store
+	    		 where user_id = #{public_user_id,jdbcType=INTEGER}
+	    	</if>
+	    	<if test="public_user_type != null and public_user_type == 6"><!-- 营业员 -->
+	    		select store_id
+	    		  from qx_store_user_rel
+	    		 where user_id = #{public_user_id,jdbcType=INTEGER}
+	    	</if>
+	    	<if test="public_user_type != null and public_user_type == 9"><!-- 销售管理 -->
+	    		select tsui.id
+                  from qx_sys_user_info tsui
+                 where tsui.user_type = 4
+     				  and tsui.organization_id in (
+						  	select id from qx_sys_organization_info where connect_by_isleaf=1
+						  	start with parent_id = #{public_user_organization_id,jdbcType=INTEGER} CONNECT BY PRIOR ID = PARENT_ID)
+	    	</if>
+	    </if>
+	</select>
+</mapper>

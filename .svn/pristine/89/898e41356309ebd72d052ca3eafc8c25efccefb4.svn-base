@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.finance.dao.SysUserAuthApprovalDao">
+	<!-- 用户认证信息审批列表总数-->
+	<select id="querySysUserAuthApprovalCount" parameterType="java.util.Map" resultType="int">
+		select count(1) from tbl_bank_card_user_info t
+		<where>
+			t.type=3
+			<if test="user_name !=null and user_name !=''">
+				and exists(select 1 from tbl_sys_user_info tsui 
+					where tsui.user_name=#{user_name,jdbcType=VARCHAR} and tsui.id=t.user_id)
+		 	</if>
+			<if test="user_real_name != null and user_real_name != ''">
+				and user_real_name like '%'||#{user_real_name,jdbcType=VARCHAR}||'%'
+			</if>
+			<if test="user_manage_mobilephone != null and user_manage_mobilephone !=''">
+				and exists(select 1 from tbl_sys_user_info tsui 
+					where tsui.phone=#{user_manage_mobilephone,jdbcType=VARCHAR} and tsui.id=t.user_id)
+			</if>
+			<if test="state != null">
+				and state IN
+	                <foreach item="item" collection="state" open="(" separator="," close=")">
+						#{item}
+					</foreach>
+			</if>
+		</where>
+	</select>
+	<!-- 分页查询用户认证信息审批列表-->
+	<select id="querySysUserAuthApprovalList" parameterType="java.util.Map" resultType="java.util.Map">
+		select *
+			from (select a.*, rownum rn
+				from (
+					select t.id,
+						   t.user_id,
+						   (select user_name from tbl_sys_user_info tsui where tsui.id=t.user_id) as user_name,
+						   (select user_realname from tbl_sys_user_info tsui where tsui.id=t.approval_user_id) as approval_user_realname,
+						   t.user_real_name,
+						   t.state,
+						   to_char(t.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+						   to_char(t.approval_date,'yyyy-mm-dd hh24:mi:ss') approval_date,
+						   t.rejected_reason
+					from tbl_bank_card_user_info t
+					<where>
+						t.type=3
+						<if test="user_name !=null and user_name !=''">
+							and exists(select 1 from tbl_sys_user_info tsui 
+								where tsui.user_name=#{user_name,jdbcType=VARCHAR} and tsui.id=t.user_id)
+					 	</if>
+						<if test="user_real_name != null and user_real_name != ''">
+							and user_real_name like '%'||#{user_real_name,jdbcType=VARCHAR}||'%'
+						</if>
+						<if test="user_manage_mobilephone != null and user_manage_mobilephone !=''">
+							and exists(select 1 from tbl_sys_user_info tsui 
+								where tsui.phone=#{user_manage_mobilephone,jdbcType=VARCHAR} and tsui.id=t.user_id)
+						</if>
+						<if test="state != null">
+							and state IN
+				                <foreach item="item" collection="state" open="(" separator="," close=")">
+									#{item}
+								</foreach>
+						</if>
+					</where>
+					order by t.state asc,create_date desc
+				) a
+			where rownum  &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 用户认证信息详情 -->
+	<select id="querySysUserAuthApprovalDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select t.id,
+			   t.user_id,
+			   (select user_name from tbl_sys_user_info tsui where tsui.id=t.user_id) as user_name,
+			   (select user_realname from tbl_sys_user_info tsui where tsui.id=t.approval_user_id) as approval_user_realname,
+			   t.user_real_name,
+			   t.state,
+			   DECODE(t.state,0,'待审核',1,'已审核',2,'已驳回') as approval_state,
+			   to_char(t.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+			   to_char(t.approval_date,'yyyy-mm-dd hh24:mi:ss') approval_date,
+			   t.rejected_reason,
+			   user_manage_cardid,
+			   user_manage_cardid_img
+		from tbl_bank_card_user_info t
+	   where id =#{id,jdbcType=INTEGER}
+	</select>
+	<!-- 会员账户表更新见证宝相关信息 -->
+    <update id="updateBankAccountInfo" parameterType="java.util.Map">
+    	UPDATE TBL_SYS_BANK_ACCOUNT 
+    	   SET bank_account = #{bank_account,jdbcType=VARCHAR},
+    	   sub_merchant_id=#{sub_merchant_id,jdbcType=VARCHAR}
+		where user_id = #{user_id,jdbcType=INTEGER}
+    </update>
+    <!-- 更新银行卡会员资料信息状态-->
+    <update id="updateBankCardUserInfo" parameterType="java.util.Map">
+    	UPDATE TBL_BANK_CARD_USER_INFO 
+    	   <set>
+    	   		<if test="state !=null and state != ''">
+			   		state=#{state,jdbcType=INTEGER},
+				</if>
+				<if test="rejected_reason !=null and rejected_reason != ''">
+			   		rejected_reason=#{rejected_reason,jdbcType=VARCHAR},
+				</if>
+				approval_user_id = #{public_user_id,jdbcType=INTEGER},
+    	   	    approval_date=sysdate
+    	   </set> 
+		where id = #{id,jdbcType=INTEGER}
+    </update>
+</mapper>

@@ -1,0 +1,460 @@
+package com.tk.oms.marketing.service;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import com.tk.oms.marketing.dao.ActivityProductDao;
+import com.tk.oms.marketing.dao.PresellActivityDao;
+import com.tk.sys.util.GridResult;
+import com.tk.sys.util.HttpUtil;
+import com.tk.sys.util.PageUtil;
+import com.tk.sys.util.ProcessResult;
+import com.tk.sys.util.Transform;
+/**
+ * 促销活动商品
+ * @author Administrator
+ *
+ */
+@Service("ActivityProductService")
+public class ActivityProductService {
+
+	@Resource
+	private ActivityProductDao activityProductDao;
+	@Resource
+	private PresellActivityDao presellActivityDao;
+	/**
+	 * 获取参与促销活动的商品列表
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryActivityProductList(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			GridResult pageParamResult = PageUtil.handlePageParams(paramMap);
+			if(pageParamResult!=null){
+				return pageParamResult;
+			}
+			List<Map<String, Object>> list = activityProductDao.queryActivityProductList(paramMap);
+			int count = activityProductDao.queryActivityProductCount(paramMap);
+			if (list != null && list.size() > 0) {
+				gr.setMessage("获取数据成功");
+				gr.setObj(list);
+			} else {
+				gr.setMessage("无数据");
+			}
+			gr.setState(true);
+			gr.setTotal(count);
+		} catch (Exception e) {
+			e.printStackTrace();
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+		}
+		return gr;
+	}
+	
+	/**
+	 * 获取参与促销活动的待审批商品列表
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryPendingApprovalActivityProductList(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			GridResult pageParamResult = PageUtil.handlePageParams(paramMap);
+			if(pageParamResult!=null){
+				return pageParamResult;
+			}
+			if((!StringUtils.isEmpty(paramMap.get("states")))&&paramMap.get("states") instanceof String){
+				paramMap.put("states",(paramMap.get("states")+"").split(","));
+			}
+			List<Map<String, Object>> list = activityProductDao.queryPendingApprovalActivityProductList(paramMap);
+			int count = activityProductDao.queryPendingApprovalActivityProductCount(paramMap);
+			if (list != null && list.size() > 0) {
+				gr.setMessage("获取数据成功");
+				gr.setObj(list);
+			} else {
+				gr.setMessage("无数据");
+			}
+			gr.setState(true);
+			gr.setTotal(count);
+		} catch (Exception e) {
+			e.printStackTrace();
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+		}
+		return gr;
+	}
+		
+	/**
+	 * 促销活动商品审批通过
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult activityProductApproved(HttpServletRequest request) throws Exception {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			if(StringUtils.isEmpty(paramMap.get("id"))||StringUtils.isEmpty(paramMap.get("public_user_id"))){
+						pr.setMessage("缺少参数");
+						pr.setState(false);
+						return pr;
+			}
+			//2.验证当前操作待审批记录状态是否正常
+			Map<String,Object> pendingApprovalActivityProductDetailMap=activityProductDao.queryPendingApprovalActivityProductDetail(paramMap);
+			if(pendingApprovalActivityProductDetailMap==null){
+				pr.setMessage("操作记录不存在，请检查");
+				pr.setState(false);
+				return pr;
+			}
+			if(!"2".equals(pendingApprovalActivityProductDetailMap.get("STATE"))){
+				pr.setMessage("操作记录状态异常，请检查");
+				pr.setState(false);
+				return pr;
+			}
+			//4.校验活动报名时间是否已截止
+			int check_apply_date_count= activityProductDao.checkActivityApplyDateCount(paramMap);
+			if(check_apply_date_count <= 0){
+				throw new RuntimeException("当前商品报名时间不在活动报名期间");
+			}
+			//当为限时折扣类活动时
+			//5.1校验活动商品报名数量是否已达上限
+			int check_count= activityProductDao.checkActivityProductCount(paramMap);
+			if(check_count <= 0){
+				throw new RuntimeException("当前活动入驻商报名商品数已达上限");
+			}
+			//6.活动商品审批通过后转移到主表
+			int num=activityProductDao.updateActivityProductFromPendingApprovalActivityProduct(paramMap);
+			paramMap.put("activity_id", pendingApprovalActivityProductDetailMap.get("ACTIVITY_ID"));
+			paramMap.put("product_itemnumber", pendingApprovalActivityProductDetailMap.get("PRODUCT_ITEMNUMBER"));
+			num += activityProductDao.updateActivityProductSkuFromPendingApprovalActivityProductSku(paramMap);
+
+			//复制预售活动商品SKU数据
+			num += activityProductDao.updatePreSellActivitySkuFromApprovalActivityProductSku(paramMap);
+			//7.更新待审批记录为审批通过
+			paramMap.put("state", "3");
+			num = activityProductDao.updatePendingApprovalActivityProductState(paramMap);
+			if(num <= 0){
+				throw new RuntimeException("操作失败");
+			}
+			pr.setMessage("操作成功");
+			pr.setState(true);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+
+	/**
+	 * 待审批促销活动商品审批驳回
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult activityProductRejected(HttpServletRequest request) throws Exception{
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			if(StringUtils.isEmpty(paramMap.get("id"))||StringUtils.isEmpty(paramMap.get("public_user_id"))
+			   ||StringUtils.isEmpty(paramMap.get("approval_remark"))){
+				pr.setMessage("缺少参数");
+				pr.setState(false);
+				return pr;
+			}
+			//TODO 20170411-002 1.验证操作用户是否存在
+//			Map<String,Object> operateUserMap=userDao.queryUserDetail(paramMap);
+//			if(operateUserMap==null){
+//				pr.setMessage("操作用户不存在，请检查");
+//				pr.setState(false);
+//				return pr;
+//			}
+			//2.验证当前操作待审批记录状态是否正常
+			Map<String,Object> pendingApprovalActivityProductDetailMap=activityProductDao.queryPendingApprovalActivityProductDetail(paramMap);
+			if(pendingApprovalActivityProductDetailMap==null){
+				pr.setMessage("操作记录不存在，请检查");
+				pr.setState(false);
+				return pr;
+			}
+			if(!"2".equals(pendingApprovalActivityProductDetailMap.get("STATE"))){
+				pr.setMessage("操作记录状态异常，请检查");
+				pr.setState(false);
+				return pr;
+			}
+			//3.更新待审批记录为审批驳回
+			paramMap.put("state", "4");
+			int num = activityProductDao.updatePendingApprovalActivityProductState(paramMap);
+			if(num <= 0){
+				throw new RuntimeException("操作失败");
+			}
+			pr.setMessage("操作成功");
+			pr.setState(true);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+
+	
+	/**
+	 * 获取参与促销活动的商品sku列表
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryActivityProductSkuList(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			if(StringUtils.isEmpty("activity_id")||StringUtils.isEmpty("product_itemnumber")){
+				pr.setMessage("缺少参数");
+				pr.setState(false);
+				return pr;
+			}
+			List<Map<String, Object>> list = activityProductDao.queryActivityProductSkuList(paramMap);
+			if (list != null && list.size() > 0) {
+				pr.setMessage("获取数据成功");
+				pr.setObj(list);
+			} else {
+				pr.setMessage("无数据");
+			}
+			pr.setState(true);
+		} catch (Exception e) {
+			e.printStackTrace();
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+		}
+		return pr;
+	}
+	
+	/**
+	 * 获取参与促销活动的待审批商品sku列表
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryPendingApprovalActivityProductSkuList(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			if(StringUtils.isEmpty("activity_id")||StringUtils.isEmpty("product_itemnumber")){
+				pr.setMessage("缺少参数");
+				pr.setState(false);
+				return pr;
+			}
+			List<Map<String, Object>> list = activityProductDao.queryPendingApprovalActivityProductSkuList(paramMap);
+			if (list != null && list.size() > 0) {
+				pr.setMessage("获取数据成功");
+				pr.setObj(list);
+			} else {
+				pr.setMessage("无数据");
+			}
+			pr.setState(true);
+		} catch (Exception e) {
+			e.printStackTrace();
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+		}
+		return pr;
+	}
+	
+	/**
+	 * 获取参与促销活动的商品sku库存列表
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryActivityProductSkuStockList(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			if(StringUtils.isEmpty("activity_id")||StringUtils.isEmpty("product_itemnumber")){
+				pr.setMessage("缺少参数");
+				pr.setState(false);
+				return pr;
+			}
+			List<Map<String, Object>> list = activityProductDao.queryActivityProductSkuStockList(paramMap);
+			if (list != null && list.size() > 0) {
+				pr.setMessage("获取数据成功");
+				pr.setObj(list);
+			} else {
+				pr.setMessage("无数据");
+			}
+			pr.setState(true);
+		} catch (Exception e) {
+			e.printStackTrace();
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+		}
+		return pr;
+	}
+	
+	/**
+	 * 待审批促销活动商品审批驳回
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult activityProductSort(HttpServletRequest request) throws Exception{
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			if(StringUtils.isEmpty(paramMap.get("activity_id"))||StringUtils.isEmpty(paramMap.get("public_user_id"))
+			   ||StringUtils.isEmpty(paramMap.get("sort_product_list"))){
+				pr.setMessage("缺少参数");
+				pr.setState(false);
+				return pr;
+			}
+			//TODO 20170411-002 1.验证操作用户是否存在
+//			Map<String,Object> operateUserMap=userDao.queryUserDetail(paramMap);
+//			if(operateUserMap==null){
+//				pr.setMessage("操作用户不存在，请检查");
+//				pr.setState(false);
+//				return pr;
+//			}
+			List<Map<String,Object>> sortProductList=(List<Map<String,Object>>)paramMap.get("sort_product_list");
+			if(sortProductList.size() < 1){
+				pr.setMessage("参数错误【sort_product_list】");
+				pr.setState(false);
+				return pr;
+			}
+			//2.排序
+			int num = activityProductDao.updateActivityProductSortId(sortProductList);
+			if(num <= 0){
+				throw new RuntimeException("操作失败");
+			}
+			pr.setMessage("操作成功");
+			pr.setState(true);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+	
+	/**
+	 * 促销活动商品强制退出
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult activityProductForceQuit(HttpServletRequest request) throws Exception{
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			if(StringUtils.isEmpty(paramMap.get("activity_product_ids"))||StringUtils.isEmpty(paramMap.get("public_user_id"))){
+				pr.setMessage("缺少参数");
+				pr.setState(false);
+				return pr;
+			}
+			//TODO 20170411-002 1.验证操作用户是否存在
+//			Map<String,Object> operateUserMap=userDao.queryUserDetail(paramMap);
+//			if(operateUserMap==null){
+//				pr.setMessage("操作用户不存在，请检查");
+//				pr.setState(false);
+//				return pr;
+//			}
+			List<Integer> quitActivityProductList=(List<Integer>)paramMap.get("activity_product_ids");
+			if(quitActivityProductList.size() < 1){
+				pr.setMessage("参数错误【activity_product_ids】");
+				pr.setState(false);
+				return pr;
+			}
+			//2.清除活动商品【先清除sku，再清除商品】
+			activityProductDao.deleteActivityProductSku(paramMap);
+			int num_product = activityProductDao.deleteActivityProduct(paramMap);
+			activityProductDao.deleteActivityProductSkuApply(paramMap);
+			int num_product_apply = activityProductDao.deleteActivityProductApply(paramMap);
+			if(num_product <= 0 || num_product_apply <=0){
+				throw new RuntimeException("操作失败");
+			}
+			pr.setMessage("操作成功");
+			pr.setState(true);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+	
+	/**
+	 * 预售活动预售数量列表
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryPreSellActivityProductSkuList(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			if(StringUtils.isEmpty("activity_id")
+					||StringUtils.isEmpty("product_itemnumber")
+					||StringUtils.isEmpty("approval")
+					){
+				pr.setMessage("缺少参数");
+				pr.setState(false);
+				return pr;
+			}
+			List<Map<String, Object>> list = presellActivityDao.queryActivityProductSkuList(paramMap);
+			if (list != null && list.size() > 0) {
+				pr.setMessage("获取数据成功");
+				pr.setObj(list);
+			} else {
+				pr.setMessage("无数据");
+			}
+			pr.setState(true);
+		} catch (Exception e) {
+			e.printStackTrace();
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+		}
+		return pr;
+	}
+}

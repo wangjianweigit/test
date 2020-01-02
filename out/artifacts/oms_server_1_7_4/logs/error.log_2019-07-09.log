@@ -1,0 +1,52 @@
+2019-07-09 09:53:16 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 09:53:17 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 09:53:18 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 09:53:19 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 10:05:40 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 10:05:42 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 10:05:43 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 10:05:44 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 10:07:23 ERROR [com.tk.oms.product.service.ProductTypeService] 批量编辑商品分类失败：同步商品分类数据至OA失败
+2019-07-09 10:10:13 ERROR [com.tk.oms.product.service.ProductTypeService] 批量编辑商品分类失败：同步商品分类数据至OA失败
+2019-07-09 10:10:26 ERROR [com.tk.oms.product.service.ProductTypeService] 批量编辑商品分类失败：同步商品分类数据至OA失败
+2019-07-09 10:10:42 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 10:10:44 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 10:10:45 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 10:10:47 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 10:43:01 ERROR [com.tk.oms.product.service.ProductTypeService] 批量编辑商品分类失败：同步商品分类数据至OA失败
+2019-07-09 10:43:26 ERROR [com.tk.oms.product.service.ProductTypeService] 批量编辑商品分类失败：同步商品分类数据至OA失败
+2019-07-09 10:44:58 ERROR [com.tk.oms.product.service.ProductTypeService] 批量编辑商品分类失败：同步商品分类数据至OA失败
+2019-07-09 10:45:09 ERROR [com.tk.oms.product.service.ProductTypeService] 批量编辑商品分类失败：同步商品分类数据至OA失败
+2019-07-09 10:49:02 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 10:49:03 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 10:49:05 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 10:49:06 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 11:17:20 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 11:17:21 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 11:17:22 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 11:17:23 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 11:48:46 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 11:48:48 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 11:48:50 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 11:48:51 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 11:53:38 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 11:53:40 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 11:53:41 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 11:53:42 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 11:54:31 ERROR [com.tk.oms.product.service.ProductTypeService] 批量编辑商品分类失败：nested exception is org.apache.ibatis.binding.BindingException: Parameter 'parent_id' not found. Available parameters are [parentId, param1]
+2019-07-09 11:54:51 ERROR [com.tk.oms.product.service.ProductTypeService] 批量编辑商品分类失败：nested exception is org.apache.ibatis.binding.BindingException: Parameter 'parent_id' not found. Available parameters are [parentId, param1]
+2019-07-09 11:55:14 ERROR [com.tk.oms.product.service.ProductTypeService] 批量编辑商品分类失败：nested exception is org.apache.ibatis.binding.BindingException: Parameter 'parent_id' not found. Available parameters are [parentId, param1]
+2019-07-09 11:55:47 ERROR [com.tk.oms.product.service.ProductTypeService] 批量编辑商品分类失败：nested exception is org.apache.ibatis.binding.BindingException: Parameter 'parent_id' not found. Available parameters are [parentId, param1]
+2019-07-09 11:56:46 ERROR [com.tk.oms.product.service.ProductTypeService] 批量编辑商品分类失败：nested exception is org.apache.ibatis.binding.BindingException: Parameter 'parent_id' not found. Available parameters are [parentId, param1]
+2019-07-09 11:57:12 ERROR [com.tk.oms.product.service.ProductTypeService] 批量编辑商品分类失败：nested exception is org.apache.ibatis.binding.BindingException: Parameter 'parent_id' not found. Available parameters are [parentId, param1]
+2019-07-09 11:57:27 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 11:57:29 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 11:57:30 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 11:57:31 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 14:23:10 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 14:23:11 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 14:23:13 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 14:23:14 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-07-09 14:31:46 ERROR [com.tk.oms.product.service.ProductTypeService] 批量编辑商品分类失败：For input string: ""
+2019-07-09 14:32:11 ERROR [com.tk.oms.product.service.ProductTypeService] 批量编辑商品分类失败：For input string: ""
+2019-07-09 14:32:30 ERROR [com.tk.oms.product.service.ProductTypeService] 批量编辑商品分类失败：For input string: ""

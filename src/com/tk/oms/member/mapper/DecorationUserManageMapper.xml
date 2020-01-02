@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tk.oms.member.dao.DecorationUserManageDao">
+
+    <!--查询装修用户列表数据-->
+    <select id="queryDecorationUserList" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select a.*, rownum as ranking from (
+                select
+                    tui.id,tui.login_name, tui.user_manage_name,
+                    (select user_realname from tbl_sys_user_info where id = tui.market_supervision_user_id) ywjl_user_name,
+                    (select user_realname from tbl_sys_user_info where id = tui.referee_user_id) ywy_user_name,
+                    (select store_name from tbl_store_info where id = tui.store_id) md_name,
+                    (select name from tbl_dic_region where id = tui.user_store_address_province) province_name,
+                    (select name from tbl_dic_region where id = tui.user_store_address_city) city_name,
+                    (select name from tbl_dic_region where id = tui.user_store_address_county) county_name,
+                    (select name from tbl_site_info where id = tui.site_id) site_name
+                from
+                    tbl_user_info tui
+                where
+                    tui.decoration_state = 1
+                <if test="login_name!=null and login_name!=''">
+                    and trim(tui.login_name) = #{login_name,jdbcType=VARCHAR}
+                </if>
+                <if test="user_manage_name!=null and user_manage_name!=''">
+                    and trim(tui.user_manage_name) = #{user_manage_name,jdbcType=VARCHAR}
+                </if>
+                <if test="ywjl_user_id != null and ywjl_user_id != ''">
+                    and	tui.market_supervision_user_id = #{ywjl_user_id,jdbcType=VARCHAR}
+                </if>
+                <if test="md_id != null and md_id != 0 ">
+                    and	tui.store_id = #{md_id,jdbcType=INTEGER}
+                </if>
+                <if test="ywy_user_id != null and ywy_user_id != ''">
+                    and	tui.referee_user_id = #{ywy_user_id,jdbcType=VARCHAR}
+                </if>
+                <if test="site_id != null and site_id!=''">
+                    and tui.site_id =#{site_id,jdbcType=INTEGER}
+                </if>
+                <if test="province != null and province!=''">
+                    and tui.user_company_address_province = #{province,jdbcType=INTEGER}
+                </if>
+                <if test="city != null and city!=''">
+                    and tui.user_company_address_city = #{city,jdbcType=INTEGER}
+                </if>
+                <if test="area != null and area!=''">
+                    and tui.user_company_address_county = #{area,jdbcType=INTEGER}
+                </if>
+            ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where ranking &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--查询装修用户列表总数量-->
+    <select id="queryDecorationUserCount" parameterType="java.util.Map" resultType="int">
+        select count(1) from tbl_user_info tui where tui.decoration_state = 1
+        <if test="login_name!=null and login_name!=''">
+            and trim(tui.login_name) = #{login_name,jdbcType=VARCHAR}
+        </if>
+        <if test="user_manage_name!=null and user_manage_name!=''">
+            and trim(tui.user_manage_name) = #{user_manage_name,jdbcType=VARCHAR}
+        </if>
+        <if test="ywjl_user_id != null and ywjl_user_id != ''">
+            and	tui.market_supervision_user_id = #{ywjl_user_id,jdbcType=VARCHAR}
+        </if>
+        <if test="md_id != null and md_id != 0 ">
+            and	tui.store_id = #{md_id,jdbcType=INTEGER}
+        </if>
+        <if test="ywy_user_id != null and ywy_user_id != ''">
+            and	tui.referee_user_id = #{ywy_user_id,jdbcType=VARCHAR}
+        </if>
+        <if test="site_id != null and site_id!=''">
+            and tui.site_id =#{site_id,jdbcType=INTEGER}
+        </if>
+        <if test="province != null and province!=''">
+            and tui.user_company_address_province = #{province,jdbcType=INTEGER}
+        </if>
+        <if test="city != null and city!=''">
+            and tui.user_company_address_city = #{city,jdbcType=INTEGER}
+        </if>
+        <if test="area != null and area!=''">
+            and tui.user_company_address_county = #{area,jdbcType=INTEGER}
+        </if>
+    </select>
+
+    <!--更新用户装修状态-->
+    <update id="updateDecorationStateById" parameterType="java.util.Map">
+        update
+            tbl_user_info
+        <set>
+            decoration_state = #{decoration_state,jdbcType=INTEGER},
+            <if test="decoration_state == 1">
+                decoration_date = sysdate
+            </if>
+            <if test="decoration_state == 0">
+                decoration_date = null
+            </if>
+        </set>
+        where id = #{user_id,jdbcType=INTEGER}
+    </update>
+</mapper>

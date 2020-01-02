@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.basicinfo.dao.DicPublicTypeDao">
+	
+	<resultMap type="java.util.Map" id="optionMap">
+		<result column="id" property="id"/>
+		<result column="type_id" property="option"/>
+	</resultMap>
+    <!--查询经营类型列表-->
+    <select id="queryDicPublicTypeOption" parameterType="java.util.Map" resultMap="optionMap">
+        select id,type_id
+          from tbl_dic_public_type 
+         where is_delete = 0
+           and type = '经营类型'
+         order by id
+    </select>
+
+</mapper>

@@ -1,0 +1,1236 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tk.oms.analysis.dao.AreaSalesAnalysisDao">
+
+    <!-- 查询区域销售分析-->
+    <select id="queryList" parameterType="java.util.Map" resultType="java.util.Map">
+    	select * from (
+			select info.*, rownum rn from (
+				select a.*
+				    from (select temp.store_id,
+						       temp.store_name,
+						       temp.ywjl_user_id,
+						       temp.ywjl_user_name,
+						       temp.ywjl_user_realname,
+						       temp.ywy_user_id,
+						       temp.ywy_user_name,
+						       temp.ywy_user_realname,
+						       nvl (temp2.order_total, 0) order_total,
+						       nvl (temp2.sales_money_total, 0) sales_money_total,
+						       nvl (temp3.replace_order_total, 0) replace_order_total,
+						       nvl (temp4.member_service_money, 0) member_service_money,
+						       nvl (temp4.loan_amount, 0) loan_amount,
+						       nvl (temp5.return_product_count, 0) return_product_count,
+						       nvl (temp5.product_count, 0) product_count,
+						       nvl (temp6.member_count, 0) member_count,
+						       nvl (temp7.new_member_count, 0) new_member_count,
+						       nvl (temp8.big_member_ratio, 0) big_member_ratio_count,
+						       case
+						          when nvl (temp5.return_product_count, 0) = 0
+						          then
+						             0
+						          when nvl (temp5.product_count, 0) = 0
+						          then
+						             0
+						          else
+						             round (temp5.return_product_count / temp5.product_count * 100,
+						                    2)
+						       end
+						          return_product_rate,
+						       case
+						          when nvl (temp4.member_service_money, 0) = 0
+						          then
+						             0
+						          when nvl (temp4.loan_amount, 0) = 0
+						          then
+						             0
+						          else
+						             round (temp4.member_service_money / temp4.loan_amount * 100,
+						                    2)
+						       end
+						          member_service_rate,
+						       case
+						          when nvl (temp2.sales_money_total, 0) = 0 then 0
+						          when nvl (temp6.member_count, 0) = 0 then 0
+						          else round (temp2.sales_money_total / temp6.member_count, 2)
+						       end
+						          per_capita_order_money,
+						       case
+						          when nvl (temp2.sales_money_total, 0) = 0 then 0
+						          when nvl (temp2.order_total, 0) = 0 then 0
+						          else round (temp2.sales_money_total / temp2.order_total, 2)
+						       end
+						          average_order_money,
+						       case
+						          when nvl (temp8.big_member_ratio, 0) = 0 then 0
+						          when nvl (temp6.member_count, 0) = 0 then 0
+						          else round (temp8.big_member_ratio / temp6.member_count * 100, 2)
+						       end
+						          big_member_ratio
+						  from (select tsi.id as store_id,
+						               tsi.store_name,
+						               tsi.manager_user_id as ywjl_user_id,
+						               (select user_name
+						                  from tbl_sys_user_info
+						                 where id = tsi.manager_user_id)
+						                  ywjl_user_name,
+						               (select user_realname
+						                  from tbl_sys_user_info
+						                 where id = tsi.manager_user_id)
+						                  ywjl_user_realname,
+						               tsur.user_id as ywy_user_id,
+						               (select user_name
+						                  from tbl_sys_user_info
+						                 where id = tsur.user_id)
+						                  ywy_user_name,
+						               (select user_realname
+						                  from tbl_sys_user_info
+						                 where id = tsur.user_id)
+						                  ywy_user_realname
+						          from tbl_store_info tsi, tbl_store_user_rel tsur
+						         where     tsi.manager_user_id is not null
+						               and tsi.id = tsur.store_id
+						               and tsur.type = '3') temp
+						       left join
+						       (  select ywy_user_name,
+						       			 md_id,
+						                 count (id) order_total,
+						                 sum (payment_money) sales_money_total
+						            from tbl_order_info toi
+						           where     order_state in (2, 3, 5)
+						                 and (ywy_user_name != '0' or ywy_user_name is not null)
+						                 and create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						        group by ywy_user_name, md_id) temp2
+						          on temp.ywy_user_name = temp2.ywy_user_name
+						         and temp.store_id = temp2.md_id
+						       left join
+						       (  select ywy_user_name, md_id, count (id) replace_order_total
+						            from tbl_order_info
+						           where     order_type = '代发'
+						                 and order_state in (2, 3, 5)
+						                 and (ywy_user_name != '0' or ywy_user_name is not null)
+						                 and create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						        group by ywy_user_name,md_id) temp3
+						          on temp.ywy_user_name = temp3.ywy_user_name
+						         and temp.store_id = temp3.md_id
+						       left join
+						       (  select t1.ywy_user_name,
+						       			 t1.md_id,
+						                 sum (t2.member_service_money) member_service_money,
+						                 sum (t3.loan_amount) loan_amount
+						            from tbl_order_info t1,(select order_number, sum (divide_money) member_service_money
+						                    from tbl_order_divide_record 
+						                    where  create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                       and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                       and divide_type = '2'
+						                       group by order_number) t2,
+						                       (select order_number, sum (divide_money) loan_amount
+								                  from tbl_order_divide_record 
+							                     where create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+							                       and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+							                       and divide_type = '1'
+							                       group by order_number) t3
+						           where     t1.order_state in (2, 3, 5)
+						                 and (t1.ywy_user_name != '0' or t1.ywy_user_name is not null)
+						                 and t1.create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and t1.create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and t1.order_number = t2.order_number(+)
+						                 and t1.order_number = t3.order_number(+)
+						        group by t1.ywy_user_name,t1.md_id) temp4
+						          on temp.ywy_user_name = temp4.ywy_user_name
+						         and temp.store_id = temp4.md_id
+						       left join
+						       (  select a.ywy_user_name,a.md_id,a.product_count,b.return_product_count
+						               from (select toi.ywy_user_name,
+						               				toi.md_id,
+						                          sum (toi.product_count) product_count
+						            from tbl_order_info toi
+						                   where     toi.order_state in (2, 3, 5)
+						                         and (toi.ywy_user_name != '0' or toi.ywy_user_name is not null)
+						                         and toi.create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                         and toi.create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                    group by toi.ywy_user_name,toi.md_id) a,
+						                    (select toi.ywy_user_name,
+						                    		toi.md_id,
+						                             sum (t1.return_product_count) return_product_count
+						                         from tbl_order_info toi,(select t3.order_number_platform, count (t3.id) return_product_count
+						                            from ${jdbc_user}.tbl_new_return_order t2, ${jdbc_user}.tbl_new_return_detail_code t3
+						                              where t2.return_number = t3.return_number
+						                              and t2.state = '8'
+						                              and t2.refund_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                              and t2.refund_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                              group by t3.order_number_platform) t1
+						                          where toi.order_state in (2, 3, 5)
+						                         and (toi.ywy_user_name != '0' or toi.ywy_user_name is not null)
+						                           and toi.order_number = t1.order_number_platform(+)
+						                    group by toi.ywy_user_name,toi.md_id) b
+						                where a.ywy_user_name = b.ywy_user_name and a.md_id = b.md_id) temp5
+						          on temp.ywy_user_name = temp5.ywy_user_name
+						         and temp.store_id = temp5.md_id
+						       left join (select ywy_user_name,md_id,count(distinct user_name) member_count
+						                    from tbl_order_info toi
+						                   where     order_state in (2, 3, 5)
+						                         and (ywy_user_name != '0' or ywy_user_name is not null)
+						                         and create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                     	 and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                group by ywy_user_name,md_id) temp6
+						          on temp.ywy_user_name = temp6.ywy_user_name
+						         and temp.store_id = temp6.md_id
+						       left join
+						       (  select referee_user_id, store_id, count (id) new_member_count
+						            from tbl_user_info tui
+						           where     tui.create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and tui.create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and referee_user_id is not null
+						        group by referee_user_id,store_id) temp7
+						          on temp.ywy_user_id = temp7.referee_user_id
+						         and temp.store_id = temp7.store_id
+						       left join
+						       (select b.ywy_user_name,b.md_id,count(b.user_name) big_member_ratio from (
+						            select t1.ywy_user_name,t1.md_id,t1.user_name,
+						                   sum (t1.product_money) as order_money
+						              from tbl_order_info t1
+						             where t1.order_state in (2, 3, 5)
+						               and t1.create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						               and t1.create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						            group by t1.ywy_user_name,t1.md_id,t1.user_name) b
+						        where b.order_money &gt; #{threshold,jdbcType=INTEGER}
+						          and (b.ywy_user_name != '0' or b.ywy_user_name is not null)
+						        group by b.ywy_user_name,b.md_id) temp8
+						          on temp.ywy_user_name = temp8.ywy_user_name
+						         and temp.store_id = temp8.md_id
+						union all
+						                            
+						select temp.store_id,
+						       temp.store_name,
+						       temp.ywjl_user_id,
+						       temp.ywjl_user_name,
+						       temp.ywjl_user_realname,
+						       temp.ywy_user_id,
+						       temp.ywy_user_name,
+						       temp.ywy_user_realname,
+						       nvl (temp2.order_total, 0) order_total,
+						       nvl (temp2.sales_money_total, 0) sales_money_total,
+						       nvl (temp3.replace_order_total, 0) replace_order_total,
+						       nvl (temp4.member_service_money, 0) member_service_money,
+						       nvl (temp4.loan_amount, 0) loan_amount,
+						       nvl (temp5.return_product_count, 0) return_product_count,
+						       nvl (temp5.product_count, 0) product_count,
+						       nvl (temp6.member_count, 0) member_count,
+						       nvl (temp7.new_member_count, 0) new_member_count,
+						       nvl (temp8.big_member_ratio, 0) big_member_ratio_count,
+						       case
+						          when nvl (temp5.return_product_count, 0) = 0
+						          then
+						             0
+						          when nvl (temp5.product_count, 0) = 0
+						          then
+						             0
+						          else
+						             round (temp5.return_product_count / temp5.product_count * 100,
+						                    2)
+						       end
+						          return_product_rate,
+						       case
+						          when nvl (temp4.member_service_money, 0) = 0
+						          then
+						             0
+						          when nvl (temp4.loan_amount, 0) = 0
+						          then
+						             0
+						          else
+						             round (temp4.member_service_money / temp4.loan_amount * 100,
+						                    2)
+						       end
+						          member_service_rate,
+						       case
+						          when nvl (temp2.sales_money_total, 0) = 0 then 0
+						          when nvl (temp6.member_count, 0) = 0 then 0
+						          else round (temp2.sales_money_total / temp6.member_count, 2)
+						       end
+						          per_capita_order_money,
+						       case
+						          when nvl (temp2.sales_money_total, 0) = 0 then 0
+						          when nvl (temp2.order_total, 0) = 0 then 0
+						          else round (temp2.sales_money_total / temp2.order_total, 2)
+						       end
+						          average_order_money,
+						       case
+						          when nvl (temp8.big_member_ratio, 0) = 0 then 0
+						          when nvl (temp6.member_count, 0) = 0 then 0
+						          else round (temp8.big_member_ratio / temp6.member_count * 100, 2)
+						       end
+						          big_member_ratio
+						  from (select tsi.id as store_id,
+						               tsi.store_name,
+						               tsi.manager_user_id as ywjl_user_id,
+						               (select user_name
+						                  from tbl_sys_user_info
+						                 where id = tsi.manager_user_id)
+						                  ywjl_user_name,
+						               (select user_realname
+						                  from tbl_sys_user_info
+						                 where id = tsi.manager_user_id)
+						                  ywjl_user_realname,
+						               0 ywy_user_id,
+						               '0' ywy_user_name,
+						               '' ywy_user_realname
+						          from tbl_store_info tsi
+						         where tsi.manager_user_id is not null) temp
+						       left join
+						       (  select md_id,
+						                 '0' ywy_user_name,
+						                 count (id) order_total,
+						                 sum (payment_money) sales_money_total
+						            from tbl_order_info toi
+						           where     order_state in (2, 3, 5)
+						                 and (ywy_user_name = '0' or ywy_user_name is null)
+						                 and create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and md_id is not null
+						        group by md_id) temp2
+						          on     temp.store_id = temp2.md_id
+						             and temp.ywy_user_name = temp2.ywy_user_name
+						       left join
+						       (  select md_id, '0' ywy_user_name, count (id) replace_order_total
+						            from tbl_order_info
+						           where     order_type = '代发'
+						                 and order_state in (2, 3, 5)
+						                 and (ywy_user_name = '0' or ywy_user_name is null)
+						                 and create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and md_id is not null
+						        group by md_id) temp3
+						          on     temp.store_id = temp3.md_id
+						             and temp.ywy_user_name = temp3.ywy_user_name
+						       left join
+						       (  select t1.md_id,
+						                 '0' ywy_user_name,
+						                 sum (t2.member_service_money) member_service_money,
+						                 sum (t3.loan_amount) loan_amount
+						            from tbl_order_info t1,(select order_number, sum (divide_money) member_service_money 
+						                   from tbl_order_divide_record 
+						                   where   create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                       and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                       and divide_type = '2'
+						                       group by order_number) t2,
+						                       (select order_number, sum (divide_money) loan_amount 
+							                      from tbl_order_divide_record 
+							                     where create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+							                       and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+							                       and divide_type = '1'
+							                       group by order_number) t3
+						           where     t1.order_state in (2, 3, 5)
+						                 and (t1.ywy_user_name = '0' or t1.ywy_user_name is null)
+						                 and t1.md_id is not null
+						                 and t1.create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and t1.create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and t1.order_number = t2.order_number(+)
+						                 and t1.order_number = t3.order_number(+)
+						        group by t1.md_id) temp4
+						          on     temp.store_id = temp4.md_id
+						             and temp.ywy_user_name = temp4.ywy_user_name
+						       left join
+						       (  select a.md_id,'0' ywy_user_name, a.product_count, b.return_product_count
+						               from (select toi.md_id,
+						                 sum (toi.product_count) product_count
+						            from tbl_order_info toi
+						                   where     toi.order_state in (2, 3, 5)
+						                         and (toi.ywy_user_name = '0' or toi.ywy_user_name is null)
+						                         and toi.create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                         and toi.create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						            group by toi.md_id) a,
+						            (select toi.md_id,
+						                     sum (t1.return_product_count) return_product_count
+						               from tbl_order_info toi,(select t3.order_number_platform, count (t3.id) return_product_count
+						                            from ${jdbc_user}.tbl_new_return_order t2, ${jdbc_user}.tbl_new_return_detail_code t3
+						                              where t2.return_number = t3.return_number
+						                              and t2.state = '8'
+						                              and t2.refund_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                              and t2.refund_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                              group by t3.order_number_platform) t1
+						                   where     toi.order_state in (2, 3, 5)
+						                         and (toi.ywy_user_name = '0' or toi.ywy_user_name is null)
+						                           and toi.order_number = t1.order_number_platform(+)
+						            group by toi.md_id) b
+						            where a.md_id = b.md_id) temp5
+						          on     temp.store_id = temp5.md_id
+						             and temp.ywy_user_name = temp5.ywy_user_name
+						       left join
+						       (select md_id,0 ywy_user_id,count(distinct user_name) member_count
+						            from tbl_order_info toi
+						           where     order_state in (2, 3, 5)
+						                 and (ywy_user_name = '0' or ywy_user_name is null)
+						                 and create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and md_id is not null
+						        group by md_id) temp6
+						          on     temp.store_id = temp6.md_id
+						             and temp.ywy_user_id = temp6.ywy_user_id
+						       left join
+						       (  select store_id, 0 referee_user_id, count (id) new_member_count
+						            from tbl_user_info tui
+						           where     tui.create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and tui.create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and referee_user_id is null
+						        group by store_id) temp7
+						          on     temp.store_id = temp7.store_id
+						             and temp.ywy_user_id = temp7.referee_user_id
+						       left join
+						       (  select b.md_id,0 ywy_user_id,count(b.user_name) big_member_ratio from (
+						            select t1.md_id,t1.user_name,
+						                   sum (t1.product_money) as order_money
+						              from tbl_order_info t1
+						             where t1.order_state in (2, 3, 5)
+						               and (t1.ywy_user_name = '0' or t1.ywy_user_name is null)
+						               and t1.create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						               and t1.create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						            group by t1.md_id,t1.user_name) b
+						        where b.order_money &gt; #{threshold,jdbcType=INTEGER}
+						        group by b.md_id) temp8
+						          on     temp.store_id = temp8.md_id
+						             and temp.ywy_user_id = temp8.ywy_user_id) a
+							<where>
+								<if test="ywjl_user_id != null and ywjl_user_id != '' ">
+							    	and	a.ywjl_user_id = #{ywjl_user_id,jdbcType=VARCHAR}
+								</if>
+								<if test="store_id != null and store_id != 0 ">
+								    and	a.store_id = #{store_id,jdbcType=INTEGER}
+								</if>
+								<if test="ywy_user_id != null and ywy_user_id != '' ">
+								    and	a.ywy_user_id = #{ywy_user_id,jdbcType=VARCHAR}
+								</if>
+								 <if test="public_user_type != null and public_user_type == 2">
+						            and exists (select 1 from tbl_sys_user_store tsus where tsus.store_id = a.store_id and tsus.user_id = #{public_user_id,jdbcType=INTEGER})
+						        </if>
+						        <if test="public_user_type != null and public_user_type == 3">
+						            and a.ywy_user_id = #{public_user_id,jdbcType=INTEGER}
+						        </if>
+						        <if test="public_user_type != null and public_user_type == 4">
+						            and a.ywjl_user_id = #{public_user_id,jdbcType=INTEGER}
+						        </if>
+						        <if test="public_user_type != null and public_user_type == 5">
+						            and exists(select 1 from tbl_store_info tsi where tsi.id = a.store_id and tsi.shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER})
+						        </if>
+						        <if test="public_user_type != null and public_user_type == 6">
+						            and exists(select 1 from tbl_store_user_rel tsui where tsui.store_id = a.store_id and tsui.user_id = #{public_user_id,jdbcType=INTEGER})
+						        </if>
+						        <if test="public_user_type != null and public_user_type == 9">
+						            and exists(select 1 
+						                         from tbl_sys_user_info tsui
+						                        where tsui.user_type = 4
+						            				  and tsui.organization_id in (
+														  	select id from tbl_sys_organization_info where connect_by_isleaf=1
+														  	start with parent_id = #{public_user_organization_id,jdbcType=INTEGER} connect by prior id = parent_id
+											              )
+											          and tsui.id = a.ywjl_user_id)
+						        </if>
+							</where>
+				<choose>
+					<when test="sort != null and sort != ''">
+						order by ${sort} ${sort_by}
+					</when>
+					<otherwise>
+						order by a.ywjl_user_id, a.store_id
+					</otherwise>
+				</choose>
+				) info
+		      where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+    <!-- 区域销售分析报表数量 -->
+    <select id="queryCount" parameterType="java.util.Map" resultType="int">
+	  			select count(1)
+				    from (  select temp.store_id,
+						       temp.store_name,
+						       temp.ywjl_user_id,
+						       temp.ywjl_user_name,
+						       temp.ywjl_user_realname,
+						       temp.ywy_user_id,
+						       temp.ywy_user_name,
+						       temp.ywy_user_realname,
+						       nvl (temp2.order_total, 0) order_total,
+						       nvl (temp2.sales_money_total, 0) sales_money_total,
+						       nvl (temp3.replace_order_total, 0) replace_order_total,
+						       nvl (temp4.member_service_money, 0) member_service_money,
+						       nvl (temp4.loan_amount, 0) loan_amount,
+						       case
+						          when nvl (temp5.return_product_count, 0) = 0
+						          then
+						             0
+						          when nvl (temp5.product_count, 0) = 0
+						          then
+						             0
+						          else
+						             round (temp5.return_product_count / temp5.product_count * 100,
+						                    2)
+						       end
+						          return_product_rate,
+						       nvl (temp6.member_count, 0) member_count,
+						       nvl (temp7.new_member_count, 0) new_member_count,
+						       case
+						          when nvl (temp4.member_service_money, 0) = 0
+						          then
+						             0
+						          when nvl (temp4.loan_amount, 0) = 0
+						          then
+						             0
+						          else
+						             round (temp4.member_service_money / temp4.loan_amount * 100,
+						                    2)
+						       end
+						          member_service_rate,
+						       case
+						          when nvl (temp2.sales_money_total, 0) = 0 then 0
+						          when nvl (temp6.member_count, 0) = 0 then 0
+						          else round (temp2.sales_money_total / temp6.member_count, 2)
+						       end
+						          per_capita_order_money,
+						       case
+						          when nvl (temp2.sales_money_total, 0) = 0 then 0
+						          when nvl (temp2.order_total, 0) = 0 then 0
+						          else round (temp2.sales_money_total / temp2.order_total, 2)
+						       end
+						          average_order_money,
+						       case
+						          when nvl (temp8.big_member_ratio, 0) = 0 then 0
+						          when nvl (temp6.member_count, 0) = 0 then 0
+						          else round (temp8.big_member_ratio / temp6.member_count * 100, 2)
+						       end
+						          big_member_ratio
+						  from (select tsi.id as store_id,
+						               tsi.store_name,
+						               tsi.manager_user_id as ywjl_user_id,
+						               (select user_name
+						                  from tbl_sys_user_info
+						                 where id = tsi.manager_user_id)
+						                  ywjl_user_name,
+						               (select user_realname
+						                  from tbl_sys_user_info
+						                 where id = tsi.manager_user_id)
+						                  ywjl_user_realname,
+						               tsur.user_id as ywy_user_id,
+						               (select user_name
+						                  from tbl_sys_user_info
+						                 where id = tsur.user_id)
+						                  ywy_user_name,
+						               (select user_realname
+						                  from tbl_sys_user_info
+						                 where id = tsur.user_id)
+						                  ywy_user_realname
+						          from tbl_store_info tsi, tbl_store_user_rel tsur
+						         where     tsi.manager_user_id is not null
+						               and tsi.id = tsur.store_id
+						               and tsur.type = '3') temp
+						       left join
+						       (  select ywy_user_name,
+						       			 md_id,
+						                 count (id) order_total,
+						                 sum (payment_money) sales_money_total
+						            from tbl_order_info toi
+						           where     order_state in (2, 3, 5)
+						                 and (ywy_user_name != '0' or ywy_user_name is not null)
+						                 and create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						        group by ywy_user_name, md_id) temp2
+						          on temp.ywy_user_name = temp2.ywy_user_name
+						         and temp.store_id = temp2.md_id
+						       left join
+						       (  select ywy_user_name, md_id, count (id) replace_order_total
+						            from tbl_order_info
+						           where     order_type = '代发'
+						                 and order_state in (2, 3, 5)
+						                 and (ywy_user_name != '0' or ywy_user_name is not null)
+						                 and create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						        group by ywy_user_name,md_id) temp3
+						          on temp.ywy_user_name = temp3.ywy_user_name
+						         and temp.store_id = temp3.md_id
+						       left join
+						       (  select t1.ywy_user_name,
+						       			 t1.md_id,
+						                 sum (t2.member_service_money) member_service_money,
+						                 sum (t3.loan_amount) loan_amount
+						            from tbl_order_info t1,(select order_number, sum (divide_money) member_service_money
+						                    from tbl_order_divide_record 
+						                    where  create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                       and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                       and divide_type = '2'
+						                       group by order_number) t2,
+						                       (select order_number, sum (divide_money) loan_amount
+                    							  from tbl_order_divide_record 
+                   			 					 where  create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+							                       and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+							                       and divide_type = '1'
+							                       group by order_number) t3
+						           where     t1.order_state in (2, 3, 5)
+						                 and (t1.ywy_user_name != '0' or t1.ywy_user_name is not null)
+						                 and t1.create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and t1.create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and t1.order_number = t2.order_number(+)
+						                 and t1.order_number = t3.order_number(+)
+						        group by t1.ywy_user_name,t1.md_id) temp4
+						          on temp.ywy_user_name = temp4.ywy_user_name
+						         and temp.store_id = temp4.md_id
+						       left join
+						       (  select a.ywy_user_name,a.md_id,a.product_count,b.return_product_count
+						               from (select toi.ywy_user_name,
+						               				toi.md_id,
+						                          sum (toi.product_count) product_count
+						            from tbl_order_info toi
+						                   where     toi.order_state in (2, 3, 5)
+						                         and (toi.ywy_user_name != '0' or toi.ywy_user_name is not null)
+						                         and toi.create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                         and toi.create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                    group by toi.ywy_user_name,toi.md_id) a,
+						                    (select toi.ywy_user_name,
+						                    		toi.md_id,
+						                             sum (t1.return_product_count) return_product_count
+						                         from tbl_order_info toi,(select t3.order_number_platform, count (t3.id) return_product_count
+						                            from ${jdbc_user}.tbl_new_return_order t2, ${jdbc_user}.tbl_new_return_detail_code t3
+						                              where t2.return_number = t3.return_number
+						                              and t2.state = '8'
+						                              and t2.refund_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                              and t2.refund_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                              group by t3.order_number_platform) t1
+						                          where toi.order_state in (2, 3, 5)
+						                         and (toi.ywy_user_name != '0' or toi.ywy_user_name is not null)
+						                           and toi.order_number = t1.order_number_platform(+)
+						                    group by toi.ywy_user_name,toi.md_id) b
+						                where a.ywy_user_name = b.ywy_user_name and a.md_id = b.md_id) temp5
+						          on temp.ywy_user_name = temp5.ywy_user_name
+						         and temp.store_id = temp5.md_id
+						       left join (select ywy_user_name,md_id,count(distinct user_name) member_count
+						                    from tbl_order_info toi
+						                   where     order_state in (2, 3, 5)
+						                         and (ywy_user_name != '0' or ywy_user_name is not null)
+						                         and create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                     	 and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                group by ywy_user_name,md_id) temp6
+						          on temp.ywy_user_name = temp6.ywy_user_name
+						         and temp.store_id = temp6.md_id
+						       left join
+						       (  select referee_user_id, store_id, count (id) new_member_count
+						            from tbl_user_info tui
+						           where     tui.create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and tui.create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and referee_user_id is not null
+						        group by referee_user_id,store_id) temp7
+						          on temp.ywy_user_id = temp7.referee_user_id
+						         and temp.store_id = temp7.store_id
+						       left join
+						       (select b.ywy_user_name,b.md_id,count(b.user_name) big_member_ratio from (
+						            select t1.ywy_user_name,t1.md_id,t1.user_name,
+						                   sum (t1.product_money) as order_money
+						              from tbl_order_info t1
+						             where t1.order_state in (2, 3, 5)
+						               and t1.create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						               and t1.create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						            group by t1.ywy_user_name,t1.md_id,t1.user_name) b
+						        where b.order_money &gt; #{threshold,jdbcType=INTEGER}
+						          and (b.ywy_user_name != '0' or b.ywy_user_name is not null)
+						        group by b.ywy_user_name,b.md_id) temp8
+						          on temp.ywy_user_name = temp8.ywy_user_name
+						         and temp.store_id = temp8.md_id
+						                                      
+						union all
+						                            
+						select temp.store_id,
+						       temp.store_name,
+						       temp.ywjl_user_id,
+						       temp.ywjl_user_name,
+						       temp.ywjl_user_realname,
+						       temp.ywy_user_id,
+						       temp.ywy_user_name,
+						       temp.ywy_user_realname,
+						       nvl (temp2.order_total, 0) order_total,
+						       nvl (temp2.sales_money_total, 0) sales_money_total,
+						       nvl (temp3.replace_order_total, 0) replace_order_total,
+						       nvl (temp4.member_service_money, 0) member_service_money,
+						       nvl (temp4.loan_amount, 0) loan_amount,
+						       case
+						          when nvl (temp5.return_product_count, 0) = 0
+						          then
+						             0
+						          when nvl (temp5.product_count, 0) = 0
+						          then
+						             0
+						          else
+						             round (temp5.return_product_count / temp5.product_count * 100,
+						                    2)
+						       end
+						          return_product_rate,
+						       nvl (temp6.member_count, 0) member_count,
+						       nvl (temp7.new_member_count, 0) new_member_count,
+						       case
+						          when nvl (temp4.member_service_money, 0) = 0
+						          then
+						             0
+						          when nvl (temp4.loan_amount, 0) = 0
+						          then
+						             0
+						          else
+						             round (temp4.member_service_money / temp4.loan_amount * 100,
+						                    2)
+						       end
+						          member_service_rate,
+						       case
+						          when nvl (temp2.sales_money_total, 0) = 0 then 0
+						          when nvl (temp6.member_count, 0) = 0 then 0
+						          else round (temp2.sales_money_total / temp6.member_count, 2)
+						       end
+						          per_capita_order_money,
+						       case
+						          when nvl (temp2.sales_money_total, 0) = 0 then 0
+						          when nvl (temp2.order_total, 0) = 0 then 0
+						          else round (temp2.sales_money_total / temp2.order_total, 2)
+						       end
+						          average_order_money,
+						       case
+						          when nvl (temp8.big_member_ratio, 0) = 0 then 0
+						          when nvl (temp6.member_count, 0) = 0 then 0
+						          else round (temp8.big_member_ratio / temp6.member_count * 100, 2)
+						       end
+						          big_member_ratio
+						  from (select tsi.id as store_id,
+						               tsi.store_name,
+						               tsi.manager_user_id as ywjl_user_id,
+						               (select user_name
+						                  from tbl_sys_user_info
+						                 where id = tsi.manager_user_id)
+						                  ywjl_user_name,
+						               (select user_realname
+						                  from tbl_sys_user_info
+						                 where id = tsi.manager_user_id)
+						                  ywjl_user_realname,
+						               0 ywy_user_id,
+						               '0' ywy_user_name,
+						               '' ywy_user_realname
+						          from tbl_store_info tsi
+						         where tsi.manager_user_id is not null) temp
+						       left join
+						       (  select md_id,
+						                 '0' ywy_user_name,
+						                 count (id) order_total,
+						                 sum (payment_money) sales_money_total
+						            from tbl_order_info toi
+						           where     order_state in (2, 3, 5)
+						                 and (ywy_user_name = '0' or ywy_user_name is null)
+						                 and create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and md_id is not null
+						        group by md_id) temp2
+						          on     temp.store_id = temp2.md_id
+						             and temp.ywy_user_name = temp2.ywy_user_name
+						       left join
+						       (  select md_id, '0' ywy_user_name, count (id) replace_order_total
+						            from tbl_order_info
+						           where     order_type = '代发'
+						                 and order_state in (2, 3, 5)
+						                 and (ywy_user_name = '0' or ywy_user_name is null)
+						                 and create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and md_id is not null
+						        group by md_id) temp3
+						          on     temp.store_id = temp3.md_id
+						             and temp.ywy_user_name = temp3.ywy_user_name
+						       left join
+						       (  select t1.md_id,
+						                 '0' ywy_user_name,
+						                 sum (t2.member_service_money) member_service_money,
+						                 sum (t3.loan_amount) loan_amount
+						            from tbl_order_info t1,(select order_number, sum (divide_money) member_service_money 
+						                   from tbl_order_divide_record 
+						                   where   create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                       and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                       and divide_type = '2'
+						                       group by order_number) t2,
+						                       (select order_number, sum (divide_money) loan_amount 
+						                   		  from tbl_order_divide_record 
+							                   where   create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+							                       and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+							                       and divide_type = '1'
+							                       group by order_number) t3
+						           where     t1.order_state in (2, 3, 5)
+						                 and (t1.ywy_user_name = '0' or t1.ywy_user_name is null)
+						                 and t1.md_id is not null
+						                 and t1.create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and t1.create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and t1.order_number = t2.order_number(+)
+						                 and t1.order_number = t3.order_number(+)
+						        group by t1.md_id) temp4
+						          on     temp.store_id = temp4.md_id
+						             and temp.ywy_user_name = temp4.ywy_user_name
+						       left join
+						       (  select a.md_id,'0' ywy_user_name, a.product_count, b.return_product_count
+						               from (select toi.md_id,
+						                 sum (toi.product_count) product_count
+						            from tbl_order_info toi
+						                   where     toi.order_state in (2, 3, 5)
+						                         and (toi.ywy_user_name = '0' or toi.ywy_user_name is null)
+						                         and toi.create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                         and toi.create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						            group by toi.md_id) a,
+						            (select toi.md_id,
+						                     sum (t1.return_product_count) return_product_count
+						               from tbl_order_info toi,(select t3.order_number_platform, count (t3.id) return_product_count
+						                            from ${jdbc_user}.tbl_new_return_order t2, ${jdbc_user}.tbl_new_return_detail_code t3
+						                              where t2.return_number = t3.return_number
+						                              and t2.state = '8'
+						                              and t2.refund_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                              and t2.refund_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                              group by t3.order_number_platform) t1
+						                   where     toi.order_state in (2, 3, 5)
+						                         and (toi.ywy_user_name = '0' or toi.ywy_user_name is null)
+						                           and toi.order_number = t1.order_number_platform(+)
+						            group by toi.md_id) b
+						            where a.md_id = b.md_id) temp5
+						          on     temp.store_id = temp5.md_id
+						             and temp.ywy_user_name = temp5.ywy_user_name
+						       left join
+						       (select md_id,0 ywy_user_id,count(distinct user_name) member_count
+						            from tbl_order_info toi
+						           where     order_state in (2, 3, 5)
+						                 and (ywy_user_name = '0' or ywy_user_name is null)
+						                 and create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and md_id is not null
+						        group by md_id) temp6
+						          on     temp.store_id = temp6.md_id
+						             and temp.ywy_user_id = temp6.ywy_user_id
+						       left join
+						       (  select store_id, 0 referee_user_id, count (id) new_member_count
+						            from tbl_user_info tui
+						           where     tui.create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and tui.create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and referee_user_id is null
+						        group by store_id) temp7
+						          on     temp.store_id = temp7.store_id
+						             and temp.ywy_user_id = temp7.referee_user_id
+						       left join
+						       (  select b.md_id,0 ywy_user_id,count(b.user_name) big_member_ratio from (
+						            select t1.md_id,t1.user_name,
+						                   sum (t1.product_money) as order_money
+						              from tbl_order_info t1
+						             where t1.order_state in (2, 3, 5)
+						               and (t1.ywy_user_name = '0' or t1.ywy_user_name is null)
+						               and t1.create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						               and t1.create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						            group by t1.md_id,t1.user_name) b
+						        where b.order_money &gt; #{threshold,jdbcType=INTEGER}
+						        group by b.md_id) temp8
+						          on     temp.store_id = temp8.md_id
+						             and temp.ywy_user_id = temp8.ywy_user_id) a
+							<where>
+								<if test="ywjl_user_id != null and ywjl_user_id != '' ">
+							    	and	a.ywjl_user_id = #{ywjl_user_id,jdbcType=VARCHAR}
+								</if>
+								<if test="store_id != null and store_id != 0 ">
+								    and	a.store_id = #{store_id,jdbcType=INTEGER}
+								</if>
+								<if test="ywy_user_id != null and ywy_user_id != '' ">
+								    and	a.ywy_user_id = #{ywy_user_id,jdbcType=VARCHAR}
+								</if>
+								 <if test="public_user_type != null and public_user_type == 2">
+						            and exists (select 1 from tbl_sys_user_store tsus where tsus.store_id = a.store_id and tsus.user_id = #{public_user_id,jdbcType=INTEGER})
+						        </if>
+						        <if test="public_user_type != null and public_user_type == 3">
+						            and a.ywy_user_id = #{public_user_id,jdbcType=INTEGER}
+						        </if>
+						        <if test="public_user_type != null and public_user_type == 4">
+						            and a.ywjl_user_id = #{public_user_id,jdbcType=INTEGER}
+						        </if>
+						        <if test="public_user_type != null and public_user_type == 5">
+						            and exists(select 1 from tbl_store_info tsi where tsi.id = a.store_id and tsi.shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER})
+						        </if>
+						        <if test="public_user_type != null and public_user_type == 6">
+						            and exists(select 1 from tbl_store_user_rel tsui where tsui.store_id = a.store_id and tsui.user_id = #{public_user_id,jdbcType=INTEGER})
+						        </if>
+						        <if test="public_user_type != null and public_user_type == 9">
+						            and exists(select 1 
+						                         from tbl_sys_user_info tsui
+						                        where tsui.user_type = 4
+						            				  and tsui.organization_id in (
+														  	select id from tbl_sys_organization_info where connect_by_isleaf=1
+														  	start with parent_id = #{public_user_organization_id,jdbcType=INTEGER} connect by prior id = parent_id
+											              )
+											          and tsui.id = a.ywjl_user_id)
+						        </if>
+							</where>
+    </select>
+    <!-- 区域销售报表 -->
+    <select id="queryListTotal" parameterType="java.util.Map" resultType="java.util.Map">
+    	select nvl( sum(order_total), 0) order_total,
+    		   nvl( sum(sales_money_total), 0) sales_money_total,
+    		   nvl( sum(replace_order_total), 0) replace_order_total,
+    		   nvl( sum(member_service_money), 0) member_service_money,
+    		   nvl( sum(loan_amount), 0) loan_amount,
+    		   case
+		          when nvl ( sum(return_product_count), 0) = 0
+		          then
+		             0
+		          when nvl ( sum(product_count), 0) = 0
+		          then
+		             0
+		          else
+		             round (sum(return_product_count) / sum(product_count) * 100, 2)
+		       end
+		          return_product_rate,
+    		   nvl( sum(member_count), 0) member_count,
+    		   nvl( sum(new_member_count), 0) new_member_count,
+    		   case
+		          when nvl ( sum(member_service_money), 0) = 0
+		          then
+		             0
+		          when nvl ( sum(loan_amount), 0) = 0
+		          then
+		             0
+		          else
+		             round ( sum(member_service_money) / sum(loan_amount) * 100, 2)
+		       end
+		          member_service_rate,
+		       case
+		          when nvl ( sum(sales_money_total), 0) = 0 then 0
+		          when nvl ( sum(member_count), 0) = 0 then 0
+		          else round ( sum(sales_money_total) / sum(member_count), 2)
+		       end
+		          per_capita_order_money,
+		       case
+		          when nvl ( sum(sales_money_total), 0) = 0 then 0
+		          when nvl ( sum(order_total), 0) = 0 then 0
+		          else round (sum(sales_money_total) / sum(order_total), 2)
+		       end
+		          average_order_money,
+    		   case
+		          when nvl ( sum(big_member_ratio), 0) = 0 then 0
+		          when nvl ( sum(member_count), 0) = 0 then 0
+		          else round ( sum(big_member_ratio) / sum(member_count) * 100, 2)
+		       end
+		          big_member_ratio
+				  from (select temp.store_id,
+						       temp.store_name,
+						       temp.ywjl_user_id,
+						       temp.ywjl_user_name,
+						       temp.ywy_user_id,
+						       temp.ywy_user_name,
+						       nvl (temp2.order_total, 0) order_total,
+						       nvl (temp2.sales_money_total, 0) sales_money_total,
+						       nvl (temp3.replace_order_total, 0) replace_order_total,
+						       nvl (temp4.member_service_money, 0) member_service_money,
+						       nvl (temp4.loan_amount, 0) loan_amount,
+						       nvl (temp5.product_count, 0) product_count,
+						       nvl (temp5.return_product_count, 0) return_product_count,
+						       nvl (temp6.member_count, 0) member_count,
+						       nvl (temp7.new_member_count, 0) new_member_count,
+						       nvl (temp8.big_member_ratio, 0) big_member_ratio
+						  from (select tsi.id as store_id,
+						               tsi.store_name,
+						               tsi.manager_user_id as ywjl_user_id,
+						               (select user_name
+						                  from tbl_sys_user_info
+						                 where id = tsi.manager_user_id)
+						                  ywjl_user_name,
+						               tsur.user_id as ywy_user_id,
+						               (select user_name
+						                  from tbl_sys_user_info
+						                 where id = tsur.user_id)
+						                  ywy_user_name
+						          from tbl_store_info tsi, tbl_store_user_rel tsur
+						         where     tsi.manager_user_id is not null
+						               and tsi.id = tsur.store_id
+						               and tsur.type = '3') temp
+						       left join
+						       (  select ywy_user_name,
+						       			 md_id,
+						                 count (id) order_total,
+						                 sum (payment_money) sales_money_total
+						            from tbl_order_info toi
+						           where     order_state in (2, 3, 5)
+						                 and (ywy_user_name != '0' or ywy_user_name is not null)
+						                 and create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						        group by ywy_user_name, md_id) temp2
+						          on temp.ywy_user_name = temp2.ywy_user_name
+						         and temp.store_id = temp2.md_id
+						       left join
+						       (  select ywy_user_name, md_id, count (id) replace_order_total
+						            from tbl_order_info
+						           where     order_type = '代发'
+						                 and order_state in (2, 3, 5)
+						                 and (ywy_user_name != '0' or ywy_user_name is not null)
+						                 and create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						        group by ywy_user_name,md_id) temp3
+						          on temp.ywy_user_name = temp3.ywy_user_name
+						         and temp.store_id = temp3.md_id
+						       left join
+						       (  select t1.ywy_user_name,
+						       			 t1.md_id,
+						                 sum (t2.member_service_money) member_service_money,
+						                 sum (t3.loan_amount) loan_amount
+						            from tbl_order_info t1,(select order_number, sum (divide_money) member_service_money
+						                    from tbl_order_divide_record 
+						                    where  create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                       and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                       and divide_type = '2'
+						                       group by order_number) t2,
+						                       (select order_number, sum (divide_money) loan_amount
+                    							  from tbl_order_divide_record 
+                   			 					 where  create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+							                       and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+							                       and divide_type = '1'
+							                       group by order_number) t3
+						           where     t1.order_state in (2, 3, 5)
+						                 and (t1.ywy_user_name != '0' or t1.ywy_user_name is not null)
+						                 and t1.create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and t1.create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and t1.order_number = t2.order_number(+)
+						                 and t1.order_number = t3.order_number(+)
+						        group by t1.ywy_user_name,t1.md_id) temp4
+						          on temp.ywy_user_name = temp4.ywy_user_name
+						         and temp.store_id = temp4.md_id
+						       left join
+						       (  select a.ywy_user_name,a.md_id,a.product_count,b.return_product_count
+						               from (select toi.ywy_user_name,
+						               				toi.md_id,
+						                          sum (toi.product_count) product_count
+						            from tbl_order_info toi
+						                   where     toi.order_state in (2, 3, 5)
+						                         and (toi.ywy_user_name != '0' or toi.ywy_user_name is not null)
+						                         and toi.create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                         and toi.create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                    group by toi.ywy_user_name,toi.md_id) a,
+						                    (select toi.ywy_user_name,
+						                    		toi.md_id,
+						                             sum (t1.return_product_count) return_product_count
+						                         from tbl_order_info toi,(select t3.order_number_platform, count (t3.id) return_product_count
+						                            from ${jdbc_user}.tbl_new_return_order t2, ${jdbc_user}.tbl_new_return_detail_code t3
+						                              where t2.return_number = t3.return_number
+						                              and t2.state = '8'
+						                              and t2.refund_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                              and t2.refund_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                              group by t3.order_number_platform) t1
+						                          where toi.order_state in (2, 3, 5)
+						                         and (toi.ywy_user_name != '0' or toi.ywy_user_name is not null)
+						                           and toi.order_number = t1.order_number_platform(+)
+						                    group by toi.ywy_user_name,toi.md_id) b
+						                where a.ywy_user_name = b.ywy_user_name and a.md_id = b.md_id) temp5
+						          on temp.ywy_user_name = temp5.ywy_user_name
+						         and temp.store_id = temp5.md_id
+						       left join (select ywy_user_name,md_id,count(distinct user_name) member_count
+						                    from tbl_order_info toi
+						                   where     order_state in (2, 3, 5)
+						                         and (ywy_user_name != '0' or ywy_user_name is not null)
+						                         and create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                     	 and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                group by ywy_user_name,md_id) temp6
+						          on temp.ywy_user_name = temp6.ywy_user_name
+						         and temp.store_id = temp6.md_id
+						       left join
+						       (  select referee_user_id, store_id, count (id) new_member_count
+						            from tbl_user_info tui
+						           where     tui.create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and tui.create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and referee_user_id is not null
+						        group by referee_user_id,store_id) temp7
+						          on temp.ywy_user_id = temp7.referee_user_id
+						         and temp.store_id = temp7.store_id
+						       left join
+						       (select b.ywy_user_name,b.md_id,count(b.user_name) big_member_ratio from (
+						            select t1.ywy_user_name,t1.md_id,t1.user_name,
+						                   sum (t1.product_money) as order_money
+						              from tbl_order_info t1
+						             where t1.order_state in (2, 3, 5)
+						               and t1.create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						               and t1.create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						            group by t1.ywy_user_name,t1.md_id,t1.user_name) b
+						        where b.order_money &gt; #{threshold,jdbcType=INTEGER}
+						          and (b.ywy_user_name != '0' or b.ywy_user_name is not null)
+						        group by b.ywy_user_name,b.md_id) temp8
+						          on temp.ywy_user_name = temp8.ywy_user_name
+						         and temp.store_id = temp8.md_id
+						                                      
+						union all
+						                            
+						select temp.store_id,
+						       temp.store_name,
+						       temp.ywjl_user_id,
+						       temp.ywjl_user_name,
+						       temp.ywy_user_id,
+						       temp.ywy_user_name,
+						       nvl (temp2.order_total, 0) order_total,
+						       nvl (temp2.sales_money_total, 0) sales_money_total,
+						       nvl (temp3.replace_order_total, 0) replace_order_total,
+						       nvl (temp4.member_service_money, 0) member_service_money,
+						       nvl (temp4.loan_amount, 0) loan_amount,
+						       nvl (temp5.product_count, 0) product_count,
+						       nvl (temp5.return_product_count, 0) return_product_count,
+						       nvl (temp6.member_count, 0) member_count,
+						       nvl (temp7.new_member_count, 0) new_member_count,
+						       nvl (temp8.big_member_ratio, 0) big_member_ratio
+						  from (select tsi.id as store_id,
+						               tsi.store_name,
+						               tsi.manager_user_id as ywjl_user_id,
+						               (select user_name
+						                  from tbl_sys_user_info
+						                 where id = tsi.manager_user_id)
+						                  ywjl_user_name,
+						               0 ywy_user_id,
+						               '0' ywy_user_name
+						          from tbl_store_info tsi
+						         where tsi.manager_user_id is not null) temp
+						       left join
+						       (  select md_id,
+						                 '0' ywy_user_name,
+						                 count (id) order_total,
+						                 sum (payment_money) sales_money_total
+						            from tbl_order_info toi
+						           where     order_state in (2, 3, 5)
+						                 and (ywy_user_name = '0' or ywy_user_name is null)
+						                 and create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and md_id is not null
+						        group by md_id) temp2
+						          on     temp.store_id = temp2.md_id
+						             and temp.ywy_user_name = temp2.ywy_user_name
+						       left join
+						       (  select md_id, '0' ywy_user_name, count (id) replace_order_total
+						            from tbl_order_info
+						           where     order_type = '代发'
+						                 and order_state in (2, 3, 5)
+						                 and (ywy_user_name = '0' or ywy_user_name is null)
+						                 and create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and md_id is not null
+						        group by md_id) temp3
+						          on     temp.store_id = temp3.md_id
+						             and temp.ywy_user_name = temp3.ywy_user_name
+						       left join
+						       (  select t1.md_id,
+						                 '0' ywy_user_name,
+						                 sum (t2.member_service_money) member_service_money,
+						                 sum (t3.loan_amount) loan_amount
+						            from tbl_order_info t1,(select order_number, sum (divide_money) member_service_money 
+						                   from tbl_order_divide_record 
+						                   where   create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                       and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                       and divide_type = '2'
+						                       group by order_number) t2,
+						                       (select order_number, sum (divide_money) loan_amount 
+						                   from tbl_order_divide_record 
+						                   where   create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                       and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                       and divide_type = '1'
+						                       group by order_number) t3
+						           where     t1.order_state in (2, 3, 5)
+						                 and (t1.ywy_user_name = '0' or t1.ywy_user_name is null)
+						                 and t1.md_id is not null
+						                 and t1.create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and t1.create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and t1.order_number = t2.order_number(+)
+						                 and t1.order_number = t3.order_number(+)
+						        group by t1.md_id) temp4
+						          on     temp.store_id = temp4.md_id
+						             and temp.ywy_user_name = temp4.ywy_user_name
+						       left join
+						       (  select a.md_id,'0' ywy_user_name, a.product_count, b.return_product_count
+						               from (select toi.md_id,
+						                 sum (toi.product_count) product_count
+						            from tbl_order_info toi
+						                   where     toi.order_state in (2, 3, 5)
+						                         and (toi.ywy_user_name = '0' or toi.ywy_user_name is null)
+						                         and toi.create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                         and toi.create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						            group by toi.md_id) a,
+						            (select toi.md_id,
+						                     sum (t1.return_product_count) return_product_count
+						               from tbl_order_info toi,(select t3.order_number_platform, count (t3.id) return_product_count
+						                            from ${jdbc_user}.tbl_new_return_order t2, ${jdbc_user}.tbl_new_return_detail_code t3
+						                              where t2.return_number = t3.return_number
+						                              and t2.state = '8'
+						                              and t2.refund_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                              and t2.refund_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                              group by t3.order_number_platform) t1
+						                   where     toi.order_state in (2, 3, 5)
+						                         and (toi.ywy_user_name = '0' or toi.ywy_user_name is null)
+						                           and toi.order_number = t1.order_number_platform(+)
+						            group by toi.md_id) b
+						            where a.md_id = b.md_id) temp5
+						          on     temp.store_id = temp5.md_id
+						             and temp.ywy_user_name = temp5.ywy_user_name
+						       left join
+						       (select md_id,0 ywy_user_id,count(distinct user_name) member_count
+						            from tbl_order_info toi
+						           where     order_state in (2, 3, 5)
+						                 and (ywy_user_name = '0' or ywy_user_name is null)
+						                 and create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and md_id is not null
+						        group by md_id) temp6
+						          on     temp.store_id = temp6.md_id
+						             and temp.ywy_user_id = temp6.ywy_user_id
+						       left join
+						       (  select store_id, 0 referee_user_id, count (id) new_member_count
+						            from tbl_user_info tui
+						           where     tui.create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and tui.create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						                 and referee_user_id is null
+						        group by store_id) temp7
+						          on     temp.store_id = temp7.store_id
+						             and temp.ywy_user_id = temp7.referee_user_id
+						       left join
+						       (  select b.md_id,0 ywy_user_id,count(b.user_name) big_member_ratio from (
+						            select t1.md_id,t1.user_name,
+						                   sum (t1.product_money) as order_money
+						              from tbl_order_info t1
+						             where t1.order_state in (2, 3, 5)
+						               and (t1.ywy_user_name = '0' or t1.ywy_user_name is null)
+						               and t1.create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						               and t1.create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						            group by t1.md_id,t1.user_name) b
+						        where b.order_money &gt; #{threshold,jdbcType=INTEGER}
+						        group by b.md_id) temp8
+						          on     temp.store_id = temp8.md_id
+						             and temp.ywy_user_id = temp8.ywy_user_id) a
+							<where>
+								<if test="ywjl_user_id != null and ywjl_user_id != '' ">
+							    	and	a.ywjl_user_id = #{ywjl_user_id,jdbcType=VARCHAR}
+								</if>
+								<if test="store_id != null and store_id != 0 ">
+								    and	a.store_id = #{store_id,jdbcType=INTEGER}
+								</if>
+								<if test="ywy_user_id != null and ywy_user_id != '' ">
+								    and	a.ywy_user_id = #{ywy_user_id,jdbcType=VARCHAR}
+								</if>
+								 <if test="public_user_type != null and public_user_type == 2">
+						            and exists (select 1 from tbl_sys_user_store tsus where tsus.store_id = a.store_id and tsus.user_id = #{public_user_id,jdbcType=INTEGER})
+						        </if>
+						        <if test="public_user_type != null and public_user_type == 3">
+						            and a.ywy_user_id = #{public_user_id,jdbcType=INTEGER}
+						        </if>
+						        <if test="public_user_type != null and public_user_type == 4">
+						            and a.ywjl_user_id = #{public_user_id,jdbcType=INTEGER}
+						        </if>
+						        <if test="public_user_type != null and public_user_type == 5">
+						            and exists(select 1 from tbl_store_info tsi where tsi.id = a.store_id and tsi.shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER})
+						        </if>
+						        <if test="public_user_type != null and public_user_type == 6">
+						            and exists(select 1 from tbl_store_user_rel tsui where tsui.store_id = a.store_id and tsui.user_id = #{public_user_id,jdbcType=INTEGER})
+						        </if>
+						        <if test="public_user_type != null and public_user_type == 9">
+						            and exists(select 1 
+						                         from tbl_sys_user_info tsui
+						                        where tsui.user_type = 4
+						            				  and tsui.organization_id in (
+														  	select id from tbl_sys_organization_info where connect_by_isleaf=1
+														  	start with parent_id = #{public_user_organization_id,jdbcType=INTEGER} connect by prior id = parent_id
+											              )
+											          and tsui.id = a.ywjl_user_id)
+						        </if>
+							</where>
+    
+    </select>
+</mapper>

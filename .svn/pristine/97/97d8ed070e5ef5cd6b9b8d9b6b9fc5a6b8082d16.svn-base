@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tk.oms.analysis.dao.ChannelHeatDao">
+
+    <!--通过页面类型统计用户日志数量-->
+    <select id="queryLogsNumberByPageType" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            page_name,
+            to_char(create_date,'yyyy-mm-dd') create_date,
+            count(id) cnt
+        from (
+            select * from (
+                select
+                    tuli.id,
+                    tuli.page_type,
+                    tuli.page_name,
+                    tuli.page_url,
+                    tuli.create_ip,
+                    to_date(to_char( tuli.create_date,'yyyy-mm-dd'),'yyyy-mm-dd') create_date,
+                    tuli.create_user_name,
+                    tuli.source_type,
+                    tuli.create_user_realname
+                from
+                    tbl_user_log_info tuli
+                left join
+                    tbl_user_info tui on tuli.create_user_name = tui.user_name
+                where
+                    tuli.page_type ='频道页'
+                    <if test="page_name != null and page_name != ''">
+                        and tuli.page_name = #{page_name,jdbcType=VARCHAR}
+                    </if>
+                    <if test="page_url != null and page_url != ''">
+                        and tuli.page_url = #{page_url,jdbcType=VARCHAR}
+                    </if>
+                    <if test="create_ip != null and create_ip != ''">
+                        and tuli.create_ip = #{create_ip,jdbcType=VARCHAR}
+                    </if>
+                    <if test="create_user_name != null and create_user_name != ''">
+                        and tuli.create_user_name = #{create_user_name,jdbcType=VARCHAR}
+                    </if>
+                    <if test="create_user_realname != null and create_user_realname != ''">
+                        and tuli.create_user_realname = #{create_user_realname,jdbcType=VARCHAR}
+                    </if>
+                    <if test="source_type != null and source_type != ''">
+                        and tuli.source_type = #{source_type,jdbcType=VARCHAR}
+                    </if>
+                    <if test="start_time != null and start_time != ''">
+                        and tuli.create_date &gt;= to_date(#{start_time,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+                    </if>
+                    <if test="end_time != null and end_time != ''">
+                        and tuli.create_date &lt;= to_date(#{end_time,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+                    </if>
+                    <if test="market_supervision_user_id != null and market_supervision_user_id != 0">
+                        and tui.market_supervision_user_id = #{market_supervision_user_id,jdbcType=VARCHAR}
+                    </if>
+                    <if test="referee_user_id != null and referee_user_id != 0">
+                        and tui.referee_user_id = #{referee_user_id,jdbcType=VARCHAR}
+                    </if>
+                    <if test="store_id != null and store_id != 0">
+                        and tui.store_id = #{store_id,jdbcType=VARCHAR}
+                    </if>
+                    <if test="public_user_type != null and public_user_type == 2">
+                        and exists (select 1 from tbl_sys_user_store tsus where tsus.store_id = tui.store_id and tsus.user_id = #{public_user_id,jdbcType=INTEGER})
+                    </if>
+                    <if test="public_user_type != null and public_user_type == 3">
+                        and tui.referee_user_id = #{public_user_id,jdbcType=VARCHAR}
+                    </if>
+                    <if test="public_user_type != null and public_user_type == 4">
+                        and tui.market_supervision_user_id = #{public_user_id,jdbcType=VARCHAR}
+                    </if>
+                    <if test="public_user_type != null and public_user_type == 5">
+                        and exists (select 1 from tbl_store_info tsi where tsi.id = tui.store_id and tsi.shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER})
+                    </if>
+                    <if test="public_user_type != null and public_user_type == 6">
+                        and exists(select 1 from tbl_store_user_rel tsui where tsui.store_id = tui.store_id and tsui.user_id = #{public_user_id,jdbcType=INTEGER})
+                    </if>
+                    <if test="public_user_type != null and public_user_type == 9">
+                        and exists(select 1
+                        from tbl_sys_user_info tsui
+                        where tsui.user_type = 4
+                        and tsui.organization_id in (
+                        select id from tbl_sys_organization_info where connect_by_isleaf=1
+                        start with parent_id = #{public_user_organization_id,jdbcType=INTEGER} connect by prior id = parent_id
+                        )
+                        and tsui.id = tui.market_supervision_user_id)
+                    </if>
+
+            )
+        )group by page_name,create_date
+        order by page_name,create_date
+    </select>
+</mapper>

@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.decoration.dao.SocialMenuDao">
+
+    <select id="queryListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select s.*, rownum num from (
+                select
+                    id,
+                    menu_name,
+                    menu_code,
+                    menu_link,
+                    is_default,
+                    state
+                from tbl_social_menu
+                where is_delete = 1
+                    and site_id = #{public_user_site_id,jdbcType=INTEGER}
+                order by sort_id desc
+        	) s where ROWNUM  &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where num &gt;#{start_rownum,jdbcType=INTEGER}
+    </select>
+    <select id="queryCountForPage" parameterType="java.util.Map" resultType="int">
+        select count(1)
+        from tbl_social_menu
+        where is_delete = 1
+            and site_id = #{public_user_site_id,jdbcType=INTEGER}
+    </select>
+
+    <resultMap id="detailMap" type="java.util.Map">
+        <result column="id" property="id" />
+        <result column="menu_name" property="menu_name" />
+        <result column="menu_code" property="menu_code" />
+        <result column="menu_link" property="menu_link" />
+    </resultMap>
+
+    <select id="queryDetail" parameterType="java.util.Map" resultMap="detailMap">
+        select id,
+                menu_name,
+                menu_code,
+                menu_link
+        from tbl_social_menu
+        where id = #{id, jdbcType=INTEGER}
+    </select>
+
+    <insert id="insert" parameterType="java.util.Map">
+        <selectKey keyProperty="id" resultType="int" order="BEFORE">
+            select seq_social_menu.nextval from DUAL
+        </selectKey>
+        insert into tbl_social_menu (
+            id,
+            menu_name,
+            menu_link,
+            site_id,
+            creater_id,
+            create_date,
+            sort_id
+        ) values (
+            #{id, jdbcType=INTEGER},
+            #{menu_name, jdbcType=VARCHAR},
+            #{menu_link, jdbcType=VARCHAR},
+            #{public_user_site_id,jdbcType=INTEGER},
+            #{public_user_id,jdbcType=INTEGER},
+            sysdate,
+            (select nvl(max(sort_id),0) + 1 from tbl_social_menu)
+        )
+    </insert>
+
+    <update id="update" parameterType="java.util.Map">
+        update tbl_social_menu
+        <set>
+            <if test="menu_name != null and menu_name != ''">
+                menu_name = #{menu_name, jdbcType=VARCHAR},
+            </if>
+            <if test="state != null and state != ''" >
+                state = #{state, jdbcType=INTEGER},
+            </if>
+            <if test="menu_link != null and menu_link != ''" >
+                menu_link = #{menu_link, jdbcType=VARCHAR},
+            </if>
+            <if test="is_default != null and is_default != ''" >
+                is_default = #{is_default, jdbcType=INTEGER},
+            </if>
+            update_id = #{public_user_id,jdbcType=INTEGER},
+            update_date = sysdate
+        </set>
+        where id = #{id, jdbcType=INTEGER}
+    </update>
+
+    <update id="delete" parameterType="java.util.Map">
+        update tbl_social_menu
+        set is_delete = 2
+        where id = #{id, jdbcType=INTEGER}
+    </update>
+
+    <select id="querySortById" parameterType="long" resultType="java.util.Map">
+		select id, sort_id
+		  from tbl_social_menu
+		 where id = #{id,jdbcType=INTEGER}
+		  and is_delete = 1
+	</select>
+
+    <!-- 更新分类排序 -->
+    <update id="updateSort" parameterType="java.util.Map">
+        update tbl_social_menu
+        <set>
+            <if test="sort_id!=null">
+                sort_id = #{sort_id,jdbcType=INTEGER},
+            </if>
+            <if test="type == 'top'">
+                sort_id = (select max(sort_id) + 1 from tbl_social_menu ),
+            </if>
+            <if test="type == 'bottom'">
+                sort_id = (select min(sort_id) - 1 from tbl_social_menu),
+            </if>
+            update_id = #{public_user_id,jdbcType=INTEGER},
+            update_date = sysdate
+        </set>
+        where id = #{id,jdbcType=INTEGER}
+    </update>
+
+
+    <!-- 更新非当前ID的其余导航的默认状态 -->
+    <update id="updateByDefault" parameterType="java.util.Map">
+    	update tbl_social_menu
+    	    set is_default = 0
+    	where id != #{id, jdbcType=INTEGER}
+    	and site_id = (select site_id from tbl_social_menu where id =#{id, jdbcType=INTEGER})
+    </update>
+
+</mapper>

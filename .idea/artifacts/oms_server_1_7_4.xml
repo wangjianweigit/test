@@ -1,0 +1,13 @@
+<component name="ArtifactManager">
+  <artifact type="exploded-war" name="oms_server_1.7.4">
+    <output-path>$PROJECT_DIR$/out/artifacts/oms_server_1_7_4</output-path>
+    <root id="root">
+      <element id="directory" name="WEB-INF">
+        <element id="directory" name="classes">
+          <element id="module-output" name="oms_server_1.7.4" />
+        </element>
+      </element>
+      <element id="javaee-facet-resources" facet="oms_server_1.7.4/web/Web" />
+    </root>
+  </artifact>
+</component>

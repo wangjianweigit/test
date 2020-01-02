@@ -1,0 +1,595 @@
+package com.tk.oms.member.service;
+
+import com.tk.oms.basicinfo.dao.StoreInfoDao;
+import com.tk.oms.member.dao.MemberInfoDao;
+import com.tk.oms.member.dao.RetailStoreApprovalDao;
+import com.tk.sys.config.EsbConfig;
+import com.tk.sys.util.*;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+*
+* Copyright (c), 2019, Tongku
+* FileName : StoreApprovalControl
+* 店铺审核
+*
+* @author liujialong
+* @version 1.00
+* @date 2019/6/26
+*/
+@Service
+public class RetailStoreApprovalService {
+	
+	private Log logger = LogFactory.getLog(this.getClass());
+	
+	@Resource
+    private RetailStoreApprovalDao retailStoreApprovalDao;
+	@Resource
+	private MemberInfoDao memberInfoDao;
+	@Resource
+	private StoreInfoDao storeInfoDao;
+	
+	@Value("${retail_service_new_url}")
+    private String retail_service_new_url;
+	
+	@Value("${sms_service_url}")
+    private String sms_service_url;
+	
+	/**
+     * 分页查询新零售小程序店铺审核列表
+     * @param request 查询条件
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+	public GridResult queryStoreApprovalList(HttpServletRequest request) {
+        GridResult gr = new GridResult();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+            //分页参数
+            GridResult pageParamResult = PageUtil.handlePageParams(paramMap);
+            if (pageParamResult != null) {
+                return pageParamResult;
+            }
+            //查询用新零售小程序权限审核记录数
+            int count = retailStoreApprovalDao.queryStoreApprovalCount(paramMap);
+            //分页查询用新零售小程序权限审核记录
+            List<Map<String, Object>> list = retailStoreApprovalDao.queryStoreApprovalList(paramMap);
+            if (list != null) {
+                gr.setMessage("获取成功");
+                gr.setObj(list);
+                gr.setTotal(count);
+            } else {
+                gr.setMessage("无数据");
+            }
+            gr.setState(true);
+        } catch (Exception e) {
+            gr.setState(false);
+            gr.setMessage(e.getMessage());
+            logger.error(e.getMessage());
+        }
+        return gr;
+    }
+    
+    /**
+     * 店铺审核详情
+     * @param request
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+	public ProcessResult queryStoreApprovalDetail(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        try {
+            //获取参数
+            String json = HttpUtil.getRequestInputStream(request);
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            //判断是否缺少参数
+            if (StringUtils.isEmpty(params.get("id"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[id]申请编号");
+                return pr;
+            }
+            //获取现金预充值审批明细
+            Map<String, Object> result = this.retailStoreApprovalDao.queryStoreApprovalDetail(params);
+            if (result != null) {
+                pr.setState(true);
+                pr.setMessage("获取成功");
+                pr.setObj(result);
+            } else {
+                pr.setState(false);
+                pr.setMessage("获取失败");
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e.getMessage());
+        }
+        return pr;
+    }
+    
+    
+    /**
+     * 店铺审核编辑详情
+     * @param request
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+	public ProcessResult queryRetailStoreApprovalUserInfoDetail(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        try {
+            //获取参数
+            String json = HttpUtil.getRequestInputStream(request);
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            //判断是否缺少参数
+            if (StringUtils.isEmpty(params.get("id"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[id]申请编号");
+                return pr;
+            }
+            //获取现金预充值审批明细
+            Map<String, Object> result = this.retailStoreApprovalDao.queryRetailStoreApprovalUserInfoDetail(params);
+            if (result != null) {
+                pr.setMessage("获取成功");
+                pr.setObj(result);
+            } else {
+                pr.setMessage("无数据");
+            }
+            pr.setState(true);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e.getMessage());
+        }
+        return pr;
+    }
+    
+    /**
+     * 店铺编辑
+     * @param request
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+	@Transactional
+    public ProcessResult editRetailStoreApprovalUserInfo(HttpServletRequest request) throws Exception {
+        ProcessResult pr = new ProcessResult();
+        try {
+            //获取请求参数
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少请求参数");
+                return pr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            if (StringUtils.isEmpty(params.get("user_id"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数user_id");
+                return pr;
+            }
+            
+            int count=retailStoreApprovalDao.updateUserInfo(params);
+            if(count<=0){
+            	pr.setState(false);
+            	throw new RuntimeException("修改失败");
+            }
+            retailStoreApprovalDao.updateRetailUserInfo(params);
+            Map<String, Object> sendMap = new HashMap<String, Object>();
+            sendMap.put("AGENT_ID", params.get("user_id"));
+            sendMap.put("SHOP_NAME", params.get("SHOP_NAME"));
+            sendMap.put("MOBILE", params.get("USER_MANAGE_MOBILEPHONE"));
+            Map<String, Object> resPr = (Map<String, Object>) this.queryForPost(sendMap, retail_service_new_url+"open/Agent/agentInfoUpdate");
+            if (Integer.parseInt(resPr.get("state").toString()) == 1) {
+            	pr.setState(true);
+                pr.setMessage("编辑成功");
+            }
+        } catch (Exception e) {
+            logger.error(e.getMessage());
+            throw new RuntimeException(e.getMessage());
+        }
+        return pr;
+    }
+    
+    /**
+     * 用户权限审核
+     * @param request
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+	@Transactional
+    public ProcessResult auditUserStoreApproval(HttpServletRequest request) throws Exception {
+        ProcessResult pr = new ProcessResult();
+        try {
+            //获取请求参数
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少请求参数");
+                return pr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            if (StringUtils.isEmpty(params.get("retail_user_id"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数retail_user_id");
+                return pr;
+            }
+            if (StringUtils.isEmpty(params.get("user_approval_state"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数user_approval_state");
+                return pr;
+            }
+            //获取会员信息，进行微商城权限校验
+            Map<String, Object> tempParamMap = new HashMap<String,Object>();
+            tempParamMap.put("id", params.get("retail_user_id"));
+            Map<String,Object> userInfo = memberInfoDao.queryMemberInfoById(tempParamMap);
+            //小程序店铺权限审批通过是特殊处理
+            if(Integer.parseInt(params.get("user_approval_state")+"")==2){
+            	//获取业务员名称
+    			String  referee_user_realname="";
+    			if(!StringUtils.isEmpty(params.get("referee_user_id"))){
+    				referee_user_realname=memberInfoDao.querySysUserInfoById(Integer.parseInt(params.get("referee_user_id").toString()));
+    			}
+    			//获取门店名称
+    			String  store_name="";
+    			if(!StringUtils.isEmpty(params.get("store_id"))){
+    				 store_name=storeInfoDao.queryStoreNameById(Integer.parseInt(params.get("store_id").toString()));
+    			}
+    			//获取业务经理名称
+    			String market_supervision_user_realna=memberInfoDao.querySysUserInfoById(Integer.parseInt(params.get("market_supervision_user_id").toString()));
+    			params.put("referee_user_realname", referee_user_realname);
+    			params.put("market_supervision_user_realna", market_supervision_user_realna);
+    			params.put("store_name", store_name);
+
+    			Map<String, Object> param = new HashMap<String, Object>();
+    			param.put("retail_user_id", params.get("retail_user_id"));
+    			Map<String, Object> storeMap = retailStoreApprovalDao.queryStoreCertDetail(param);
+    			Map<String, Object> existMap = new HashMap<String, Object>();
+    			existMap.put("user_manage_mobilephone", storeMap.get("USER_MOBILEPHONE"));
+    			existMap.put("user_manage_cardid", storeMap.get("USER_MANAGE_CARDID"));
+    			existMap.put("id", params.get("retail_user_id"));
+                int count1 = memberInfoDao.queryMemberInfoRecordByMobilePhone(existMap);
+                int count2 = memberInfoDao.queryMemberInfoRecordByUserManageCardId(existMap);
+                if(count1 > 0) {
+                    throw new RuntimeException("手机号重复");
+                }
+                if(count2 > 0) {
+                    throw new RuntimeException("身份证重复");
+                }
+    			//初次审批（全新会员）
+    			if(userInfo == null){
+    				//生成临时会员登录名
+    				params.put("temp_login_name", createNewLoginName(storeMap.get("USER_MOBILEPHONE").toString()));
+                	//插入会员申请表数据，默认临时会员状态
+                	retailStoreApprovalDao.insertUserInfoRecord(params);
+                	//插入会员主表表数据，默认临时会员状态
+                	retailStoreApprovalDao.insertUserInfo(params);
+                	//创建用户帐户信息
+    				addUserAccount(params);
+    			}else{
+    				//之前已是平台会员，信息做更新处理
+    				params.put("distribution_state", 1);
+    				params.put("is_wechat", 1);
+    				retailStoreApprovalDao.updateUserInfoOnRetailAudit(params);
+    			}
+            }
+            //更新权限审批状态（通过/驳回）
+            retailStoreApprovalDao.auditUserStoreApproval(params);
+            Map<String, Object> sendMap = new HashMap<String, Object>();
+            sendMap.put("AGENT_ID", params.get("retail_user_id"));
+            sendMap.put("USER_CERT_STATE", "2");
+            sendMap.put("USER_APPROVAL_STATE", params.get("user_approval_state"));
+            sendMap.put("APPLET_PERMIT", "2".equals(params.get("user_approval_state")+"")?"1":"0");
+            Map<String, Object> resPr = (Map<String, Object>) this.queryForPost(sendMap, retail_service_new_url+"open/Agent/agentInfoUpdate");
+            if (Integer.parseInt(resPr.get("state").toString()) != 1) {
+             	pr.setMessage("调用远程接口异常");
+             	throw new RuntimeException("调用远程接口异常");
+            }
+            //短信提醒处理
+            try{
+              	//相关信息获取
+            	params.put("id", params.get("retail_user_id"));
+            	Map<String, Object> param = new HashMap<String, Object>();
+            	Map<String, Object> tempStoreApprovaldetail = retailStoreApprovalDao.queryStoreApprovalDetail(params);
+            	param.put("verify_state", params.get("user_approval_state"));
+            	param.put("verfiy_time", tempStoreApprovaldetail.get("APPROVAL_DATE"));
+            	//短信提醒参数封装
+            	Map<String, Object> noticeMap = new HashMap<String, Object>();
+            	noticeMap.put("param", param);
+            	noticeMap.put("type", Integer.parseInt(params.get("user_approval_state")+"")==2 ? 28 : 29);
+            	noticeMap.put("mobile",tempStoreApprovaldetail.get("USER_MOBILEPHONE"));
+            	noticeMap.put("sms_key","");
+            	if(tempStoreApprovaldetail.containsKey("OPENID") && !StringUtils.isEmpty(tempStoreApprovaldetail.get("OPENID"))){
+            		noticeMap.put("openid",tempStoreApprovaldetail.get("OPENID"));
+            	}else{
+            		noticeMap.put("openid","");
+            	}
+            	//调用远程接口
+            	ProcessResult sendPr = (ProcessResult)this.queryForPostSendNotice(noticeMap, sms_service_url);
+            	if (sendPr.getState()) {
+            		logger.info("新零售商家("+params.get("id")+")权限审批时调用远程接口发送提醒信息成功");
+            	}else{
+            		logger.info("新零售商家("+params.get("id")+")权限审批时调用远程接口发送提醒信息失败:"+sendPr.getMessage());
+            	}
+          	}catch(Exception e){
+          		logger.error("新零售商家("+params.get("id")+")审批时消息提醒异常"+e.getMessage());
+          	}
+            //成功消息
+            pr.setMessage("操作成功");
+            pr.setState(true);
+        } catch (Exception e) {
+            logger.error(e.getMessage());
+            throw new RuntimeException(e.getMessage());
+        }
+        return pr;
+    }
+    public Object queryForPost(Map<String,Object> obj,String url) throws Exception{
+        String params = "";
+        if(obj != null){
+            Packet packet = Transform.GetResult(obj, EsbConfig.ERP_FORWARD_KEY_NAME);//加密数据
+            params = Jackson.writeObject2Json(packet);//对象转json、字符串
+        }
+        //发送至服务端
+        String json = HttpClientUtil.post(url, params,30000);
+        return Transform.GetPacketJzb(json,Map.class);
+    }
+    
+    public Object queryForPostSendNotice(Map<String,Object> obj,String url) throws Exception{
+        String params = "";
+        if(obj != null){
+            Packet packet = Transform.GetResult(obj,EsbConfig.ERP_FORWARD_KEY_NAME);//加密数据
+            params = Jackson.writeObject2Json(packet);//对象转json、字符串
+        }
+        //发送至服务端(设置3秒超时时间)
+        String json = HttpClientUtil.post(url, params,3000);
+        return  Transform.GetPacket(json,ProcessResult.class,EsbConfig.ERP_REVERSE_KEY_NAME);
+	}
+ 
+    /**
+   	 * 审核通过，添加用户帐户
+   	 * @param user
+   	 * @return
+        */
+   	@Transactional
+   	private int addUserAccount(Map<String, Object> user) throws Exception{
+   		//设置会员id
+   		user.put("user_name", user.get("retail_user_id"));
+   		//创建用户账户信息
+   		Map<String,Object> codeParams = new HashMap<String,Object>();
+   		codeParams.put("c_user_name",user.get("retail_user_id"));
+   		codeParams.put("c_money",0);
+   		codeParams.put("c_typeid","new");
+   		codeParams.put("c_user_type","1");
+   		String key = memberInfoDao.getUserKey(codeParams);
+   		codeParams.put("c_user_key",key);
+   		String code = memberInfoDao.getCheck_Code(codeParams);
+   		Map<String,Object> account = new HashMap<String,Object>();
+   		account.put("user_id", user.get("retail_user_id"));
+   		account.put("account_balance_checkcode", code);//余额校验码
+   		account.put("credit_checkcode", code);//授信校验码
+   		account.put("bank_account", "");
+   		account.put("sub_merchant_id", "");
+   		account.put("user_type", "1");
+   		account.put("credit_money", 0);
+   		account.put("credit_money_use", 0);
+   		account.put("credit_money_balance", 0);
+   		account.put("deposit_money", 0);
+   		account.put("account_balance", 0);
+   		account.put("score", 6001);
+   		//保存用户key
+   		Map<String,Object> uck = new HashMap<String,Object>();
+   		uck.put("user_name", user.get("retail_user_id"));
+   		uck.put("cache_key", key);
+   		if(memberInfoDao.insertCacheKey(uck)>0){
+   			return memberInfoDao.insertBankAccount(account);
+   		}
+   		return 0;
+   	}
+   	
+   	
+   	/**
+     * 分页查询新零售小程序店铺实名认证列表
+     * @param request 查询条件
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+	public GridResult queryStoreCertList(HttpServletRequest request) {
+        GridResult gr = new GridResult();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+            //分页参数
+            GridResult pageParamResult = PageUtil.handlePageParams(paramMap);
+            if (pageParamResult != null) {
+                return pageParamResult;
+            }
+            //查询新零售小程序店铺实名认证数量
+            int count = retailStoreApprovalDao.queryStoreCertCount(paramMap);
+            //查询新零售小程序店铺实名认证列表
+            List<Map<String, Object>> list = retailStoreApprovalDao.queryStoreCertList(paramMap);
+            if (list != null) {
+                gr.setMessage("获取成功");
+                gr.setObj(list);
+                gr.setTotal(count);
+            } else {
+                gr.setMessage("无数据");
+            }
+            gr.setState(true);
+        } catch (Exception e) {
+            gr.setState(false);
+            gr.setMessage(e.getMessage());
+            logger.error(e.getMessage());
+        }
+        return gr;
+    }
+    
+    /**
+     * 新零售小程序店铺实名认证详情
+     * @param request
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+	public ProcessResult queryStoreCertDetail(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        try {
+            //获取参数
+            String json = HttpUtil.getRequestInputStream(request);
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            //判断是否缺少参数
+            if (StringUtils.isEmpty(params.get("id"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[id]");
+                return pr;
+            }
+            //查询新零售小程序店铺实名认证详情
+            Map<String, Object> result = this.retailStoreApprovalDao.queryStoreCertDetail(params);
+            if (result != null) {
+                pr.setState(true);
+                pr.setMessage("获取成功");
+                pr.setObj(result);
+            } else {
+                pr.setState(false);
+                pr.setMessage("获取失败");
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e.getMessage());
+        }
+        return pr;
+    }
+    
+    /**
+     * 新零售小程序店铺实名认证审批
+     * @param request
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+	@Transactional
+    public ProcessResult auditStoreCert(HttpServletRequest request) throws Exception {
+    	 Map<String,Object> params = null;
+         Map<String,Object> userInfoParam=new HashMap<String,Object>();
+         ProcessResult pr = new ProcessResult();
+         try{
+             String json = HttpUtil.getRequestInputStream(request);
+             params = (Map<String,Object>)Transform.GetPacket(json, Map.class);
+             //查询会员认证信息
+             Map<String,Object> detail = retailStoreApprovalDao.queryStoreCertDetail(params);
+             if(Integer.parseInt(detail.get("STATE").toString())!=0){
+                 pr.setState(false);
+                 pr.setMessage("当前会员认证状态异常");
+                 return pr;
+             }
+             //审批人参数处理
+             params.put("approval_user_id", params.get("public_user_id"));
+             //查询会员相关信息
+             userInfoParam.put("id", detail.get("USER_ID"));
+             Map<String,Object> userInfo=memberInfoDao.queryMemberInfoById(userInfoParam);
+             int state =Integer.parseInt(params.get("state").toString());
+             if(state == 1 && !StringUtils.isEmpty(userInfo)){
+                 //普通会员需要校验认证信息真实姓名和会员注册姓名一致
+                 if(Integer.parseInt(userInfo.get("USER_TYPE").toString()) == 1 && !detail.get("USER_REAL_NAME").equals(userInfo.get("USER_MANAGE_NAME"))){
+                     pr.setState(false);
+                     pr.setMessage("会员认证姓名与注册姓名不一致");
+                     return pr;
+                 }
+             }
+            //相关信息获取
+           	Map<String, Object> tempCertdetail = retailStoreApprovalDao.queryStoreCertDetail(params);
+           	if(state == 1){
+           		userInfoParam.put("user_manage_cardid", tempCertdetail.get("USER_MANAGE_CARDID"));
+                if(memberInfoDao.queryMemberInfoRecordByUserManageCardId(userInfoParam) > 0) {
+                   pr.setState(false);
+   				pr.setMessage("身份证重复");
+   				return pr;
+                }
+           	}
+             //更新店铺实名认证审批状态
+             if(memberInfoDao.updateBankCardUserInfo(params) < 1){
+                 pr.setState(false);
+                 pr.setMessage("操作失败");
+                 return pr;
+             }
+             Map<String, Object> sendMap = new HashMap<String, Object>();
+             sendMap.put("AGENT_ID", detail.get("USER_ID"));
+             sendMap.put("USER_CERT_STATE", state == 1 ? 2 : 3);
+             Map<String, Object> resPr = (Map<String, Object>) this.queryForPost(sendMap, retail_service_new_url+"open/Agent/agentInfoUpdate");
+             if (Integer.parseInt(resPr.get("state").toString()) == 1) {
+            	 //实名认证相关短信提醒处理，仅当【实名认证失败】时发短信。
+                 if(state == 2){
+                	 try{
+      	            	//短信提醒参数封装
+      	            	Map<String, Object> noticeMap = new HashMap<String, Object>();
+      	            	noticeMap.put("type", 21);
+      	            	noticeMap.put("mobile",tempCertdetail.get("USER_MOBILEPHONE"));
+      	            	noticeMap.put("sms_key","");
+      	            	if(tempCertdetail.containsKey("OPENID") && !StringUtils.isEmpty(tempCertdetail.get("OPENID"))){
+      	            		noticeMap.put("openid",tempCertdetail.get("OPENID"));
+      	            	}else{
+      	            		noticeMap.put("openid","");
+      	            	}
+      	            	//调用远程接口
+      	            	ProcessResult sendPr = (ProcessResult)this.queryForPostSendNotice(noticeMap, sms_service_url);
+      	            	if (sendPr.getState()) {
+      	            		logger.info("新零售社交账号("+params.get("id")+")审批时调用远程接口发送提醒信息成功");
+      	            	}else{
+      	            		logger.info("新零售社交账号("+params.get("id")+")审批时调用远程接口发送提醒信息失败:"+sendPr.getMessage());
+      	            	}
+                  	}catch(Exception e){
+                  		logger.error("新零售社交账号("+params.get("id")+")审批时消息提醒异常"+e.getMessage());
+                  	}  
+                 }
+             }else{
+             	pr.setMessage("调用远程接口异常");
+             	throw new RuntimeException("调用远程接口异常");
+             }
+             pr.setState(true);
+             pr.setMessage("审批成功");
+         } catch (Exception e) {
+             pr.setState(false);
+             pr.setMessage(e.getMessage());
+             throw new RuntimeException(e);
+         }
+     return pr;
+    }
+    
+    
+    /**
+     * 通过手机号码创建新的额登录名，格式为 
+     * tk+手机号
+     * 例如:tk15857101723
+     * 如果该用户名已被占用，则在后面加序列号，例如：tk15857101723_1
+    *<p>Title: createNewLoginName</p> 
+    *<p>Description: </p> 
+    * @return
+     */
+    public String createNewLoginName(String mobile_phone) {
+    	StringBuffer loginName = new StringBuffer("tk");
+    	loginName.append(mobile_phone);
+    	String tempLoginName = loginName.toString();
+        int index = 0;
+         //校验用户名是否被使用,已存在，则在其后附加序列号
+        while (retailStoreApprovalDao.checkUserInfoByLoginName(tempLoginName) > 0) {
+        	 index++;
+        	 //创建临时登录名
+        	 tempLoginName = loginName.toString()+"_"+index;
+        }
+        if(index!=0) {
+        	loginName = loginName.append("_").append(index);
+        }
+    	return loginName.toString();
+    }
+}

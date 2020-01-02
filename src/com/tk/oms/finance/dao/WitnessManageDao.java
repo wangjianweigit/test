@@ -1,0 +1,282 @@
+package com.tk.oms.finance.dao;
+
+import com.tk.oms.finance.dto.CapitalDistributionDetailDTO;
+import com.tk.oms.finance.dto.CapitalDistributionListDTO;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 见证宝管理
+ * @zhenghui
+ */
+@Repository
+public interface WitnessManageDao {
+    /**
+     *根据会员id查询会员账户信息
+     */
+    Map<String, Object> queryUserAccountById(long user_id);
+
+    /**
+     * 获取入驻商列表
+     * @param params
+     * @return
+     */
+    List<Map<String, Object>> queryStationedUserList(Map<String, Object> params);
+
+    /**
+     * 获取入驻商总数
+     * @param params
+     * @return
+     */
+    int queryStationedUserCount(Map<String, Object> params);
+
+    /**
+     * 通过入驻商ID查询入驻信息
+     * @param paramId
+     * @return
+     */
+    Map<String, Object> queryStationedUserById(long paramId);
+
+    /**
+     * 通过user_name查询会员信息
+     * @param paramId
+     * @return
+     */
+    Map<String, Object> queryUserInfoByUserName(long paramId);
+
+    /**
+     * 获取平台服务和仓储服务账户
+     *
+     * @param params
+     * @return
+     */
+    String queryServeAccount(Map<String, Object> params);
+
+    /**
+     * 获取清分明细列表
+     * @param params
+     * @return
+     */
+    List<Map<String, Object>> queryAllocatingDetailForPage(Map<String, Object> params);
+
+    /**
+     * 获取清分明细记录数
+     * @param params
+     * @return
+     */
+    int queryAllocatingDetailCount(Map<String, Object> params);
+
+    /**
+     * 获取退款明细列表
+     * @param params
+     * @return
+     */
+    List<Map<String, Object>> queryRefundDetailForPage(Map<String, Object> params);
+
+    /**
+     * 获取退款明细记录数
+     * @param params
+     * @return
+     */
+    int queryRefundDetailCount(Map<String, Object> params);
+
+    /**
+     * 获取订单分成明细列表
+     * @param params
+     * @return
+     */
+    List<Map<String, Object>> queryDivideDetailForPage(Map<String, Object> params);
+
+    /**
+     * 获取订单分成明细记录数
+     * @param params
+     * @return
+     */
+    int queryDivideDetailCount(Map<String, Object> params);
+    /**
+     * 资金清算查询列表
+     * @param params
+     * @return
+     */
+	List<Map<String, Object>> queryClearingFundsDetailForPage(Map<String, Object> params);
+	/**
+	 * 资金清算查询数量
+	 * @param params
+	 * @return
+	 */
+	int queryClearingFundsDetailCount(Map<String, Object> params);
+	/**
+	 * 资金概况
+	 * @param paramMap
+	 * @return
+	 */
+	Map<String, Object> queryMoneySituation(Map<String, Object> paramMap);
+	/**
+	 * 商家列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> queryMerchantList(Map<String, Object> paramMap);
+	/**
+	 * 其他费用列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<CapitalDistributionDetailDTO> queryOtherCharges(Map<String, Object> paramMap);
+	/**
+	 * 结算类型列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<CapitalDistributionDetailDTO> querySettlementTypeList(Map<String, Object> paramMap);
+	/**
+	 * 结算明细列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> queryBillingDetailsList(Map<String, Object> paramMap);
+	/**
+	 * 运费详情
+	 * @param paramMap
+	 * @return
+	 */
+	Map<String, Object> queryFreightDetail(Map<String, Object> paramMap);
+	/**
+	 * 代发费详情
+	 * @param paramMap
+	 * @return
+	 */
+	Map<String, Object> queryGenerationExpensesDetail(Map<String, Object> paramMap);
+	/**
+	 * 代发费详情列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> queryGenerationExpensesDetailList(Map<String, Object> paramMap);
+	/**
+	 * 结算明细汇总
+	 * @param paramMap
+	 * @return
+	 */
+	Map<String, Object> queryBillingDetailsTotal(Map<String, Object> paramMap);
+
+    /**
+     * 新增(衫徳)提现记录
+     * @param params
+     * @return
+     */
+    int insertSdAccountWithdrawal(Map<String, Object> params);
+
+    /**
+     * 查询杉徳提现记录数
+     * @param params
+     * @return
+     */
+    int querySdAcountWithdrawalCount(Map<String, Object> params);
+
+    /**
+     * 查询杉徳提现列表
+     * @param params
+     * @return
+     */
+    List<Map<String, Object>> querySdAcountWithdrawalList(Map<String, Object> params);
+    /**
+	 * 退款退货明细查询
+	 * @param params
+	 * @return
+	 */
+	List<Map<String, Object>> queryRefundReturnDetailForPage(Map<String, Object> params);
+	/**
+	 * 退款退货明细数量
+	 * @param params
+	 * @return
+	 */
+	int queryRefundReturnDetailCount(Map<String, Object> params);
+	/**
+	 * 仅退款  退款概况
+	 * @param paramMap
+	 * @return
+	 */
+	Map<String, Object> queryRefundSituation(Map<String, Object> paramMap);
+	/**
+	 * 退货退款 退款概况
+	 * @param paramMap
+	 * @return
+	 */
+	Map<String, Object> queryReturnRefundSituation(Map<String, Object> paramMap);
+	/**
+	 * 退款 商家列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> queryRefundMerchantList(Map<String, Object> paramMap);
+	/**
+	 * 仅退款 其他费用
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> queryOtherRefundCharges(Map<String, Object> paramMap);
+	/**
+	 * 退货退款 其他费用
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> queryOtherReturnRefundCharges(Map<String, Object> paramMap);
+    /**
+     * 退款类型列表
+     * @param paramMap
+     * @return
+     */
+	List<Map<String, Object>> queryRefundTypeList(Map<String, Object> paramMap);
+	/**
+	 * 仅退款明细列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> queryRefundDetailsList(Map<String, Object> paramMap);
+	/**
+	 * 仅退款明细汇总
+	 * @param paramMap
+	 * @return
+	 */
+	Map<String, Object> queryRefundDetailsTotal(Map<String, Object> paramMap);
+	/**
+	 * 退货退款类型列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> queryReturnRefundTypeList(Map<String, Object> paramMap);
+	/**
+	 * 退货退款明细列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> queryReturnRefundDetailsList(Map<String, Object> paramMap);
+	/**
+	 * 退货退款明细汇总
+	 * @param paramMap
+	 * @return
+	 */
+	Map<String, Object> queryReturnRefundDetailsTotal(Map<String, Object> paramMap);
+
+	/**
+	 * 获取衫德提现申请单号
+	 * @return
+	 */
+	String getSdAccountWithdrawal();
+
+	/**
+	 * 获取提现验证默认手机号
+	 * @return
+	 */
+	String getWithdrawCheckDefaultPhone();
+
+	/**
+	 * 查询指定账户类型清分记录列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<CapitalDistributionListDTO> querySettlementTypeListByType(Map<String, Object> paramMap);
+}

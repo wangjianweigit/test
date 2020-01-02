@@ -1,0 +1,160 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+ <head>
+    <meta http-equiv="content-type" content="text/html;charset=utf-8">
+    <title>测试界面</title>
+    <script src="http://apps.bdimg.com/libs/jquery/1.8.0/jquery.min.js"></script>
+    <script src="jquery.form.js"></script>
+    <script src="webtoolkit.md5.js"></script>
+    <script src="t.js"></script>
+    <style type="text/css">
+    	body
+		{
+			font-size:18px;
+		}
+    </style>
+    <script type="text/javascript">
+        // ################################ 常量定义 ################################
+        var BaseURL = "/oms_server/";
+        var jmURL = BaseURL+"test/encryption";//加密url
+		var jm2URL = BaseURL+"test/decrypt";//解密url
+		/**
+		测试地址，注意,测试地址中的 / 使用两个下划线代替
+		**/
+        var DATA_MAP = {
+            product__pending_approval_list: {
+                info: '待审批商品列表',
+                data: '{"pageIndex":1,"pageSize":10}'
+            },
+            product__pending_approval_detail: {
+                info: '待审批商品详情',
+                data: '{"id":16}'
+            },
+            product__approve: {
+                info: '待审批商品审批通过',
+                data: '{"id":16,"public_user_id":1}'
+            },
+            product__rejecte: {
+                info: '待审批商品审批驳回',
+                data: '{"id":16,"public_user_id":1,"rejected_reason":"商品参数有误"}'
+            },
+            product__list: {
+                info: '商品列表',
+                data: '{"pageIndex":1,"pageSize":10}'
+            },
+            product__detail: {
+                info: '商品详情',
+                data: '{"id":1,"itemnumber":"1"}'
+            },
+            product_type__list:{
+            	info: '商品分类列表',
+            	data: '{"parent_id":0}'
+            },
+            product_type__insert:{
+            	info: '新增商品分类',
+            	data: '{"type_name":"鞋类","code":2,"parent_id":0}'
+            },
+            product_type__update:{
+            	info: '更新商品分类',
+            	data: '{"type_name":"鞋类","id":2,"sortid":""}'
+            },
+            product_type__delete:{
+            	info: '删除商品分类',
+            	data: '{"ids":"2"}'
+            },
+            product_param__list:{
+            	info: '商品参数列表',
+            	data: '{"product_type_id":"17","pageIndex":1,"pageSize":10}'
+            },
+            product_param__insert:{
+            	info: '新增商品参数',
+            	data: '{"parameter_name":"测试123","parameter_type":"text","parameter_values":"1","required_flag":1,"is_display":2,"product_type_id":290}'
+            },
+            product_param__delete:{
+            	info: '删除商品参数',
+            	data: '{"id":2}'
+            },
+            product_param__update:{
+            	info: '更新商品参数',
+            	data: '{"id":2,"parameter_name":"测试123","parameter_type":"text","parameter_values":"1","required_flag":1,"is_display":2}'
+            },
+            product_param__info_list:{
+            	info: '查询分类ID对应的商品参数',
+            	data: '{"product_type_id":17}'
+            },
+            product_brand__add: {
+                info: '品牌新增',
+                data: '{"brand_name":"ds","code":"02","state":2,"remark":"dfh","create_user_id":5}'
+            },
+            product_brand__edit: {
+                info: '品牌修改',
+                data: '{"id":2,"brand_name":"ds","code":"02","state":2,"remark":"dfh","create_user_id":5}'
+            },
+            product_brand__list: {
+                info: '品牌列表',
+                data: '{"pageIndex":1,"pageSize":10}'
+            },
+            product_brand__remove: {
+                info: '品牌删除',
+                data: '{"id":1}'
+            },
+            product_brand__sort: {
+                info: '品牌排序',
+                data: '{"id":1,"toId":10}'
+            },
+            product_group__list: {
+                info: '查询商品分组列表',
+                data: '{}'
+            },
+            product_group__add: {
+                info: '新增商品分组',
+                data: '{"group_name":"测试123"}'
+            },
+            product_group__remove: {
+                info: '删除商品分组',
+                data: '{"id":1}'
+            },
+            product_group__edit: {
+                info: '编辑商品分组',
+                data: '{"id":1}'
+            },
+            product_group__state: {
+                info: '商品分组启停用',
+                data: '{"id":1,"state":"2"}'
+            },
+            product_group__all: {
+                info: '查询商品分组层级信息',
+                data: '{}'
+            },
+            product_group__sort: {
+                info: '商品分组排序',
+                data: '{"id1":1,"id2":2}'
+            },
+        };
+    </script>
+</head>
+<body>
+Action:
+<!-- 
+<input type="radio" name="action" value="http://localhost:8080/esb/" onclick="changeAction(this);" checked="checked"/>localhost
+<input type="radio" name="action" value="http://192.168.0.188:8080/esb/" onclick="changeAction(this);"/>188
+ -->
+<br/>
+<select id="action_select" onchange="h($('#action_select option:selected').attr('value'))" size="8"
+        style="width:40%;">
+</select><br/>
+访问URL:
+<input id="submit_url" onchange="h(this.value)" value=".action" style="width:35%;background-color:pink;height:30"><form id="htmlForm" name="htmlForm" action="" method="post">
+    data:<input type="button" value="提交" onclick="submit_function('data');"/>
+    <input type="button" onclick="javascript: $('#ret').val('');" value="清除"/><br/>
+    <textarea id="data" name="data" style="width:40%;height:100px;font-size: 15px;font-family:monaco" onchange="load_data('data')"></textarea>
+    <input id="req_h_data" type="hidden" value=""/>
+    <input id="res_h_data" type="hidden" value=""/>
+</form>
+<div style="position: fixed;top: 20px;right:30px;width:45%;overflow-y: auto;height:100%;background: #eee;">
+    response:<br/>
+    <span id="ret" style="font-size: 15px;font-family:monaco"></span>
+</div>
+<div id="data_view" style="position: fixed;top:350px;width:40%;overflow-y: auto;height: 400px;background: #eee;font-size: 15px;font-family:monaco"></div>
+</body>
+</html>

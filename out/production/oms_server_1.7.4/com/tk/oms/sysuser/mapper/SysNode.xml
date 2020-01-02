@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.sysuser.dao.SysNodeDao">
+	<!-- 新增系统菜单或按钮节点 -->
+    <insert id="insert"  parameterType="com.tk.oms.sysuser.entity.SysNode">
+         insert into tbl_sys_node(
+             id,
+             name,
+             node_type,
+             parent_id,
+             key_name,
+             remarks,
+             url
+         ) VALUES
+         (
+             seq_sys_node_id.nextval,
+             #{name,jdbcType=VARCHAR},
+             #{node_type,jdbcType=VARCHAR},
+             #{parent_id,jdbcType=INTEGER},
+             #{key_name,jdbcType=VARCHAR},
+             #{remarks,jdbcType=VARCHAR},
+             #{url,jdbcType=VARCHAR}
+        )
+    </insert>
+    
+    <!-- 删除系统菜单或按钮节点,执行此处需要同步执行SysRoleNode的删除 -->
+    <delete id="delete"  parameterType="java.util.HashMap">
+         delete from tbl_sys_node where id = #{id,jdbcType=INTEGER}
+    </delete>
+
+	<!-- 更新系统菜单或按钮节点 -->
+    <update id="update" parameterType="com.tk.oms.sysuser.entity.SysNode">
+       update tbl_sys_node
+       <set>
+           name = #{name,jdbcType=VARCHAR},
+           node_type = #{node_type,jdbcType=VARCHAR},
+           key_name = #{key_name,jdbcType=VARCHAR},
+           remarks = #{remarks,jdbcType=VARCHAR},
+           url = #{url,jdbcType=VARCHAR}
+       </set>
+        where id = #{id,jdbcType=INTEGER}
+    </update>
+
+	<resultMap type="java.util.HashMap" id="allNodeMap">
+		<result column="id" property="id"/>
+		<result column="node_name" property="name"/>
+		<result column="level" property="pid"/>
+		<result column="chk" property="chk"/>
+		<result column="menu_type" property="menu_type"/>
+	</resultMap>
+
+	<!-- 查询所有系统菜单或按钮节点列表 -->
+    <select id="queryAllList" resultMap="allNodeMap" parameterType="java.util.HashMap">
+            select id,node_name,level, 0 chk,menu_type from tbl_sys_node
+			where is_delete = '0'
+			start with parent_id=0
+			connect by prior id=parent_id
+			order siblings by sort_id asc
+    </select>
+
+	<!-- 根据条件查询系统菜单或按钮节点列表 -->
+    <select id="queryList" resultType="com.tk.oms.sysuser.entity.SysNode" parameterType="java.util.HashMap">
+        select * from (
+        select a.*, rownum rn from (
+            SELECT * from tbl_sys_node
+            <where>
+            	<if test="parent_id!=null and parent_id!=-1 ">
+                    name parent_id = #{parent_id}
+                </if>
+                <if test="keyword!=null and keyword!='' ">
+                    and (name like '%'#{keyword}'%' or remarks like '%'#{keyword}'%')
+                </if>
+            </where>
+        ) a where
+        rownum &lt;= #{end_rownum})
+        where rn &gt; #{start_rownum}
+    </select>
+
+	<!-- 根据条件查询系统菜单或按钮节点数量 -->
+    <select id="queryCount" resultType="int" parameterType="java.util.HashMap">
+        SELECT
+        count(*)
+        from tbl_sys_node
+         <where>
+               <if test="parent_id!=null and parent_id!=-1 ">
+                    name parent_id = #{parent_id}
+                </if>
+                <if test="keyword!=null and keyword!='' ">
+                    and (name like '%'#{keyword}'%' or remarks like '%'#{keyword}'%')
+                </if>
+            </where>
+    </select>
+
+	<!-- 查询系统菜单或按钮节点详情 -->
+    <select id="queryById" resultType="com.tk.oms.sysuser.entity.SysNode" parameterType="com.tk.oms.sysuser.entity.SysNode">
+            SELECT * from tbl_sys_node 
+            <where>
+                    id = #{id}
+            </where>
+    </select>
+</mapper>

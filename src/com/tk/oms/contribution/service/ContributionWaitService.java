@@ -1,0 +1,237 @@
+package com.tk.oms.contribution.service;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import com.tk.oms.basicinfo.dao.StoreInfoDao;
+import com.tk.oms.contribution.dao.ContributionOrderDao;
+import com.tk.oms.contribution.dao.ContributionWaitDao;
+import com.tk.oms.sysuser.dao.SysUserInfoDao;
+import com.tk.oms.sysuser.entity.SysUserInfo;
+import com.tk.sys.util.GridResult;
+import com.tk.sys.util.HttpUtil;
+import com.tk.sys.util.PageUtil;
+import com.tk.sys.util.ProcessResult;
+import com.tk.sys.util.Transform;
+/**
+ * 
+ * Copyright (c), 2017, Tongku
+ * FileName : ContributionWaitService
+ * 待缴款订单
+ *
+ * @author yejingquan
+ * @version 1.00
+ * @date 2017-4-19
+ */
+@Service("ContributionWaitService")
+public class ContributionWaitService {
+	private Log logger = LogFactory.getLog(this.getClass());
+	
+	@Resource
+	private ContributionWaitDao contributionWaitDao;
+	@Resource
+	private ContributionOrderDao contributionOrderDao;
+	@Resource
+	private SysUserInfoDao sysUserInfoDao;
+	@Resource
+	private StoreInfoDao storeInfoDao;
+	/**
+	 * 查询待缴款订单列表
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryList(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+
+			if (!StringUtils.isEmpty(json)) {
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+				PageUtil.handlePageParams(paramMap);
+			}
+			if (paramMap.size() == 0) {
+				gr.setState(false);
+				gr.setMessage("参数缺失");
+				return gr;
+			}
+			if (StringUtils.isEmpty(paramMap.get("public_user_name"))) {
+				gr.setState(false);
+				gr.setMessage("缺少参数public_user_name");
+				return gr;
+			}
+			if (paramMap.containsKey("states")) {
+				String[] states = ((String) paramMap.get("states")).split(",");
+				int[] intStr = new int[states.length];
+				for (int i = 0; i < states.length; i++) {
+					intStr[i] = Integer.parseInt(states[i]);
+				}
+				paramMap.put("states", intStr);
+			}
+			//增加业务员、业务经理、店长查询待缴款单列表
+			int total = contributionWaitDao.queryContributionWaitCount(paramMap);
+			//查询待缴款订单列表
+			List<Map<String, Object>> dataList = contributionWaitDao.queryContributionWaitList(paramMap);
+			if (dataList != null && dataList.size() > 0) {
+				gr.setState(true);
+				gr.setMessage("查询列表成功!");
+				gr.setObj(dataList);
+				gr.setTotal(total);
+			} else {
+				gr.setState(true);
+				gr.setMessage("无数据");
+			}
+		} catch (Exception e) {
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+			e.printStackTrace();
+			logger.error("查询失败：" + e.getMessage());
+		}
+
+		return gr;
+	}
+	/**
+	 * 缴款
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult contribution(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        }
+            if(paramMap.size() == 0) {
+            	pr.setState(false);
+            	pr.setMessage("参数缺失");
+                return pr;
+            }
+            if(StringUtils.isEmpty(paramMap.get("ids"))){
+                pr.setState(false);
+                pr.setMessage("缺少参数ids");
+                return pr;
+            }
+            if(StringUtils.isEmpty(paramMap.get("voucher_path"))){
+                pr.setState(false);
+                pr.setMessage("缺少参数voucher_path");
+                return pr;
+            }
+            if(StringUtils.isEmpty(paramMap.get("public_user_name"))){
+                pr.setState(false);
+                pr.setMessage("缺少参数public_user_name");
+                return pr;
+            }
+            if(!("5".equals(paramMap.get("public_user_type")+"")||"3".equals(paramMap.get("public_user_type")+"")||"4".equals(paramMap.get("public_user_type")+""))){
+            	pr.setObj(false);
+            	pr.setMessage("当前用户不能缴款");
+            	return pr;
+			}
+            Map<String, Object> contributionOrder = new HashMap<String, Object>();
+            contributionOrder.put("sale_user_name", paramMap.get("public_user_name").toString());
+            contributionOrder.put("public_user_type", paramMap.get("public_user_type"));
+            contributionOrder.put("voucher_path", paramMap.get("voucher_path").toString());
+            if(!StringUtils.isEmpty(paramMap.get("remark"))){
+            	contributionOrder.put("remark", paramMap.get("remark").toString());
+            }
+            String[] ids = paramMap.get("ids").toString().split(",");
+			float contribution_money = 0f;
+			for (String id : ids) {
+				Map<String, Object> contributionWait = contributionWaitDao.queryById(Long.parseLong(id));
+				if (contributionWait == null) {
+					pr.setState(false);
+					pr.setMessage("待缴款单不存在");
+					return pr;
+				}
+				if (Integer.parseInt(contributionWait.get("STATE").toString()) != 1) {
+					pr.setState(false);
+					pr.setMessage("待缴款单已缴款或待审核");
+					return pr;
+				}
+				contribution_money += Float.parseFloat(contributionWait.get("CONTRIBUTION_MONEY").toString());
+			}
+			contributionOrder.put("receipt_type", "转账");
+			contributionOrder.put("total_money", contribution_money);
+			contributionOrder.put("md_id",  null);
+			if("5".equals(paramMap.get("public_user_type")+"")){
+				Map<String, Object> storeUser = storeInfoDao.queryByUserId(paramMap);
+				if(storeUser != null){
+					contributionOrder.put("md_id",  storeUser.get("STORE_ID"));
+				}else{
+					throw new RuntimeException("获取门店信息失败");
+				}
+			}
+			//新增缴款单
+			if (contributionOrderDao.insert(contributionOrder) <= 0) {
+				throw new RuntimeException("新增缴款单失败");
+			}
+            contributionOrder = (Map<String,Object>) contributionOrderDao.queryById(Long.parseLong(contributionOrder.get("id").toString()));
+
+            // 更新待缴款信息
+            Map<String, Object> waitMap = new HashMap<String, Object>();
+            waitMap.put("contribution_number", contributionOrder.get("CONTRIBUTION_NUMBER"));
+            waitMap.put("state", 2);
+            waitMap.put("ids", ids);
+            //生成缴款单详情
+            if(contributionWaitDao.update(waitMap) > 0&&contributionWaitDao.insertContributionOrderDetail(waitMap)>0){
+                pr.setState(true);
+                pr.setMessage("缴款成功");
+            }else{
+                throw new RuntimeException("更新待缴款单失败");
+            }
+            
+		} catch (Exception e) {
+        	pr.setState(false);
+        	pr.setMessage(e.getMessage());
+        	logger.error("缴款失败："+e.getMessage());
+        	throw new RuntimeException(e.getMessage());
+        }
+		return pr;
+	}
+
+	/**
+	 * 缴款单（充值）详情
+	 * @param request
+	 * @return
+	 */
+	public ProcessResult queryCashPaymentDetailForRecharge(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if (StringUtils.isEmpty(json)) {
+				pr.setState(false);
+				pr.setMessage("缺少参数");
+				return pr;
+			}
+			Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+
+			Map<String, Object> recharge = this.contributionWaitDao.queryCashPaymentDetailForRecharge(paramMap);
+			if (recharge != null) {
+				pr.setMessage("获取充值详情成功");
+				pr.setObj(recharge);
+			} else {
+				pr.setMessage("无数据");
+			}
+			pr.setState(true);
+		} catch (Exception e) {
+
+		}
+		return pr;
+	}
+}

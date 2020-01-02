@@ -1,0 +1,428 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.analysis.dao.MemberVisitDao">
+	 <!-- 用户统计表 -->
+    <sql id="queryTable">
+        select
+        pv.create_user_name user_name,
+        ui.login_name,
+        ui.user_manage_name user_realname,
+        pv.pv,
+        pv.ip_count,
+        pv.login_count,
+        nvl (oc.order_count, 0) order_count,
+        nvl (om.order_money, 0) order_money,
+        nvl(um.mark, 0) mark,
+        (select mark_name from tbl_dic_user_mark where id = um.mark) as mark_name,
+        (select mark_img_url from tbl_dic_user_mark where id = um.mark) as mark_img_url,
+        nvl(um.remark, '') remark,
+        ui.referee_user_realname,
+        ui.market_supervision_user_realna,
+        ui.store_name,
+        (select name from tbl_dic_region where id = ui.user_company_address_province)||
+        (select name from tbl_dic_region where id = ui.user_company_address_city)||
+        (select name from tbl_dic_region where id = ui.user_company_address_county) region_address
+        from
+        tbl_user_info ui,
+        (select a.create_user_name,
+                min (a.pv) pv,
+                count (1) ip_count,
+                nvl(max(c.login_count),0) login_count
+            from (select
+                    create_user_name,
+                    count (1) pv
+                from tbl_user_log_info
+                <where>
+                    <if test="start_date != null and start_date != ''">
+                        and create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+                    </if>
+                    <if test="end_date != null and end_date != ''">
+                        and create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+                    </if>
+                </where>
+                group by create_user_name) a,
+                (select distinct create_user_name, create_ip
+                from tbl_user_log_info
+                <where>
+                    <if test="start_date != null and start_date != ''">
+                        and create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+                    </if>
+                    <if test="end_date != null and end_date != ''">
+                        and create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+                    </if>
+                </where>
+                ) b,
+                (select create_user_name, count(1) login_count
+                from tbl_user_log_info
+                <where>
+                    page_type = '登录'
+                    <if test="start_date != null and start_date != ''">
+                        and create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+                    </if>
+                    <if test="end_date != null and end_date != ''">
+                        and create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+                    </if>
+                </where>
+                group by create_user_name) c
+            where a.create_user_name = b.create_user_name
+                and a.create_user_name = c.create_user_name(+)
+            group by a.create_user_name) pv,
+        (select user_name, count (1) order_count
+            from tbl_order_info
+            <where>
+                <if test="start_date != null and start_date != ''">
+                    and create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+                </if>
+                <if test="end_date != null and end_date != ''">
+                    and create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+                </if>
+            </where>
+            group by user_name) oc,
+        (select user_name, sum (payment_money) order_money
+            from tbl_order_info
+            where order_state in (2, 3, 5)
+            <if test="start_date != null and start_date != ''">
+                and create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+            </if>
+            <if test="end_date != null and end_date != ''">
+                and create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+            </if>
+            group by user_name) om,
+        tbl_user_mark um
+        where ui.user_name = pv.create_user_name
+        and pv.create_user_name = oc.user_name(+)
+        and pv.create_user_name = om.user_name(+)
+        and pv.create_user_name = um.user_name(+)
+        <if test="login_name != null and login_name != ''">
+            and instr(ui.login_name, #{login_name,jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="user_realname != null and user_realname != ''">
+            and instr(ui.user_manage_name, #{user_realname,jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="mark != null and mark == -1">
+            and um.mark is null
+        </if>
+        <if test="mark != null and mark != '' and mark != -1">
+            and um.mark = #{mark,jdbcType=INTEGER}
+        </if>
+        <if test="market_supervision_user_id !=null and market_supervision_user_id !=0">
+			and ui.market_supervision_user_id = #{market_supervision_user_id, jdbcType=VARCHAR}
+		</if>
+		<if test="referee_user_id!=null and referee_user_id !=0">
+			and ui.referee_user_id = #{referee_user_id, jdbcType=VARCHAR}
+		</if>
+		<if test="store_user_id != null and store_user_id !=0">
+			and (exists (select 1 from tbl_store_info tsi where tsi.shopkeeper_user_id = #{store_user_id,jdbcType=INTEGER} and tsi.id = ui.store_id)
+				or exists(select 1 from tbl_store_user_rel tsur where tsur.user_id = #{store_user_id,jdbcType=INTEGER} and tsur.store_id = ui.store_id and tsur.type=6 )
+			)
+		</if>
+		<if test="store_id != null and store_id !=0">
+			and ui.store_id =#{store_id,jdbcType=INTEGER} 
+		</if>
+		<if test="province != null and province !=''">
+			and ui.user_company_address_province =#{province,jdbcType=INTEGER} 
+		</if>
+		<if test="city != null and city !=''">
+			and ui.user_company_address_city =#{city,jdbcType=INTEGER} 
+		</if>
+		<if test="area != null and area !=''">
+			and ui.user_company_address_county =#{area,jdbcType=INTEGER} 
+		</if>
+		<if test="public_user_type != null and public_user_type == 2">
+            and exists (select 1 from tbl_sys_user_store tsus where tsus.store_id = ui.store_id and tsus.user_id = #{public_user_id,jdbcType=INTEGER})
+        </if>
+        <if test="public_user_type != null and public_user_type == 3">
+            and ui.referee_user_id = #{public_user_id,jdbcType=VARCHAR}
+        </if>
+        <if test="public_user_type != null and public_user_type == 4">
+            and ui.market_supervision_user_id = #{public_user_id,jdbcType=VARCHAR}
+        </if>
+        <if test="public_user_type != null and public_user_type == 5">
+            and exists(select 1 from tbl_store_info tsi where tsi.id = ui.store_id and tsi.shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER})
+        </if>
+        <if test="public_user_type != null and public_user_type == 6">
+            and exists(select 1 from tbl_store_user_rel tsui where tsui.store_id = ui.store_id and tsui.user_id = #{public_user_id,jdbcType=INTEGER})
+        </if>
+        <if test="public_user_type != null and public_user_type == 9">
+            and exists(select 1 
+                         from tbl_sys_user_info tsui
+                        where tsui.user_type = 4
+            				  and tsui.organization_id in (
+								  	select id from tbl_sys_organization_info where connect_by_isleaf=1
+								  	start with parent_id = #{public_user_organization_id,jdbcType=INTEGER} connect by prior id = parent_id
+					              )
+					          and tsui.user_name = (select user_name from tbl_sys_user_info where id=ui.market_supervision_user_id))
+        </if>
+    </sql>
+    <!-- 会员访问统计数量 -->
+    <select id="queryMemberVisitCount" parameterType="java.util.Map" resultType="int">
+    	select count(1)
+          from (<include refid="queryTable"/>)
+        <where>
+            <if test="start_loginCount !=null and start_loginCount !=''">
+                and login_count &gt;= #{start_loginCount,jdbcType=INTEGER}
+            </if>
+            <if test="end_loginCount !=null and end_loginCount !=''">
+                and login_count &lt;= #{end_loginCount,jdbcType=INTEGER}
+            </if>
+            <if test="start_pageView !=null and start_pageView !=''">
+                and pv &gt;= #{start_pageView,jdbcType=INTEGER}
+            </if>
+            <if test="end_pageView !=null and end_pageView !=''">
+                and pv &lt;= #{end_pageView,jdbcType=INTEGER}
+            </if>
+            <if test="start_orderCount !=null and start_orderCount !=''">
+                and order_count &gt;= #{start_orderCount,jdbcType=INTEGER}
+            </if>
+            <if test="end_orderCount !=null and end_orderCount !=''">
+                and order_count &lt;= #{end_orderCount,jdbcType=INTEGER}
+            </if>
+            <if test="start_orderMoney !=null and start_orderMoney !=''">
+                and order_money &gt;= #{start_orderMoney,jdbcType=INTEGER}
+            </if>
+            <if test="end_orderMoney !=null and end_orderMoney !=''">
+                and order_money &lt;= #{end_orderMoney,jdbcType=INTEGER}
+            </if>
+        </where>
+    </select>
+    <!-- 会员访问统计列表 -->
+    <select id="queryMemberVisitList" parameterType="java.util.Map" resultType="java.util.Map">
+    	select * from
+          (select a.*, rownum num from
+            (
+            select
+                user_name,
+                login_name,
+                user_realname,
+                pv,
+                ip_count,
+                login_count,
+                order_count,
+                order_money,
+                mark,
+                remark,
+                referee_user_realname,
+        		market_supervision_user_realna,
+        		store_name,
+        		region_address,
+                mark_name,
+                mark_img_url
+            from (<include refid="queryTable"/>)
+            <where>
+                <if test="start_loginCount !=null and start_loginCount !=''">
+                	and login_count &gt;= #{start_loginCount,jdbcType=INTEGER}
+                </if>
+                <if test="end_loginCount !=null and end_loginCount !=''">
+                	and login_count &lt;= #{end_loginCount,jdbcType=INTEGER}
+                </if>
+                <if test="start_pageView !=null and start_pageView !=''">
+                	and pv &gt;= #{start_pageView,jdbcType=INTEGER}
+                </if>
+                <if test="end_pageView !=null and end_pageView !=''">
+                	and pv &lt;= #{end_pageView,jdbcType=INTEGER}
+                </if>
+                <if test="start_orderCount !=null and start_orderCount !=''">
+                	and order_count &gt;= #{start_orderCount,jdbcType=INTEGER}
+                </if>
+                <if test="end_orderCount !=null and end_orderCount !=''">
+                	and order_count &lt;= #{end_orderCount,jdbcType=INTEGER}
+                </if>
+                <if test="start_orderMoney !=null and start_orderMoney !=''">
+                	and order_money &gt;= #{start_orderMoney,jdbcType=INTEGER}
+                </if>
+                <if test="end_orderMoney !=null and end_orderMoney !=''">
+                	and order_money &lt;= #{end_orderMoney,jdbcType=INTEGER}
+                </if>
+            </where>
+                <if test="sort != null and sort != ''">
+                    order by ${sort} ${sort_by},user_name
+                </if>
+            ) a
+            where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+        where num &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+    <!-- 查询用户是否存在标记 -->
+    <select id="queryUserMarkByUserName" parameterType="java.util.Map" resultType="int">
+    	select count(1)
+    	  from tbl_user_mark
+    	 where user_name = #{user_name,jdbcType=VARCHAR}
+    </select>
+    <!-- 添加用户标记 -->
+    <insert id="insertUserMark" parameterType="java.util.Map">
+        insert into tbl_user_mark(
+            user_name,
+            mark,
+            <if test="remark !=null and remark !=''">
+            remark,
+            </if>
+            mark_date
+        )
+        values (
+            #{user_name,jdbcType=VARCHAR},
+            #{mark,jdbcType=INTEGER},
+            <if test="remark !=null and remark !=''">
+            #{remark,jdbcType=VARCHAR},
+            </if>
+            sysdate
+        )
+    </insert>
+    <!-- 更新用户标记 -->
+    <insert id="updateUserMark" parameterType="java.util.Map">
+        update tbl_user_mark
+        <set>
+            <if test="mark != null and mark != '' and mark != 0">
+                mark = #{mark,jdbcType=INTEGER},
+                mark_date = sysdate,
+            </if>
+            <if test="remark != null and remark != ''">
+                remark = #{remark,jdbcType=VARCHAR}
+            </if>
+        </set>
+        where user_name = #{user_name,jdbcType=VARCHAR}
+    </insert>
+    <!-- 删除用户标记 -->
+    <delete id="deleteUserMark" parameterType="java.util.Map">
+        delete from tbl_user_mark where user_name = #{user_name,jdbcType=VARCHAR}
+    </delete>
+    
+    <!-- 查询用户IP访问记录 -->
+    <resultMap id="userIpRecordMap" type="java.util.Map">
+        <result column="ip" property="ip"/>
+        <result column="ip_address" property="ip_address"/>
+    </resultMap>
+    <select id="queryUserIpRecord" parameterType="java.util.Map" resultMap="userIpRecordMap">
+        select create_ip ip,min(create_address) ip_address
+        from tbl_user_log_info
+        <where>
+            create_user_name = #{user_name,jdbcType=VARCHAR}
+            <if test="start_date != null and start_date != ''">
+                and create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+            </if>
+            <if test="end_date != null and end_date != ''">
+                and create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+            </if>
+        </where>
+        group by create_ip
+    </select>
+    <select id="queryUserIpRecordCount" parameterType="java.util.Map" resultType="int">
+    	select count(1) from
+    	(select create_ip ip,min(create_address) ip_address
+        	from tbl_user_log_info
+        <where>
+            create_user_name = #{user_name,jdbcType=VARCHAR}
+            <if test="start_date != null and start_date != ''">
+                and create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+            </if>
+            <if test="end_date != null and end_date != ''">
+                and create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+            </if>
+        </where>
+        group by create_ip)
+    </select>
+    <!-- 查询用户订单记录 -->
+    <resultMap id="userOrderRecordMap" type="java.util.Map">
+        <result column="order_number" property="order_number"/>
+        <result column="order_money" property="order_money"/>
+        <result column="order_date" property="order_date"/>
+        <result column="order_state" property="order_state"/>
+        <result column="payment_date" property="payment_date"/>
+    </resultMap>
+    <select id="queryUserOrderRecord" parameterType="java.util.Map" resultMap="userOrderRecordMap">
+    select * from
+          (select a.*, rownum num from
+            (select order_number,(product_money + logistics_money + df_money) order_money,to_char(create_date,'yyyy-mm-dd hh24:mi:ss') order_date,
+	            to_char(payment_date,'yyyy-mm-dd hh24:mi:ss') payment_date,
+	            case order_state when 1 then '待付款'
+	                             when 2 then '待发货'
+	                             when 3 then '待收货'
+	                             when 4 then '退款中'
+	                             when 5 then '交易完成'
+	                             when 6 then '交易关闭' end order_state
+	        from tbl_order_info
+		        <where>
+		            user_name = #{user_name,jdbcType=VARCHAR}
+		            <if test="start_date != null and start_date != ''">
+                        and create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+                    </if>
+                    <if test="end_date != null and end_date != ''">
+                        and create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+                    </if>
+		            <if test="type != null and type == 'order_money'">
+		                and order_state IN (2, 3, 5)
+		            </if>
+		        </where>
+		        <if test="type != null and type == 'order_detail'">
+		            order by create_date desc
+		        </if>
+		        <if test="type != null and type == 'order_money'">
+		            order by payment_date desc
+		        </if>
+        	) a
+            where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+        where num &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+    <!-- 查询用户订单记录数量  -->
+    <select id="queryUserOrderRecordCount" parameterType="java.util.Map" resultType="int"> 
+    	select count(1)
+        from tbl_order_info
+        <where>
+            user_name = #{user_name,jdbcType=VARCHAR}
+            <if test="start_date != null and start_date != ''">
+                and create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+            </if>
+            <if test="end_date != null and end_date != ''">
+                and create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+            </if>
+            <if test="type != null and type == 'order_money'">
+                and order_state IN (2, 3, 5)
+            </if>
+        </where>
+        <if test="type != null and type == 'order_detail'">
+            order by create_date
+        </if>
+        <if test="type != null and type == 'order_money'">
+            order by payment_date
+        </if>
+    </select>
+    <!-- 查询用户浏览记录 -->
+    <resultMap id="userBrowseRecordMap" type="java.util.Map">
+        <result column="page_type" property="page_type"/>
+        <result column="page_name" property="page_name"/>
+        <result column="page_url" property="page_url"/>
+        <result column="create_date" property="create_date"/>
+    </resultMap>
+    <select id="queryUserBrowseRecord" parameterType="java.util.Map" resultMap="userBrowseRecordMap">
+        select * from
+          (select a.*, rownum num from
+            (select page_type,page_name,page_url,to_char(create_date, 'yyyy-mm-dd hh24:mi:ss') create_date
+        		from tbl_user_log_info
+		        <where>
+		            create_user_name = #{user_name,jdbcType=VARCHAR}
+		            <if test="start_date != null and start_date != ''">
+                        and create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+                    </if>
+                    <if test="end_date != null and end_date != ''">
+                        and create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+                    </if>
+		        </where>
+		        order by create_date desc) a
+            where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+        where num &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+    <!-- 查询用户浏览记录数量 -->
+    <select id="queryUserBrowseRecordCount" parameterType="java.util.Map" resultType="int">
+    	select count(1)
+      		from tbl_user_log_info
+        <where>
+            create_user_name = #{user_name,jdbcType=VARCHAR}
+            <if test="start_date != null and start_date != ''">
+                and create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+            </if>
+            <if test="end_date != null and end_date != ''">
+                and create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+            </if>
+        </where>
+    </select>
+</mapper>

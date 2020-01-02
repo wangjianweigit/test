@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.analysis.dao.UserOperationLogDao">
+
+    <!--分页查询商品操作日志列表-->
+    <select id="listUserOperationLogForPage" parameterType="java.util.Map" resultType="java.util.Map">
+        select  a.* from (
+        select t.*,rownum as rn from (
+        select
+        tuol.id,
+        tuol.user_type,
+        tuol.operate_id,
+        (select user_realname from tbl_sys_user_info tsui where tsui.id=tuol.create_user_id) as operator_user_realname,
+        (select user_name from tbl_sys_user_info tsui where tsui.id=tuol.create_user_id) as operator_user_name,
+        to_char(tuol.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+        tuol.remark,
+        tuol.user_name,
+        tuol.user_realname
+        from tbl_user_operation_log tuol
+        <where>
+            <if test="user_type != null and user_type != ''">
+               and tuol.user_type=#{user_type,jdbcType=INTEGER}
+            </if>
+            <if test="operation_type != null and operation_type != ''">
+               and tuol.operate_id=#{operation_type,jdbcType=INTEGER}
+            </if>
+            <if test="user_name != null and user_name != ''">
+               and tuol.user_name=#{user_name,jdbcType=VARCHAR}
+            </if>
+            <if test="user_manage_name != null and user_manage_name != ''">
+               tuol.user_realname like concat(concat('%',#{user_manage_name,jdbcType=VARCHAR}),'%')
+            </if>
+            <if test="operator_user_name != null and operator_user_name != ''">
+               and exists(select 1 from tbl_sys_user_info tsui where tsui.id=tuol.create_user_id and tsui.user_name= #{operator_user_name,jdbcType=VARCHAR})
+            </if>
+            <if test="operator_user_realname != null and operator_user_realname != ''">
+               and exists(select 1 from tbl_sys_user_info tsui where tsui.id=tuol.create_user_id and tsui.user_realname like concat(concat('%',#{operator_user_realname,jdbcType=VARCHAR}),'%'))
+            </if>
+            <if test="operate_start_date != null and operate_start_date != ''">
+                and tuol.create_date &gt;= to_date(#{operate_start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+            </if>
+            <if test="operate_end_date != null and operate_end_date != ''">
+                and tuol.create_date &lt;= to_date(#{operate_end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+            </if>
+        </where>
+        order by tuol.create_date desc,tuol.id desc
+        ) t where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) a where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--查询商品操作日志列表总数量-->
+    <select id="countUserOperationLogForPage" parameterType="java.util.Map" resultType="java.lang.Integer">
+        select count(1)
+        from tbl_user_operation_log tuol
+        <where>
+            <if test="user_type != null and user_type != ''">
+               and tuol.user_type=#{user_type,jdbcType=INTEGER}
+            </if>
+            <if test="operation_type != null and operation_type != ''">
+               and tuol.operate_id=#{operation_type,jdbcType=INTEGER}
+            </if>
+             <if test="user_name != null and user_name != ''">
+               and tuol.user_name=#{user_name,jdbcType=VARCHAR}
+            </if>
+            <if test="user_manage_name != null and user_manage_name != ''">
+               tuol.user_realname like concat(concat('%',#{user_manage_name,jdbcType=VARCHAR}),'%')
+            </if>
+            <if test="operator_user_name != null and operator_user_name != ''">
+               and exists(select 1 from tbl_sys_user_info tsui where tsui.id=tuol.create_user_id and tsui.user_name= #{operator_user_name,jdbcType=VARCHAR})
+            </if>
+            <if test="operator_user_realname != null and operator_user_realname != ''">
+               and exists(select 1 from tbl_sys_user_info tsui where tsui.id=tuol.create_user_id and tsui.user_realname like concat(concat('%',#{operator_user_realname,jdbcType=VARCHAR}),'%'))
+            </if>
+            <if test="operate_start_date != null and operate_start_date != ''">
+                and tuol.create_date &gt;= to_date(#{operate_start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+            </if>
+            <if test="operate_end_date != null and operate_end_date != ''">
+                and tuol.create_date &lt;= to_date(#{operate_end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+            </if>
+        </where>
+    </select>
+
+</mapper>

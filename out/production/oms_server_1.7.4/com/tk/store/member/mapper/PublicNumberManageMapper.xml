@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.store.member.dao.PublicNumberManageDao">
+	<!-- 查询公众号管理列表 -->
+    <select id="queryPublicNumberManageList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	select  a.*
+    	  from (select t.*,rownum as rn
+				  from (select * from 
+			  				(select tsui.id,
+					               tsui.user_realname,
+					               nvl (tspn.state, 2) as state,
+					               tspn.public_number_name,
+					               tspn.url_top,
+					               to_char (tspn.bind_date, 'yyyy-mm-dd hh24:mi:ss') as bind_date
+					          from tbl_sys_user_info tsui
+					               left join tbl_store_public_number tspn
+					                  on tsui.id = tspn.user_id
+					         where tsui.user_type = 9) tt
+						    <where>
+								<if test="state != null">
+									and tt.state in
+					                <foreach item="item" collection="state" open="(" separator="," close=")">
+										#{item}
+									</foreach>
+								</if>
+								<if test="public_number_name != null and public_number_name != '' ">
+								    and	tt.public_number_name like concat(concat('%', #{public_number_name,jdbcType=VARCHAR}),'%')
+								</if>
+								<if test="user_realname != null and user_realname != '' ">
+								    and tt.user_realname like concat(concat('%', #{user_realname,jdbcType=VARCHAR}),'%')
+								</if>
+								<if test="start_bind_date != null and start_bind_date != '' ">
+								    and	tt.bind_date &gt;= to_date(#{start_bind_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+								</if>
+								<if test="end_bind_date != null and end_bind_date != '' ">
+								    and	tt.bind_date &lt;= to_date(#{end_bind_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+								</if>
+								<choose>
+									<when test="public_user_type != null and public_user_type == 1">
+										and 1=1
+									</when>
+									<when test="public_user_type != null and public_user_type == 9">
+										and tt.id=#{public_user_id,jdbcType=INTEGER}
+									</when>
+									<otherwise>
+										and 1=2
+									</otherwise>
+								</choose>
+						    </where>
+					   ) T
+		 		 WHERE ROWNUM &lt;= #{end_rownum,jdbcType=INTEGER}) A
+		 WHERE RN &gt; #{start_rownum,jdbcType=INTEGER} 
+	</select>
+	
+	<!-- 查询公众号管理列表总数 -->
+    <select id="queryPublicNumberManageCount" parameterType="java.util.HashMap" resultType="int">
+		  select count(1) from 
+  				(select tsui.id,
+		               tsui.user_realname,
+		               nvl (tspn.state, 1) as state,
+		               tspn.public_number_name,
+		               to_char (tspn.bind_date, 'yyyy-mm-dd hh24:mi:ss') as bind_date
+		          from tbl_sys_user_info tsui
+		               left join tbl_store_public_number tspn
+		                  on tsui.id = tspn.user_id
+		         where tsui.user_type = 9) tt
+			    <where>
+					<if test="state != null">
+						and tt.state in
+		                <foreach item="item" collection="state" open="(" separator="," close=")">
+							#{item}
+						</foreach>
+					</if>
+					<if test="public_number_name != null and public_number_name != '' ">
+					    and	tt.public_number_name like concat(concat('%', #{public_number_name,jdbcType=VARCHAR}),'%')
+					</if>
+					<if test="user_realname != null and user_realname != '' ">
+					    and tt.user_realname like concat(concat('%', #{user_realname,jdbcType=VARCHAR}),'%')
+					</if>
+					<if test="start_bind_date != null and start_bind_date != '' ">
+					    and	tt.bind_date &gt;= to_date(#{start_bind_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+					</if>
+					<if test="end_bind_date != null and end_bind_date != '' ">
+					    and	tt.bind_date &lt;= to_date(#{end_bind_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+					</if>
+					<choose>
+						<when test="public_user_type != null and public_user_type == 1">
+							and 1=1
+						</when>
+						<when test="public_user_type != null and public_user_type == 9">
+							and tt.id=#{public_user_id,jdbcType=INTEGER}
+						</when>
+						<otherwise>
+							and 1=2
+						</otherwise>
+					</choose>
+			    </where>
+	</select>
+	
+	<!--获取公众号详情-->
+    <select id="queryPublicNumberManageDetail" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT ID,
+    		   PUBLIC_NUMBER_NAME,
+    		   USER_ID,
+    		   STATE,
+    		   TO_CHAR(BIND_DATE,'YYYY-MM-DD HH24:MI:SS') AS BIND_DATE,
+    		   TO_CHAR(UNBIND_DATE,'YYYY-MM-DD HH24:MI:SS') AS BIND_DATE
+		  FROM TBL_STORE_PUBLIC_NUMBER 
+		<where>
+			USER_ID=#{user_id,jdbcType=INTEGER}
+		</where> 
+	</select>
+</mapper>

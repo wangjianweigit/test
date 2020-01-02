@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.product.dao.SampleProductDao">
+	<!-- 样品订购商品数量 -->
+	<select id="querySampleProductCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_sample_product t,
+		  	   tbl_product_info t1
+		 where t.product_itemnumber = t1.itemnumber(+)
+		 	<if test="product_itemnumber != null and product_itemnumber !=''">
+		 		and t.product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+		 	</if>
+		 	<if test="product_type_id != null and product_type_id !=''">
+		 		and (t1.product_type_id = #{product_type_id,jdbcType=INTEGER}
+		 		or t1.product_type_id in (select id from tbl_dic_product_type t start with parent_id = #{product_type_id,jdbcType=INTEGER} connect by prior id=parent_id))
+		 	</if>
+		 	<if test="brand_id != null and brand_id !=''">
+		 		and t1.brand_id = #{brand_id,jdbcType=INTEGER}
+		 	</if>
+		 	<if test="year != null and year !=''">
+		 		and t1.year = #{year,jdbcType=INTEGER}
+		 	</if>
+		 	<if test="season_id != null and season_id !=''">
+		 		and t1.season_id = #{season_id,jdbcType=INTEGER}
+		 	</if>
+	</select>
+	<!-- 样品订购商品列表 -->
+	<select id="querySampleProductListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+			select a.*,rownum rn from (
+				select t1.id as product_id,
+					   t.id,
+					   t.product_itemnumber,
+					   t1.product_img_url,
+					   t1.product_name,
+					   t1.year,
+					   (select type_name from tbl_dic_product_type where id=t1.product_type_id) as product_type,
+					   (select name from tbl_dic_product_season tdps where tdps.id = t1.season_id) as season,
+					   (select brand_name from tbl_dic_product_brand tdpb where tdpb.id = t1.brand_id) as brand,
+					   to_char(t.create_date, 'yyyy-mm-dd hh24:mi:ss') create_date
+				  from tbl_sample_product t,
+				  	   tbl_product_info t1
+				 where t.product_itemnumber = t1.itemnumber(+)
+				 	<if test="product_itemnumber != null and product_itemnumber !=''">
+				 		and t.product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+				 	</if>
+				 	<if test="product_type_id != null and product_type_id !=''">
+				 		and (t1.product_type_id = #{product_type_id,jdbcType=INTEGER}
+				 		or t1.product_type_id in (select id from tbl_dic_product_type t start with parent_id = #{product_type_id,jdbcType=INTEGER} connect by prior id=parent_id))
+				 	</if>
+				 	<if test="brand_id != null and brand_id !=''">
+				 		and t1.brand_id = #{brand_id,jdbcType=INTEGER}
+				 	</if>
+				 	<if test="year != null and year !=''">
+				 		and t1.year = #{year,jdbcType=INTEGER}
+				 	</if>
+				 	<if test="season_id != null and season_id !=''">
+				 		and t1.season_id = #{season_id,jdbcType=INTEGER}
+				 	</if>
+				 	order by t.create_date desc) a
+		 	where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 新增 -->
+	<insert id="insert" parameterType="java.util.Map">
+		insert into tbl_sample_product
+		(
+			id,
+			product_itemnumber
+		)
+		select seq_sample_product.nextval,
+			   itemnumber 
+		  from tbl_product_info
+		  where id in
+		  <foreach collection="id" item="item"  open="(" separator="," close=")">   
+           #{item}
+        </foreach> 
+	</insert>
+	<!-- 删除 -->
+	<delete id="delete" parameterType="java.util.Map">
+		delete from tbl_sample_product where id = #{id,jdbcType=INTEGER}
+	</delete>
+</mapper>

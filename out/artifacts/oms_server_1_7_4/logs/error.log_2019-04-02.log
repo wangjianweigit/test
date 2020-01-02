@@ -1,0 +1,6 @@
+2019-04-02 11:41:52 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-04-02 14:25:31 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-04-02 14:26:32 ERROR [com.tk.oms.returns.service.ReturnsService] 仓库未终止发货，不能执行退款
+2019-04-02 14:26:42 ERROR [com.tk.oms.returns.service.ReturnsService] 仓库未终止发货，不能执行退款
+2019-04-02 14:27:32 ERROR [com.tk.oms.returns.service.ReturnsService] 仓库未终止发货，不能执行退款
+2019-04-02 14:27:39 ERROR [com.tk.oms.returns.service.ReturnsService] 仓库未终止发货，不能执行退款

@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.platform.dao.DecorateCommonDao">
+
+    <!--查询固定模块选择商品列表-->
+    <select id="listSelectProductForPage" parameterType="java.util.Map" resultType="java.util.Map">
+		select b.*,getProduct_OldPrice_Min(b.product_itemnumber) as sale_price_min from (
+		    select a.*,rownum rn from (
+                select
+                    pi.itemnumber as product_itemnumber,
+                    pi.product_name,
+                    pi.product_img_url,
+                    pi.state
+                from tbl_product_info pi
+                where product_type in (0,1)
+                and exists (select 1 from tbl_site_product_delay spd where spd.site_id = #{site_id,jdbcType=INTEGER} and spd.product_id = pi.id)
+                <if test="product_type_id != null and product_type_id != 0">
+                    and pi.product_type_id in (select id from tbl_dic_product_type nod start with nod.id = #{product_type_id,jdbcType=INTEGER} connect by prior nod.id = nod.parent_id)
+                </if>
+                <if test="keyword != null and keyword != ''">
+            			and (pi.itemnumber like '%'|| #{keyword,jdbcType=VARCHAR} ||'%' or pi.product_name like '%'|| #{keyword,jdbcType=VARCHAR} ||'%' or pi.product_subtitle like '%'|| #{keyword,jdbcType=VARCHAR} ||'%')
+                </if>
+                <if test="show_video != null and show_video == 1">
+                    and exists(select 1 from tbl_product_images tpi where pi.itemnumber = tpi.product_itemnumber and type = 2)
+                </if>
+                <if test="show_custom != null and show_custom == 1">
+                    and pi.product_type = 0 and (is_brand_custom = 1 or is_common_custom = 1)
+                </if>
+                <if test="show_presell != null and show_presell == 1">
+                    and exists (
+                        select 1 from tbl_activity_product ap,tbl_activity_info ai
+                        where ap.activity_id = ai.id and pi.itemnumber = ap.product_itemnumber
+                        and ai.activity_type = 4 and ap.activity_end_date &gt;= sysdate
+                        and exists(select 1 from tbl_activity_site tas where tas.site_id = #{site_id,jdbcType=INTEGER} and tas.activity_id = ai.id)
+                    )
+                </if>
+                <if test="state != null and state != ''">
+                    and pi.state = #{state,jdbcType=VARCHAR}
+                </if>
+                order by pi.${sort}
+        	) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+		) b where b.rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--查询选中商品列表-->
+    <select id="listSelectProduct" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            pi.itemnumber as product_itemnumber,
+            pi.product_name,
+            pi.product_img_url,
+            getProduct_OldPrice_Min(pi.itemnumber) as sale_price_min,
+            pi.state
+        from tbl_product_info pi
+        where product_type = 0
+        and exists (select 1 from tbl_site_product_delay spd where spd.site_id = #{site_id,jdbcType=INTEGER} and spd.product_id = pi.id)
+        <if test="itemnumbers != null and itemnumbers != ''">
+            and pi.itemnumber in
+            <foreach item="itemnumber" collection="itemnumbers" open="(" separator="," close=")">
+                #{itemnumber,jdbcType=VARCHAR}
+            </foreach>
+            order by instr(<foreach collection="itemnumbers" item="itemnumber" open="'" close="'" separator=",">${itemnumber}</foreach>,pi.itemnumber)
+        </if>
+    </select>
+
+    <!--查询固定模块选择商品总数量-->
+    <select id="countSelectProductForPage" parameterType="java.util.Map" resultType="java.lang.Integer">
+        select count(1) from tbl_product_info pi where product_type = 0
+        and exists (select 1 from tbl_site_product_delay spd where spd.site_id = #{site_id,jdbcType=INTEGER} and spd.product_id = pi.id)
+        <if test="product_type_id != null and product_type_id != 0">
+            and pi.product_type_id in (select id from tbl_dic_product_type nod start with nod.id = #{product_type_id,jdbcType=INTEGER} connect by prior nod.id = nod.parent_id)
+        </if>
+        <if test="keyword != null and keyword != ''">
+            and (pi.itemnumber like '%'|| #{keyword,jdbcType=VARCHAR} ||'%' or pi.product_name like '%'|| #{keyword,jdbcType=VARCHAR} ||'%' or pi.product_subtitle like '%'|| #{keyword,jdbcType=VARCHAR} ||'%')
+        </if>
+        <if test="show_video != null and show_video == 1">
+            and exists(select 1 from tbl_product_images tpi where pi.itemnumber = tpi.product_itemnumber and type = 2)
+        </if>
+        <if test="show_custom != null and show_custom == 1">
+            and pi.product_type = 0 and (is_brand_custom = 1 or is_common_custom = 1)
+        </if>
+        <if test="show_presell != null and show_presell == 1">
+            and exists (
+                select 1 from tbl_activity_product ap,tbl_activity_info ai
+                where ap.activity_id = ai.id and pi.itemnumber = ap.product_itemnumber
+                and ai.activity_type = 4 and ap.activity_end_date &gt;= sysdate
+                and exists(select 1 from tbl_activity_site tas where tas.site_id = #{site_id,jdbcType=INTEGER} and tas.activity_id = ai.id)
+            )
+        </if>
+        <if test="state != null and state != ''">
+            and pi.state = #{state,jdbcType=VARCHAR}
+        </if>
+    </select>
+
+    <!--查询商品分组-->
+    <select id="listProductGroup" resultType="java.util.Map">
+        select id,parent_id,type_name as name from tbl_dic_product_type
+    </select>
+
+    <!--查询父级商品分组-->
+    <select id="listParentProductGroup" parameterType="java.util.Map" resultType="java.util.Map">
+        select id,parent_id,type_name as name from tbl_dic_product_type nod where nod.parent_id = 0
+    </select>
+
+    <!--查询活动列表-->
+    <select id="listActivity" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            tai.id,
+            tai.activity_name as name
+        from tbl_activity_info tai
+        where
+            tai.is_delete = 1 and tai.state = 2 and tai.activity_state = 3 and tai.end_date &gt;= sysdate
+        and exists (select 1 from tbl_activity_site tas where tas.activity_id = tai.id and tas.site_id = #{site_id,jdbcType=INTEGER})
+        <if test="not_show_presell != null and not_show_presell == 1">
+            and tai.activity_type != 4
+        </if>
+        <if test="not_show_sale != null and not_show_sale == 1">
+            and tai.activity_type != 1
+        </if>
+        <if test="not_show_order != null and not_show_order == 1">
+            and tai.activity_type != 2
+        </if>
+    </select>
+
+    <!--查询装修页面列表-->
+    <select id="listDecoratePage" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            tdp.id,
+            tdp.page_name,
+            tdp.home_page_flag,
+            page_type
+        from tbl_decorate_page tdp
+        where tdp.template_id = #{template_id,jdbcType=INTEGER}
+        and tdp.site_id = #{site_id,jdbcType=INTEGER} and tdp.is_delete = '1' and tdp.page_state = 2
+        order by tdp.id
+    </select>
+
+    <!--查询商品季节-->
+    <select id="listProductSeason" resultType="com.tk.oms.platform.entity.commonParams">
+        select id, name from tbl_dic_product_season where state = 1 order by sortid desc
+    </select>
+
+    <!--查询商品品牌-->
+    <select id="listProductBrand" resultType="com.tk.oms.platform.entity.commonParams">
+        select id, brand_name as name from tbl_dic_product_brand where state = 2 and show='1' order by sortid desc
+    </select>
+
+    <!-- 分页查询商品品牌列表 -->
+    <select id="listProductBrandForPage" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select t.*,rownum as rn from (
+                select
+                    id,
+                    brand_name,
+                    code,
+                    logo
+                from tbl_dic_product_brand
+                where 1=1
+                <if test="keyword != null and keyword != ''">
+                    and brand_name like '%'|| #{keyword,jdbcType=VARCHAR} ||'%'
+                </if>
+                order by sortid desc
+            ) t where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+        where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!-- 查询商品品牌数量 -->
+    <select id="countProductBrandForPage" parameterType="java.util.Map" resultType="int">
+        select count(1) from tbl_dic_product_brand where 1=1
+        <if test="keyword != null and keyword != ''">
+            and brand_name like '%'|| #{keyword,jdbcType=VARCHAR} ||'%'
+        </if>
+    </select>
+
+    <!--查询已选中品牌列表-->
+    <select id="listSelectProductBrand" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            id,
+            brand_name,
+            code,
+            logo
+        from tbl_dic_product_brand
+        where 1=1
+        <if test="brand_ids != null and brand_ids != ''">
+            and id in
+            <foreach item="brand_id" collection="brand_ids" open="(" separator="," close=")">
+                #{brand_id,jdbcType=VARCHAR}
+            </foreach>
+            order by instr(<foreach collection="brand_ids" item="brand_id" open="'" close="'" separator=",">${brand_id}</foreach>,id)
+        </if>
+    </select>
+
+    <!--查询商品规格-->
+    <select id="listProductSpec" resultType="com.tk.oms.platform.entity.commonParams">
+        select id,spec_name as name from tbl_product_spec_group
+    </select>
+
+    <!--查询仓库-->
+    <select id="listWarehouse" parameterType="java.lang.Long" resultType="com.tk.oms.platform.entity.commonParams">
+        select t2.warehouse_id as id,t.name from tbl_warehouse_info t,tbl_site_warehouse t2 where t.id = t2.parent_warehouse_id and t2.site_id = #{site_id,jdbcType=INTEGER} order by t2.sort_number asc
+    </select>
+
+    <!--查询全部商品列表（带视频）-->
+    <select id="listProductForPage" parameterType="java.util.Map" resultType="java.util.Map">
+        select b.*,getProduct_OldPrice_Min(b.product_itemnumber) as sale_price_min from (
+            select a.*,rownum rn from (
+                select
+                    pi.itemnumber as product_itemnumber,
+                    pi.product_name,
+                    pi.product_img_url,
+                    pi.state
+                from tbl_product_info pi
+                where product_type = 0
+                    <if test="product_type_id != null and product_type_id != 0">
+                        and pi.product_type_id in (select id from tbl_dic_product_type nod start with nod.id = #{product_type_id,jdbcType=INTEGER} connect by prior nod.id = nod.parent_id)
+                    </if>
+                    <if test="keyword != null and keyword != ''">
+            			and (pi.itemnumber like '%'|| #{keyword,jdbcType=VARCHAR} ||'%' or pi.product_name like '%'|| #{keyword,jdbcType=VARCHAR} ||'%' or pi.product_subtitle like '%'|| #{keyword,jdbcType=VARCHAR} ||'%')
+                    </if>
+                    <if test="show_video != null and show_video == 1">
+                        and exists(select 1 from tbl_product_images tpi where pi.itemnumber = tpi.product_itemnumber and type = 2)
+                    </if>
+                    <if test="state != null and state != ''">
+                        and pi.state = #{state,jdbcType=VARCHAR}
+                    </if>
+                order by pi.${sort}
+            ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) b where b.rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--查询全部商品列表（带视频）-->
+    <select id="countProductForPage" parameterType="java.util.Map" resultType="int">
+        select count(1)
+        from tbl_product_info pi
+        where product_type = 0
+            <if test="product_type_id != null and product_type_id != 0">
+                and pi.product_type_id in (select id from tbl_dic_product_type nod start with nod.id = #{product_type_id,jdbcType=INTEGER} connect by prior nod.id = nod.parent_id)
+            </if>
+            <if test="keyword != null and keyword != ''">
+            	and (pi.itemnumber like '%'|| #{keyword,jdbcType=VARCHAR} ||'%' or pi.product_name like '%'|| #{keyword,jdbcType=VARCHAR} ||'%' or pi.product_subtitle like '%'|| #{keyword,jdbcType=VARCHAR} ||'%')
+            </if>
+            <if test="show_video != null and show_video == 1">
+                and exists(select 1 from tbl_product_images tpi where pi.itemnumber = tpi.product_itemnumber and type = 2)
+            </if>
+            <if test="state != null and state != ''">
+                and pi.state = #{state,jdbcType=VARCHAR}
+            </if>
+    </select>
+
+
+</mapper>

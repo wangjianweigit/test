@@ -1,0 +1,555 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.store.order.dao.StoreOrderDao">
+	<sql id="all_column">
+			TOI.ID,
+			TOI.ORDER_NUMBER,
+			TO_CHAR(TOI.CREATE_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  CREATE_DATE,
+			TOI.USER_NAME,
+			TOI.USER_MANAGE_NAME,
+			TOI.ORDER_TYPE,
+			TOI.ORDER_STATE,
+			TOI.ORDER_REMARK,
+			TOI.RECEIVING_NAME,
+			TOI.RECEIVING_ADDRESS,
+			TOI.RECEIVING_PHONE,
+			TOI.LOGISTICS_COMPANY_CODE,
+			TOI.LOGISTICS_COMPANY_NAME,
+			TOI.LOGISTICS_NUMBER,
+			TOI.LOGISTICS_MONEY,
+			TOI.CANCEL_REASON,
+			TO_CHAR(TOI.CANCEL_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  CANCEL_DATE,
+			TOI.PAYMENT_STATE,
+			TO_CHAR(TOI.PAYMENT_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  PAYMENT_DATE,
+			TOI.PAYMENT_TYPE,
+			TOI.PAYMENT_MONEY,
+			TOI.PAYMENT_NUMBER,
+			TOI.CHECK_USER_NAME,
+			TOI.CHECK_USER_REALNAME,
+			TO_CHAR(TOI.CHECK_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  CHECK_DATE,
+			TOI.CHECK_CANCLE_REASON,
+			TOI.PRODUCT_MONEY,
+			TOI.PRODUCT_COUNT,
+			TOI.DISCOUNT_MONEY,
+			TOI.UPDATE_REASON,
+			TO_CHAR(TOI.CONFIRM_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  CONFIRM_DATE,
+			TOI.ORDER_SOURCE,
+			TOI.CANCEL_USER_NAME,
+			TOI.CANCEL_USER_REALNAME,
+			TOI.CHECK_STATE,
+			TOI.REFUND_STATE,
+			TOI.DF_MONEY,
+			TOI.YWJL_USER_NAME,
+			TOI.YWY_USER_NAME,
+			TOI.MD_ID,
+			TOI.XDR_USER_TYPE,
+			TOI.XDR_USER_NAME,
+			TOI.PAYMENT_METHOD,
+			TOI.PAYMENT_SEND_STATE,
+			TOI.PAYMENT_TRANSFER_USER_NAME,
+			TOI.PAYMENT_TRANSFER_USER_REALNAME,
+			TO_CHAR(TOI.PAYMENT_TRANSFER_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  PAYMENT_TRANSFER_DATE,
+			TOI.USER_PAY_STATE,
+			TOI.WAREHOUSE_ID,
+			TOI.PARTNER_USER_NAME,
+			TOI.SUPERVISOR_USER_NAME
+	</sql>	
+	<sql id="all_column_detail">
+			TOI.ID,
+			TOI.ORDER_NUMBER,
+			TO_CHAR(TOI.CREATE_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  CREATE_DATE,
+			TOI.USER_NAME,
+			TOI.USER_MANAGE_NAME,
+			TOI.ORDER_TYPE,
+			TOI.ORDER_STATE,
+			TOI.ORDER_REMARK,
+			TOI.RECEIVING_NAME,
+			TOI.RECEIVING_ADDRESS,
+			TOI.RECEIVING_PHONE,
+			TOI.LOGISTICS_COMPANY_CODE,
+			TOI.LOGISTICS_COMPANY_NAME,
+			TOI.LOGISTICS_NUMBER,
+			TOI.LOGISTICS_MONEY,
+			TOI.CANCEL_REASON,
+			TO_CHAR(TOI.CANCEL_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  CANCEL_DATE,
+			TOI.PAYMENT_STATE,
+			TO_CHAR(TOI.PAYMENT_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  PAYMENT_DATE,
+			TOI.PAYMENT_TYPE,
+			TOI.PAYMENT_MONEY,
+			TOI.PAYMENT_NUMBER,
+			TOI.CHECK_USER_NAME,
+			TOI.CHECK_USER_REALNAME,
+			TO_CHAR(TOI.CHECK_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  CHECK_DATE,
+			TOI.CHECK_CANCLE_REASON,
+			TOI.PRODUCT_MONEY,
+			TOI.PRODUCT_COUNT,
+			TOI.DISCOUNT_MONEY,
+			TOI.UPDATE_REASON,
+			TO_CHAR(TOI.CONFIRM_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  CONFIRM_DATE,
+			TOI.ORDER_SOURCE,
+			TOI.CANCEL_USER_NAME,
+			TOI.CANCEL_USER_REALNAME,
+			TOI.CHECK_STATE,
+			TOI.REFUND_STATE,
+			TO_CHAR(TOI.LAST_UPDATE_TIME,'YYYY-MM-DD HH24:MI:SS')  AS  LAST_UPDATE_TIME,
+			TOI.DF_MONEY,
+			TOI.YWJL_USER_NAME,
+			TOI.YWY_USER_NAME,
+			(SELECT STORE_NAME FROM TBL_STORE_INFO WHERE ID=TOI.MD_ID) AS STORE_NAME,
+			TOI.XDR_USER_TYPE,
+			TOI.XDR_USER_NAME,
+			TOI.PAYMENT_METHOD,
+			TOI.TRANSFER_VOUCHER_URL,
+			TOI.PAYMENT_SEND_STATE,
+			TOI.PAYMENT_TRANSFER_USER_NAME,
+			TOI.PAYMENT_TRANSFER_USER_REALNAME,
+			TO_CHAR(TOI.PAYMENT_TRANSFER_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  PAYMENT_TRANSFER_DATE,
+			TOI.USER_PAY_STATE,
+			TOI.USER_VOUCHER_URL,
+			TOI.WAREHOUSE_ID,
+			TOI.PARTNER_USER_NAME,
+			TOI.SUPERVISOR_USER_NAME,
+			TOI.DELIVERY_TYPE
+	</sql>
+	
+	<!-- 获取店铺订货单列表 -->
+    <select id="queryOrderList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT  A.*,
+    			 (SELECT TSUI.USER_REALNAME FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.USER_NAME = A.PARTNER_USER_NAME) AS PARTNER_USER_REALNAME,
+                 (SELECT TSUI.USER_REALNAME FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.USER_NAME = A.YWJL_USER_NAME) AS YWJL_USER_REALNAME,
+                 (SELECT TSUI.USER_REALNAME FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.USER_NAME = A.YWY_USER_NAME) AS YWY_USER_REALNAME,
+                 (SELECT TSUI.USER_REALNAME FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.USER_NAME = A.SUPERVISOR_USER_NAME) AS SUPERVISOR_USER_REALNAME,
+                 (SELECT TSUI.USER_REALNAME FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.USER_NAME = A.XDR_USER_NAME) AS XDR_USER_REALNAME,
+                 (SELECT TSI.STORE_NAME FROM TBL_STORE_INFO TSI WHERE TSI.ID = A.MD_ID) AS MD_NAME,
+                 (SELECT TWI.NAME FROM TBL_WAREHOUSE_INFO TWI WHERE TWI.ID = (SELECT TWIT.PARENT_ID FROM TBL_WAREHOUSE_INFO TWIT WHERE TWIT.ID = A.WAREHOUSE_ID)) AS WAREHOUSE_NAME,
+                 (SELECT TUI.LOGIN_NAME FROM TBL_USER_INFO TUI WHERE TUI.USER_NAME = A.USER_NAME) AS USER_LOGIN_NAME,
+                 (SELECT TUI.USER_CONTROL_STORE_NAME FROM TBL_USER_INFO TUI WHERE TUI.USER_NAME = A.USER_NAME) AS USER_STORE_NAME,
+                 getOrderSendStatus(A.order_number,A.order_state) deliver_state,
+                 (select user_realname from tbl_sys_user_info where id = (select partner_user_id from tbl_user_info where user_name = A.USER_NAME)) user_realname
+    	  FROM (SELECT T.*,ROWNUM AS RN
+				  FROM (SELECT <include refid="all_column"/> 
+				  		  FROM TBL_ORDER_INFO TOI
+					    <where>
+							   1=1
+							   AND TOI.IS_STORE_ORDER = 1
+							<if test="order_state != null">
+								AND TOI.ORDER_STATE IN
+				                <foreach item="item" collection="order_state" open="(" separator="," close=")">
+									#{item}
+								</foreach>
+							</if>
+							<if test="order_type != null and order_type != '' ">
+							    AND	TOI.ORDER_TYPE = #{order_type,jdbcType=VARCHAR}
+							</if>
+							<if test="region_id != null and region_id != ''">
+								AND EXISTS (SELECT 1 FROM TBL_USER_INFO WHERE USER_NAME = TOI.USER_NAME AND PARTNER_USER_ID =#{region_id,jdbcType=INTEGER} AND USER_STATE = 1)
+							</if>
+							<if test="store_id != null and store_id != '' ">
+							    AND	TOI.USER_NAME = #{store_id,jdbcType=INTEGER}
+							</if>
+							<if test='df_type != null and df_type == "1" '>
+							    AND	TOI.ORDER_SOURCE != '零售'
+							</if>
+							<if test='df_type != null and df_type == "2" '>
+							    AND	TOI.ORDER_SOURCE = '零售'
+							</if>
+							<if test="order_number != null and order_number != '' ">
+							    AND	TOI.ORDER_NUMBER = #{order_number,jdbcType=VARCHAR}
+							</if>
+							<if test="user_login_name != null and user_login_name != '' ">
+							    AND	EXISTS(SELECT 1 FROM TBL_USER_INFO TUI WHERE TUI.USER_NAME = TOI.USER_NAME AND TUI.USER_CONTROL_STORE_NAME LIKE '%'|| #{user_login_name,jdbcType=VARCHAR}||'%')
+							</if>
+							<if test="ywjl_user_name != null and ywjl_user_name != '' ">
+							    AND	TOI.YWJL_USER_NAME = #{ywjl_user_name,jdbcType=VARCHAR}
+							</if>
+							<if test="md_id != null and md_id != 0 ">
+							    AND	TOI.MD_ID = #{md_id,jdbcType=INTEGER}
+							</if>
+							<if test="ywy_user_name != null and ywy_user_name != '' ">
+							    AND	TOI.YWY_USER_NAME = #{ywy_user_name,jdbcType=VARCHAR}
+							</if>
+							<if test="xdr_user_name != null and xdr_user_name != '' ">
+							    AND	TOI.XDR_USER_NAME = #{xdr_user_name,jdbcType=VARCHAR}
+							</if>
+							<if test="warehouse_id != null and warehouse_id != 0 ">
+							    AND EXISTS(SELECT 1 FROM TBL_WAREHOUSE_INFO TWI WHERE TWI.ID = TOI.WAREHOUSE_ID AND TWI.PARENT_ID = #{warehouse_id,jdbcType=INTEGER})	
+							</if>
+							<if test="receiving_name != null and receiving_name != '' ">
+							    AND	TOI.RECEIVING_NAME LIKE  '%'||#{receiving_name,jdbcType=VARCHAR}||'%'
+							</if>
+							<if test="receiving_phone != null and receiving_phone != '' ">
+							    AND	TOI.RECEIVING_PHONE = #{receiving_phone,jdbcType=VARCHAR}
+							</if>
+							<if test="start_date != null and start_date != '' ">
+							    AND	TOI.CREATE_DATE &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+							</if>
+							<if test="end_date != null and end_date != '' ">
+							    AND	TOI.CREATE_DATE &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+							</if>
+							<if test="itemnumber != null and itemnumber != ''">
+					            and EXISTS (select 1 from tbl_order_product product where product.order_number = TOI.order_number and product.itemnumber = #{itemnumber})
+					        </if>
+					        <if test="product_count_min != null and product_count_min !=''">
+					            and TOI.PRODUCT_COUNT &gt;= #{product_count_min,jdbcType=INTEGER}
+					        </if>
+					        <if test="product_count_max != null and product_count_max !=''">
+					            and TOI.PRODUCT_COUNT &lt;= #{product_count_max,jdbcType=INTEGER}
+					        </if>
+					        <if test="order_money_min != null and order_money_min !=''">
+					            and (TOI.PRODUCT_MONEY + TOI.LOGISTICS_MONEY + TOI.DF_MONEY) &gt;= #{order_money_min,jdbcType=DOUBLE}
+					        </if>
+					        <if test="order_money_max != null and order_money_max !=''">
+					            and (TOI.PRODUCT_MONEY + TOI.LOGISTICS_MONEY + TOI.DF_MONEY) &lt;= #{order_money_max,jdbcType=DOUBLE}
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 3">
+					            and 1=2
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 4">
+					            and TOI.YWJL_USER_NAME = #{public_user_name,jdbcType=VARCHAR}
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 5">
+					            and 1=2
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 6">
+					            and 1=2
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 7">
+					            and TOI.SUPERVISOR_USER_NAME = #{public_user_name,jdbcType=VARCHAR}
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 9">
+								AND TOI.PARTNER_USER_NAME = #{public_user_name,jdbcType=VARCHAR}
+					        </if>
+					        <if test="deliver_state != null and deliver_state == 1">
+					        	AND TOI.ORDER_STATE = '3'
+								AND NOT EXISTS(SELECT 1 FROM TBL_ORDER_PRODUCT_SKU t1 WHERE t1.order_number = toi.order_number and T1.total_send_count &gt; 0)
+								AND EXISTS(SELECT 1
+				                            FROM TBL_ORDER_PRODUCT_SKU t1, (SELECT a.order_number, a.product_sku, SUM(a.COUNT) returned_count
+				                                     FROM TBL_ORDER_RETURN_PRODUCT a
+				                                    WHERE  EXISTS
+				                                    (SELECT 1
+				                                             FROM TBL_ORDER_RETURN_INFO b
+				                                            WHERE b.return_number = a.return_number
+				                                                  AND b.state = '2')
+				                                    GROUP BY a.order_number, a.product_sku) t2
+				                           WHERE t1.order_number = TOI.ORDER_NUMBER
+				                                 AND t1.order_number = t2.order_number(+)
+				                                 AND t1.product_sku = t2.product_sku(+)
+				                                 AND t1.COUNT - nvl(t1.total_send_count, 0) &gt; nvl(t2.returned_count, 0))
+					   		</if>
+					   		<if test="deliver_state != null and deliver_state == 2">
+					   			AND TOI.ORDER_STATE = '3'
+					   			AND EXISTS(SELECT 1 FROM TBL_ORDER_PRODUCT_SKU t1 WHERE t1.order_number = toi.order_number and T1.total_send_count &gt; 0)
+						   		AND EXISTS(SELECT 1
+				                            FROM TBL_ORDER_PRODUCT_SKU t1, (SELECT a.order_number, a.product_sku, SUM(a.COUNT) returned_count
+				                                     FROM TBL_ORDER_RETURN_PRODUCT a
+				                                    WHERE  EXISTS
+				                                    (SELECT 1
+				                                             FROM TBL_ORDER_RETURN_INFO b
+				                                            WHERE b.return_number = a.return_number
+				                                                  AND b.state = '2')
+				                                    GROUP BY a.order_number, a.product_sku) t2
+				                           WHERE t1.order_number = TOI.ORDER_NUMBER
+				                                 AND t1.order_number = t2.order_number(+)
+				                                 AND t1.product_sku = t2.product_sku(+)
+				                                 AND t1.COUNT - nvl(t1.total_send_count, 0)  &gt; nvl(t2.returned_count, 0))
+					   		</if>
+					   		<if test="deliver_state != null and deliver_state == 3">
+					   			AND TOI.ORDER_STATE = '3'
+						   		AND NOT EXISTS(SELECT 1
+				                            FROM TBL_ORDER_PRODUCT_SKU t1, (SELECT a.order_number, a.product_sku, SUM(a.COUNT) returned_count
+				                                     FROM TBL_ORDER_RETURN_PRODUCT a
+				                                    WHERE  EXISTS
+				                                    (SELECT 1
+				                                             FROM TBL_ORDER_RETURN_INFO b
+				                                            WHERE b.return_number = a.return_number
+				                                                  AND b.state = '2')
+				                                    GROUP BY a.order_number, a.product_sku) t2
+				                           WHERE t1.order_number = TOI.ORDER_NUMBER
+				                                 AND t1.order_number = t2.order_number(+)
+				                                 AND t1.product_sku = t2.product_sku(+)
+				                                 AND t1.COUNT - nvl(t1.total_send_count, 0) &gt; nvl(t2.returned_count, 0))
+					   		</if>
+					    </where>
+					    ORDER BY TOI.ORDER_STATE ASC,TOI.CREATE_DATE DESC) T
+		 		 WHERE ROWNUM &lt;= #{end_rownum,jdbcType=INTEGER}) A
+		 WHERE RN &gt; #{start_rownum,jdbcType=INTEGER} 
+	</select>
+	
+	<!-- 获取店铺订货单总数 -->
+    <select id="queryOrderCount" parameterType="java.util.HashMap" resultType="int">
+    	SELECT count(1) 
+		  FROM TBL_ORDER_INFO TOI
+		<where>
+			   1=1
+			   AND TOI.IS_STORE_ORDER = 1
+			<if test="order_state != null">
+			   AND TOI.ORDER_STATE IN
+			   <foreach item="item" collection="order_state" open="(" separator="," close=")">
+					#{item}
+			   </foreach>
+			</if>
+			<if test="order_type != null and order_type != '' ">
+				AND	TOI.ORDER_TYPE = #{order_type,jdbcType=VARCHAR}
+			</if>
+			<if test="region_id != null and region_id != ''">
+				AND EXISTS (SELECT 1 FROM TBL_USER_INFO WHERE USER_NAME = TOI.USER_NAME AND PARTNER_USER_ID =#{region_id,jdbcType=INTEGER} AND USER_STATE = 1)
+			</if>
+			<if test="store_id != null and store_id != '' ">
+			    AND	TOI.USER_NAME = #{store_id,jdbcType=INTEGER}
+			</if>
+			<if test='df_type != null and df_type == "1" '>
+			    AND	TOI.ORDER_SOURCE != '零售'
+			</if>
+			<if test='df_type != null and df_type == "2" '>
+				AND	TOI.ORDER_SOURCE = '零售'
+			</if>
+			<if test="order_number != null and order_number != '' ">
+		    	AND	TOI.ORDER_NUMBER = #{order_number,jdbcType=VARCHAR}
+			</if>
+			<if test="user_login_name != null and user_login_name != '' ">
+			    AND	EXISTS(SELECT 1 FROM TBL_USER_INFO TUI WHERE TUI.USER_NAME = TOI.USER_NAME AND TUI.USER_CONTROL_STORE_NAME LIKE '%'|| #{user_login_name,jdbcType=VARCHAR}||'%')
+			</if>
+			<if test="ywjl_user_name != null and ywjl_user_name != '' ">
+			    AND	TOI.YWJL_USER_NAME = #{ywjl_user_name,jdbcType=VARCHAR}
+			</if>
+			<if test="md_id != null and md_id != 0 ">
+			    AND	TOI.MD_ID = #{md_id,jdbcType=INTEGER}
+			</if>
+			<if test="ywy_user_name != null and ywy_user_name != '' ">
+			    AND	TOI.YWY_USER_NAME = #{ywy_user_name,jdbcType=VARCHAR}
+			</if>
+			<if test="xdr_user_name != null and xdr_user_name != '' ">
+			    AND	TOI.XDR_USER_NAME = #{xdr_user_name,jdbcType=VARCHAR}
+			</if>
+			<if test="warehouse_id != null and warehouse_id != 0 ">
+			    AND EXISTS(SELECT 1 FROM TBL_WAREHOUSE_INFO TWI WHERE TWI.ID = TOI.WAREHOUSE_ID AND TWI.PARENT_ID = #{warehouse_id,jdbcType=INTEGER})
+			</if>
+			<if test="receiving_name != null and receiving_name != '' ">
+			    AND	TOI.RECEIVING_NAME LIKE  '%'||#{receiving_name,jdbcType=VARCHAR}||'%'
+			</if>
+			<if test="receiving_phone != null and receiving_phone != '' ">
+			    AND	TOI.RECEIVING_PHONE = #{receiving_phone,jdbcType=VARCHAR}
+			</if>
+			<if test="start_date != null and start_date != '' ">
+			    AND	TOI.CREATE_DATE &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+			<if test="end_date != null and end_date != '' ">
+			    AND	TOI.CREATE_DATE &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+			<if test="itemnumber != null and itemnumber != ''">
+	            and EXISTS (select 1 from tbl_order_product product where product.order_number = TOI.order_number and product.itemnumber = #{itemnumber})
+	        </if>
+	        <if test="product_count_min != null and product_count_min != ''">
+				and TOI.PRODUCT_COUNT &gt;= #{product_count_min,jdbcType=INTEGER}
+			</if>
+			<if test="product_count_max != null and product_count_max != ''">
+				and TOI.PRODUCT_COUNT &lt;= #{product_count_max,jdbcType=INTEGER}
+			</if>
+			<if test="order_money_min != null and order_money_min != ''">
+				and (TOI.PRODUCT_MONEY + TOI.LOGISTICS_MONEY + TOI.DF_MONEY) &gt;= #{order_money_min,jdbcType=DOUBLE}
+			</if>
+			<if test="order_money_max != null and order_money_max != ''">
+				and (TOI.PRODUCT_MONEY + TOI.LOGISTICS_MONEY + TOI.DF_MONEY) &lt;= #{order_money_max,jdbcType=DOUBLE}
+			</if>
+	        <if test="public_user_type != null and public_user_type == 3">
+				and 1=2
+			</if>
+			<if test="public_user_type != null and public_user_type == 4">
+				and TOI.YWJL_USER_NAME = #{public_user_name,jdbcType=VARCHAR}
+			</if>
+			<if test="public_user_type != null and public_user_type == 5">
+				and 1=2
+			</if>
+			<if test="public_user_type != null and public_user_type == 6">
+				and 1=2
+			</if>
+			<if test="public_user_type != null and public_user_type == 7">
+				and TOI.SUPERVISOR_USER_NAME = #{public_user_name,jdbcType=VARCHAR}
+			</if>
+			<if test="public_user_type != null and public_user_type == 9">
+				and TOI.PARTNER_USER_NAME = #{public_user_name,jdbcType=VARCHAR}
+			</if>
+			<if test="deliver_state != null and deliver_state == 1">
+				AND TOI.ORDER_STATE = '3'
+				AND NOT EXISTS(SELECT 1 FROM TBL_ORDER_PRODUCT_SKU t1 WHERE t1.order_number = toi.order_number and T1.total_send_count &gt; 0)
+				AND EXISTS(SELECT 1
+                            FROM TBL_ORDER_PRODUCT_SKU t1, (SELECT a.order_number, a.product_sku, SUM(a.COUNT) returned_count
+                                     FROM TBL_ORDER_RETURN_PRODUCT a
+                                    WHERE  EXISTS
+                                    (SELECT 1
+                                             FROM TBL_ORDER_RETURN_INFO b
+                                            WHERE b.return_number = a.return_number
+                                                  AND b.state = '2')
+                                    GROUP BY a.order_number, a.product_sku) t2
+                           WHERE t1.order_number = TOI.ORDER_NUMBER
+                                 AND t1.order_number = t2.order_number(+)
+                                 AND t1.product_sku = t2.product_sku(+)
+                                 AND t1.COUNT - nvl(t1.total_send_count, 0) &gt; nvl(t2.returned_count, 0))
+	   		</if>
+	   		<if test="deliver_state != null and deliver_state == 2">
+	   			AND TOI.ORDER_STATE = '3'
+	   			AND EXISTS(SELECT 1 FROM TBL_ORDER_PRODUCT_SKU t1 WHERE t1.order_number = toi.order_number and T1.total_send_count &gt; 0)
+		   		AND EXISTS(SELECT 1
+                            FROM TBL_ORDER_PRODUCT_SKU t1, (SELECT a.order_number, a.product_sku, SUM(a.COUNT) returned_count
+                                     FROM TBL_ORDER_RETURN_PRODUCT a
+                                    WHERE  EXISTS
+                                    (SELECT 1
+                                             FROM TBL_ORDER_RETURN_INFO b
+                                            WHERE b.return_number = a.return_number
+                                                  AND b.state = '2')
+                                    GROUP BY a.order_number, a.product_sku) t2
+                           WHERE t1.order_number = TOI.ORDER_NUMBER
+                                 AND t1.order_number = t2.order_number(+)
+                                 AND t1.product_sku = t2.product_sku(+)
+                                 AND t1.COUNT - nvl(t1.total_send_count, 0)  &gt; nvl(t2.returned_count, 0))
+	   		</if>
+	   		<if test="deliver_state != null and deliver_state == 3">
+	   			AND TOI.ORDER_STATE = '3'
+		   		AND NOT EXISTS(SELECT 1
+                            FROM TBL_ORDER_PRODUCT_SKU t1, (SELECT a.order_number, a.product_sku, SUM(a.COUNT) returned_count
+                                     FROM TBL_ORDER_RETURN_PRODUCT a
+                                    WHERE  EXISTS
+                                    (SELECT 1
+                                             FROM TBL_ORDER_RETURN_INFO b
+                                            WHERE b.return_number = a.return_number
+                                                  AND b.state = '2')
+                                    GROUP BY a.order_number, a.product_sku) t2
+                           WHERE t1.order_number = TOI.ORDER_NUMBER
+                                 AND t1.order_number = t2.order_number(+)
+                                 AND t1.product_sku = t2.product_sku(+)
+                                 AND t1.COUNT - nvl(t1.total_send_count, 0) &gt; nvl(t2.returned_count, 0))
+	   		</if>
+		</where>
+	</select>	
+	<!-- 获取店铺订货单基本信息 -->
+    <select id="queryOrderDetail" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT <include refid="all_column_detail"/>,
+    			getOrderSendStatus(TOI.order_number,TOI.order_state) deliver_state,
+    			(SELECT TSUI.USER_REALNAME FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.USER_NAME = TOI.PARTNER_USER_NAME) AS PARTNER_USER_REALNAME,
+    			(SELECT TSUI.USER_REALNAME FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.USER_NAME = TOI.YWJL_USER_NAME) AS YWJL_USER_REALNAME,
+                (SELECT TSUI.USER_REALNAME FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.USER_NAME = TOI.YWY_USER_NAME) AS YWY_USER_REALNAME,
+                (SELECT TSUI.USER_REALNAME FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.USER_NAME = TOI.SUPERVISOR_USER_NAME) AS SUPERVISOR_USER_REALNAME,
+                (SELECT TSUI.USER_REALNAME FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.USER_NAME = TOI.XDR_USER_NAME) AS XDR_USER_REALNAME,
+                (SELECT TSI.STORE_NAME FROM TBL_STORE_INFO TSI WHERE TSI.ID = TOI.MD_ID) AS MD_NAME,
+                (SELECT TWI.NAME FROM TBL_WAREHOUSE_INFO TWI WHERE TWI.ID = (SELECT TWIT.PARENT_ID FROM TBL_WAREHOUSE_INFO TWIT WHERE TWIT.ID = TOI.WAREHOUSE_ID)) AS WAREHOUSE_NAME,
+                (SELECT TUI.LOGIN_NAME FROM TBL_USER_INFO TUI WHERE TUI.USER_NAME = TOI.USER_NAME) AS USER_LOGIN_NAME,
+                (SELECT TUI.USER_CONTROL_STORE_NAME FROM TBL_USER_INFO TUI WHERE TUI.USER_NAME = TOI.USER_NAME) AS USER_STORE_NAME,
+                (SELECT TO_CHAR(MIN(TOBI.SEND_DATE),'YYYY-MM-DD HH24:MI:SS') FROM TBL_ORDER_BOX_INFO TOBI WHERE TOBI.ORDER_NUMBER = TOI.ORDER_NUMBER) AS SEND_DATE
+		  FROM TBL_ORDER_INFO TOI
+		<where>
+				1=1
+			<if test="order_number != null and order_number != '' ">
+			    AND	TOI.ORDER_NUMBER = #{order_number,jdbcType=VARCHAR}
+			</if>
+		</where> 
+	</select>
+
+	<!-- 获取店铺订货单商品SKU信息列表 -->
+    <select id="queryOrderProductSkuList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT  TOPS.ID,
+				TOPS.ORDER_NUMBER,
+				TOPS.ORDER_ITEM_NUMBER,
+				TOPS.CODENUMBER,
+				TOPS.COUNT,
+				TOPS.PRODUCT_UNIT_PRICE,
+				TOPS.PRODUCT_TOTAL_MONEY,
+				TOPS.PRODUCT_OLD_UNIT_PRICE,
+				TOPS.PRODUCT_TOTAL_DISCOUNT_MONEY,
+				TOPS.USER_NAME,
+				TO_CHAR(TOPS.ORDER_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  ORDER_DATE,
+				TOPS.PRODUCT_SKU,
+				TOPS.PRODUCT_SKU_NAME,
+				TOPS.PRODUCT_ITEMNUMBER,
+				TOPS.PRODUCT_COLOR,
+				TOPS.PRODUCT_OUT_COUNT,
+				TOPS.PRODUCT_SURE_COUNT,
+				TOPS.PRODUCT_CONFIGURE_STATE,
+				TOPS.PRODUCT_LACK_COUNT,
+				TOPS.PRODUCT_SPECS,
+				TOPS.PRODUCT_OLDSALE_PRIZE,
+				TOPS.TOTAL_SEND_COUNT,
+				TOPS.WAREHOUSE_ID,
+				NVL((SELECT SUM(TORP.COUNT) 
+			      FROM TBL_ORDER_RETURN_PRODUCT TORP 
+			     WHERE TORP.ORDER_NUMBER=TOPS.ORDER_NUMBER 
+			     	   AND TORP.PRODUCT_SKU=TOPS.PRODUCT_SKU 
+			     	   AND EXISTS(SELECT 1 
+			     	                FROM TBL_ORDER_RETURN_INFO TORI 
+			     	   			   WHERE TORI.RETURN_NUMBER = TORP.RETURN_NUMBER 
+			     	   			         AND TORI.STATE IN('1','2') )),0) AS TOTAL_RETURN_COUNT,
+			    (SELECT TPI.PRODUCT_IMG_URL FROM TBL_PRODUCT_INFO TPI WHERE TPI.ITEMNUMBER = TOPS.PRODUCT_ITEMNUMBER) AS PRODUCT_IMG_URL,
+			    (SELECT TPI.PRODUCT_NAME FROM TBL_PRODUCT_INFO TPI WHERE TPI.ITEMNUMBER = TOPS.PRODUCT_ITEMNUMBER) AS PRODUCT_NAME,
+			    NVL((SELECT TODR.DIVIDE_MONEY FROM TBL_ORDER_DIVIDE_RECORD TODR WHERE TODR.ORDER_NUMBER = TOPS.ORDER_NUMBER AND TODR.PRODUCT_SKU = TOPS.PRODUCT_SKU AND TODR.DIVIDE_TYPE ='2'),0) AS DIVIDE_MONEY,
+			    (SELECT ORIGINAL_PRODUCT_ITEMNUMBER FROM TBL_CUSTOM_PRODUCT_REL TCPR WHERE TCPR.CUSTOM_PRODUCT_ITEMNUMBER = TOPS.PRODUCT_ITEMNUMBER) AS PRODUCT_OLD_ITEMNUMBER
+		  FROM TBL_ORDER_PRODUCT_SKU TOPS
+		<where>
+			    1=1
+			  <if test="order_number != null and order_number != '' ">
+				AND	TOPS.ORDER_NUMBER = #{order_number,jdbcType=VARCHAR}
+			  </if>
+		</where>
+		ORDER BY TOPS.PRODUCT_ITEMNUMBER,TOPS.PRODUCT_COLOR,TOPS.CODENUMBER ASC
+	</select>
+	
+	<!-- 获取店铺订货单包裹信息列表 -->
+    <select id="queryOrderBoxList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT  TOBI.BOX_NUMBER,
+				TOBI.ORDER_NUMBER,
+				TOBI.LOGISTICS_NUMBER,
+				TOBI.LOGISTICS_COMPANY_NAME,
+				TO_CHAR(TOBI.SEND_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  SEND_DATE,
+				(SELECT LOGISTICS_COMPANY_CODE FROM TBL_ORDER_INFO WHERE ORDER_NUMBER=TOBI.ORDER_NUMBER) AS LOGISTICS_COMPANY_CODE
+		  FROM TBL_ORDER_BOX_INFO TOBI
+		<where>
+			    1=1
+			  <if test="order_number != null and order_number != '' ">
+				AND	TOBI.ORDER_NUMBER = #{order_number,jdbcType=VARCHAR}
+			  </if>
+		</where>
+		ORDER BY SEND_DATE DESC
+	</select>
+	
+	<!-- 取消店铺订货单【合作商审核驳回】 -->
+	<update id="cancelOrder" statementType="CALLABLE" parameterType="java.util.Map">
+		<![CDATA[
+			CALL PRO_CANCEL_ORDER_MANAGE(
+					#{public_user_name,mode=IN,jdbcType=VARCHAR},
+					#{order_number,mode=IN,jdbcType=VARCHAR},
+					#{cancel_reason,mode=IN,jdbcType=VARCHAR},
+					#{output_status,mode=OUT,jdbcType=VARCHAR},
+					#{output_msg,mode=OUT,jdbcType=VARCHAR}
+				)
+			]]>
+	</update>
+	
+	<!-- 店铺订货单支付【合作商审核】 -->
+	<update id="updatePaymentState" statementType="CALLABLE" parameterType="java.util.Map">
+		<![CDATA[
+			call pro_payment_deposit(
+					#{public_user_name,mode=IN,jdbcType=VARCHAR},
+					#{order_number,mode=IN,jdbcType=VARCHAR},
+					#{output_status,mode=OUT,jdbcType=VARCHAR},
+					#{output_msg,mode=OUT,jdbcType=VARCHAR}
+				)
+			]]>
+	</update>
+	<!-- 店铺订货单下单人信息 -->
+	<select id="queryOrderUserInfo" parameterType="java.util.Map" resultType="java.util.Map">
+		select a.user_name,
+		       a.user_manage_name,
+		       (a.product_money + a.logistics_money + a.df_money) order_money,
+		       b.bank_account
+		  from tbl_order_info a, tbl_bank_account b
+		 where a.user_name = b.user_id
+		   and a.order_number = #{order_number,jdbcType=VARCHAR}
+	</select>
+	<!-- 查询交易号 -->
+	<select id="queryOrderPayTradeNumber" parameterType="java.util.Map" resultType="string">
+		select pay_trade_number 
+		  from tbl_order_union_pay_detail
+		 where order_number = #{order_number,jdbcType=VARCHAR}
+	</select>
+	
+</mapper>

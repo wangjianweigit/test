@@ -1,0 +1,353 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.basicinfo.dao.OrderImportModelDao">
+    <sql id="queryWhereByPage">
+        <where>
+            1=1
+            <if test="model_name !='' and model_name != null">
+                and model_name = #{model_name, jdbcType=VARCHAR}
+            </if>
+            <if test="model_type !='' and model_type != null">
+                and model_type = #{model_type, jdbcType=CHAR}
+            </if>
+            <if test="start_date != null and start_date != ''">
+                and create_date &gt;= to_date(#{start_date},'YYYY-MM-DD HH24:MI:SS')
+            </if>
+            <if test="end_date != null and end_date != ''">
+                and create_date &lt;= to_date(#{end_date},'YYYY-MM-DD HH24:MI:SS')
+            </if>
+        </where>
+    </sql>
+
+    <!-- 查询订单导入模版记录数 -->
+    <select id="queryOrderImportModelCount" parameterType="java.util.Map" resultType="int">
+        SELECT count(1) FROM TBL_ORDER_IMPORT_MODEL <include refid="queryWhereByPage" />
+    </select>
+
+    <!-- 查询订单导入模版列表 -->
+    <select id="queryOrderImportModelList" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT * FROM
+          (SELECT a.*, rownum num
+            FROM
+                (SELECT id,
+                        to_char(create_date, 'YYYY-MM-DD HH24:MI:SS') as create_date,
+                        model_name,
+                        model_type,
+                        icon_img,
+                        example_path,
+                        state
+                  FROM TBL_ORDER_IMPORT_MODEL
+                  <include refid="queryWhereByPage"/>
+                  ORDER BY create_date desc
+                )a
+            where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+        where num &gt; #{start_rownum,jdbcType=INTEGER}
+
+    </select>
+
+    <!-- 根据模版id查询模版信息 -->
+    <select id="queryOrderImportModelById" parameterType="java.lang.Long" resultType="java.util.Map">
+        SELECT id,
+        to_char(create_date, 'YYYY-MM-DD HH24:MI:SS') as create_date,
+        model_name,
+        model_type,
+        icon_img,
+        state,
+        example_path,
+        model_code
+        FROM TBL_ORDER_IMPORT_MODEL WHERE id = #{id, jdbcType=INTEGER}
+    </select>
+
+    <!-- 查询相同名称的模版记录数 -->
+    <select id="queryOrderImportModelByNameCount" parameterType="java.util.Map" resultType="int">
+        SELECT count(1) FROM TBL_ORDER_IMPORT_MODEL WHERE model_name = #{model_name, jdbcType=VARCHAR} or model_code = #{model_code, jdbcType=VARCHAR}
+    </select>
+
+    <!-- 新增订单导入模版数据 -->
+    <insert id="insertOrderImportModel" parameterType="java.util.Map">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT SEQ_ORDER_IMPORT_MODEL.nextval FROM dual
+        </selectKey>
+        insert into TBL_ORDER_IMPORT_MODEL
+        (
+        id,
+        create_date,
+        creater_id,
+        model_name,
+        model_type,
+        icon_img,
+        example_path,
+        model_code,
+        state
+        )
+        values
+        (
+        #{id, jdbcType=INTEGER},
+        sysdate,
+        #{public_user_id, jdbcType=INTEGER},
+        #{model_name, jdbcType=VARCHAR},
+        #{model_type, jdbcType=CHAR},
+        #{icon_img, jdbcType=VARCHAR},
+        #{example_path, jdbcType=VARCHAR},
+        #{model_code, jdbcType=VARCHAR},
+        #{state, jdbcType=CHAR}
+        )
+    </insert>
+
+    <!-- 删除订单导入模版数据 -->
+    <delete id="deleteOrderImportModel" parameterType="java.lang.Long">
+        DELETE TBL_ORDER_IMPORT_MODEL WHERE id = #{id, jdbcType=INTEGER}
+    </delete>
+
+    <!-- 修改订单导入模版数据 -->
+    <update id="updateOrderImportModel" parameterType="java.util.Map">
+        UPDATE TBL_ORDER_IMPORT_MODEL
+        <set>
+            <if test="model_name!= null and model_name != ''">
+                model_name = #{model_name, jdbcType=VARCHAR},
+            </if>
+            <if test="model_type !='' and model_type != null">
+                model_type = #{model_type, jdbcType=VARCHAR},
+            </if>
+            <if test="icon_img !='' and icon_img != null">
+                icon_img = #{icon_img, jdbcType=VARCHAR},
+            </if>
+            <if test="example_path !='' and example_path != null">
+                example_path = #{example_path, jdbcType=VARCHAR},
+            </if>
+            <if test="state !='' and state != null">
+                state = #{state, jdbcType=CHAR}
+            </if>
+        </set>
+        WHERE id = #{id, jdbcType=INTEGER}
+    </update>
+
+    <!-- 查询模版配置数据信息 -->
+    <select id="queryOrderImportModelConfigDetail" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT * FROM TBL_ORDER_IMPORT_MODEL_CONFIG WHERE model_id = #{model_id, jdbcType=INTEGER}
+        <if test="type != '' and type != null">
+            and type = #{type, jdbcType=CHAR}
+        </if>
+    </select>
+
+    <!-- 查询订单导入模版配置记录数 -->
+    <select id="queryOrderImportModelConfigCount" parameterType="java.util.Map" resultType="int">
+        SELECT COUNT (1) FROM TBL_ORDER_IMPORT_MODEL_CONFIG WHERE model_id = #{model_id, jdbcType=INTEGER}
+    </select>
+
+    <!-- 根据模版id删除模版配置数据信息 -->
+    <delete id="deleteOrderImportModelConfig" parameterType="java.lang.Long">
+        DELETE TBL_ORDER_IMPORT_MODEL_CONFIG WHERE model_id = #{model_id, jdbcType=INTEGER}
+    </delete>
+
+    <!-- 批量新增模版配置数据 -->
+    <insert id="insertOrderImportModelConfigByBatch" parameterType="java.util.Map">
+        insert into TBL_ORDER_IMPORT_MODEL_CONFIG (
+            id,
+            model_id,
+            header_name,
+            field_name,
+            type,
+            field_type,
+            match_format,
+            match_type
+        )
+        select SEQ_ORDER_IMPORT_MODEL_CONFIG.NEXTVAL,A.* from(
+        <foreach collection="modelConfig" item="item" index="index" separator="UNION">
+            select
+                #{model_id,jdbcType=INTEGER} as model_id,
+                #{item.HEADER_NAME,jdbcType=VARCHAR} as header_name,
+                #{item.FIELD_NAME,jdbcType=VARCHAR} field_name,
+                #{item.TYPE,jdbcType=CHAR} as type,
+                #{item.FIELD_TYPE,jdbcType=CHAR} as field_type,
+                #{item.MATCH_FORMAT,jdbcType=VARCHAR} as match_format,
+                #{item.MATCH_TYPE,jdbcType=CHAR} as match_type
+            from dual
+        </foreach>
+        ) A
+    </insert>
+
+    <!-- 查询表是否存在 -->
+    <select id="queryExistTable" parameterType="java.lang.String" resultType="int">
+        SELECT count(1) FROM TKVIP_NEW.${table_name}
+    </select>
+    
+    <!-- 删除表 -->
+    <update id="dropTable" parameterType="java.lang.String">
+        DROP TABLE TKVIP_NEW.${table_name} CASCADE CONSTRAINTS
+    </update>
+
+    <!-- 模版订单表创建 -->
+    <update id="createImportOrderTable" parameterType="java.util.Map">
+        CREATE TABLE TKVIP_NEW.${table_name}
+        (
+            <foreach collection="columns" index="index" item="item">
+                <choose>
+                    <when test="item.FIELD_NAME == 'out_order_number'">
+                        ${item.FIELD_NAME} VARCHAR2 (100 Byte),
+                    </when>
+                    <when test="item.FIELD_NAME == 'order_state'">
+                        ${item.FIELD_NAME} VARCHAR2 (100 Byte),
+                    </when>
+                    <when test="item.FIELD_NAME == 'order_remark'">
+                        ${item.FIELD_NAME} VARCHAR2 (1000 Byte),
+                    </when>
+                    <when test="item.FIELD_NAME == 'receiving_name'">
+                        ${item.FIELD_NAME} VARCHAR2 (50 Byte),
+                    </when>
+                    <when test="item.FIELD_NAME == 'receiving_address'">
+                        ${item.FIELD_NAME} VARCHAR2 (200 Byte),
+                    </when>
+                    <when test="item.FIELD_NAME == 'receiving_phone'">
+                        ${item.FIELD_NAME} VARCHAR2 (50 Byte),
+                    </when>
+                    <when test="item.FIELD_NAME == 'product_money'">
+                        ${item.FIELD_NAME} VARCHAR2 (50 Byte),
+                    </when>
+                    <when test="item.FIELD_NAME == 'product_count'">
+                        ${item.FIELD_NAME} VARCHAR2 (50 Byte),
+                    </when>
+                    <when test="item.FIELD_NAME == 'out_order_date'">
+                        ${item.FIELD_NAME} VARCHAR2 (50 Byte),
+                    </when>
+                    <otherwise>
+                        ${item.FIELD_NAME}  VARCHAR2(500 BYTE),
+                    </otherwise>
+                </choose>
+            </foreach>
+            TASK_ID            NUMBER,
+            ROW_NUMBER         NUMBER,
+            ERROR_MSG          VARCHAR2(4000 BYTE),
+            USER_ID            NUMBER
+        )
+        TABLESPACE TBS_DATA
+        RESULT_CACHE (MODE DEFAULT)
+        PCTUSED    0
+        PCTFREE    10
+        INITRANS   1
+        MAXTRANS   255
+        STORAGE    (
+                    INITIAL          64K
+                    NEXT             1M
+                    MINEXTENTS       1
+                    MAXEXTENTS       UNLIMITED
+                    PCTINCREASE      0
+                    BUFFER_POOL      DEFAULT
+                    FLASH_CACHE      DEFAULT
+                    CELL_FLASH_CACHE DEFAULT
+                   )
+        LOGGING
+        NOCOMPRESS
+        NOCACHE
+        NOPARALLEL
+        MONITORING
+    </update>
+
+    <!-- 模版订单明细表创建 -->
+    <update id="createImportOrderDetailTable" parameterType="java.util.Map">
+        CREATE TABLE TKVIP_NEW.${table_name}
+        (
+            <foreach collection="columns" index="index" item="item">
+                <choose>
+                    <when test="item.FIELD_NAME == 'out_order_number'">
+                        ${item.FIELD_NAME} VARCHAR2 (100 Byte),
+                    </when>
+                    <when test="item.FIELD_NAME == 'product_count'">
+                        ${item.FIELD_NAME} VARCHAR2 (20 Byte),
+                    </when>
+                    <when test="item.FIELD_NAME == 'product_sku'">
+                        ${item.FIELD_NAME} VARCHAR2 (100 Byte),
+                    </when>
+                    <otherwise>
+                        ${item.FIELD_NAME}  VARCHAR2(500 BYTE),
+                    </otherwise>
+                </choose>
+            </foreach>
+            TASK_ID            NUMBER,
+            ROW_NUMBER         NUMBER,
+            ERROR_MSG          VARCHAR2(4000 BYTE),
+            USER_ID            NUMBER
+        )
+        TABLESPACE TBS_DATA
+        RESULT_CACHE (MODE DEFAULT)
+        PCTUSED    0
+        PCTFREE    10
+        INITRANS   1
+        MAXTRANS   255
+        STORAGE    (
+                    INITIAL          64K
+                    NEXT             1M
+                    MINEXTENTS       1
+                    MAXEXTENTS       UNLIMITED
+                    PCTINCREASE      0
+                    BUFFER_POOL      DEFAULT
+                    FLASH_CACHE      DEFAULT
+                    CELL_FLASH_CACHE DEFAULT
+                   )
+        LOGGING
+        NOCOMPRESS
+        NOCACHE
+        NOPARALLEL
+        MONITORING
+    </update>
+
+    <!-- 查询订单导入模版配置信息 -->
+    <select id="queryOrderImportModelConfig" parameterType="java.lang.Long" resultType="java.util.Map">
+        SELECT * FROM TBL_ORDER_IMPORT_MODEL_CONFIG WHERE id = #{config_id, jdbcType=INTEGER}
+    </select>
+
+    <!-- 根据模版配置id删除模版配置数据信息 -->
+    <delete id="deleteOrderImportModelConfigById" parameterType="java.lang.Long">
+        DELETE TBL_ORDER_IMPORT_MODEL_CONFIG WHERE id = #{configId, jdbcType=INTEGER}
+    </delete>
+
+    <!-- 删除配置表列数据 -->
+    <update id="deleteTableColumn" parameterType="java.util.Map">
+        alter table ${table_name} drop column ${column}
+    </update>
+
+    <!-- 添加配置表列数据 -->
+    <update id="addTableColumn" parameterType="java.util.Map">
+        alter table ${table_name} add(
+        ${column}<choose>
+            <when test="column == 'out_order_number'">
+                VARCHAR2 (100 Byte)
+            </when>
+            <when test="column == 'order_state'">
+                VARCHAR2 (100 Byte)
+            </when>
+            <when test="column == 'order_remark'">
+                VARCHAR2 (1000 Byte)
+            </when>
+            <when test="column == 'receiving_name'">
+                VARCHAR2 (50 Byte)
+            </when>
+            <when test="column == 'receiving_address'">
+                VARCHAR2 (200 Byte)
+            </when>
+            <when test="column == 'receiving_phone'">
+                VARCHAR2 (50 Byte)
+            </when>
+            <when test="column == 'product_money'">
+                VARCHAR2 (50 Byte)
+            </when>
+            <when test="column == 'product_count'">
+                VARCHAR2 (50 Byte)
+            </when>
+            <when test="column == 'out_order_date'">
+                VARCHAR2 (50 Byte)
+            </when>
+            <otherwise>
+                VARCHAR2(500 BYTE)
+            </otherwise>
+        </choose>)
+    </update>
+
+    <!-- 修改配置表列数据 -->
+    <update id="updateTableColumn" parameterType="java.util.Map">
+        alter table ${table_name} rename column ${old_column} to ${new_column}
+    </update>
+
+</mapper>

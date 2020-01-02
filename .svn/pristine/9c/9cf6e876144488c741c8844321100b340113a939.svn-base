@@ -1,0 +1,4 @@
+#ERP\u5730\u5740\u5E93\u540C\u6B65
+common_sync_region =common/sync_region
+#OA\u5730\u5740\u5E93\u540C\u6B65
+sys_dictionary_sync_region = sys_dictionary/sync_region

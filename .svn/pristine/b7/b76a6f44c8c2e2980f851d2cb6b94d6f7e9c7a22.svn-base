@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.product.dao.ProductGroupDao">
+   <sql id="all_column">
+        id,
+		parent_id,
+		group_name,
+		img_url,
+		remark,
+		redirect_url,
+		redirect_url_phone,
+		to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+		create_user_id,
+		sortid,
+		is_display
+	</sql>
+	<!-- 查询商品分组列表 -->
+	<select id="queryProductGroupList" parameterType="java.util.Map" resultType="java.util.Map" >
+     	select
+		<include refid="all_column" />
+		from tbl_product_group dpg
+		<where>     
+	        <if test="id!=null and id!=0 ">     
+	            id = #{id,jdbcType=INTEGER}
+			</if>
+	        <if test="parent_id!= null">
+	            and parent_id = #{parent_id,jdbcType=INTEGER}
+	        </if>     
+	        <if test="group_name!= null and group_name!=''">     
+	            and group_name = #{group_name,jdbcType=VARCHAR}
+			</if>
+	    </where>
+		order by sortid desc
+    </select>
+    <!-- 新增商品分组 -->
+	<insert id="insert" parameterType="java.util.Map">
+		<selectKey keyProperty="id" resultType="int" order="BEFORE">
+			select seq_product_group.nextval from dual
+		</selectKey>
+		insert into tbl_product_group(
+			id,
+			parent_id,
+			group_name,
+			img_url,
+			remark,
+			redirect_url,
+			redirect_url_phone,
+			create_date,
+			create_user_id,
+			sortid
+		) values
+		(
+			#{id,jdbcType=INTEGER},
+			#{parent_id,jdbcType=INTEGER},
+			#{group_name,jdbcType=VARCHAR},
+			#{img_url,jdbcType=VARCHAR},
+			#{remark,jdbcType=VARCHAR},
+			#{redirect_url,jdbcType=VARCHAR},
+			#{redirect_url_phone,jdbcType=VARCHAR},
+			sysdate,
+			#{public_user_id,jdbcType=INTEGER},
+			(select nvl(max(sortid),0)+1 from tbl_product_group where parent_id = #{parent_id,jdbcType=INTEGER})
+		)
+	</insert>
+	<!-- 更新商品分组信息 -->
+	<update id="update" parameterType="java.util.Map">
+		update tbl_product_group
+		<set>
+			<if test="group_name!=null and group_name!=''">
+				group_name = #{group_name,jdbcType=VARCHAR},
+			</if>
+			<if test="redirect_url!=null and redirect_url!=''">
+				redirect_url = #{redirect_url,jdbcType=VARCHAR},
+			</if>
+			<if test="remark!=null and remark!=''">
+				remark = #{remark,jdbcType=VARCHAR},
+			</if>
+			<if test="img_url!=null and img_url!=''">
+				img_url = #{img_url,jdbcType=VARCHAR},
+			</if>	
+			<if test="sortid!=null">
+				sortid = #{sortid,jdbcType=INTEGER}
+			</if>
+			<if test="type == 'top'">
+				<if test="parent_id!=null">
+				sortid = (select max(sortid) + 1 from tbl_product_group where parent_id = #{parent_id,jdbcType=INTEGER})
+				</if>
+			</if>
+			<if test="type == 'bottom'">
+				<if test="parent_id!=null">
+				sortid = (select min(sortid) - 1 from tbl_product_group where parent_id = #{parent_id,jdbcType=INTEGER})
+				</if>
+			</if>
+		</set>
+		WHERE id = #{id,jdbcType=INTEGER}
+	</update>
+	<!-- 查询商品分组详情 -->
+	<select id="queryById" parameterType="long" resultType="java.util.Map">
+		select id,sortid
+		from tbl_product_group
+		WHERE id = #{id,jdbcType=INTEGER}
+	</select>
+	<!-- 删除商品分组 -->
+	<delete id="delete" parameterType="java.util.Map">
+		delete from tbl_product_group where id = #{id,jdbcType=INTEGER}
+	</delete>
+	<!-- 根据分组名称查询商品分组是否存在 -->
+	<select id="isExist" parameterType="java.util.Map" resultType="int">
+		select
+		count(id)
+		from tbl_product_group
+		<where>
+			<if test="id!=null and id!=0">
+				id != #{id,jdbcType=INTEGER}
+			</if>
+			<if test="group_name!=null and group_name!=''">
+				and group_name = #{group_name,jdbcType=VARCHAR}
+			</if>
+		</where>
+	</select>
+	<!-- 查询商品分组层级信息 -->
+	<select id="queryProductGroupAll" resultType="java.util.Map">
+		select
+		a.*
+		,level from tbl_product_group a
+		start with parent_id = 0
+		connect by prior id = parent_id
+	</select>
+	<!-- 批量更新 -->
+	<update id="batchUpdate" parameterType="java.util.List">
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";">
+			update tbl_product_group 
+			   set group_name = #{item.group_name,jdbcType=VARCHAR},
+			  	   redirect_url = #{item.redirect_url,jdbcType=VARCHAR},
+			  	   redirect_url_phone = #{item.redirect_url_phone,jdbcType=VARCHAR},
+			  	   img_url = #{item.img_url,jdbcType=VARCHAR}
+			 where id = #{item.id,jdbcType=INTEGER}
+		</foreach>
+	</update>
+	<!-- 根据父节点ID查询所有的子节点 -->
+	<select id="queryChildrenByParentId" parameterType="java.util.Map" resultType="java.util.Map">
+		select 
+        pg.id,
+        pg.group_name,
+        (select count(1) from tbl_product_group where parent_id =  pg.id) children
+        from  tbl_product_group pg
+        where id = #{id,jdbcType=INTEGER}
+	</select>
+	<!-- 更新是否展示 -->
+	<update id="updateIsDisplay" parameterType="java.util.Map">
+		update tbl_product_group
+		<set>
+			<if test="is_display !=null and is_display !=''">
+				is_display = #{is_display,jdbcType=CHAR}
+			</if>
+		</set>
+		WHERE id = #{id,jdbcType=INTEGER}
+	</update>
+</mapper>

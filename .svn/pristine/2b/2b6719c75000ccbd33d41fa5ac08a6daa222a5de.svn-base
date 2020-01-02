@@ -1,0 +1,1803 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tk.analysis.product.dao.ProductAnalysisOperationDao">
+	<resultMap type="java.util.Map" id="saleAreaMap">
+  		<result column="id" property="id" />
+  		<result column="name" property="name" />
+  		<result column="value" property="value" />
+  	</resultMap>
+	<!--获取商品概况 -->
+	<select id="queryProductSurvey" parameterType="java.util.Map" resultType="java.util.Map">
+			select (select count(1) from tbl_product_info where state = '上架') putaway_count,
+				   (select count(1) from tbl_product_info_apply t where state= '2' 
+				   and itemnumber not in (select itemnumber from tbl_product_info where state = '上架')) approval_count,
+				   (select money from tbl_target_info where year = to_number(to_char(sysdate,'yyyy')) 
+				   	and month = to_number(to_char(sysdate,'fmmm'))) month_money
+			  from dual
+	</select>
+	<!-- 查询目标 -->
+	<select id="queryTarget" parameterType="java.util.Map" resultType="java.util.Map">
+		select t.month,t1.money as this_money,t2.money as last_money
+		  from (select lpad(level,2) month from dual
+				connect by level&lt;13) t,
+		  	    (select month,money
+				  from tbl_target_info t
+				 where year = #{this_year,jdbcType=INTEGER}) t1,
+				(select month,money 
+				  from tbl_target_info 
+				 where year = #{last_year,jdbcType=INTEGER}) t2
+		  where t.month = t1.month(+)
+            and t.month = t2.month(+)
+            order by t.month
+	</select>
+	<!-- 删除目标 -->
+	<delete id="deleteTargetByYear" parameterType="java.util.Map">
+		delete tbl_target_info where year = #{year,jdbcType=INTEGER}
+	</delete>
+	<!-- 新增目标 -->
+	<insert id="insertTarget" parameterType="java.util.Map">
+		insert into tbl_target_info
+		<foreach collection="list" item="item" open="(" separator="union all" close=")">
+			select #{item.year,jdbcType=INTEGER} as year,
+				   #{item.month,jdbcType=INTEGER} as month,
+				   #{item.money,jdbcType=INTEGER} as money
+			  from dual
+		</foreach>
+	</insert>
+	<!-- 实时 支付金额 -->
+  	<select id="queryRealTime_AllPayMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(b.payment_money),0) from tbl_order_info b
+		 where b.payment_state = 2
+		and b.payment_date >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+		and b.payment_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+  	</select>
+  	<!-- 实时 预订支付的首款 -->
+  	<select id="queryRealTime_PreFirstMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+  		select nvl(sum(b.earnest_money),0) 
+  		 from tbl_pre_order_info b
+		where b.payment_state = 2
+		and b.payment_date >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+		and b.payment_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+  	</select>
+  	<!-- 实时 尾款订单的定金金额 -->
+  	<select id="queryRealTime_PreOrderFirstMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+  		select nvl(sum(f.earnest_money),0)
+  		 from tbl_order_info b,tbl_pre_order_relate f
+		where b.order_number = f.order_number and b.payment_state = 2
+		and b.payment_date >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+		and b.payment_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+  	</select>
+	<!-- 其他 支付金额 -->
+	<select id="r_queryOther_AllPayMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t1.payment_money-t1.pre_earnest_money),0)
+		  from fact_order t1,dim_date dt
+		 where t1.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+	</select>
+  	<!-- 其他 预订支付的首款 -->
+  	<select id="r_queryOther_PreFirstMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+  		select nvl(sum(t1.earnest_money),0) 
+  		  from fact_pre_order t1,dim_date dt
+		 where t1.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+  	</select>
+  							<!-- #################        商品概况-核心数据分析         ################ -->
+  	<!-- 其他 折线图 商品访客数，浏览量 -->
+	<select id="r_queryOther_VisitorPvCount_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select to_char(dt.date_value,'yyyy-mm-dd') as create_date,count(distinct t1.member_key) visitor_count,count(*) pv_count
+		  from fact_user_log_product t1,dim_date dt
+		 where t1.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           group by to_char(dt.date_value,'yyyy-mm-dd')
+	</select>
+	<!-- 其他 折线图 下单买家数、下单件数和下单金额 -->
+	<select id="r_queryOther_PurchaseNumberMoney_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select to_char(dt.date_value,'yyyy-mm-dd') as create_date,
+			   count(distinct t1.member_key) purchase_number,
+			   sum(t1.product_count) product_count,
+			   nvl(sum(t1.product_money+t1.df_money+t1.logistics_money),0) order_money
+		  from fact_order t1,dim_date dt
+		 where t1.create_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           group by to_char(dt.date_value,'yyyy-mm-dd')
+	</select>
+	<!-- 其他 折线图 支付买家数、支付件数和支付金额 -->
+	<select id="r_queryOther_PayPurchaseNumberMoney_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select to_char(dt.date_value,'yyyy-mm-dd') as create_date,
+			   count(distinct t1.member_key) purchase_number,
+			   sum(t1.product_count) payment_count,
+			   nvl(sum(t1.payment_money-t1.pre_earnest_money),0) payment_money
+		  from fact_order t1,dim_date dt
+		 where t1.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           group by to_char(dt.date_value,'yyyy-mm-dd')
+	</select>
+	<!-- 其他 折线图 预订支付的首款 -->
+	<select id="r_queryOther_PreFirstMoney_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select to_char(dt.date_value,'yyyy-mm-dd') as create_date,
+			   nvl(sum(t1.earnest_money),0) pre_first_money
+		  from fact_pre_order t1,dim_date dt
+		 where t1.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           group by to_char(dt.date_value,'yyyy-mm-dd')
+	</select>
+	<!-- 其他 折线图 退款信息 -->
+	<select id="r_queryOther_Return_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select to_char(dt.date_value,'yyyy-mm-dd') as create_date, nvl(sum(t.refund_order_money),0) return_money,nvl(sum(t.refund_product_count),0) return_count
+		  from fact_return_product_d t,dim_date dt
+		 where t.refund_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           group by to_char(dt.date_value,'yyyy-mm-dd')
+	</select>
+	<!-- 其他 折线图 商品访客数，浏览量<天> -->
+	<select id="r_queryOther_VisitorPvCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_full||':00' create_date,count(distinct a.member_key) visitor_count,count(*) pv_count
+		  from
+		(select t1.log_time_key,t1.member_key
+		  from fact_user_log_product t1,dim_date dt
+		 where t1.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')) a,dim_time dt
+           where a.log_time_key = dt.time_key
+           group by dt.hours24_full
+           order by dt.hours24_full
+	</select>
+	<!-- 其他 折线图 下单买家数、下单件数和下单金额<天> -->
+	<select id="r_queryOther_PurchaseNumberMoneyD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_full||':00' create_date,count(distinct a.member_key) purchase_number,sum(a.product_count) product_count,
+			   nvl(sum(a.product_money+a.df_money+a.logistics_money),0) order_money
+		  from
+		(select t1.create_date_time_key,t1.member_key,t1.product_count,t1.product_money,t1.df_money,t1.logistics_money
+		  from fact_order t1,dim_date dt
+		 where t1.create_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')) a,dim_time dt
+           where a.create_date_time_key = dt.time_key
+           group by dt.hours24_full
+           order by dt.hours24_full
+	</select>
+	<!-- 其他 折线图 支付买家数、支付件数和支付金额<天> -->
+	<select id="r_queryOther_PayPurchaseNumberMoneyD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_full||':00' create_date,count(distinct a.member_key) purchase_number,sum(a.product_count) payment_count,
+			   nvl(sum(a.payment_money-a.pre_earnest_money),0) payment_money
+		  from
+		(select t1.payment_date_time_key,t1.member_key,t1.product_count,t1.payment_money,t1.pre_earnest_money
+		  from fact_order t1,dim_date dt
+		 where t1.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')) a,dim_time dt
+           where a.payment_date_time_key = dt.time_key
+           group by dt.hours24_full
+           order by dt.hours24_full
+	</select>
+	<!-- 其他 折线图 预订支付的首款<天> -->
+	<select id="r_queryOther_PreFirstMoneyD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_full||':00' create_date,nvl(sum(a.earnest_money),0) pre_first_money
+		  from
+		(select t1.payment_date_time_key,t1.earnest_money
+		  from fact_pre_order t1,dim_date dt
+		 where t1.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')) a,dim_time dt
+           where a.payment_date_time_key = dt.time_key
+           group by dt.hours24_full
+           order by dt.hours24_full
+	</select>
+	<!-- 其他 折线图 退款信息<天> -->
+	<select id="r_queryOther_ReturnD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+        select dt.hours24_full||':00' create_date,nvl(sum(a.product_money),0) return_money,nvl(sum(a.product_count),0) return_count
+		  from
+		(select t.aso_refund_date_time_key,t.product_money,t.product_count
+		  from fact_aso_refund_product t,dim_date dt
+		 where t.aso_refund_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')) a,dim_time dt
+		   where a.aso_refund_date_time_key = dt.time_key
+           group by dt.hours24_full
+           order by dt.hours24_full
+	</select>
+  	<!-- 其他 核心数据分析-商品访客数 -->
+  	<select id="r_queryOther_VisitorCount" parameterType="java.util.Map" resultType="java.lang.Float">
+  		select count(distinct t1.member_key)
+		  from fact_user_log_product t1,dim_date dt
+		 where t1.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+  	</select>
+  	<!-- 其他 核心数据分析-商品浏览量 -->
+  	<select id="r_queryOther_PvCount" parameterType="java.util.Map" resultType="java.lang.Float">
+  		select count(*) pv_count
+		  from fact_user_log_product t1,dim_date dt
+		 where t1.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+  	</select>
+  	<!-- 其他 核心数据分析-下单买家数 -->
+  	<select id="r_queryOther_OPurchaseNumber" parameterType="java.util.Map" resultType="java.lang.Float">
+  		select count(distinct t1.member_key) purchase_number
+		  from fact_order t1,dim_date dt
+		 where t1.create_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+  	</select>
+  	<!-- 其他 核心数据分析-下单件数 -->
+  	<select id="r_queryOther_OCount" parameterType="java.util.Map" resultType="java.lang.Float">
+  		select nvl(sum(t1.product_count),0) product_count
+		  from fact_order t1,dim_date dt
+		 where t1.create_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+  	</select>
+  	<!-- 其他 核心数据分析-下单金额 -->
+  	<select id="r_queryOther_OMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+  		select nvl(sum(t1.product_money+t1.df_money+t1.logistics_money),0) order_money
+		  from fact_order t1,dim_date dt
+		 where t1.create_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+  	</select>
+  	<!-- 其他 核心数据分析-支付买家数 -->
+  	<select id="r_queryOther_PayPurchaseNumber" parameterType="java.util.Map" resultType="java.lang.Float">
+  		select count(distinct t1.member_key) purchase_number
+		  from fact_order t1,dim_date dt
+		 where t1.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+  	</select>
+  	<!-- 其他 核心数据分析-支付件数 -->
+  	<select id="r_queryOther_PayCount" parameterType="java.util.Map" resultType="java.lang.Float">
+  		select nvl(sum(t1.product_count),0)
+		  from fact_order t1,dim_date dt
+		 where t1.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+  	</select>
+  	<!-- 其他 核心数据分析-支付金额 -->
+  	<select id="r_queryOther_PayMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+  		select nvl(sum(t1.payment_money-t1.pre_earnest_money),0) order_money
+		  from fact_order t1,dim_date dt
+		 where t1.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+  	</select>
+  	<!-- 其他 核心数据分析-成功退款金额 -->
+  	<select id="r_queryOther_ReturnMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+  		select nvl(sum(t1.refund_order_money),0)
+  		  from fact_return_product_d t1,dim_date dt
+  		 where t1.refund_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+  	</select>
+  	<!-- 其他 核心数据分析-退款商品数 -->
+  	<select id="r_queryOther_RefundProductCount" parameterType="java.util.Map" resultType="java.lang.Float">
+  		select nvl(sum(t1.refund_product_count),0)
+  		  from fact_return_product_d t1,dim_date dt
+  		 where t1.refund_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+  	</select>
+							<!-- #################        商品概况-商品汇总排行         ################ -->		
+	<!-- 其他 商品汇总排行 -->
+	<select id="r_queryOther_ProductSummary_Rank" parameterType="java.util.Map" resultType="java.util.Map">
+		select *
+		  from (
+			select * from(
+	       	select t.itemnumber,
+			       t.product_name,
+			       t.product_img_url,
+			       nvl(t1.visitor_count,0) visitor_count,
+			       nvl(t1.pv_count,0) pv_count,
+			       nvl(t2.o_purchase_number,0) o_purchase_number,
+			       nvl(t2.o_count,0) o_count,
+			       nvl(t2.o_money,0) o_money,
+			       nvl(t3.p_purchase_number,0) p_purchase_number,
+			       nvl(t3.p_count,0) p_count,
+			       nvl(t3.p_money,0) p_money,
+			       case when nvl(t1.visitor_count,0) = 0 or nvl(t2.o_purchase_number,0) = 0 then 0
+			       else nvl(t2.o_purchase_number,0)/nvl(t1.visitor_count,0)*100 end o_zhl,
+			       case when nvl(t1.visitor_count,0) = 0 or nvl(t3.p_purchase_number,0) = 0 then 0
+			       else nvl(t3.p_purchase_number,0)/nvl(t1.visitor_count,0)*100 end p_zhl,
+	               nvl(t4.refund_product_count,0) refund_product_count,
+	               nvl(t4.refund_product_money,0) refund_product_money
+			  from dim_product t,
+			       (select t1.product_key,count(distinct t1.member_key) visitor_count,count(*) pv_count
+					  from fact_user_log_product t1,dim_date dt
+					 where t1.log_date_key = dt.date_key
+			           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   			   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			           group by t1.product_key) t1,
+			       (select t1.product_key ,count(distinct t1.member_key) o_purchase_number,nvl(sum(t1.product_count),0) o_count,nvl(sum(t1.product_money),0) o_money
+					  from fact_order_product_sku t1,dim_date dt
+					 where t1.create_date_key = dt.date_key
+			           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   			   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			           group by t1.product_key) t2,
+			       (select t1.product_key,count(distinct t1.member_key) p_purchase_number,nvl(sum(t1.product_count),0) p_count,nvl(sum(t1.product_money),0) p_money
+					  from fact_order_product_sku t1,dim_date dt
+					 where t1.payment_date_key = dt.date_key
+			           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   			   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			           group by t1.product_key) t3,
+			       (select t1.product_key,nvl(sum(t1.product_count),0) refund_product_count,nvl(sum(t1.product_money),0) refund_product_money
+					  from fact_return_product_sku_d t1,dim_date dt
+					 where t1.refund_date_key = dt.date_key
+			           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   			   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			           group by t1.product_key) t4
+			        where t.product_key = t1.product_key(+)
+			          and t.product_key = t2.product_key(+)
+			          and t.product_key = t3.product_key(+)
+			          and t.product_key = t4.product_key(+))
+	         <if test="sort!=null and sort!='' and sort_by!=null and sort_by!=''">
+				order by ${sort} ${sort_by}
+			 </if>
+			 <if test="sort==null and sort_by==null">
+				order by visitor_count desc
+			 </if>) where rownum &lt;= #{num,jdbcType=INTEGER}
+	</select>
+								<!-- #################        商品概况-销售区域分布          ################ -->
+  	<!-- 其他 下单买家总数 -->
+	<select id="r_queryOther_PurchaseNumberTotal" parameterType="java.util.Map" resultType="long">
+     	select nvl(sum(t.purchase_number),0)
+		  from fact_sale_area_d t,dim_date dt
+		 where t.date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+	   	   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+	   	   and t.province_key != -1
+	   	   and t.city_key != -1
+  	</select>
+  	<!-- 其他 按省份下单买家数 排行榜 -->
+	<select id="r_queryOther_PurchaseNumberProvince_Rank" parameterType="java.util.Map" resultType="java.util.Map">
+  		select (select name from dim_dic_region where region_key = a.province_key) province_name,a.purchase_number,to_char (a.purchase_number/#{count,jdbcType=INTEGER}, 'fm999999990.0000') as ratio 
+  		    from (select province_key,purchase_number from
+  		    	(select province_key,nvl(sum(t.purchase_number),0) purchase_number
+				  from fact_sale_area_d t,dim_date dt
+				 where t.date_key = dt.date_key
+		           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			   	   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			   	   and t.province_key != -1
+	   	   		   and t.city_key != -1
+			   	   group by t.province_key) 
+			     where purchase_number > 0
+			     order by purchase_number desc) a
+			  where rownum &lt;=#{num,jdbcType=INTEGER}
+  	</select>
+  	<!-- 其他 按城市下单买家数 排行榜 -->
+  	<select id="r_queryOther_PurchaseNumberCity_Rank" parameterType="java.util.Map" resultType="java.util.Map">
+  		select (select name from dim_dic_region where region_key = a.city_key) city_name,a.purchase_number,to_char (a.purchase_number/#{count,jdbcType=INTEGER}, 'fm999999990.0000') as ratio 
+  		    from (select city_key,purchase_number from
+  		    	(select city_key,nvl(sum(t.purchase_number),0) purchase_number
+				  from fact_sale_area_d t,dim_date dt
+				 where t.date_key = dt.date_key
+		           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			   	   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			   	   and t.province_key != -1
+	   	   		   and t.city_key != -1
+			   	   group by t.city_key)
+			     where purchase_number > 0 
+			     order by purchase_number desc) a
+			  where rownum &lt;=#{num,jdbcType=INTEGER}
+  	</select>
+  	<!-- 其他 成交总金额 -->
+	<select id="r_queryOther_PayMoneyTotal" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t.money),0)
+		  from fact_sale_area_d t,dim_date dt
+		 where t.date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+	   	   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+	   	   and t.province_key != -1
+	   	   and t.city_key != -1
+  	</select>
+  	<!-- 其他 按省份成交金额 排行榜 -->
+	<select id="r_queryOther_PayMoneyProvince_Rank" parameterType="java.util.Map" resultType="java.util.Map">
+  		select (select name from dim_dic_region where region_key = a.province_key) province_name,a.payment_money,to_char (a.payment_money/#{money,jdbcType=INTEGER}, 'fm999999990.0000') as ratio 
+  		    from (select province_key,payment_money from 
+  		    	(select province_key,nvl(sum(t.money),0) payment_money
+				  from fact_sale_area_d t,dim_date dt
+				 where t.date_key = dt.date_key
+		           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			   	   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			   	   and t.province_key != -1
+	   	   		   and t.city_key != -1
+			   	   group by t.province_key) 
+			     where payment_money > 0
+			     order by payment_money desc) a
+			  where rownum &lt;=#{num,jdbcType=INTEGER}
+  	</select>
+  	<!-- 其他 按城市成交金额 排行榜 -->
+  	<select id="r_queryOther_PayMoneyCity_Rank" parameterType="java.util.Map" resultType="java.util.Map">
+  		  select (select name from dim_dic_region where region_key = a.city_key) city_name,a.payment_money,to_char (a.payment_money/#{money,jdbcType=INTEGER}, 'fm999999990.0000') as ratio 
+  		    from (select city_key,payment_money from
+  		    	(select city_key,nvl(sum(t.money),0) payment_money
+				  from fact_sale_area_d t,dim_date dt
+				 where t.date_key = dt.date_key
+		           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			   	   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			   	   and t.province_key != -1
+	   	   		   and t.city_key != -1
+			   	   group by t.city_key) 
+			     where payment_money > 0
+			     order by payment_money desc) a
+			  where rownum &lt;=#{num,jdbcType=INTEGER}
+  	</select>
+  	<!-- 其他 销售区域明细 -->
+  	<select id="r_queryOther_SaleAreaDetail" parameterType="java.util.Map" resultType="java.util.Map">
+  		select (select name from dim_dic_region where region_key = a.city_key) city_name,purchase_number,payment_money from
+  		    	(select city_key,nvl(sum(t.purchase_number),0) purchase_number,nvl(sum(t.money),0) payment_money
+				  from fact_sale_area_d t,dim_date dt
+				 where t.date_key = dt.date_key
+		           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			   	   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			   	   and t.province_key != -1
+	   	   		   and t.city_key != -1
+			   	   <if test="province_id != null and province_id !=''">
+			   	   and t.province_key = (select region_key from dim_dic_region where region_id = #{province_id,jdbcType=INTEGER})
+			   	   </if>
+			   	   group by t.city_key) a
+			     where payment_money > 0
+			     order by payment_money desc
+  	</select>
+  	<!-- 其他 销售区域地图 -->
+  	<select id="r_queryOther_SaleAreaMap" parameterType="java.util.Map" resultMap="saleAreaMap">
+  		<if test="type == 1">
+	  		select t.region_id as id,
+	  			   t.name,
+	  			   nvl(t1.payment_money,0) as value
+	  		  from dim_dic_region t,(select province_key,nvl(sum(t.money),0) payment_money
+										  from fact_sale_area_d t,dim_date dt
+										 where t.date_key = dt.date_key
+								           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+									   	   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+									   	   and t.province_key != -1
+	   	   		   						   and t.city_key != -1
+									   	   group by t.province_key) t1
+		      where t.parent_id in (select region_id from dim_dic_region where parent_id = 0)
+			    and t.region_key = t1.province_key(+)
+  		</if>
+  		<if test="type == 2">
+  			select t.region_id as id,
+  			   t.name,
+  			   nvl(t1.purchase_number,0) as value
+	  		  from dim_dic_region t,(select province_key,nvl(sum(t.purchase_number),0) purchase_number
+										  from fact_sale_area_d t,dim_date dt
+										 where t.date_key = dt.date_key
+								           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+									   	   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+									   	   and t.province_key != -1
+	   	   		   						   and t.city_key != -1
+									   	   group by t.province_key) t1
+		      where t.parent_id in (select region_id from dim_dic_region where parent_id = 0)
+			    and t.region_key = t1.province_key(+)
+  		</if>
+  	</select>
+  							<!-- #################        商品销售分析-商品汇总排行          ################ -->
+	<!-- 其他 商品汇总排行总数 -->
+	<select id="r_queryOther_ProductSummaryCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from dim_product t,
+	  	   (select t1.product_key,count(distinct t1.member_key) p_purchase_number,nvl(sum(t1.product_count),0) p_count,nvl(sum(t1.product_money),0) p_money
+			  from fact_order_product_sku t1,dim_date dt
+			 where t1.payment_date_key = dt.date_key
+	           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+   			   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+	           group by t1.product_key) t3
+	        where t.product_key = t3.product_key(+)
+              and t3.p_count > 0
+	</select>
+	<!-- 其他 商品汇总排行分页 -->
+	<select id="r_queryOther_ProductSummaryPage" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from
+ 			(select a.*,rownum rn 
+ 				from (select * from 
+ 			 (select t.itemnumber,
+			       t.product_name,
+			       t.product_img_url,
+			       case when nvl(t3.p_count,0) = 0 then 0
+		       	   else nvl(t3.p_money,0)/nvl(t3.p_count,0) end sale_price,
+			       1 replenishment_type,
+			       0 replenishment_count,
+			       to_char(sysdate, 'yyyy-mm-dd') estimated_date,
+			       nvl(t1.visitor_count,0) visitor_count,
+			       nvl(t2.o_purchase_number,0) o_purchase_number,
+			       nvl(t2.o_count,0) o_count,
+			       nvl(t3.p_purchase_number,0) p_purchase_number,
+			       nvl(t3.p_money,0) p_money,
+			       case when nvl(t1.visitor_count,0) = 0 or nvl(t3.p_purchase_number,0) = 0 then 0
+			       else nvl(t3.p_purchase_number,0)/nvl(t1.visitor_count,0)*100 end p_zhl
+			  from dim_product t,
+			  	   (select t1.product_key,count(distinct t1.member_key) visitor_count
+					  from fact_user_log_product t1,dim_date dt
+					 where t1.log_date_key = dt.date_key
+			           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   			   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			           group by t1.product_key) t1,
+			       (select t1.product_key ,count(distinct t1.member_key) o_purchase_number,nvl(sum(t1.product_count),0) o_count,nvl(sum(t1.product_money),0) o_money
+					  from fact_order_product_sku t1,dim_date dt
+					 where t1.create_date_key = dt.date_key
+			           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   			   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			           group by t1.product_key) t2,
+			       (select t1.product_key,count(distinct t1.member_key) p_purchase_number,nvl(sum(t1.product_count),0) p_count,nvl(sum(t1.product_money),0) p_money
+					  from fact_order_product_sku t1,dim_date dt
+					 where t1.payment_date_key = dt.date_key
+			           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   			   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			           group by t1.product_key) t3
+			        where t.product_key = t1.product_key(+)
+			          and t.product_key = t2.product_key(+)
+			          and t.product_key = t3.product_key(+)
+                      and t3.p_count > 0)
+			 <if test="sort!=null and sort!='' and sort_by!=null and sort_by!=''">
+				order by ${sort} ${sort_by}
+			 </if>
+			 <if test="sort==null and sort_by==null">
+				order by visitor_count desc
+			 </if>) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+			 where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+							<!-- #################        商品退货分析          ################ -->
+  	<!-- 查询商品退货分析-待处理 -->
+  	<select id="queryPendingDetail" parameterType="java.util.Map" resultType="java.util.Map">
+  		select sum(return_count) return_count, sum(product_count) product_count
+		from (select count(1) return_count,nvl(sum(t.product_count),0) product_count
+		  from tbl_order_return_info t
+		  where t.state = 1
+		    union all
+		select count(1) return_count,nvl(sum(t.return_product_count),0) product_count
+		  from tbl_return_info t
+		where t.return_state = 2
+		    union all
+		select count(distinct t1.return_number) return_count,nvl(sum(t1.return_num),0) product_count
+		  from ${jdbc_user}.tbl_new_return_order t,${jdbc_user}.tbl_new_return_temporary t1 
+		 where t.return_number = t1.return_number
+		   and t.state = 2)
+  	</select>
+  	<!-- 查询商品退货分析-退货退款信息 -->
+  	<select id="queryProductReturnDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select count(distinct t1.return_number) return_count,nvl(sum(t1.return_num),0) product_count
+		  from ${jdbc_user}.tbl_new_return_order t,${jdbc_user}.tbl_new_return_temporary t1 
+		 where t.return_number = t1.return_number
+		 and t.state = #{state,jdbcType=INTEGER}
+  	</select>
+  	<!-- 查询商品退货分析-已收货待退款 -->
+  	<select id="queryTakeDeliveryRefundDetail" parameterType="java.util.Map" resultType="java.util.Map">
+  		select count(distinct t1.return_number) return_count,nvl(sum(t1.actually_return_money),0) return_money
+		  from ${jdbc_user}.tbl_new_return_order t,${jdbc_user}.tbl_new_return_refund t1 
+		 where t.return_number = t1.return_number
+		 and t.state in (5,6,7)
+  	</select>
+  							<!-- #################        商品退货分析-退货数据分析          ################ -->
+  	<!-- 其他 成功退款笔数 -->
+  	<select id="r_queryOther_ReturnCount" parameterType="java.util.Map" resultType="java.lang.Float">
+  		select nvl(sum(t.refund_order_count),0)
+		  from fact_return_product_d t,dim_date dt
+		 where t.refund_date_key = dt.date_key
+		   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+  	</select>
+  	<!-- 其他 成功退款件数 -->
+  	<select id="r_queryOther_ProductCount" parameterType="java.util.Map" resultType="java.lang.Float">
+  		select nvl(sum(t.refund_product_count),0)
+		  from fact_return_product_d t,dim_date dt
+		 where t.refund_date_key = dt.date_key
+		   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+  	</select>
+  	<!-- 其他 驳回申请笔数 -->
+  	<select id="r_queryOther_RejectCount" parameterType="java.util.Map" resultType="java.lang.Float">
+  		select nvl(sum(t.reject_order_count),0) return_count
+		  from fact_return_product_d t,dim_date dt
+		 where t.refund_date_key = dt.date_key
+		   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+  	</select>
+  	<!-- 其他 品质退换货笔数 -->
+  	<select id="r_queryOther_QualityReturnCount" parameterType="java.util.Map" resultType="java.lang.Float">
+  		select nvl(sum(t.quality_refund_order_count),0) return_count
+		  from fact_return_product_d t,dim_date dt
+		 where t.refund_date_key = dt.date_key
+		   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+  	</select>
+  	<!-- 其他 品质退换货件数 -->
+  	<select id="r_queryOther_QualityProductCount" parameterType="java.util.Map" resultType="java.lang.Float">
+  		select nvl(sum(t.quality_refund_product_count),0)
+		  from fact_return_product_d t,dim_date dt
+		 where t.refund_date_key = dt.date_key
+		   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+  	</select>
+  	<!-- 其他 折线图 成功退款笔数和成功退款件数  -->
+  	<select id="r_queryOther_ReturnProductCount_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+  		select to_char(dt.date_value,'yyyy-mm-dd') as create_date,nvl(sum(t.refund_order_count),0) return_count,nvl(sum(t.refund_product_count),0) product_count
+		  from fact_return_product_d t,dim_date dt
+		 where t.refund_date_key = dt.date_key
+		   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   group by to_char(dt.date_value,'yyyy-mm-dd')
+  	</select>
+  	<!-- 其他 折线图 驳回申请笔数 -->
+  	<select id="r_queryOther_RejectCount_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select to_char(dt.date_value,'yyyy-mm-dd') as create_date,count(1) reject_count
+		  from fact_after_sales_order t,dim_date dt
+		 where t.aso_reject_date_key = dt.date_key
+		   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   group by to_char(dt.date_value,'yyyy-mm-dd')
+  	</select>
+  	<!-- 其他 折线图 品质退换货笔数和品质退换货件数 -->
+  	<select id="r_queryOther_QualityReturnProductCount_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+  		select to_char(dt.date_value,'yyyy-mm-dd') as create_date,nvl(sum(t.quality_refund_order_count),0) return_count,nvl(sum(t.quality_refund_product_count),0) product_count
+		  from fact_return_product_d t,dim_date dt
+		 where t.refund_date_key = dt.date_key
+		   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   group by to_char(dt.date_value,'yyyy-mm-dd')
+  	</select>
+  	<!-- 其他 折线图 成功退款笔数和成功退款件数<天>  -->
+  	<select id="r_queryOther_ReturnProductCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+  		select dt.hours24_full||':00' create_date,count(distinct a.after_sales_order_key) return_count,nvl(sum(a.product_count),0) product_count
+		  from
+		(select t.aso_refund_date_time_key,t.after_sales_order_key,t.product_count
+		  from fact_aso_refund_product t,dim_date dt
+		 where t.aso_refund_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')) a,dim_time dt
+		   where a.aso_refund_date_time_key = dt.time_key
+           group by dt.hours24_full
+           order by dt.hours24_full
+  	</select>
+  	<!-- 其他 折线图 驳回申请笔数<天> -->
+  	<select id="r_queryOther_RejectCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+  		select dt.hours24_full||':00' create_date,count(a.after_sales_order_key) reject_count
+		  from
+		(select t.aso_reject_date_time_key,t.after_sales_order_key
+		  from fact_after_sales_order t,dim_date dt
+		 where t.aso_reject_date_key = dt.date_key
+		   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')) a,dim_time dt
+		   where a.aso_reject_date_time_key = dt.time_key
+           group by dt.hours24_full
+           order by dt.hours24_full
+  	</select>
+  	<!-- 其他 折线图 品质退换货笔数和品质退换货件数<天> -->
+  	<select id="r_queryOther_QualityReturnProductCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+  		select dt.hours24_full||':00' create_date,count(distinct a.after_sales_order_key) return_count,nvl(sum(a.after_sales_product_count),0) product_count
+		  from
+		(select t.aso_refund_date_time_key,t.after_sales_order_key,t.after_sales_product_count
+		  from fact_after_sales_order t,dim_after_sales_order t1,dim_date dt
+		 where t.after_sales_order_key = t1.after_sales_order_key
+           and t.aso_refund_date_key = dt.date_key
+		   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           and t1.after_sales_order_subtype in (4,5)) a,dim_time dt
+		   where a.aso_refund_date_time_key = dt.time_key
+           group by dt.hours24_full
+           order by dt.hours24_full
+  	</select>
+  	<!-- 其他 商品退货分析-商品总数 -->
+  	<select id="r_queryOther_ProductReturnCount" parameterType="java.util.Map" resultType="int">
+  		select count(1)
+  		  from dim_product t
+  		  left join (select t1.product_key,nvl(sum(t1.product_count),0) product_count,nvl(sum(t1.product_money),0) return_money
+			  from fact_return_product_sku_d t1,dim_date dt
+             where t1.refund_date_key = dt.date_key
+			    and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+                and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			    group by t1.product_key) t2 on t.product_key = t2.product_key
+		  where t2.product_count > 0
+  	</select>
+  	<!-- 其他 商品退货分析-商品列表 -->
+  	<select id="r_queryOther_ProductReturnListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+  		select * from
+ 			(select a.*,rownum rn 
+ 				from (select * from 
+ 			 (select t.itemnumber,
+					t.product_name,
+					t.product_img_url,
+					nvl(t1.sale_money,0) sale_money,
+			        nvl(t1.sale_count,0) sale_count,
+			        nvl(t2.return_money,0) return_money,
+			        nvl(t2.product_count,0) product_count,
+			        case when nvl(t1.sale_count,0) = 0 or nvl(t2.product_count,0) = 0 then 0
+			        else (nvl(t2.product_count,0)/nvl(t1.sale_count,0))*100 end return_ratio
+			  from dim_product t 
+			  left join (select t1.product_key,nvl(sum(t1.product_money),0) sale_money,nvl(sum(t1.product_count),0) sale_count
+			                from fact_order_product_sku_d t1,dim_date dt
+			               where t1.payment_date_key = dt.date_key
+			                 and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			                 and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			                 group by t1.product_key) t1 on t.product_key = t1.product_key
+			  left join (select t1.product_key,nvl(sum(t1.product_count),0) product_count,nvl(sum(t1.product_money),0) return_money
+			  from fact_return_product_sku_d t1,dim_date dt
+             where t1.refund_date_key = dt.date_key
+			    and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+                and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			    group by t1.product_key) t2 on t.product_key = t2.product_key
+			    where t2.product_count > 0)
+			 <if test="sort!=null and sort!='' and sort_by!=null and sort_by!=''">
+				order by ${sort} ${sort_by}
+			 </if>) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+			 where rn &gt;#{start_rownum,jdbcType=INTEGER}
+  	</select>
+  	<!-- 其他 品质退换货商品总数 -->
+  	<select id="r_queryReturnQualityCount" parameterType="java.util.Map" resultType="java.lang.Float">
+  		select nvl(sum(t1.product_count),0)
+		  from fact_return_product_reason_d t1,dim_date dt
+		  where t1.refund_date_key = dt.date_key
+		    and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		    and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		    <if test="itemnumber != null and itemnumber !=''">
+		    and t1.product_key = (select product_key from dim_product where itemnumber = #{itemnumber,jdbcType=VARCHAR})
+		    </if>
+  	</select>
+  	<!-- 其他 商品退货分析-品质退换货分析 -->
+  	<select id="r_queryReturnQualityList" parameterType="java.util.Map" resultType="java.util.Map">
+  		select * from(
+  		select aso_reason,product_count from
+  		(select t.aso_reason,nvl(sum(t1.product_count),0) product_count
+		  from dim_aso_reason t,fact_return_product_reason_d t1,dim_date dt
+		  where t.aso_reason_key = t1.aso_reason_key
+		    and t1.refund_date_key = dt.date_key
+		    and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		    and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		    <if test="itemnumber != null and itemnumber !=''">
+		    and t1.product_key = (select product_key from dim_product where itemnumber = #{itemnumber,jdbcType=VARCHAR})
+		    </if>
+		    group by t.aso_reason)
+		    order by product_count desc) where rownum &lt;=#{num,jdbcType=INTEGER}
+  	</select>
+  	<!-- 其他 商品退货分析-退货商家排行 -->
+  	<select id="r_queryReturnStationed_Rank" parameterType="java.util.Map" resultType="java.util.Map">
+  		select rownum rn,a.* from (
+			select *
+			  from (select t.stationed_user_id,t.stationed_user_name,nvl(sum(t1.return_money),0) return_money,nvl(sum(t1.product_count),0) product_count
+			          from dim_product t 
+			          left join (select t1.product_key,nvl(sum(t1.product_money),0) return_money,nvl(sum(t1.product_count),0) product_count
+					  from fact_return_product_sku_d t1,dim_date dt
+                     where t1.refund_date_key = dt.date_key
+					   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		    		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			           group by t1.product_key) t1 on t.product_key = t1.product_key
+			         group by t.stationed_user_id,t.stationed_user_name)
+			         where product_count > 0
+			         order by product_count desc) a  where rownum &lt;=#{num,jdbcType=INTEGER}
+  	</select>
+  	<!-- 其他 商品退货分析-退货品牌排行 -->
+  	<select id="r_queryReturnBrand_Rank" parameterType="java.util.Map" resultType="java.util.Map">
+  		select rownum rn,a.*,(select logo from qx_dic_product_brand where id = a.brand_id) brand_logo from (
+			select *
+			  from (select t.brand_id,t.brand_name,nvl(sum(t1.return_money),0) return_money,nvl(sum(t1.product_count),0) product_count
+			          from dim_product t 
+			          left join (select t1.product_key,nvl(sum(t1.product_money),0) return_money,nvl(sum(t1.product_count),0) product_count
+					  from fact_return_product_sku_d t1,dim_date dt
+                     where t1.refund_date_key = dt.date_key
+					   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		    		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			           group by t1.product_key) t1 on t.product_key = t1.product_key
+			         group by t.brand_id,t.brand_name)
+			         where product_count > 0
+			         order by product_count desc) a  where rownum &lt;=#{num,jdbcType=INTEGER}
+  	</select>
+							<!-- #################        单品分析          ################ -->
+  	<!-- 其他 单品分析搜索 -->
+  	<select id="r_queryProductSingleSearch" parameterType="java.util.Map" resultType="java.util.Map">
+  		select itemnumber,
+  			   product_name
+  		  from dim_product t
+		 where 1=1
+		 <if test="search_value != null and search_value != ''">
+	   		<if test="search_box == 1">
+	   			and t.itemnumber like concat(concat('%', #{search_value,jdbcType=VARCHAR}),'%')
+	   		</if>
+	   		<if test="search_box == 2">
+	   			and t.product_name like concat(concat('%', #{search_value,jdbcType=VARCHAR}),'%')
+	   		</if>
+	   		<if test="search_box == 3">
+	   			and t.brand_name like concat(concat('%', #{search_value,jdbcType=VARCHAR}),'%')
+	   		</if>
+	     </if>
+	     and rownum &lt;= 10
+  	</select>
+	<!-- 其他 查询单品分析总数 -->
+	<select id="r_queryProductSingleCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from dim_product t
+		 where t.itemnumber is not null
+		 <if test="search_value != null and search_value != ''">
+	   		<if test="search_box == 1">
+	   			and t.itemnumber like concat(concat('%', #{search_value,jdbcType=VARCHAR}),'%')
+	   		</if>
+	   		<if test="search_box == 2">
+	   			and t.product_name like concat(concat('%', #{search_value,jdbcType=VARCHAR}),'%')
+	   		</if>
+	   		<if test="search_box == 3">
+	   			and t.brand_name like concat(concat('%', #{search_value,jdbcType=VARCHAR}),'%')
+	   		</if>
+	     </if>
+	</select>
+	<!-- 排序获取某一页的商品列表-销售额 -->
+	<select id="r_querySalePrice_Product" parameterType="java.util.Map" resultType="string">
+		select itemnumber
+		  from (select a.*,rownum rn
+		  from (select t.itemnumber,
+		      		   nvl(t1.max_sale_price,0) max_sale_price
+		 from dim_product t
+		 left join (select itemnumber,max(product_price_cost) max_sale_price from dim_product_sku
+              where product_group = '尺码'
+                group by itemnumber) t1 on t.itemnumber = t1.itemnumber
+		 where t.itemnumber is not null
+		   <if test="search_value != null and search_value != ''">
+		   		<if test="search_box == 1">
+		   			and t.itemnumber like concat(concat('%', #{search_value,jdbcType=VARCHAR}),'%')
+		   		</if>
+		   		<if test="search_box == 2">
+		   			and t.product_name like concat(concat('%', #{search_value,jdbcType=VARCHAR}),'%')
+		   		</if>
+		   		<if test="search_box == 3">
+		   			and t.brand_name like concat(concat('%', #{search_value,jdbcType=VARCHAR}),'%')
+		   		</if>
+		   </if>
+		   order by ${sort} ${sort_by})a
+		    where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 排序获取某一页的商品列表-累计销量 -->
+	<select id="r_querySaleCount_Product" parameterType="java.util.Map" resultType="string">
+		select itemnumber
+		  from (select a.*,rownum rn
+		  from (select t.itemnumber,
+		      		   nvl(t1.sale_count,0) sale_count
+		 from dim_product t
+		 left join (select product_key,nvl(sum(order_count),0) sale_count from fact_product_sales_summary
+		        group by product_key) t1 on t.product_key = t1.product_key
+		 where t.itemnumber is not null
+		   <if test="search_value != null and search_value != ''">
+		   		<if test="search_box == 1">
+		   			and t.itemnumber like concat(concat('%', #{search_value,jdbcType=VARCHAR}),'%')
+		   		</if>
+		   		<if test="search_box == 2">
+		   			and t.product_name like concat(concat('%', #{search_value,jdbcType=VARCHAR}),'%')
+		   		</if>
+		   		<if test="search_box == 3">
+		   			and t.brand_name like concat(concat('%', #{search_value,jdbcType=VARCHAR}),'%')
+		   		</if>
+		   </if>
+		   order by ${sort} ${sort_by})a
+		    where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 排序获取某一页的商品列表-剩余库存 -->
+	<select id="queryStockCount_Product" parameterType="java.util.Map" resultType="string">
+		select itemnumber
+		  from (select a.*,rownum rn
+		  from (select t.itemnumber,
+		  			   getProductItemnumber_stocks(t.itemnumber) stock_count
+		  from tbl_product_info t
+		 where 1=1
+		   <if test="search_value != null and search_value != ''">
+		   		<if test="search_box == 1">
+		   			and t.itemnumber like concat(concat('%', #{search_value,jdbcType=VARCHAR}),'%')
+		   		</if>
+		   		<if test="search_box == 2">
+		   			and t.product_name like concat(concat('%', #{search_value,jdbcType=VARCHAR}),'%')
+		   		</if>
+		   		<if test="search_box == 3">
+		   			and t.brand_name like concat(concat('%', #{search_value,jdbcType=VARCHAR}),'%')
+		   		</if>
+		   </if>
+		   order by ${sort} ${sort_by})a
+		    where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 排序获取某一页的商品列表-发布时间 -->
+	<select id="r_queryPublishDate_Product" parameterType="java.util.Map" resultType="string">
+		select itemnumber
+		  from (select a.*,rownum rn
+		  from (select t.itemnumber,
+		      		   to_char(t.first_sell_state_date, 'yyyy-mm-dd hh24:mi:ss') first_sell_state_date
+		 from dim_product t
+		 where t.itemnumber is not null
+		   <if test="search_value != null and search_value != ''">
+		   		<if test="search_box == 1">
+		   			and t.itemnumber like concat(concat('%', #{search_value,jdbcType=VARCHAR}),'%')
+		   		</if>
+		   		<if test="search_box == 2">
+		   			and t.product_name like concat(concat('%', #{search_value,jdbcType=VARCHAR}),'%')
+		   		</if>
+		   		<if test="search_box == 3">
+		   			and t.brand_name like concat(concat('%', #{search_value,jdbcType=VARCHAR}),'%')
+		   		</if>
+		   </if>
+		   order by ${sort} ${sort_by} nulls last)a
+		    where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 默认排序的商品列表 -->
+	<select id="r_queryProductSingleListBy_Default" parameterType="java.util.Map" resultType="string">
+		select itemnumber
+		  from (select a.*,rownum rn
+		  from (select t.itemnumber
+		 from dim_product t
+		 where t.itemnumber is not null
+		   <if test="search_value != null and search_value != ''">
+		   		<if test="search_box == 1">
+		   			and t.itemnumber like concat(concat('%', #{search_value,jdbcType=VARCHAR}),'%')
+		   		</if>
+		   		<if test="search_box == 2">
+		   			and t.product_name like concat(concat('%', #{search_value,jdbcType=VARCHAR}),'%')
+		   		</if>
+		   		<if test="search_box == 3">
+		   			and t.brand_name like concat(concat('%', #{search_value,jdbcType=VARCHAR}),'%')
+		   		</if>
+		   </if>
+		   order by t.first_sell_state_date desc nulls last) a
+		    where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 单品分析-商品列表 -->
+	<select id="r_queryProductSingleList" parameterType="java.util.Map" resultType="java.util.Map">
+	   select t.itemnumber,t.product_name,
+		      t.product_img_url,
+		      to_char(t.first_sell_state_date, 'yyyy-mm-dd hh24:mi:ss') first_sell_state_date
+		 from dim_product t
+		 where t.itemnumber in 
+		 <foreach collection="productList" item="item" open="(" close=")" separator=",">
+            #{item,jdbcType=VARCHAR}
+         </foreach>
+		 order by
+			instr(
+				<foreach collection="productList" item="item" open="'" close="'," separator=",">
+		            ${item}
+		        </foreach>
+		        t.itemnumber)
+	</select>
+	<!-- 查询销售价 -->
+	<select id="r_querySalePrice" parameterType="java.util.Map" resultType="java.util.Map">
+		select itemnumber,min(product_price_cost) min_sale_price,max(product_price_cost) max_sale_price from (
+		   select itemnumber,product_price_cost 
+		     from dim_product_sku t
+		    where product_group = '尺码'
+		      and t.itemnumber in 
+		      <foreach collection="productList" item="item" open="(" close=")" separator=",">
+	            #{item,jdbcType=VARCHAR}
+	          </foreach>
+		 group by itemnumber,product_price_cost)
+		 group by itemnumber
+	</select>
+	<!-- 查询累计销量 -->
+	<select id="r_querySaleCount" parameterType="java.util.Map" resultType="java.util.Map">
+		select t.itemnumber,
+                nvl((select sum(order_count)
+                  from fact_product_sales_summary
+                  where product_key = t.product_key),0) sale_count
+           from dim_product t
+		  where t.itemnumber in 
+		  <foreach collection="productList" item="item" open="(" close=")" separator=",">
+            #{item,jdbcType=VARCHAR}
+          </foreach>
+	</select>
+	<!-- 查询剩余库存 -->
+	<select id="queryStockCount" parameterType="java.util.Map" resultType="java.util.Map">
+		select t.itemnumber,
+			   getProductItemnumber_stocks(t.itemnumber) stock_count
+		  from tbl_product_info t
+		 where t.itemnumber in 
+		 	<foreach collection="productList" item="item" open="(" close=")" separator=",">
+            	#{item,jdbcType=VARCHAR}
+         	</foreach>
+	</select>
+	<!-- 其他 查询单品分析列表 -->
+	<select id="r_queryProductSingleListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+		select *
+		  from (select a.*,rownum rn
+		  from (select t.itemnumber,t.product_name,
+		      t.product_img_url,
+		      nvl(t1.min_sale_price,0) min_sale_price,
+		      nvl(t1.max_sale_price,0) max_sale_price,
+		      to_char(t.first_sell_state_date, 'yyyy-mm-dd hh24:mi:ss') publish_date,
+		      nvl(t2.sale_count,0) sale_count
+		 from dim_product t,
+		 (select itemnumber,min(product_price_cost) min_sale_price,max(product_price_cost) max_sale_price from (
+		   select itemnumber,product_price_cost 
+		     from dim_product_sku 
+		    where product_group = '尺码'
+		 group by itemnumber,product_price_cost)
+		 group by itemnumber) t1,
+		 (select product_key,nvl(sum(order_count),0) sale_count from fact_product_sales_summary
+		        group by product_key) t2
+		 where t.itemnumber = t1.itemnumber(+)
+		   and t.product_key = t2.product_key(+)
+		   and t.itemnumber is not null
+		   <if test="search_value != null and search_value != ''">
+		   		<if test="search_box == 1">
+		   			and t.itemnumber like concat(concat('%', #{search_value,jdbcType=VARCHAR}),'%')
+		   		</if>
+		   		<if test="search_box == 2">
+		   			and t.product_name like concat(concat('%', #{search_value,jdbcType=VARCHAR}),'%')
+		   		</if>
+		   		<if test="search_box == 3">
+		   			and t.brand_name like concat(concat('%', #{search_value,jdbcType=VARCHAR}),'%')
+		   		</if>
+		   </if>) a
+		    where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 其他 单品分析-商品信息 -->
+	<select id="r_queryOther_SignleProductInfo" parameterType="java.util.Map" resultType="java.util.Map">
+		select t.itemnumber,
+			   t.product_name,
+			   t.product_img_url,
+			   t.is_outstock,
+			   t.product_type,
+			   t1.min_sale_price,
+		       t1.max_sale_price,
+		       to_char(t.first_sell_state_date,'yyyy-mm-dd') publish_date,
+		       nvl((select sum(order_count) from fact_product_sales_summary where product_key = t.product_key),0) sale_count
+		  from dim_product t,(select itemnumber,min(product_price_cost) min_sale_price,max(product_price_cost) max_sale_price from (
+		   select itemnumber,product_price_cost 
+		     from dim_product_sku 
+		    where product_group = '尺码'
+		      and itemnumber = #{itemnumber,jdbcType=VARCHAR}
+		 	  group by itemnumber,product_price_cost)
+		 	group by itemnumber) t1
+		 where t.itemnumber = #{itemnumber,jdbcType=VARCHAR}
+		   and t.itemnumber = t1.itemnumber
+	</select>
+	<!-- 其他 单品分析-商品总销量 -->
+	<select id="r_queryOther_SignleProductTotalSaleCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(product_count),0) 
+		  from fact_order_product_sku_d t1,dim_date dt
+	     where t1.payment_date_key = dt.date_key
+		   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+    	   and t1.product_key = (select product_key from dim_product where itemnumber = #{itemnumber,jdbcType=VARCHAR})
+	</select>
+  	<!-- 其他 单品分析-按颜色统计 -->
+  	<select id="r_queryOther_ProductSignleColorList" parameterType="java.util.Map" resultType="java.util.Map">
+  		 select t.product_group_member as product_color,
+  			   nvl(sum(t1.sale_count),0) sale_count
+  		  from dim_product_sku t,(select product_sku_id,nvl(sum(product_count),0) sale_count   
+                        from(select (select product_sku_parent_id from dim_product_sku where product_sku_id = a.product_sku_id) product_sku_id,
+                        a.product_count from (
+                   select (select product_sku_parent_id from dim_product_sku where product_sku_key = t1.product_sku_key) product_sku_id,
+                        t1.product_count 
+                        from fact_order_product_sku_d t1,dim_date dt
+			   where t1.payment_date_key = dt.date_key
+				 and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		         and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+                 and t1.product_key = (select product_key from dim_product where itemnumber = #{itemnumber,jdbcType=VARCHAR})) a)
+                 group by product_sku_id) t1
+  		 where t.product_group = '颜色'
+  		   and t.itemnumber = #{itemnumber,jdbcType=VARCHAR}
+           and t.product_sku_id = t1.product_sku_id(+)
+           group by t.product_group_member
+           order by t.product_group_member
+  	</select>
+  	<!-- 其他 单品分析-按规格统计 -->
+  	<select id="r_queryOther_ProductSignleSpecsList" parameterType="java.util.Map" resultType="java.util.Map">
+  		   select t.product_group_member as product_spesc,
+  			    nvl(sum(t1.sale_count),0) sale_count
+  		  from dim_product_sku t,(select product_sku_id,nvl(sum(product_count),0) sale_count   
+          from (select (select product_sku_parent_id from dim_product_sku where product_sku_key = t1.product_sku_key) product_sku_id,
+                        t1.product_count 
+                        from fact_order_product_sku_d t1,dim_date dt
+			   where t1.payment_date_key = dt.date_key
+				 and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		         and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+                 and t1.product_key = (select product_key from dim_product where itemnumber = #{itemnumber,jdbcType=VARCHAR}))
+                 group by product_sku_id) t1
+  		 where t.product_group = '规格'
+  		   and t.itemnumber = #{itemnumber,jdbcType=VARCHAR}
+           and t.product_sku_id = t1.product_sku_id(+)
+          group by t.product_group_member
+          order by t.product_group_member
+  	</select>
+  	<!-- 其他 折线图 商品访客数，浏览量<按货号> -->
+	<select id="r_queryOther_ProductVisitorPvCount_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select to_char(dt.date_value,'yyyy-mm-dd') as create_date,count(distinct t1.member_key) visitor_count,count(*) pv_count
+		  from fact_user_log_product t1,dim_date dt
+		 where t1.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and t1.product_key = (select product_key from dim_product where itemnumber = #{itemnumber,jdbcType=VARCHAR})
+           group by to_char(dt.date_value,'yyyy-mm-dd')
+	</select>
+	<!-- 其他 折线图 下单买家数、下单件数和下单金额<按货号> -->
+	<select id="r_queryOther_ProductPurchaseNumberMoney_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select to_char(dt.date_value,'yyyy-mm-dd') as create_date,count(distinct t1.member_key) purchase_number,sum(t1.product_count) product_count,nvl(sum(t1.product_money),0) order_money
+		  from fact_order_product_sku t1,dim_date dt
+		 where t1.create_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and t1.product_key = (select product_key from dim_product where itemnumber = #{itemnumber,jdbcType=VARCHAR})
+           group by to_char(dt.date_value,'yyyy-mm-dd')
+	</select>
+	<!-- 其他 折线图 支付买家数、支付件数和支付金额<按货号> -->
+	<select id="r_queryOther_ProductPayPurchaseNumberMoney_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select to_char(dt.date_value,'yyyy-mm-dd') as create_date,count(distinct t1.member_key) purchase_number,sum(t1.product_count) product_count,nvl(sum(t1.product_money),0) order_money
+		  from fact_order_product_sku t1,dim_date dt
+		 where t1.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and t1.product_key = (select product_key from dim_product where itemnumber = #{itemnumber,jdbcType=VARCHAR})
+           group by to_char(dt.date_value,'yyyy-mm-dd')
+	</select>
+	<!-- 其他 折线图 退款信息<按货号> -->
+	<select id="r_queryOther_ProductReturn_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select to_char(dt.date_value,'yyyy-mm-dd') as create_date, nvl(sum(t.product_money),0) return_money,nvl(sum(t.product_count),0) return_count
+		  from fact_return_product_sku_d t,dim_date dt
+		 where t.refund_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and t.product_key = (select product_key from dim_product where itemnumber = #{itemnumber,jdbcType=VARCHAR})
+           group by to_char(dt.date_value,'yyyy-mm-dd')
+	</select>
+	<!-- 其他 折线图 商品访客数，浏览量<按货号><天> -->
+	<select id="r_queryOther_ProductVisitorPvCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_full||':00' create_date,count(distinct a.member_key) visitor_count,count(*) pv_count
+		  from
+		(select t1.log_time_key,t1.member_key
+		  from fact_user_log_product t1,dim_date dt
+		 where t1.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and t1.product_key = (select product_key from dim_product where itemnumber = #{itemnumber,jdbcType=VARCHAR})) a, dim_time dt
+           where a.log_time_key = dt.time_key
+           group by dt.hours24_full
+           order by dt.hours24_full
+	</select>
+	<!-- 其他 折线图 下单买家数、下单件数和下单金额<按货号><天> -->
+	<select id="r_queryOther_ProductPurchaseNumberMoneyD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_full||':00' create_date,count(distinct a.member_key) purchase_number,nvl(sum(a.product_count),0) product_count,nvl(sum(a.product_money),0) order_money
+		  from
+		(select t1.create_date_time_key,t1.member_key,t1.product_count,t1.product_money
+		  from fact_order_product_sku t1,dim_date dt
+		 where t1.create_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and t1.product_key = (select product_key from dim_product where itemnumber = #{itemnumber,jdbcType=VARCHAR})) a,dim_time dt
+           where a.create_date_time_key = dt.time_key
+           group by dt.hours24_full
+           order by dt.hours24_full
+	</select>
+	<!-- 其他 折线图 支付买家数、支付件数和支付金额<按货号><天> -->
+	<select id="r_queryOther_ProductPayPurchaseNumberMoneyD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_full||':00' create_date,count(distinct a.member_key) purchase_number,sum(a.product_count) payment_count,nvl(sum(a.product_money),0) payment_money
+		  from
+		(select t1.payment_date_time_key,t1.member_key,t1.product_count,t1.product_money
+		  from fact_order_product_sku t1,dim_date dt
+		 where t1.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and t1.product_key = (select product_key from dim_product where itemnumber = #{itemnumber,jdbcType=VARCHAR})) a,dim_time dt
+           where a.payment_date_time_key = dt.time_key
+           group by dt.hours24_full
+           order by dt.hours24_full
+	</select>
+	<!-- 其他 折线图 退款信息<按货号><天> -->
+	<select id="r_queryOther_ProductReturnD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_full||':00' create_date,nvl(sum(a.product_money),0) return_money,nvl(sum(a.product_count),0) return_count
+		  from
+		(select t.aso_refund_date_time_key,t.product_money,t.product_count
+		  from fact_aso_refund_product t,dim_date dt
+		 where t.aso_refund_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and t.product_key = (select product_key from dim_product where itemnumber = #{itemnumber,jdbcType=VARCHAR})) a,dim_time dt
+		   where a.aso_refund_date_time_key = dt.time_key
+           group by dt.hours24_full
+           order by dt.hours24_full
+	</select>
+  	<!-- 其他 单品分析-商品销量sku明细 -->
+  	<select id="r_queryOther_ProductSignleSkuList" parameterType="java.util.Map" resultType="java.util.Map">
+  		select product_sku_id,
+  			   product_group_member as product_size,
+  			   product_color,
+  			   product_specs,
+  			   nvl(t1.o_count,0) o_count,
+  			   nvl(t2.sale_count,0) sale_count
+  		  from dim_product_sku t,
+  		  	   (select t1.product_sku_key,sum(t1.product_count) o_count
+  		  	      from fact_order_product_sku t1,dim_date dt
+  		  	     where t1.create_date_key = dt.date_key
+			  	   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   	  	   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   	  	   and t1.product_key in (select product_key from dim_product where itemnumber = #{itemnumber,jdbcType=VARCHAR})
+		   	  	   group by t1.product_sku_key) t1,
+		   	   (select t1.product_sku_key,sum(t1.product_count) sale_count
+  		  	      from fact_order_product_sku_d t1,dim_date dt
+  		  	     where t1.payment_date_key = dt.date_key
+			  	   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   	  	   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   	  	   and t1.product_key in (select product_key from dim_product where itemnumber = #{itemnumber,jdbcType=VARCHAR})
+		   	  	   group by t1.product_sku_key) t2
+  		 where t.product_group = '尺码'
+  		   and t.itemnumber = #{itemnumber,jdbcType=VARCHAR}
+  		   and t.product_sku_key = t1.product_sku_key(+)
+  		   and t.product_sku_key = t2.product_sku_key(+)
+  		   order by product_color,product_specs,product_group_member
+  	</select>
+  	<!-- 其他 单品分析-销售区域分析 -->
+  	<select id="r_queryOther_ProductSingleSaleArea" parameterType="java.util.Map" resultType="java.util.Map">
+  	   select t.*,(select name from dim_dic_region where region_key = t.city_key) city_name,
+              (select name from dim_dic_region where region_key = t.province_key) province_name
+         from (select city_key,
+         			  province_key,
+         			  nvl(sale_count,0) sale_count,
+		              nvl(visitor_count,0) visitor_count,
+		              nvl(o_count,0) o_count,
+		              nvl(o_money,0) o_money,
+		              nvl(p_money,0) p_money,
+		              nvl(o_purchase_number,0) o_purchase_number,
+		              nvl(p_purchase_number,0) p_purchase_number,
+		              case when nvl(visitor_count,0) = 0 or nvl(p_purchase_number,0) = 0 then 0
+			          else nvl(p_purchase_number,0)/nvl(visitor_count,0)*100 end p_zhl
+              from (select t1.city_key,
+         			  t1.province_key,
+				      sum(t1.unique_visitor) visitor_count,
+					  sum(t1.order_unique_visitor) o_purchase_number,
+					  sum(t1.pay_unique_visitor) p_purchase_number,
+					  sum(t1.order_count) o_count,
+					  sum(t1.order_money) o_money,
+					  sum(t1.pay_count) sale_count,
+					  sum(t1.pay_money) p_money
+	         from fact_product_sale_area_d t1,dim_date dt
+	        where t1.date_key = dt.date_key
+			  and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   	  and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   	  and t1.product_key = (select product_key from dim_product where itemnumber = #{itemnumber,jdbcType=VARCHAR})
+	        group by t1.city_key,t1.province_key)
+	        <if test="sort!=null and sort!='' and sort_by!=null and sort_by!=''">
+				order by ${sort} ${sort_by}
+			 </if>
+			 <if test="sort==null and sort_by==null">
+				order by sale_count desc
+			 </if>) t
+	        where rownum &lt;= #{num,jdbcType=INTEGER}
+  	</select>
+  	<!-- 其他 单品分析-销售区域地图 -->
+  	<select id="r_queryOther_SingleSaleAreaMap" parameterType="java.util.Map" resultMap="saleAreaMap">
+  		select t.region_id as id,
+  			   t.name,
+  			   nvl(t1.sale_count,0) as value
+  		  from dim_dic_region t,(select province_key,nvl(sum(t.pay_count),0) sale_count
+									  from fact_product_sale_area_d t,dim_date dt
+									 where t.date_key = dt.date_key
+							           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+								   	   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+								   	   and t.product_key in (select product_key from dim_product where itemnumber = #{itemnumber,jdbcType=VARCHAR})
+								   	   group by t.province_key) t1
+	      where t.parent_id in (select region_id from dim_dic_region where parent_id = 0)
+		    and t.region_key = t1.province_key(+)
+  	</select>
+  	<!-- 其他 单品分析-销售区域分析-sku销量明细 -->
+  	<select id="r_queryOther_SkuSaleDetail" parameterType="java.util.Map" resultType="java.util.Map">
+  		select product_color,
+  			   product_group_member as product_size,
+  			   nvl(t1.sale_count,0) sale_count
+  		  from dim_product_sku t,
+		   	   (select t1.product_sku_key,sum(t1.pay_count) sale_count
+  		  	      from fact_product_sku_sale_area_d t1,dim_date dt
+  		  	     where t1.date_key = dt.date_key
+			  	   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   	  	   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   	  	   and t1.product_key in (select product_key from dim_product where itemnumber = #{itemnumber,jdbcType=VARCHAR})
+		   	  	   and t1.province_key = #{province_key,jdbcType=INTEGER}
+		   	  	   and t1.city_key = #{city_key,jdbcType=INTEGER}
+		   	  	   group by t1.product_sku_key) t1
+  		 where t.product_group = '尺码'
+  		   and t.itemnumber = #{itemnumber,jdbcType=VARCHAR}
+  		   and t.product_sku_key = t1.product_sku_key(+)
+  		   order by t.product_color,t.product_group_member
+  	</select>
+  	<!-- 其他 折线图 sku支付件数 -->
+  	<select id="r_queryOther_SkuPayCount_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+  		select to_char(dt.date_value,'yyyy-mm-dd') as create_date,sum(t1.product_count) product_count
+		  from fact_order_product_sku_d t1,dim_date dt
+		 where t1.product_sku_key = (select product_sku_key from dim_product_sku where product_sku_id = #{product_sku,jdbcType=INTEGER})
+		   and t1.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           group by to_char(dt.date_value,'yyyy-mm-dd')
+  	</select>
+  	<!-- 其他 折线图 sku成功退款件数 -->
+  	<select id="r_queryOther_SkuReturnCount_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+  		select to_char(dt.date_value,'yyyy-mm-dd') as create_date,sum(t1.product_count) product_count
+		  from fact_return_product_sku_d t1,dim_date dt
+		 where t1.product_sku_key = (select product_sku_key from dim_product_sku where product_sku_id = #{product_sku,jdbcType=INTEGER})
+		   and t1.refund_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           group by to_char(dt.date_value,'yyyy-mm-dd')
+  	</select>
+  	<!-- 其他 折线图 sku支付件数<天> -->
+  	<select id="r_queryOther_SkuPayCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+  		select dt.hours24_full||':00' create_date,nvl(sum(a.product_count),0) product_count
+		  from
+		(select t1.payment_date_time_key,t1.product_count
+		  from fact_order_product_sku t1,dim_date dt
+		 where t1.product_sku_key = (select product_sku_key from dim_product_sku where product_sku_id = #{product_sku,jdbcType=INTEGER})
+		   and t1.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')) a,dim_time dt
+           where a.payment_date_time_key = dt.time_key
+           group by dt.hours24_full
+           order by dt.hours24_full
+  	</select>
+  	<!-- 其他 折线图 sku成功退款件数<天> -->
+  	<select id="r_queryOther_SkuReturnCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+  		select dt.hours24_full||':00' create_date,nvl(sum(a.product_count),0) product_count
+		  from
+		(select t1.aso_refund_date_time_key,t1.product_count
+		  from fact_aso_refund_product t1,dim_date dt
+		 where t1.product_sku_key = (select product_sku_key from dim_product_sku where product_sku_id = #{product_sku,jdbcType=INTEGER})
+		   and t1.aso_refund_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')) a,dim_time dt
+           where a.aso_refund_date_time_key = dt.time_key
+           group by dt.hours24_full
+           order by dt.hours24_full
+  	</select>
+  	<!-- 其他 单品分析-售后分析 -->
+  	<select id="r_queryOther_ProductSingleAfterSale_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+  		select page_name,sum(cnt) cnt
+         from
+       (select decode(t.after_sales_order_subtype,1,'未发退款',2,'未发退款',3,'政策内退换货',4,'品质问题退换货','品质问题退换货') page_name,count(1) cnt
+		  from dim_after_sales_order t,fact_aso_refund_product t1,dim_date dt
+		 where t.after_sales_order_key = t1.after_sales_order_key
+		   and t1.aso_refund_date_key = dt.date_key
+		   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="itemnumber != null and itemnumber != ''">
+		   and t1.product_key = (select product_key from dim_product where itemnumber = #{itemnumber,jdbcType=VARCHAR})
+		   </if>
+		   group by t.after_sales_order_subtype)
+           group by page_name
+  	</select>
+  							<!-- #################        异常商品-流量下跌          ################ -->
+  	<!-- 流量下跌总数 -->
+  	<select id="r_queryAbnormalFlowCount" parameterType="java.util.Map" resultType="int">
+  		select count(1)
+		  from dim_product t,(select t1.product_key,nvl(sum(t1.pv),0) first_pv_count
+				  from fact_user_log_product_visit_d t1,dim_date dt
+				 where t1.log_date_key = dt.date_key
+		           and dt.date_value >= to_date(#{first_start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+				   and dt.date_value &lt;= to_date(#{first_end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		           group by t1.product_key) t1,
+		           (select t1.product_key,nvl(sum(t1.pv),0) last_pv_count
+				  from fact_user_log_product_visit_d t1,dim_date dt
+				 where t1.log_date_key = dt.date_key
+		           and dt.date_value >= to_date(#{last_start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+				   and dt.date_value &lt;= to_date(#{last_end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		           group by t1.product_key) t2
+		 where t.product_key = t1.product_key
+		   and t.product_key = t2.product_key
+		   and t1.first_pv_count/t2.last_pv_count*100 &lt;= 50
+  	</select>
+  	<!-- 流量下跌列表 -->
+  	<select id="r_queryAbnormalFlowListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+  		select * from (
+			select a.*,rownum rn from (
+			select t.itemnumber,t.product_name,t.product_img_url,
+			       nvl(t1.first_pv_count,0) first_pv_count,
+			       nvl(t2.last_pv_count,0) last_pv_count
+			  from dim_product t,(select t1.product_key,nvl(sum(t1.pv),0) first_pv_count
+					  from fact_user_log_product_visit_d t1,dim_date dt
+					 where t1.log_date_key = dt.date_key
+			           and dt.date_value >= to_date(#{first_start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+					   and dt.date_value &lt;= to_date(#{first_end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			           group by t1.product_key) t1,
+			           (select t1.product_key,nvl(sum(t1.pv),0) last_pv_count
+					  from fact_user_log_product_visit_d t1,dim_date dt
+					 where t1.log_date_key = dt.date_key
+			           and dt.date_value >= to_date(#{last_start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+					   and dt.date_value &lt;= to_date(#{last_end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			           group by t1.product_key) t2
+			 where t.product_key = t1.product_key
+			   and t.product_key = t2.product_key
+			   and t1.first_pv_count/t2.last_pv_count*100 &lt;= 50
+			   <if test="sort!=null and sort!='' and sort_by!=null and sort_by!=''">
+				   order by ${sort} ${sort_by}
+			   </if>) a
+			   where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt;#{start_rownum,jdbcType=INTEGER}
+  	</select>
+  	<!-- 支付转化率低总数 -->
+  	<select id="r_queryAbnormalZhlCount" parameterType="java.util.Map" resultType="int">
+  		select count(1)
+		  from dim_product t,
+		  		<!-- 以商品为维度，统计近7天访客数 -->
+		        (select t1.product_key,count(distinct t1.member_key) first_visitor_count
+				  from fact_user_log_product t1,dim_date dt
+				 where t1.log_date_key = dt.date_key
+		           and dt.date_value >= to_date(#{first_start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+				   and dt.date_value &lt;= to_date(#{first_end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		           group by t1.product_key) a1,
+		        <!-- 以商品为维度，统计近7天支付买家数 -->
+		        (select t1.product_key,count(distinct t1.member_key) first_purchase_number
+				  from fact_order_product_sku t1,dim_date dt
+				 where t1.payment_date_key = dt.date_key
+		           and dt.date_value >= to_date(#{first_start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+				   and dt.date_value &lt;= to_date(#{first_end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		           group by t1.product_key) a2,
+		        <!-- 以商品类别为维度，统计近7天支付转化率 -->
+		        (<foreach collection="list" item="item" separator="union all">
+			        	select #{item.PRODUCT_CLASSIFY} product_classify,
+			        	       #{item.FIRST_AVG_ZHL} first_avg_zhl
+			        	  from dual
+			        </foreach>) a3,
+		        <!-- 以商品为维度，统计上周期7天访客数 -->
+		        (select t1.product_key,count(distinct t1.member_key) last_visitor_count
+				  from fact_user_log_product t1,dim_date dt
+				 where t1.log_date_key = dt.date_key
+		           and dt.date_value >= to_date(#{last_start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+				   and dt.date_value &lt;= to_date(#{last_end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		           group by t1.product_key) b1,
+		        <!-- 以商品为维度，统计上周期7天支付买家数 -->
+		        (select t1.product_key,count(distinct t1.member_key) last_purchase_number
+				  from fact_order_product_sku t1,dim_date dt
+				 where t1.payment_date_key = dt.date_key
+		           and dt.date_value >= to_date(#{last_start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+				   and dt.date_value &lt;= to_date(#{last_end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		           group by t1.product_key) b2
+		 where t.product_key = a1.product_key
+		   and t.product_key = a2.product_key
+		   and t.product_classify = a3.product_classify
+		   and t.product_key = b1.product_key
+		   and t.product_key = b2.product_key
+		   and a2.first_purchase_number/a1.first_visitor_count &lt; a3.first_avg_zhl
+  	</select>
+  	<!-- 同类商品支付转化率平均值 -->
+  	<select id="r_queryAvgZhlList" parameterType="java.util.Map" resultType="java.util.Map">
+  		select t1.product_classify,nvl(sum(t2.first_total_purchase_number/t1.first_total_visitor_count)/count(t1.itemnumber),0) first_avg_zhl
+         from (select t.product_classify,t.itemnumber,count(distinct t1.member_key) first_total_visitor_count
+			  	  from dim_product t,fact_user_log_product t1,dim_date dt
+				 where t.product_key = t1.product_key
+		           and t1.log_date_key = dt.date_key
+		           and dt.date_value >= to_date(#{first_start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   		   and dt.date_value &lt;= to_date(#{first_end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		           group by t.product_classify,t.itemnumber) t1,
+		        (select t.product_classify,t.itemnumber ,count(distinct t1.member_key) first_total_purchase_number
+				  from dim_product t,fact_order_product_sku t1,dim_date dt
+				 where t.product_key = t1.product_key
+		           and t1.payment_date_key = dt.date_key
+		           and dt.date_value >= to_date(#{first_start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   		   and dt.date_value &lt;= to_date(#{first_end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		           group by t.product_classify,t.itemnumber) t2
+           where t1.itemnumber = t2.itemnumber
+           group by t1.product_classify
+  	</select>
+  	<!-- 支付转化率低列表 -->
+  	<select id="r_queryAbnormalZhlListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+  		select * from (
+			select a.*,rownum rn 
+			from (select *
+			from (
+			select t.itemnumber,t.product_name,t.product_img_url,
+			       to_char(a2.first_purchase_number/a1.first_visitor_count*100,'fm999999990.00') first_zhl,
+			       to_char(b2.last_purchase_number/b1.last_visitor_count*100,'fm999999990.00') last_zhl
+			  from dim_product t,
+			  		<!-- 以商品为维度，统计近7天访客数 -->
+			        (select t1.product_key,count(distinct t1.member_key) first_visitor_count
+				  	  from fact_user_log_product t1,dim_date dt
+					 where t1.log_date_key = dt.date_key
+			           and dt.date_value >= to_date(#{first_start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+					   and dt.date_value &lt;= to_date(#{first_end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			           group by t1.product_key) a1,
+			        <!-- 以商品为维度，统计近7天支付买家数 -->
+			        (select t1.product_key,count(distinct t1.member_key) first_purchase_number
+					  from fact_order_product_sku t1,dim_date dt
+					 where t1.payment_date_key = dt.date_key
+			           and dt.date_value >= to_date(#{first_start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+					   and dt.date_value &lt;= to_date(#{first_end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			           group by t1.product_key) a2,
+			        <!-- 以商品类别为维度，统计近7天支付转化率 -->
+			        (<foreach collection="list" item="item" separator="union all">
+			        	select #{item.PRODUCT_CLASSIFY} product_classify,
+			        	       #{item.FIRST_AVG_ZHL} first_avg_zhl
+			        	  from dual
+			        </foreach>) a3,
+			        <!-- 以商品为维度，统计上周期7天访客数 -->
+			        (select t1.product_key,count(distinct t1.member_key) last_visitor_count
+				  	  from fact_user_log_product t1,dim_date dt
+					 where t1.log_date_key = dt.date_key
+			           and dt.date_value >= to_date(#{last_start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+					   and dt.date_value &lt;= to_date(#{last_end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			           group by t1.product_key) b1,
+			        <!-- 以商品为维度，统计上周期7天支付买家数 -->
+			        (select t1.product_key,count(distinct t1.member_key) last_purchase_number
+					  from fact_order_product_sku t1,dim_date dt
+					 where t1.payment_date_key = dt.date_key
+			           and dt.date_value >= to_date(#{last_start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+					   and dt.date_value &lt;= to_date(#{last_end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			           group by t1.product_key) b2
+			 where t.product_key = a1.product_key
+			   and t.product_key = a2.product_key
+			   and t.product_classify = a3.product_classify
+			   and t.product_key = b1.product_key
+			   and t.product_key = b2.product_key
+			   and a2.first_purchase_number/a1.first_visitor_count &lt; a3.first_avg_zhl) 
+			   <if test="sort!=null and sort!='' and sort_by!=null and sort_by!=''">
+				   order by ${sort} ${sort_by}
+			   </if>) a
+			   where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt;#{start_rownum,jdbcType=INTEGER}
+  	</select>
+    <!-- 退款退货总数 -->
+    <select id="r_queryAbnormalRefundCount" parameterType="java.util.Map" resultType="int">
+    	select count(1)
+		  from dim_product t,
+		        (select t1.product_key,nvl(sum(t1.product_count),0) first_product_count
+				  from fact_return_product_sku_d t1,dim_date dt
+				 where t1.refund_date_key = dt.date_key
+		           and dt.date_value >= to_date(#{first_start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+				   and dt.date_value &lt;= to_date(#{first_end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		           group by t1.product_key) t1,
+		        (select t1.product_key,nvl(sum(t1.product_count),0) last_product_count
+				  from fact_return_product_sku_d t1,dim_date dt
+				 where t1.refund_date_key = dt.date_key
+		           and dt.date_value >= to_date(#{last_start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+				   and dt.date_value &lt;= to_date(#{last_end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		           group by t1.product_key) t2
+		 where t.product_key = t1.product_key
+		   and t.product_key = t2.product_key
+		   and (t1.first_product_count-t2.last_product_count)/t2.last_product_count*100 >= 50
+    </select>
+    <!-- 退款预警列表 -->
+    <select id="r_queryAbnormalRefundListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+    	select * from (
+			select a.*,rownum rn from (
+			select t.itemnumber,t.product_name,t.product_img_url,
+			       nvl(t1.first_product_count,0) first_product_count,
+			       nvl(t2.last_product_count,0) last_product_count
+			  from dim_product t,
+			        (select t1.product_key,nvl(sum(t1.product_count),0) first_product_count
+					  from fact_return_product_sku_d t1,dim_date dt
+					 where t1.refund_date_key = dt.date_key
+			           and dt.date_value >= to_date(#{first_start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+					   and dt.date_value &lt;= to_date(#{first_end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			           group by t1.product_key) t1,
+			        (select t1.product_key,nvl(sum(t1.product_count),0) last_product_count
+					  from fact_return_product_sku_d t1,dim_date dt
+					 where t1.refund_date_key = dt.date_key
+			           and dt.date_value >= to_date(#{last_start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+					   and dt.date_value &lt;= to_date(#{last_end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			           group by t1.product_key) t2
+			 where t.product_key = t1.product_key
+			   and t.product_key = t2.product_key
+			   and (t1.first_product_count-t2.last_product_count)/t2.last_product_count*100 >= 50
+			   <if test="sort!=null and sort!='' and sort_by!=null and sort_by!=''">
+				   order by ${sort} ${sort_by}
+			   </if>) a
+			   where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt;#{start_rownum,jdbcType=INTEGER}
+    </select>
+    <!-- 库存预警总数 -->
+    <select id="r_queryAbnormalStockCount" parameterType="java.util.Map" resultType="int">
+    	select count(1)
+		  from dim_product t,
+		        (select t1.product_key,nvl(sum(t1.product_count),0) first_sale_count
+				  from fact_order_product_sku_d t1,dim_date dt
+				 where t1.payment_date_key = dt.date_key
+		           and dt.date_value >= to_date(#{first_start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+				   and dt.date_value &lt;= to_date(#{first_end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		           group by t1.product_key) t1
+		 where t.product_key = t1.product_key
+		   and t1.first_sale_count > 10*(1+0.8)
+    </select>
+    <!-- 库存预警列表 -->
+    <select id="r_queryAbnormalStockListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+    	select * from (
+			select a.*,rownum rn from (
+			select t.itemnumber,t.product_name,t.product_img_url,
+			       nvl(t1.first_sale_count,0) first_sale_count,
+			       nvl(t2.last_sale_count,0) last_sale_count
+			  from dim_product t,
+			        (select t1.product_key,nvl(sum(t1.product_count),0) first_sale_count
+					  from fact_order_product_sku_d t1,dim_date dt
+					 where t1.payment_date_key = dt.date_key
+			           and dt.date_value >= to_date(#{first_start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+					   and dt.date_value &lt;= to_date(#{first_end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			           group by t1.product_key) t1,
+			        (select t1.product_key,nvl(sum(t1.product_count),0) last_sale_count
+					  from fact_order_product_sku_d t1,dim_date dt
+					 where t1.payment_date_key = dt.date_key
+			           and dt.date_value >= to_date(#{last_start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+					   and dt.date_value &lt;= to_date(#{last_end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			           group by t1.product_key) t2
+			 where t.product_key = t1.product_key
+			   and t.product_key = t2.product_key
+			   and t1.first_sale_count > 10*(1+0.8)) a
+			   where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt;#{start_rownum,jdbcType=INTEGER}
+    </select>
+    <!-- 滞销商品总数 -->
+    <select id="r_queryAbnormalUnsalableCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+			from (select
+			    t.itemnumber,
+			    nvl(t1.sale_total_count, 0) sale_total_count
+			from dim_product t,
+			     (select t1.product_key,nvl(sum(t1.product_count),0) sale_total_count
+			        from fact_order_product_sku_d t1, dim_date dt
+			        where t1.payment_date_key = dt.date_key
+			        group by t1.product_key) t1,
+			     (select t1.product_key,nvl(sum(t1.product_count),0) sale_count
+			        from fact_order_product_sku_d t1, dim_date dt
+			        where t1.payment_date_key = dt.date_key
+			        and dt.date_value >= to_date(#{first_start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+					   and dt.date_value &lt;= to_date(#{first_end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			        group by t1.product_key) t2
+			where t.state= '上架'
+			  and sysdate-t.first_sell_state_date > 15
+			  and t.product_key = t1.product_key
+			  and t.product_key = t2.product_key
+			  and sale_count &lt; 50) a
+			  where a.sale_total_count &lt; tkvip_new.getProductItemnumber_stocks(a.itemnumber)
+    </select>
+    <!-- 滞销商品列表 -->
+    <select id="r_queryAbnormalUnsalableListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+    	select * from (
+			select a.*,rownum rn from
+			(select
+			    t.itemnumber,
+			    t.product_name,
+			    t.product_img_url,
+			    nvl(t1.sale_total_count, 0) sale_total_count,
+			    nvl(t2.sale_count, 0) sale_count,
+			    to_char(t.first_sell_state_date,'yyyy-mm-dd hh24:mi:ss') publish_date,
+			    0 unsalable_day_num
+			from dim_product t,
+			     (select t1.product_key,nvl(sum(t1.product_count),0) sale_total_count
+			        from fact_order_product_sku_d t1, dim_date dt
+			        where t1.payment_date_key = dt.date_key
+			        group by t1.product_key) t1,
+			     (select t1.product_key,nvl(sum(t1.product_count),0) sale_count
+			        from fact_order_product_sku_d t1, dim_date dt
+			        where t1.payment_date_key = dt.date_key
+			        and dt.date_value >= to_date(#{first_start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+					   and dt.date_value &lt;= to_date(#{first_end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			        group by t1.product_key) t2
+			where t.state= '上架'
+			  and sysdate-t.first_sell_state_date > 15
+			  and t.product_key = t1.product_key
+			  and t.product_key = t2.product_key
+			  and sale_count &lt; 50) a
+			  where a.sale_total_count &lt; tkvip_new.getProductItemnumber_stocks(a.itemnumber)
+			    and rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt;#{start_rownum,jdbcType=INTEGER}
+    </select>
+    <!-- 获取商品库存 -->
+    <select id="queryProductStockCount" parameterType="java.util.List" resultType="java.util.Map">
+    	select itemnumber,
+    		   getProductItemnumber_stocks(t.itemnumber) stock_count
+    	  from tbl_product_info t
+    	 where itemnumber in
+    	 <foreach collection="list" item="item" open="(" separator="," close=")">
+    	 	#{item}
+    	 </foreach>
+    </select>
+    <!-- 根据待退货数排序 -->
+    <select id="queryReturnStayProductCountListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+    	select * from
+		(select a.*,rownum rn from (
+		select *
+		 from (select t.itemnumber,
+		 		      t.product_name,
+					  t.product_img_url,
+					  nvl(t1.stay_product_count,0)+nvl(t2.stay_product_count,0) stay_product_count
+		    from tbl_product_info t,
+		         (select c.product_itemnumber, sum(b.return_num) stay_product_count
+			        from ${jdbc_user}.tbl_new_return_order a,${jdbc_user}.tbl_new_return_temporary b,
+		                 tbl_product_sku c
+					where a.return_number = b.return_number 
+		              and a.state in ('2','3','4','5','6','7')
+		              and b.product_sku = c.id
+		              group by c.product_itemnumber) t1,
+		             (select b.product_itemnumber, sum(product_count) stay_product_count
+		                from tbl_order_return_info a,tbl_order_return_product b
+		               where a.state = '1'
+		                 and a.return_number = b.return_number
+		                group by b.product_itemnumber) t2
+		            where t.itemnumber = t1.product_itemnumber
+		              and t.itemnumber = t2.product_itemnumber)
+		            where stay_product_count > 0
+		              order by ${sort} ${sort_by}) a  
+		              where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		        where rn &gt;#{start_rownum,jdbcType=INTEGER}
+    </select>
+    <!-- 商品退货信息 -->
+    <select id="r_queryOther_ProductReturnInfo" parameterType="java.util.Map" resultType="java.util.Map">
+    	select t.itemnumber,
+			   nvl(t1.sale_money,0) sale_money,
+		       nvl(t1.sale_count,0) sale_count,
+		       nvl(t2.return_money,0) return_money,
+		       nvl(t2.product_count,0) product_count
+		 from dim_product t 
+		left join (select t1.product_key,nvl(sum(t1.product_money),0) sale_money,nvl(sum(t1.product_count),0) sale_count
+                from fact_order_product_sku_d t1,dim_date dt
+               where t1.payment_date_key = dt.date_key
+                 and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+                 and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+                 group by t1.product_key) t1 on t.product_key = t1.product_key
+		left join (select t3.product_key,nvl(sum(t3.product_count),0) product_count,nvl(sum(t3.product_money),0) return_money
+			  from dim_after_sales_order t2,fact_aso_refund_product t3,dim_date dt
+			  where t2.after_sales_order_key = t3.after_sales_order_key 
+			    and (t2.refund_state = 2 or t2.return_state = 8)
+			    and t3.aso_refund_date_key = dt.date_key
+			    and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			    and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			    group by t3.product_key) t2 on t.product_key = t2.product_key
+		  where t.itemnumber in 
+		  <foreach collection="list" item="item" open="(" separator="," close=")">
+    	 	#{item}
+    	  </foreach>
+    </select>
+    <!-- 查询待退货数 -->
+    <select id="queryReturnStayProductCount" parameterType="java.util.Map" resultType="java.util.Map">
+    	select t.itemnumber,
+			  nvl(t1.stay_product_count,0)+nvl(t2.stay_product_count,0) stay_product_count
+    from tbl_product_info t,
+         (select c.product_itemnumber, sum(b.return_num) stay_product_count
+	        from ${jdbc_user}.tbl_new_return_order a,${jdbc_user}.tbl_new_return_temporary b,
+                 tbl_product_sku c
+			where a.return_number = b.return_number 
+              and a.state in ('2','3','4','5','6','7')
+              and b.product_sku = c.id
+              group by c.product_itemnumber) t1,
+             (select b.product_itemnumber, sum(b.count) stay_product_count
+                from tbl_order_return_info a,tbl_order_return_product b
+               where a.state = '1'
+                 and a.return_number = b.return_number
+                group by b.product_itemnumber) t2
+            where t.itemnumber = t1.product_itemnumber
+              and t.itemnumber = t2.product_itemnumber
+              and t.itemnumber in 
+              <foreach collection="list" item="item" open="(" separator="," close=")">
+	    	 	#{item}
+	    	  </foreach>
+    </select>
+    <!-- 获取商品sku库存 -->
+    <select id="queryProductSkuStockCount" parameterType="java.util.List" resultType="java.util.Map">
+    	select t.id as product_sku,
+    		   getProductSku_stocks_ALL(t.id,0)  stock_count
+    	  from tbl_product_sku t
+    	 where id in
+    	 <foreach collection="list" item="item" open="(" separator="," close=")">
+    	  #{item}
+    	 </foreach>
+    </select>
+    <!-- 商品库存明细 -->
+    <select id="queryProductStockDetail" parameterType="java.util.Map" resultType="java.util.Map">
+    	select id as product_sku,product_color,product_group_member as product_size,getProductSku_stocks_ALL(t.id,0) stock_count
+		  from tbl_product_sku t
+		 where product_itemnumber = #{itemnumber,jdbcType=VARCHAR}
+		   and product_group = '尺码'
+		   order by product_color,product_group_member
+    </select>
+    <!-- 获取成品仓列表 -->
+    <select id="queryWarehouseList" parameterType="java.util.Map" resultType="java.util.Map">
+    	select id,(select name from tbl_warehouse_info where id=t.parent_id) warehouse_name
+		  from tbl_warehouse_info t
+		 where name = '成品仓'
+		 order by id
+    </select>
+    <!-- 根据仓库获取商品sku库存 -->
+    <select id="queryWarehouseProductSkuStock" parameterType="java.util.Map" resultType="java.util.Map">
+    	<foreach collection="list" item="item" separator="union all" >
+    	select id as product_sku,#{item.ID} as warehouse_id,getProductSku_stocks_ALL(t.id,#{item.ID}) stock_count
+		  from tbl_product_sku t
+		 where product_itemnumber = #{itemnumber,jdbcType=VARCHAR}
+		   and product_group = '尺码'
+    	</foreach>
+    </select>
+</mapper>

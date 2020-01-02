@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.sysuser.dao.SysRoleDao">
+	<!-- 新增系统角色 -->
+    <insert id="insert"  parameterType="java.util.HashMap">
+    	<selectKey keyProperty="id" resultType="int" order="BEFORE"> 
+        	select seq_sys_role_id.nextval from dual
+    	</selectKey> 
+         insert into tbl_sys_role(
+             id,
+             role_name,
+             remarks,
+             create_time
+         ) VALUES
+         (
+             #{id,jdbcType=INTEGER},
+             #{role_name,jdbcType=VARCHAR},
+             #{remarks,jdbcType=VARCHAR},
+             sysdate
+        )
+    </insert>
+    
+    <!-- 删除系统角色,执行此处需要同步执行SysRoleNode的删除 -->
+    <delete id="delete"  parameterType="java.util.HashMap">
+         delete from tbl_sys_role where id = #{role_id,jdbcType=INTEGER}
+    </delete>
+
+	<!-- 更新系统角色信息 -->
+    <update id="update" parameterType="java.util.HashMap">
+       update tbl_sys_role
+       <set>
+           role_name = #{role_name,jdbcType=VARCHAR},
+           remarks = #{remarks,jdbcType=VARCHAR}
+       </set>
+        where id = #{role_id,jdbcType=INTEGER}
+    </update>
+
+	<!-- 根据条件查询系统角色列表 -->
+    <select id="queryList" resultType="com.tk.oms.sysuser.entity.SysRole" parameterType="java.util.HashMap">
+        select * from (
+        select a.*, rownum rn from (
+            SELECT * from tbl_sys_role
+            <where>
+                <if test="keyword!=null and keyword!='' ">
+                    role_name like '%'||#{keyword}||'%' or remarks like '%'||#{keyword}||'%'
+                </if>
+                <if test="dateMin!=null and dateMin!='' ">
+                    and create_time &gt;= to_date(#{dateMin},'yyyy-mm-dd hh24:mi:ss')
+                </if>
+                <if test="dateMax!=null and dateMax!='' ">
+                    and create_time &lt;= to_date(#{dateMax},'yyyy-mm-dd hh24:mi:ss')
+                </if>
+            </where>
+            order by create_time desc
+        ) a where
+        rownum &lt;= #{end_rownum})
+        where rn &gt; #{start_rownum}
+    </select>
+
+	<!-- 根据条件查询系统角色数量 -->
+    <select id="queryCount" resultType="int" parameterType="java.util.HashMap">
+        SELECT
+        count(*)
+        from tbl_sys_role
+         <where>
+                <if test="keyword!=null and keyword!='' ">
+                    role_name like '%'||#{keyword}||'%' or remarks like '%'||#{keyword}||'%'
+                </if>
+            </where>
+    </select>
+
+	<!-- 查询系统角色详情 -->
+    <select id="queryById" resultType="com.tk.oms.sysuser.entity.SysRole" parameterType="java.util.HashMap">
+            SELECT * from tbl_sys_role 
+            <where>
+                    id = #{role_id}
+            </where>
+    </select>
+    
+    <!-- 判断是否有重复的角色名称 -->
+    <select id="queryByRoleName" parameterType="java.util.HashMap"  resultType="int"> 
+            SELECT count(1) from tbl_sys_role 
+            <where>
+                    role_name = #{role_name,jdbcType=VARCHAR}
+            </where>
+            <if test="role_id!=null and role_id!='' ">
+                and id &lt;&gt;#{role_id,jdbcType=INTEGER}
+            </if>
+    </select>
+</mapper>

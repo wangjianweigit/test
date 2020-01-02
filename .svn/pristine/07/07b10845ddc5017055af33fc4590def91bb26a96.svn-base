@@ -1,0 +1,793 @@
+package com.tk.oms.finance.service;
+
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import com.tk.oms.finance.dao.CreditBillDao;
+import com.tk.oms.finance.dao.UserAccountRecordDao;
+import com.tk.oms.member.dao.MemberInfoDao;
+import com.tk.oms.returns.dao.ReturnsDao;
+import com.tk.oms.returns.service.UserMbrCardInfoService;
+import com.tk.oms.sys.dao.SysConfigDao;
+import com.tk.sys.config.EsbConfig;
+import com.tk.sys.util.*;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import com.tk.oms.finance.dao.AdvanceOrderDao;
+
+/**
+ * 
+ * Copyright (c), 2017, Tongku
+ * FileName : AdvanceOrderService
+ * 预定订单
+ *
+ * @author yejingquan
+ * @version 1.00
+ * @date 2017-9-26
+ */
+@Service("AdvanceOrderService")
+public class AdvanceOrderService {
+    private Log logger = LogFactory.getLog(this.getClass());
+
+    private static final String CREDIT_PAY = "授信";
+
+    @Resource
+    private AdvanceOrderDao advanceOrderDao;
+    @Resource
+    private MemberInfoDao memberInfoDao;
+    @Resource
+    private SysConfigDao sysConfigDao;
+    @Resource
+    private UserAccountRecordDao userAccountRecordDao;
+    @Resource
+    private ReturnsDao returnsDao;
+
+    @Resource
+    private CreditBillDao creditBillDao;
+
+
+    @Value("${pay_service_url}")
+    private String pay_service_url;//见证宝接口地址信息
+    @Value("${tran_capital_unfreeze}")
+    private String tran_capital_unfreeze;	//资金解冻
+    @Value("${bank_batch_liquidation}")
+    private String bank_batch_liquidation;	//资金支付
+	@Resource
+	private UserMbrCardInfoService userMbrCardInfoService;
+    @Value("${jdbc_user}")
+    private String jdbc_user;	//erp数据库用户名
+    /**
+     * 退定金审批列表
+     *
+     * @param request
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+    public GridResult queryDepositRefundList(HttpServletRequest request) {
+        GridResult gr = new GridResult();
+
+        Map<String, Object> paramMap = new HashMap<String, Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+
+            if (!StringUtils.isEmpty(json)) {
+                paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+                PageUtil.handlePageParams(paramMap);
+            }
+
+            if (paramMap.size() == 0) {
+                gr.setState(false);
+                gr.setMessage("参数缺失");
+                return gr;
+            }
+            if (paramMap.containsKey("state") && !StringUtils.isEmpty(paramMap.get("state"))) {
+                String[] state = paramMap.get("state").toString().split(",");
+                if (state.length > 1) {
+                    paramMap.put("state", paramMap.get("state"));
+                } else {
+                    paramMap.put("state", paramMap.get("state").toString().split(","));
+                }
+            }
+            //查询退定金审批数量
+            int total = advanceOrderDao.queryDepositRefundCount(paramMap);
+            //查询退定金审批列表
+            List<Map<String, Object>> dataList = advanceOrderDao.queryDepositRefundList(paramMap);
+            if (dataList != null && dataList.size() > 0) {
+                gr.setState(true);
+                gr.setMessage("查询成功!");
+                gr.setObj(dataList);
+                gr.setTotal(total);
+            } else {
+                gr.setState(true);
+                gr.setMessage("无数据");
+            }
+
+        } catch (Exception e) {
+            gr.setState(false);
+            gr.setMessage(e.getMessage());
+            logger.error("查询失败：" + e.getMessage());
+        }
+
+        return gr;
+    }
+
+    /**
+     * 退定金详情
+     *
+     * @param request
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+    public ProcessResult queryDepositRefundDetail(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        Map<String, Object> paramMap = new HashMap<String, Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+
+            if (!StringUtils.isEmpty(json)) {
+                paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            }
+            if (paramMap.size() == 0) {
+                pr.setState(false);
+                pr.setMessage("参数缺失");
+                return pr;
+            }
+            if (StringUtils.isEmpty(paramMap.get("return_number"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数，return_number");
+                return pr;
+			}
+			//退定金详情
+			Map<String, Object> retMap = advanceOrderDao.queryDepositRefundDetail(paramMap);
+			pr.setState(true);
+			pr.setMessage("查询成功");
+			pr.setObj(retMap);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			logger.error("查询失败："+e.getMessage());
+		}
+		return pr;
+	}
+	/**
+	 * 预定订单列表
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryAdvanceOrderList(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        	PageUtil.handlePageParams(paramMap);
+	        }
+
+            if(paramMap.size() == 0) {
+            	gr.setState(false);
+            	gr.setMessage("参数缺失");
+                return gr;
+            }
+            if(paramMap.containsKey("order_state") && !StringUtils.isEmpty(paramMap.get("order_state"))) {
+                String[] order_state = paramMap.get("order_state").toString().split(",");
+                if (order_state.length > 1) {
+                    paramMap.put("order_state", paramMap.get("order_state"));
+                } else {
+                    paramMap.put("order_state", paramMap.get("order_state").toString().split(","));
+                }
+            }
+            paramMap.put("jdbc_user", jdbc_user);
+            //查询预定订单数量
+			int total = advanceOrderDao.queryAdvanceOrderCount(paramMap);
+            //查询预定订单列表
+			List<Map<String, Object>> dataList = advanceOrderDao.queryAdvanceOrderList(paramMap);
+			if (dataList != null && dataList.size() > 0) {
+				gr.setState(true);
+				gr.setMessage("查询成功!");
+				gr.setObj(dataList);
+				gr.setTotal(total);
+			} else {
+				gr.setState(true);
+				gr.setMessage("无数据");
+			}
+
+        } catch (Exception e) {
+        	gr.setState(false);
+        	gr.setMessage(e.getMessage());
+        	logger.error("查询失败："+e.getMessage());
+        }
+
+		return gr;
+	}
+	/**
+	 * 预定订单详情
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryAdvanceOrderDetail(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        }
+			if(paramMap.size() == 0) {
+            	pr.setState(false);
+            	pr.setMessage("参数缺失");
+                return pr;
+            }
+			if(StringUtils.isEmpty(paramMap.get("order_number"))){
+				pr.setState(false);
+            	pr.setMessage("缺少参数，order_number");
+                return pr;
+			}
+			//预定订单详情
+			Map<String, Object> retMap = advanceOrderDao.queryAdvanceOrderDetail(paramMap);
+			//相关联的普通订单
+			List<Map<String, Object>> orderList = advanceOrderDao.queryOrderList(paramMap);
+			//预定订单金额信息
+			Map<String, Object> moneyInfo = advanceOrderDao.queryAdvanceOrderMoneyInfo(paramMap);
+			//预定商品清单
+			List<Map<String, Object>> cartList= advanceOrderDao.queryPreUserCart(paramMap);
+			for(Map<String, Object> map : cartList){
+				Map<String, Object> param = new HashMap<String, Object>();
+				param.put("order_number", paramMap.get("order_number"));
+				param.put("product_itemnumber", map.get("PRODUCT_ITEMNUMBER"));
+				//预定商品清单明细
+				List<Map<String, Object>> cartDetailList =advanceOrderDao.queryPreUserCartDetail(param);
+				map.put("cartDetailList", cartDetailList);
+			}
+			if(paramMap.containsKey("is_custom_order")){
+				//  查询定制订单明细数据
+				retMap.put("customDetail", advanceOrderDao.queryCustomOrderProductDetail(paramMap));
+			}
+			retMap.put("orderList", orderList);
+			retMap.put("cartList", cartList);
+			retMap.put("moneyInfo", moneyInfo);
+			pr.setState(true);
+			pr.setMessage("查询成功");
+			pr.setObj(retMap);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			logger.error("查询失败："+e.getMessage());
+		}
+		return pr;
+	}
+	/**
+	 * 取消订单
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult updateOrderCancel(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        }
+			if(paramMap.size() == 0) {
+            	pr.setState(false);
+            	pr.setMessage("参数缺失");
+                return pr;
+            }
+			if(StringUtils.isEmpty(paramMap.get("order_number"))){
+				pr.setState(false);
+            	pr.setMessage("缺少参数，order_number");
+                return pr;
+			}
+			//查询待支付的订单是否存在
+			if(advanceOrderDao.queryOrderUnpaid(paramMap)>0){
+				if(advanceOrderDao.updateOrderCancel(paramMap)>0){
+					/**
+					 * 2017.07.16 songwangwen
+					 * 运营总后台取消预付订单，判断预付订单是否是
+					 */
+					Map<String,Object> preOrderMap = advanceOrderDao.queryAdvanceOrderDetail(paramMap);
+					int mbr_card = Integer.parseInt(preOrderMap.get("MBR_CARD").toString());//该订单使用有使用会员卡优化  1.没有使用   2.有使用
+					if(mbr_card == 2){//是用了会员卡，则需要返还会员卡额度，返还的额度等于整个预付订单的商品金额
+						//获取用户会员卡记录信息
+						long userId = Long.parseLong(preOrderMap.get("USER_ID").toString());
+						Map<String, Object> userMbrCard = this.returnsDao.getUserMbrCardByUserId(userId);
+						if (userMbrCard == null) {
+							pr.setState(false);
+							pr.setMessage("用户会员卡记录信息异常");
+							return pr;
+						}
+						int EXPIRATION_FLAG = Integer.parseInt(userMbrCard.get("EXPIRATION_FLAG").toString());//会员卡过期标志位 0.未过期   1.已过期
+						if (EXPIRATION_FLAG == 0) {//会员卡未过期才进行反充
+							BigDecimal cardBalance = new BigDecimal(userMbrCard.get("CARD_BALANCE").toString());
+							BigDecimal product_money = new BigDecimal(preOrderMap.get("PRODUCT_MONEY").toString());
+							userMbrCard.put("CARD_BALANCE",cardBalance.add(product_money));//修改余额
+							
+							if(!userMbrCardInfoService.updateUserMbrCardInfo(userId, userMbrCard)){
+								throw new RuntimeException("更新会员卡信息失败");
+							}
+							/**
+							 * 封装增加会员卡使用记录参数
+							 * 增加会员卡使用记录
+							 */
+							Map<String, Object> userRecordMap = new HashMap<String, Object>(16);
+							userRecordMap.put("mbr_card_id", Long.parseLong(userMbrCard.get("ID").toString()));
+							userRecordMap.put("order_number", preOrderMap.get("ORDER_NUMBER"));
+							userRecordMap.put("type", 5);//预定订单取消会员卡额度反充
+							userRecordMap.put("used_amount", product_money);
+							userRecordMap.put("remark", "预定订单取消，会员卡额度返还。预定订单号：" + preOrderMap.get("ORDER_NUMBER").toString());
+							if (this.returnsDao.insertUserMbrCardUseRecord(userRecordMap) < 0) {
+								throw new RuntimeException("记录会员卡收支记录失败");
+							}
+						}
+					}
+					pr.setState(true);
+					pr.setMessage("操作成功");
+				}else{
+					pr.setState(false);
+					pr.setMessage("操作失败");
+				}
+			}else{
+				pr.setState(false);
+            	pr.setMessage("订单状态异常，请刷新列表");
+			}
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			logger.error("查询失败："+e.getMessage());
+		}
+		return pr;
+	}
+	/**
+	 * 关闭订单
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult colseOrder(HttpServletRequest request) throws Exception{
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+
+		String json = HttpUtil.getRequestInputStream(request);
+		
+		if(!StringUtils.isEmpty(json)) {
+			paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+		}
+		if(paramMap==null 
+				|| paramMap.isEmpty()
+				||StringUtils.isEmpty(paramMap.get("order_number"))
+				||StringUtils.isEmpty(paramMap.get("return_type"))
+				||StringUtils.isEmpty(paramMap.get("apply_user_name"))
+				||StringUtils.isEmpty(paramMap.get("apply_user_realname"))
+				) {
+			pr.setState(false);
+			pr.setMessage("参数缺失");
+			return pr;
+		}
+		if(StringUtils.isEmpty(paramMap.get("order_number"))){
+			pr.setState(false);
+			pr.setMessage("缺少参数，order_number");
+			return pr;
+		}
+		paramMap.put("jdbc_user", jdbc_user);
+		Map<String,Object> preOrder = advanceOrderDao.queryPreOrderByNumber(paramMap);
+		if(preOrder==null){
+			pr.setState(false);
+			pr.setMessage("订单不存在");
+			return pr;
+		}
+		/**
+		 * 仅允许关闭
+		 * 待付尾款（2） ，已付部分尾款（3）
+		 * 的订单
+		 */
+		if(!"2".equals(preOrder.get("ORDER_STATE")) && !"3".equals(preOrder.get("ORDER_STATE"))){
+			pr.setState(false);
+			pr.setMessage("当前状态订单不允许关闭");
+			return pr;
+		}
+		/**
+		 * 校验当前预定定单关联的实际订单是否存在【待付款】的订单，如果存在，则不允许关闭订单
+		 */
+		if(advanceOrderDao.checkRemainOrderStateByPreOrderNumber(paramMap)>0){
+			pr.setState(false);
+			pr.setMessage("该预定订单存在待支付的尾款订单，不允许关闭！");
+			return pr;
+		}
+		/**
+		 * 校验当前预定定单关联的生产计划单是否已终止，如果未终止，则不允许关闭订单
+		 */
+		if("1".equals(""+preOrder.get("CLOSE_FLAG"))){
+			pr.setState(false);
+			pr.setMessage("该预定订单对应生产计划单未终止，不允许关闭！");
+			return pr;
+		}
+		
+		//查询待支付的订单是否存在
+		//更新订单状态为：终止中
+		paramMap.put("order_state","4");
+		if(advanceOrderDao.updatePreOrderState(paramMap)>0){
+			//更新订单专状态成功，插入退款申请记录
+			if(advanceOrderDao.insertAdvanceOrderMoneyInfo(paramMap)>0){
+				pr.setState(true);
+				pr.setMessage("关闭成功");
+			}else{
+				throw new RuntimeException("关闭失败，增加退款申请失败");
+			}
+		}
+		return pr;
+	}
+
+    /**
+     * 退定金单审批
+     *
+     * @param request
+     * @return
+     */
+    @Transactional
+    public ProcessResult approveDepositRefund(HttpServletRequest request, int approveStatus) throws Exception {
+        ProcessResult pr = new ProcessResult();
+
+        try {
+            // 获取请求参数
+            String json = HttpUtil.getRequestInputStream(request);
+            if(StringUtils.isEmpty(json)){
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            // 解析请求参数
+            Map<String, Object> paramsMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if(!paramsMap.containsKey("return_number") || StringUtils.isEmpty(paramsMap.get("return_number").toString())){
+                pr.setState(false);
+                pr.setMessage("缺少中止单号");
+                return pr;
+            }
+
+            // 获取退定金审批单信息
+            Map<String, Object> depositRefundMap = advanceOrderDao.queryDepositReturnForUpdate(paramsMap.get("return_number").toString());
+
+            if(!"1".equals(depositRefundMap.get("state").toString())){
+                pr.setState(false);
+                pr.setMessage("申请单状态异常，无法审批");
+                return pr;
+            }
+
+            paramsMap.put("state", approveStatus);
+            if(!paramsMap.containsKey("check_cancle_reason")){
+                paramsMap.put("check_cancle_reason", "");
+            }
+            // 更新申请单状态
+            if(advanceOrderDao.updateDepositReturn(paramsMap) <= 0){
+                throw new RuntimeException("更新审批状态失败");
+            }
+
+            paramsMap.put("order_number", depositRefundMap.get("order_number").toString());
+
+            // 获取申请单类型，既是否退定金
+            int returnType = Integer.parseInt(depositRefundMap.get("return_type").toString());
+            Map<String, Object> map = advanceOrderDao.queryAdvanceOrderDetail(paramsMap);
+            // 判断当前操作是审批通过还是审批驳回
+            if(approveStatus == 2){
+            	if(advanceOrderDao.queryActuallyMoney(paramsMap)>0){
+            		paramsMap.put("order_state", 5);
+            	}else{
+            		paramsMap.put("order_state", 6);
+            	}
+				if(advanceOrderDao.updatePreOrderFinishDate(depositRefundMap.get("order_number").toString()) <= 0){
+					throw new RuntimeException("更新完成时间异常");
+				}
+
+                // 获取会员账户信息
+                Map<String, Object> memberInfoMap = memberInfoDao.queryUserAccountByUserName(depositRefundMap.get("user_id").toString());
+
+                Map<String, Object> reqMap = new HashMap<String, Object>();
+                reqMap.put("thirdLogNo", depositRefundMap.get("third_logno").toString());
+                reqMap.put("order_number", depositRefundMap.get("order_number").toString());
+
+                String postPath = null;
+                //增加预定订单关闭时，相关订单手工占用数据的清除。
+                advanceOrderDao.deletePreOrderWarehouseCount(paramsMap);
+                // 根据申请单类型，盘点当前操作是否需要退回定金
+                if(returnType == 1) {
+					postPath = bank_batch_liquidation;
+                    // 将已冻结的定金支付给平台服务商
+                    reqMap.put("out_user_id", memberInfoMap.get("USER_ID").toString());
+                    reqMap.put("out_bank_account", memberInfoMap.get("BANK_ACCOUNT").toString());
+
+                    List<Map<String, Object>> accountList = new ArrayList<Map<String, Object>>();
+                    Map<String, Object> accountMap = new HashMap<String, Object>();
+                    accountMap.put("user_id", sysConfigDao.querySysParamConfig("platform_user_id"));
+                    accountMap.put("bank_account", sysConfigDao.querySysParamConfig("platform_bank_account"));
+                    accountMap.put("tran_amount", depositRefundMap.get("return_money").toString());
+
+                    accountList.add(accountMap);
+
+                    reqMap.put("inAccountList", accountList);
+                }else{
+                	// 增加授信支付退款 -- by wanghai add 2019-05-14
+					// 获取预定订单支付方式
+					String paymentType = depositRefundMap.get("payment_type").toString();
+
+                	// 判断预定订单定金是否授信支付
+					if(CREDIT_PAY.equals(paymentType)) {
+						// 是授信支付
+						// 增加会员授信账单明细 -- 退款
+						Map<String, Object> billMap = new HashMap<String, Object>();
+						billMap.put("trade_number", depositRefundMap.get("return_number"));
+						billMap.put("tran_amount", depositRefundMap.get("return_money"));
+						billMap.put("user_id", depositRefundMap.get("user_id"));
+						billMap.put("remark", "预定订单退款，订单号：" + depositRefundMap.get("order_number").toString());
+
+						int count = creditBillDao.insertCreditBillDetailOfReturn(billMap);
+						if(count == 0) {
+							throw new RuntimeException("会员授信账单记录异常");
+						}
+
+						// 更新会员授信余额和已使用授信额度
+						Map<String, Object> updateBalanceMap = new HashMap<String, Object>();
+						updateBalanceMap.put("user_id", depositRefundMap.get("user_id").toString());
+						updateBalanceMap.put("money", depositRefundMap.get("return_money").toString());
+						if (memberInfoDao.updateCreditBalanceAndUse(updateBalanceMap) <= 0) {
+							throw new RuntimeException("更新会员账户授信余额失败");
+						}
+
+						depositRefundMap.put("record_channel", "授信");
+					}else {
+						// 不是授信支付
+						// 更新会员余额
+						Map<String, Object> updateBalanceMap = new HashMap<String, Object>();
+						updateBalanceMap.put("user_id", depositRefundMap.get("user_id").toString());
+						updateBalanceMap.put("money", depositRefundMap.get("return_money").toString());
+						if (memberInfoDao.updateAccountBalance(updateBalanceMap) <= 0) {
+							throw new RuntimeException("更新会员账户余额失败");
+						}
+
+						depositRefundMap.put("record_channel", "余额");
+					}
+
+                    // 记录会员收支记录
+                    if(userAccountRecordDao.insertUserRecordByEarnest(depositRefundMap) <= 0){
+                        throw new RuntimeException("增加会员收支记录失败");
+                    }
+
+                    // 更新会员校验码
+                    memberInfoDao.updateUserAccountCode(Long.parseLong(depositRefundMap.get("user_id").toString()));
+
+                    // 将已冻结的订单根据退回金额退回到会员余额
+                    postPath = tran_capital_unfreeze;
+                    reqMap.put("user_id", memberInfoMap.get("USER_ID").toString());
+                    reqMap.put("bank_account", memberInfoMap.get("BANK_ACCOUNT").toString());
+                    reqMap.put("tran_amount", depositRefundMap.get("return_money").toString());
+                    reqMap.put("remark", depositRefundMap.get("order_number").toString() + "预定订单中止退定金");
+                }
+                /**
+				 * 2017.07.16 songwangwen
+				 * 运营总后台取消预付订单，判断预付订单是否是
+				 */
+				Map<String,Object> preOrderMap = advanceOrderDao.queryAdvanceOrderDetail(paramsMap);
+				int mbr_card = Integer.parseInt(preOrderMap.get("MBR_CARD").toString());//该订单使用有使用会员卡优化  1.没有使用   2.有使用
+				if(mbr_card == 2){//是用了会员卡，则需要返还会员卡额度，返还的额度等于未生产尾端订单的商品金额
+					long userId = Long.parseLong(preOrderMap.get("USER_ID").toString());
+					Map<String, Object> userMbrCard = this.returnsDao.getUserMbrCardByUserId(userId);
+					if (userMbrCard == null) {
+						pr.setState(false);
+						pr.setMessage("用户会员卡记录信息异常");
+						return pr;
+					}
+					int EXPIRATION_FLAG = Integer.parseInt(userMbrCard.get("EXPIRATION_FLAG").toString());//会员卡过期标志位 0.未过期   1.已过期
+					if (EXPIRATION_FLAG == 0) {//会员卡未过期才进行反充
+						BigDecimal cardBalance = new BigDecimal(userMbrCard.get("CARD_BALANCE").toString());
+						BigDecimal pre_product_money = new BigDecimal(preOrderMap.get("PRODUCT_MONEY").toString());//预付订单的总金额
+						BigDecimal ordeed_product_money = new BigDecimal(advanceOrderDao.queryOrderedProducrMoneyBrPreOrderNumber(paramsMap));
+						BigDecimal product_money = pre_product_money.subtract(ordeed_product_money);
+						userMbrCard.put("CARD_BALANCE",cardBalance.add(product_money));//修改余额
+						if(!userMbrCardInfoService.updateUserMbrCardInfo(userId, userMbrCard)){
+							throw new RuntimeException("更新会员卡信息失败");
+						}
+						/**
+						 * 封装增加会员卡使用记录参数
+						 * 增加会员卡使用记录
+						 */
+						Map<String, Object> userRecordMap = new HashMap<String, Object>(16);
+						userRecordMap.put("mbr_card_id", Long.parseLong(userMbrCard.get("ID").toString()));
+						userRecordMap.put("order_number", preOrderMap.get("ORDER_NUMBER"));
+						userRecordMap.put("type", 5);//预定订单取消会员卡额度反充
+						userRecordMap.put("used_amount",product_money);
+						userRecordMap.put("remark", "预定订单取消，会员卡额度返还(仅返还未生产尾款订单的部分)。预定订单号：" + preOrderMap.get("ORDER_NUMBER").toString());
+						if (this.returnsDao.insertUserMbrCardUseRecord(userRecordMap) < 0) {
+							throw new RuntimeException("记录会员卡收支记录失败");
+						}
+					}
+				}
+                ProcessResult resPr = HttpClientUtil.post(pay_service_url + postPath, reqMap, EsbConfig.PAY_FORWARD_KEY_NAME, EsbConfig.PAY_REVERSE_KEY_NAME);
+                if(!resPr.getState()){
+                    throw new RuntimeException(resPr.getMessage());
+                }
+            }else {
+
+                // 根据申请单类型，预定订单回退不同的状态
+                if(returnType == 1) {
+                    paramsMap.put("order_state", 2);
+                }else{
+                    paramsMap.put("order_state", 3);
+                }
+            }
+
+            // 更新预定订单状态
+			if(advanceOrderDao.updatePreOrderState(paramsMap) <= 0){
+				throw new RuntimeException("更新预定订单状态失败");
+			}
+
+            pr.setState(true);
+            pr.setMessage("审批成功");
+        } catch (IOException e) {
+            e.printStackTrace();
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+    }
+    
+    /**
+	 * 手工占用
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult allocationOrder(HttpServletRequest request) throws Exception{
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+
+		String json = HttpUtil.getRequestInputStream(request);
+		
+		if(!StringUtils.isEmpty(json)) {
+			paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+		}
+		if(paramMap==null 
+				|| paramMap.isEmpty()
+				||StringUtils.isEmpty(paramMap.get("order_number"))
+				||StringUtils.isEmpty(paramMap.get("warehouse_id"))
+				) {
+			pr.setState(false);
+			pr.setMessage("参数缺失");
+			return pr;
+		}
+		paramMap.put("jdbc_user", jdbc_user);
+		Map<String,Object> preOrder = advanceOrderDao.queryPreOrderByNumber(paramMap);
+		if(preOrder==null){
+			pr.setState(false);
+			pr.setMessage("订单不存在");
+			return pr;
+		}
+		/**
+		 * 仅允许关闭
+		 * 待付尾款（2） ，已付部分尾款（3）
+		 * 的订单
+		 */
+		if(!"2".equals(preOrder.get("ORDER_STATE")) && !"3".equals(preOrder.get("ORDER_STATE"))){
+			pr.setState(false);
+			pr.setMessage("当前预定订单状态不允许手工占用");
+			return pr;
+		}
+		if("2".equals(preOrder.get("WAREHOUSE_STATE"))){
+			pr.setState(false);
+			pr.setMessage("当前预定订单状态已手工占用");
+			return pr;
+		}
+		if(advanceOrderDao.updatePreOrderWarehouseState(paramMap)>0){
+			//更新订单专状态成功，插入退款申请记录
+			if(advanceOrderDao.insertAdvanceOrderWarehouseCount(paramMap)>0){
+				pr.setState(true);
+				pr.setMessage("手工占用成功");
+				return pr;
+			}else{
+				throw new Exception("手工占用失败");
+			}
+		}
+		return pr;
+	}
+
+	/**
+	 * 商品定制订单审批
+	 * @param request
+	 * @return
+     */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult queryAdvanceOrderCustomChecking(HttpServletRequest request) throws Exception{
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+
+		String json = HttpUtil.getRequestInputStream(request);
+
+		if(!StringUtils.isEmpty(json)) {
+			paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+		}
+		if(paramMap.size() == 0) {
+			pr.setState(false);
+			pr.setMessage("参数缺失");
+			return pr;
+		}
+		if(StringUtils.isEmpty(paramMap.get("order_number"))){
+			pr.setState(false);
+			pr.setMessage("缺少参数[order_number]定制订单号");
+			return pr;
+		}if(StringUtils.isEmpty(paramMap.get("check_state"))){
+			pr.setState(false);
+			pr.setMessage("缺少参数[check_state]审批状态");
+			return pr;
+		}
+		//查询定制订单信息
+		//预定订单详情
+		Map<String, Object> retMap = advanceOrderDao.queryAdvanceOrderDetail(paramMap);
+		if(retMap==null || retMap.isEmpty()){
+			pr.setState(false);
+			pr.setMessage("定制订单号不存在");
+			return pr;
+		}
+		if(advanceOrderDao.checkingCustomOrder(paramMap) >0){
+			/**
+			 * 预定订单审批通过后，将会员自定义的  品牌信息保存下来，作为该次定制商品的品牌信息
+			 * 主要包括：品牌名称、LOGO、烫底等，同时记录原先的商品的品牌ID
+			 * songwangwen  2018.01.17
+			 * 
+			 * 修改，记录定制品牌信息时，记录当前品牌的定制会员。如果同一个会员第二次定制相同的品牌，则不在新增，而是直接使用
+			 * 已有的定制货号，判断是否存在的条件为：定制品牌名称
+			 * songwangwen  2018.02.01
+			 * 
+			 * 修改，仅品牌定制才需要检测用户是否定制过该品牌信息，查询用户的定制品牌信息内容
+			 * songwangwen  2018.09.27
+			 */
+			if("2".equals(retMap.get("PRE_ORDER_TYPE").toString())){
+				Long customBrandId = advanceOrderDao.queryCustomBrandByPreOrderNum(paramMap);
+				if(customBrandId==null || customBrandId==0){
+					if(advanceOrderDao.insertCustomBrand(paramMap)<=0){
+						throw new RuntimeException("保存定制商品品牌信息失败！");
+					}
+				}else{
+					paramMap.put("id", customBrandId);
+				}
+				/**
+				 *	新增完成后，修改商品表中的该定制商品数据的【brand_id】，更新成为刚刚插入的品牌记录ID
+				 *	songwangwen  2018.01.17
+				 * */
+				if(advanceOrderDao.updateProductBrandId(paramMap)<=0){
+					throw new RuntimeException("更新定制商品关联品牌信息失败！");
+				}
+			}
+			pr.setMessage("审批成功");
+			pr.setState(true);
+		}else{
+			pr.setMessage("审批失败");
+			pr.setState(false);
+		}
+		return pr;
+	}
+
+
+
+}

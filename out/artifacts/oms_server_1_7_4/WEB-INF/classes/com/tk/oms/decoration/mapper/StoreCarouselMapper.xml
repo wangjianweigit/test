@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.decoration.dao.StoreCarouselDao">
+    <!-- 所有字段 -->
+	<sql id="all_column">
+		ID,
+		PLAN_NAME,
+		STATE,
+		SWITCH_TIME,
+		CREATE_TIME,
+		EFFECT_DATE
+	</sql> 
+	
+	<!-- 添加新轮播方案-->
+	<insert id="insert" parameterType="java.util.Map">
+	    <selectKey keyProperty="id" resultType="int" order="BEFORE"> 
+        	SELECT seq_store_carousel_info.nextval FROM DUAL
+    	</selectKey>
+		insert into TBL_STORE_CAROUSEL_INFO
+		(
+			id,
+			plan_name,
+			switch_time,
+			create_date,
+			effect_date,
+			create_user_id
+		)
+		VALUES
+		(
+			#{id,jdbcType=INTEGER},
+			#{plan_name,jdbcType=VARCHAR},
+			#{switch_time,jdbcType=INTEGER},
+			SYSDATE,
+			to_date(#{effect_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS'),
+			#{public_user_id,jdbcType=VARCHAR}
+		)
+	</insert>
+	<!-- 修改新轮播方案-->
+	<update id="update_carousel" parameterType="java.util.Map">
+		update TBL_STORE_CAROUSEL_INFO
+		<set>
+			<if test="PLAN_NAME!=null">
+				PLAN_NAME = #{PLAN_NAME,jdbcType=VARCHAR},
+			</if>
+			<if test="SWITCH_TIME!=null">
+				SWITCH_TIME = #{SWITCH_TIME,jdbcType=INTEGER},
+			</if>
+			<if test="EFFECT_DATE!=null">
+				EFFECT_DATE = to_date(#{EFFECT_DATE,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+		</set>
+		WHERE id = #{id,jdbcType=INTEGER}
+	</update>
+	
+	<!-- 查询列表信息-->
+    <select id="querylist" resultType="java.util.Map" parameterType="java.util.Map">
+    select * from (
+            select s.*, rownum num from (
+			SELECT A.ID,A.PLAN_NAME,A.STATE,A.SWITCH_TIME,TO_CHAR(A.CREATE_DATE,'YYYY-MM-DD HH24:MI:SS')  CREATE_TIME,TO_CHAR(A.EFFECT_DATE,'YYYY-MM-DD HH24:MI:SS') EFFECT_DATE 
+				FROM TBL_STORE_CAROUSEL_INFO A
+				
+				ORDER BY A.ID
+				) s where ROWNUM  &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where num &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	
+	<!-- 查询列表数据数量-->
+    <select id="querycount" resultType="int" parameterType="java.util.Map">
+      	SELECT COUNT(ID) FROM TBL_STORE_CAROUSEL_INFO
+	</select>
+	
+	<!-- 附件附表插入数据 
+	<insert  id ="insert_filetable" parameterType ="java.util.List">
+		INSERT INTO TBL_STORE_CAROUSEL_DETAIL(
+		CAROUSEL_ID,
+		FILE_TYPE,
+		FILE_URL,
+		FILE_GROUP) values(
+		#{carousel_id,jdbcType=INTEGER},
+		#{file_type,jdbcType=INTEGER},
+		#{file_url,jdbcType=VARCHAR},
+		#{file_group,jdbcType=INTEGER}
+		)
+	</insert>
+	-->
+	<!-- 附件附表插入数据 -->
+	<insert  id ="insert_filetable" parameterType ="java.util.List">
+		INSERT INTO TBL_STORE_CAROUSEL_DETAIL
+		select A.* from(
+		<foreach collection="list" item="itm" index="index"
+				 separator="UNION">
+					SELECT
+						#{itm.carousel_id,jdbcType=INTEGER},
+						#{itm.file_type,jdbcType=INTEGER},
+						#{itm.file_url,jdbcType=VARCHAR},
+						#{itm.file_group,jdbcType=VARCHAR}
+					FROM DUAL
+		</foreach>
+		) A
+	</insert>
+	<!-- 删除轮播方案 -->
+	<delete id="remove" parameterType="java.util.Map">
+	      DELETE TBL_STORE_CAROUSEL_INFO WHERE ID = #{id,jdbcType=INTEGER}
+	</delete>
+	<!-- 删除轮播方案图片视频附件 -->
+	<delete id="delete_carousel_files" parameterType="java.util.Map">
+	       DELETE TBL_STORE_CAROUSEL_DETAIL WHERE CAROUSEL_ID = #{id,jdbcType=INTEGER}
+	</delete>
+	
+	<!-- 改变方案状态 -->
+	<update id="changestate" parameterType="java.util.Map" >
+	       UPDATE  TBL_STORE_CAROUSEL_INFO
+	       SET STATE =  #{state,jdbcType=INTEGER}
+	       WHERE  ID = #{id,jdbcType=INTEGER}
+	</update>
+	<!-- 停用全部方案状态 -->
+	<update id="changestateAll">
+	       UPDATE  TBL_STORE_CAROUSEL_INFO SET STATE =1
+	</update>
+	
+	
+		<!-- 查询方案详情 -->
+    <select id="query_detail" resultType="java.util.Map" parameterType="java.util.Map">
+      	SELECT ID,PLAN_NAME,STATE,SWITCH_TIME,TO_CHAR(CREATE_DATE,'YYYY-MM-DD HH24:MI:SS')  CREATE_TIME,TO_CHAR(EFFECT_DATE,'YYYY-MM-DD HH24:MI:SS') EFFECT_DATE 
+      	FROM TBL_STORE_CAROUSEL_INFO 
+      	WHERE ID= #{id,jdbcType=INTEGER}
+	</select>  
+	
+		<!-- 查询子表 文件表-->
+    <select id="query_files" resultType="java.util.Map" parameterType="java.util.Map">
+      	SELECT CAROUSEL_ID,FILE_TYPE,FILE_URL,FILE_GROUP
+      	FROM TBL_STORE_CAROUSEL_DETAIL 
+      	WHERE CAROUSEL_ID = #{id,jdbcType=INTEGER}
+      	ORDER BY FILE_TYPE
+	</select>  
+	
+		<!-- 查询字表  门店表-->
+    <select id="query_stores" resultType="java.util.Map" parameterType="java.util.Map">
+      	SELECT ID,CAROUSEL_ID,STORE_ID 
+      	FROM TBL_STORE_CAROUSEL_STODETAIL
+      	WHERE CAROUSEL_ID =  #{id,jdbcType=INTEGER}
+      	ORDER BY ID
+	</select>  
+</mapper>

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>  
+  
+<project name="oms_server" default="warFile" basedir=".">  
+      
+
+    <property name="warFileName" value="ROOT.war"></property>  
+     
+    <path id="project.lib">  
+        <fileset dir="${basedir}/WebRoot/WEB-INF/lib">	
+            <include name="**/*.jar"/>  
+        </fileset> 
+        <fileset dir="/usr/tomcat/tomcat7/lib">  		
+            <include name="**/*.jar"/>  
+        </fileset>  		
+    </path>  
+      
+
+    <target name="clean">  
+        <delete dir="${basedir}/build" />  
+        <mkdir dir="${basedir}/build" />  
+    </target>  
+      
+
+    <target name="compile" depends="clean">  
+        <javac srcdir="${basedir}/src" destdir="${basedir}/build" includeantruntime="false">  
+            <classpath refid="project.lib">  
+            </classpath>  
+        </javac>  
+    </target>  
+     
+    <target name ="copy">   
+         <copy todir="${basedir}/build">  
+         <fileset dir="src">  		 
+         <exclude name="**/*.java"/>  
+         </fileset>  
+         </copy>
+		 <copy todir="${basedir}/build" overwrite="true">  
+         <fileset dir="/var/lib/jenkins/cf/oms_server/WEB-INF/classes">  			 
+         </fileset>  
+         </copy>
+    </target> 	
+	
+    <target name="warFile">  
+        <delete dir="${basedir}/${warFileName}" />  
+        <war destfile="${basedir}/${warFileName}" webxml="${basedir}/WebRoot/WEB-INF/web.xml">   
+            <fileset dir="${basedir}/WebRoot">  
+                <include name="**/**.*" />  
+                <exclude name="**/*.jar"/>  
+                <exclude name="**/*.class"/>  
+            </fileset> 
+            <lib dir="${basedir}/WebRoot/WEB-INF/lib" />  
+            <classes dir="${basedir}/build" />  
+        </war>  
+    </target> 
+</project>  

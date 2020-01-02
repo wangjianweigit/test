@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.stationed.dao.StationedTemplateDao">
+
+    <sql id="all_column">
+        dt.id,
+        dt.template_name,
+        dt.template_image_url,
+        dt.template_color,
+        dt.support_device,
+        dt.template_style,
+        dt.industry_name,
+        to_char(dt.create_date,'YYYY-MM-DD HH24:MI:SS') create_date,
+        dt.create_user_id,
+        dt.state,
+        dt.is_default,
+        dt.remark,
+        dt.css_path,
+        dt.js_path,
+        dt.directory
+    </sql>
+
+    <sql id="templateListByWhere">
+        <where>
+            dt.support_device = #{support_device, jdbcType=INTEGER}
+            and is_delete = 1
+            <if test="template_name != null and template_name != ''" >
+                and dt.template_name =  #{template_name, jdbcType=VARCHAR}
+            </if>
+            <if test="template_color != null and template_color != ''" >
+                and instr(dt.template_color, #{template_color,jdbcType=VARCHAR}) > 0
+            </if>
+            <if test="template_style != null and template_style != ''" >
+                and instr(dt.template_style, #{template_style,jdbcType=VARCHAR}) > 0
+            </if>
+            <if test="industry_name != null and industry_name != ''" >
+                and dt.industry_name =  #{industry_name, jdbcType=VARCHAR}
+            </if>
+            <if test="start_date!=null and start_date!=''">
+                and dt.create_date &gt;= to_date(#{start_date},'yyyy-mm-dd hh24:mi:ss')
+            </if>
+            <if test="end_date!=null and end_date!=''">
+                and dt.create_date &lt;= to_date(#{end_date},'yyyy-mm-dd hh24:mi:ss')
+            </if>
+            <if test="state != null and state.size()>0">
+                and dt.state IN
+                <foreach item="item" collection="state" open="(" separator="," close=")">
+                    #{item}
+                </foreach>
+            </if>
+        </where>
+    </sql>
+
+    <select id="queryTemplateId" resultType="int">
+        select seq_sta_decorate_template.nextval from dual
+    </select>
+
+
+    <!--通过ID获取模板信息-->
+    <select id="queryById" parameterType="long" resultType="java.util.Map">
+		select <include refid="all_column" />
+		from
+		    tbl_sta_decorate_template dt
+		where
+		    dt.id = #{id,jdbcType=INTEGER}
+	</select>
+
+    <!-- 查询入驻商模板总数 -->
+    <select id="queryCount" parameterType="java.util.Map" resultType="int">
+        select count(1)
+        from tbl_sta_decorate_template dt
+        <include refid="templateListByWhere"/>
+    </select>
+
+    <!--判定是否存在相同模板名称-->
+    <select id="isExistTemplateName" parameterType="java.util.Map" resultType="int">
+        select count(1)
+        from tbl_sta_decorate_template
+        where
+          template_name = #{template_name,jdbcType=VARCHAR}
+            and is_delete = '1'
+            <if test="id != null and id != 0">
+                and id != #{id,jdbcType=INTEGER}
+            </if>
+    </select>
+	<!-- 获取模板列表，其中，商品模板图片仅取第一张图片 -->
+    <select id="queryList" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from
+        (
+            select a.*, rownum rn from
+            (
+                select
+                dt.id,
+		        dt.template_name,
+		        (
+			        case when instr(dt.template_image_url,',') &gt;0 then
+					substr(dt.template_image_url,1,(instr(dt.template_image_url,',')-1))
+					else template_image_url
+					end
+		        ) template_image_url,
+		        dt.template_color,
+		        dt.support_device,
+		        dt.template_style,
+		        dt.industry_name,
+		        to_char(dt.create_date,'YYYY-MM-DD HH24:MI:SS') create_date,
+		        dt.create_user_id,
+		        dt.state,
+		        dt.is_default,
+		        dt.remark,
+		        dt.css_path,
+		        dt.js_path,
+		        dt.directory,
+                (
+                    select count(1) from tbl_sta_decorate_info di
+                    where di.template_id = dt.id and di.is_delete = 1
+                ) as use_count,
+                ui.user_realname
+                from tbl_sta_decorate_template dt
+                left join tbl_sys_user_info ui on dt.create_user_id = ui.id
+                <include refid="templateListByWhere"/>
+            ) a
+            where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        )
+        where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!-- 插入或更新 -->
+    <update id="insertOrUpdate" parameterType="java.util.Map">
+        merge into tbl_sta_decorate_template c1
+        using
+        (
+            select
+                #{ID,jdbcType=INTEGER} id,
+                #{TEMPLATE_NAME,jdbcType=VARCHAR} template_name,
+                #{IMAGE_URL,jdbcType=VARCHAR} template_image_url,
+                #{TEMPLATE_COLOR,jdbcType=VARCHAR} template_color,
+                #{SUPPORT_DEVICE,jdbcType=INTEGER} support_device,
+                #{TEMPLATE_STYLE,jdbcType=VARCHAR} template_style,
+                #{INDUSTRY_NAME,jdbcType=VARCHAR} industry_name,
+                #{JS_PATH,jdbcType=VARCHAR} js_path,
+                #{CSS_PATH,jdbcType=VARCHAR} css_path,
+                #{content,jdbcType=VARCHAR} remark
+            from dual
+        ) t1 on (t1.id = c1.id)
+        when matched then
+            update set
+                c1.template_name = t1.template_name,
+                c1.template_image_url = t1.template_image_url,
+                c1.template_color = t1.template_color,
+                c1.template_style = t1.template_style,
+                c1.industry_name = t1.industry_name ,
+                c1.js_path = t1.js_path,
+                c1.css_path = t1.css_path,
+                c1.remark = t1.remark
+        when not matched then
+            insert (
+                id,
+                support_device,
+                template_name,
+                template_color,
+                template_image_url,
+                remark,
+                css_path,
+                js_path,
+                create_date,
+                create_user_id,
+                template_style,
+                industry_name,
+                directory
+            ) values (
+                t1.id,
+                t1.support_device,
+                t1.template_name,
+                t1.template_color,
+                t1.template_image_url,
+                t1.remark,
+                t1.css_path,
+                t1.js_path,
+                sysdate,
+                #{public_user_id,jdbcType=INTEGER},
+                t1.template_style,
+                t1.industry_name,
+                #{DIRECTORY,jdbcType=VARCHAR}
+            )
+    </update>
+
+    <update id="update" parameterType="java.util.Map">
+        update tbl_sta_decorate_template
+        <set>
+            <if test="state!= null and state != ''">
+                state = #{state, jdbcType=INTEGER}
+            </if>
+            <if test="is_default!= null and is_default != ''">
+                is_default = #{is_default, jdbcType=INTEGER}
+            </if>
+        </set>
+        where id = #{id, jdbcType=INTEGER}
+    </update>
+
+    <!-- 更新不等于模板ID的模板默认状态 -->
+    <update id="updateByDefault" parameterType="java.util.Map">
+         update tbl_sta_decorate_template
+            set is_default = 1
+         where id != #{id, jdbcType=INTEGER}
+            and support_device = #{support_device, jdbcType=INTEGER}
+    </update>
+
+    <!-- 逻辑删除活动信息 -->
+    <update id="updateIsDelete" parameterType="java.util.Map">
+    	UPDATE tbl_sta_decorate_template
+		   SET is_delete = '2'
+    	WHERE id = #{id,jdbcType=INTEGER}
+	</update>
+
+</mapper>

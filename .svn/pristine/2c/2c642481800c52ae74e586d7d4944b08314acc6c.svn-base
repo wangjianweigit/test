@@ -1,0 +1,39 @@
+package com.tk.oms.marketing.dao;
+
+import org.apache.ibatis.annotations.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.Map;
+
+@Repository
+public interface ClearActivityDao {
+
+	/**
+	 * 新增清尾活动信息
+	 * @param params
+	 * @return
+	 */
+	int insertClearActivity(Map<String,Object> params);
+
+	/**
+	 * 更新清尾活动信息
+	 * @param params
+	 * @return
+	 */
+	int updateClearActivity(Map<String,Object> params);
+
+	/**
+	 * 更新清尾活动页面装修信息
+	 * @param params
+	 * @return
+	 */
+	int updateClearActivityDecorate(Map<String,Object> params);
+
+	/**
+	 * 根据活动ID查询清尾活动
+	 * @param paramId
+	 * @return
+	 */
+	Map<String,Object> getClearActivityByActivityId(@Param("activity_id") long paramId);
+	
+}

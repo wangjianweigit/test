@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.basicinfo.dao.LogisticsCompanyDao">
+	<sql id="all_column">
+       id, 
+       code,
+       name,
+       type,
+       sort_id,
+       state
+	</sql>
+	<resultMap type="java.util.Map" id="resultDetailMap">
+		<result column="id" property="id"/>
+		<result column="code" property="code"/>
+		<result column="name" property="name"/>
+		<result column="type" property="type"/>
+		<result column="state" property="state"/>
+		<result column="standard_logistics_id" property="standard_logistics_id"/>
+		<result column="shipping_method_id" property="shipping_method_id"/>
+	</resultMap>
+	<!-- 查询物流公司列表 -->
+	<select id="queryLogisticsCompanyList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+			select T.*,rownum as rn from (
+		        select
+					l.*,
+					(select count(id) cnt from tbl_user_logistics_company where logistics_company_id = l.id) cnt,
+ 					(select logistics_name from tbl_standard_logistics where l.standard_logistics_id = id) logistics_name ,
+					(select method_name from tbl_shipping_method where l.shipping_method_id = id) shipping_method_name
+		        from tbl_logistics_company  l
+				<where>
+					type != '3'
+					<if test="name !=null and name !=''">
+						and name like concat(concat('%', #{name,jdbcType=VARCHAR}),'%')
+					</if>
+					<if test="shipping_method_id !=null and shipping_method_id !=''">
+                        and shipping_method_id = #{shipping_method_id,jdbcType=INTEGER}
+					</if>
+					<if test="type != null">
+					   and type in
+					   <foreach item="item" collection="type" open="(" separator="," close=")">
+							#{item}
+					   </foreach>
+					</if>
+				</where>
+		        order by type,sort_id desc) T
+				where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	 <!-- 查询物流公司总数量 -->
+	<select id="queryLogisticsCompanyCount" parameterType="java.util.Map" resultType="int">
+		select count(1) cnt
+		  from tbl_logistics_company
+		  <where>
+		  	type != '3'
+		  	<if test="name !=null and name !=''">
+		  		and name like concat(concat('%', #{name,jdbcType=VARCHAR}),'%')
+		  	</if>
+            <if test="shipping_method_id !=null and shipping_method_id !=''">
+                and shipping_method_id = #{shipping_method_id,jdbcType=INTEGER}
+            </if>
+		  	<if test="type != null">
+			   and type in
+			   <foreach item="item" collection="type" open="(" separator="," close=")">
+					#{item}
+			   </foreach>
+			</if>
+		  </where>
+	</select>
+	<!-- 查询物流公司详细信息 -->
+	<select id="queryLogisticsCompanyDetail"  parameterType="java.util.Map" resultType="java.util.Map" resultMap="resultDetailMap">
+		select id,code,name,type,state,standard_logistics_id,shipping_method_id from tbl_logistics_company
+		<where> id = #{id,jdbcType=INTEGER}
+		<if test="code!=null">
+			or code=#{code,jdbcType=INTEGER}
+		</if>
+		</where>
+	</select>
+	
+	<!-- 新增物流公司信息 -->
+	<insert id="insert" parameterType="java.util.Map" >
+		 <selectKey keyProperty="id" resultType="long" order="BEFORE">
+			select seq_logistics_company.nextval from dual
+		</selectKey> 
+		insert into tbl_logistics_company(
+			id,
+			code,
+			name,
+			type,
+			sort_id,
+			state,
+			standard_logistics_id,
+            shipping_method_id,
+			create_date,
+			create_user_id
+		)
+		values
+		(
+			#{id,jdbcType=INTEGER},
+			#{code,jdbcType=VARCHAR},
+			#{name,jdbcType=VARCHAR},
+			#{type,jdbcType=CHAR},
+			(select nvl(max(sort_id),0) + 1 from tbl_logistics_company),
+			#{state,jdbcType=CHAR},
+			#{standard_logistics_id,jdbcType=INTEGER},
+			#{shipping_method_id,jdbcType=INTEGER},
+			sysdate,
+			#{public_user_id,jdbcType=VARCHAR}
+		)
+	</insert>
+	
+	<!-- 更新物流公司信息 -->
+	<update id="update" parameterType="java.util.Map">
+		update tbl_logistics_company
+		<set>
+			<if test="code!=null and code !=''">
+				code=#{code,jdbcType=VARCHAR},
+			</if>
+			<if test="name!=null and name !=''">
+				name=#{name,jdbcType=VARCHAR},
+			</if>
+			<if test="type!=null and type !=''">
+				type=#{type,jdbcType=CHAR},
+			</if>
+            <if test="state !=null and state !=''">
+				state=#{state,jdbcType=CHAR},
+			</if>
+			<if test="standard_logistics_id != null and standard_logistics_id != ''">
+				standard_logistics_id = #{standard_logistics_id,jdbcType=INTEGER},
+			</if>
+			<if test="shipping_method_id != null and shipping_method_id != ''">
+                shipping_method_id = #{shipping_method_id,jdbcType=INTEGER},
+			</if>
+			<if test="sort_id!=null">
+               	sort_id = #{sort_id,jdbcType=INTEGER}
+            </if>
+		</set>
+		where id = #{id,jdbcType=INTEGER}
+	</update>
+	
+	<!-- 删除物流公司信息-->
+	<delete id="delete"  parameterType="java.util.Map">
+		delete from tbl_logistics_company  where id = #{id,jdbcType=INTEGER}
+	</delete>
+	
+	<!-- 物流公司代码是否重复 -->
+	<select id="queryLogisticsByCode" parameterType="java.util.Map" resultType="int">
+		select
+		count(1)
+		from tbl_logistics_company
+		<where>
+			code = #{code,jdbcType=VARCHAR}
+			<if test="id!=null">
+			and id !=#{id,jdbcType=INTEGER}
+			</if>
+		</where>
+	</select>
+	<!-- 物流公司名称是否重复 -->
+	<select id="queryLogisticsByName" parameterType="java.util.Map" resultType="int">
+		select
+		count(1)
+		from tbl_logistics_company
+		<where>
+			name = #{name,jdbcType=VARCHAR}
+			<if test="id!=null">
+			and id !=#{id,jdbcType=INTEGER}
+			</if>
+		</where>
+	</select>
+	<!-- 删除物流公司为用户可用记录 -->
+	<delete id="deleteLogisticsForUser"  parameterType="java.util.Map">
+		delete from tbl_user_logistics_company  where logistics_company_id = #{id,jdbcType=INTEGER}
+	</delete>
+		<!-- 查看物流公司关联用户数量-->
+	<select  id="queryLogisticsForUser" parameterType="java.util.Map" resultType="java.util.Map"  >
+		select count(1) cnt from tbl_user_logistics_company where logistics_company_id = #{id,jdbcType=INTEGER}
+	</select>
+	<!-- 查询排序ID -->
+	<select id="queryById" parameterType="long" resultType="java.util.Map">
+        select sort_id
+        from tbl_logistics_company where id=#{id,jdbcType=INTEGER}
+    </select>
+    <!-- 分类返回物流公司 -->
+    <select id="queryLogisticsList" parameterType="java.util.Map" resultType="java.util.Map" >
+     	select
+		<include refid="all_column" />
+		from tbl_logistics_company
+        <where>
+            <if test="id!=null and id!=0 ">
+                id = #{id}
+            </if>
+            <if test="code!=null and code!='' ">
+                and code = #{code}
+            </if>
+            <if test="name!=null and name!='' ">
+                and name = #{name}
+            </if>
+            <if test="type!=null and type!='\u0000' ">
+                and type = #{type}
+            </if>
+        </where>
+        order by sort_id desc
+    </select>
+    
+    <!-- 分类返回物流公司 -->
+    <select id="queryLogisticsCompany" parameterType="java.util.Map" resultType="java.util.Map" >
+     	select id,code,name
+		from tbl_logistics_company
+	   where type=#{order_type,jdbcType=CHAR}
+	     and shipping_method_id = #{shipping_method_id,jdbcType=INTEGER}
+        order by sort_id desc
+    </select>
+    <!-- 更新排序 -->
+    <update id="updateSort" parameterType="java.util.Map">
+    	update tbl_logistics_company
+    		<set>
+	            <if test="type == 'top'">
+					sort_id = (select max(sort_id) + 1 from tbl_logistics_company)
+				</if>
+				<if test="type == 'bottom'">
+					sort_id = (select min(sort_id) - 1 from tbl_logistics_company)
+				</if>
+    		</set>
+    	where id = #{id,jdbcType=INTEGER}
+    </update>
+    <!-- 查询配送方式下拉列表 -->
+    <select id="queryDistributionMethodOption" parameterType="java.util.Map" resultMap="logisticsCompanyMap" >
+     	select id,method_name
+			from tbl_shipping_method
+		where state=2 and delete_flag=0
+        order by sort desc
+    </select>
+    <resultMap id="logisticsCompanyMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="method_name" property="option"/>
+    </resultMap>
+    <!--批量新增平台会员可用配送方式与标准物流的关联关系表数据-->
+	<insert id="batchStandardLogisticsComRef" parameterType="java.util.Map">
+		insert into TBL_STANDARD_LOGISTICS_COM_REF(
+			logistics_company_id,
+			standard_logistics_id
+		)
+		 select 
+		 	   #{logistics_company_id,jdbcType=INTEGER} logistics_company_id,
+			   A.standard_logistics_id
+	       	   from (
+			       <foreach collection="standard_logistics_id_list"  item="item" separator="UNION">
+			            SELECT 
+			            #{item,jdbcType=INTEGER} AS standard_logistics_id
+			            FROM DUAL
+			       </foreach>
+	       	  ) A
+	</insert>
+    <!--批量删除平台会员可用配送方式与标准物流的关联关系表数据-->
+	<delete id="delStandardLogisticsComRef" parameterType="java.util.Map">
+		delete from TBL_STANDARD_LOGISTICS_COM_REF where logistics_company_id =  #{logistics_company_id,jdbcType=INTEGER} 
+	</delete>
+</mapper>

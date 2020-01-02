@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	   xmlns:mvc="http://www.springframework.org/schema/mvc"
+	   xmlns:p="http://www.springframework.org/schema/p"
+	   xmlns:context="http://www.springframework.org/schema/context"
+	   xmlns:aop="http://www.springframework.org/schema/aop"
+	   xmlns:tx="http://www.springframework.org/schema/tx" xmlns:task="http://www.springframework.org/schema/task"
+	   xsi:schemaLocation="http://www.springframework.org/schema/beans
+			http://www.springframework.org/schema/beans/spring-beans-4.2.xsd
+			http://www.springframework.org/schema/context 
+			http://www.springframework.org/schema/context/spring-context-4.2.xsd
+			http://www.springframework.org/schema/aop 
+			http://www.springframework.org/schema/aop/spring-aop-4.2.xsd
+			http://www.springframework.org/schema/tx 
+			http://www.springframework.org/schema/tx/spring-tx-4.2.xsd
+			http://www.springframework.org/schema/mvc 
+			http://www.springframework.org/schema/mvc/spring-mvc-4.2.xsd http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task.xsd">
+    
+	<!-- 数据库配置信息 -->
+	<bean id="jdbcConfig" class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+		<!--<property name="locations" value="classpath:resources/jdbc.properties" />-->
+		<property name="locations" >
+			<list>
+                <value>classpath:resources/*.properties</value>
+			</list>
+			</property>
+	</bean>
+	
+	<!-- 配置DRUID类型数据源Master节点数据源 -->
+	<bean id="masterDataSource" class="com.alibaba.druid.pool.DruidDataSource" init-method="init" destroy-method="close"> 
+	    <!-- 基本属性driverClassName、url、username、password -->
+		<property name="driverClassName" value="${jdbc.driverClassName}" />
+	    <property name="url" value="${jdbc.url}" />
+	    <property name="username" value="${jdbc.username}" />
+	    <property name="password" value="${jdbc.password}" />
+	    
+	    <!-- 配置初始化大小、最小、最大 -->
+	    <property name="initialSize" value="10" />
+	    <property name="minIdle" value="10" /> 
+	    <property name="maxActive" value="50" />
+	    
+	    <!-- 配置获取连接等待超时的时间 -->
+	    <property name="maxWait" value="20000" />
+	    
+	    <!-- 配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位是毫秒 -->
+	    <property name="timeBetweenEvictionRunsMillis" value="60000" />
+	    
+	    <!-- 配置一个连接在池中最小生存的时间，单位是毫秒 -->
+	    <property name="minEvictableIdleTimeMillis" value="300000" />
+	    
+	    <property name="validationQuery" value="select 1 from dual" />
+	    <property name="testWhileIdle" value="true" />
+	    <property name="testOnBorrow" value="true" />
+	    <property name="testOnReturn" value="true" />
+	    
+	    <!-- 打开PSCache，并且指定每个连接上PSCache的大小 -->
+	    <property name="poolPreparedStatements" value="true" />
+	    <property name="maxPoolPreparedStatementPerConnectionSize" value="20" />
+	    
+	    <!-- 配置监控统计拦截的filters，去掉后监控界面sql无法统计 -->
+	    <property name="filters" value="stat" /> 
+	</bean>
+	
+	<!-- 配置DRUID类型数据源Slave节点01数据源 -->
+	<bean id="slave01DataSource" class="com.alibaba.druid.pool.DruidDataSource" init-method="init" destroy-method="close"> 
+	    <!-- 基本属性driverClassName、url、username、password -->
+		<property name="driverClassName" value="${jdbc.driverClassName.slave}" />
+	    <property name="url" value="${jdbc.url.slave}" />
+	    <property name="username" value="${jdbc.username.slave}" />
+	    <property name="password" value="${jdbc.password.slave}" />
+	    
+	    <!-- 配置初始化大小、最小、最大 -->
+	    <property name="initialSize" value="10" />
+	    <property name="minIdle" value="10" /> 
+	    <property name="maxActive" value="50" />
+	    
+	    <!-- 配置获取连接等待超时的时间 -->
+	    <property name="maxWait" value="20000" />
+	    
+	    <!-- 配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位是毫秒 -->
+	    <property name="timeBetweenEvictionRunsMillis" value="60000" />
+	    
+	    <!-- 配置一个连接在池中最小生存的时间，单位是毫秒 -->
+	    <property name="minEvictableIdleTimeMillis" value="300000" />
+	    
+	    <property name="validationQuery" value="select 1 from dual" />
+	    <property name="testWhileIdle" value="true" />
+	    <property name="testOnBorrow" value="true" />
+	    <property name="testOnReturn" value="true" />
+	    
+	    <!-- 打开PSCache，并且指定每个连接上PSCache的大小 -->
+	    <property name="poolPreparedStatements" value="true" />
+	    <property name="maxPoolPreparedStatementPerConnectionSize" value="20" />
+	    
+	    <!-- 配置监控统计拦截的filters，去掉后监控界面sql无法统计 -->
+	    <property name="filters" value="stat" /> 
+	</bean>
+	
+	<!-- 去掉对controller的扫描 -->
+	<context:component-scan base-package="com.tk">
+		<context:exclude-filter type="annotation" expression="org.springframework.stereotype.Controller" />
+	</context:component-scan>
+	
+	<!-- 配置动态数据源  -->
+	<bean id="dataSource" class="com.tk.sys.util.DynamicDataSource">
+        <!-- 设置多个数据源 -->
+        <property name="targetDataSources">
+            <map key-type="java.lang.String">
+                <!-- 这个key需要和程序中的key一致 -->
+                <entry key="master" value-ref="masterDataSource"/>
+                <entry key="slave" value-ref="slave01DataSource"/>
+            </map>
+        </property>
+        <!-- 设置默认的数据源，这里默认走写库 -->
+        <property name="defaultTargetDataSource" ref="masterDataSource"/>
+    </bean> 
+	
+	<!-- 使用 mybatis作为持久层框架 -->
+	<bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<!-- dataSource属性指定要用到的连接池 -->
+		<property name="dataSource" ref="dataSource" />
+		<!-- mybatis全局配置 -->
+        <property name="configLocation" value="classpath:resources/mybatis-config.xml"/>
+		<!-- 所有配置的mapper文件 -->
+		<!--<property name="mapperLocations" value="classpath*:/com/tk/oms/*/mapper/*.xml" />-->
+		<property name="mapperLocations" >
+			<list>
+                <value>classpath*:/com/tk/oms/*/mapper/*.xml</value>
+                <value>classpath*:/com/tk/store/*/mapper/*.xml</value>
+                <value>classpath*:/com/tk/pvtp/*/mapper/*.xml</value>
+			</list>
+		</property>
+	</bean>
+	
+	<!-- 声明使用注解式事务 -->
+	<tx:annotation-driven transaction-manager="transactionManager"/>
+
+	<!-- 定义事务处理类，不同的数据访问方式，事务处理类不同 -->
+	<bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dataSource"></property>
+	</bean>
+
+	<!-- MapperScannerConfigurer配置Spring完成Mybatis的代理，只定义接口，由Spring完成实现 -->
+	<bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+		<!-- 扫描器开始扫描的基础包名，支持嵌套扫描 -->
+		<property name="basePackage" value="com.tk.oms;com.tk.store;com.tk.pvtp" />
+	</bean>
+	
+	<!-- 初始缓存数据，初始化spring中定义的bean的前后都会用此实现类 -->
+	<bean id="cacheBeanPostProcessor" class="com.tk.oms.cache.CacheBeanPostProcess"/>
+
+	<!-- <aop:aspectj-autoproxy /> -->
+
+	<task:executor id="executor" pool-size="5"/>
+	<task:annotation-driven executor="executor"/>
+	<!-- 引入rabbitmq配置 -->
+	<import resource="classpath:resources/spring-rabbitmq*.xml" />
+	<!-- 引入主从库配置 -->
+	<import resource="classpath:resources/spring-aop.xml" />
+</beans>

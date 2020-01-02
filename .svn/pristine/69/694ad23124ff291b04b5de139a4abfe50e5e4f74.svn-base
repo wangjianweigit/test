@@ -1,0 +1,774 @@
+package com.tk.oms.product.control;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import com.tk.oms.product.service.ProductService;
+import com.tk.sys.util.Packet;
+import com.tk.sys.util.ProcessResult;
+import com.tk.sys.util.Transform;
+
+/**
+ * 
+ * Copyright (c), 2017, Tongku
+ * FileName : ProductControl
+ * 商品管理
+ * 
+ * @author shifan
+ * @version 1.00
+ * @date 2017-4-6
+ */
+@Controller
+@RequestMapping("/product")
+public class ProductControl {
+
+	@Resource
+	private ProductService productService;
+	
+	/**
+    *
+    * @api {post} /{project_name}/product/pending_approval_list 待审批商品列表
+    * @apiGroup product
+    * @apiDescription  入驻商品发布的商品基本信息、报价信息待审批列表
+    * @apiVersion 0.0.1
+
+	* @apiParam {number} pageIndex				页码 （第几页） 
+	* @apiParam {number} pageSize				每页多少条   
+
+    * @apiSuccess {boolean} state 接口获取数据是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    * @apiSuccess {object[]} obj 待审批商品列表
+    * @apiSuccess {number} obj.ID			主键ID
+    * @apiSuccess {number} obj.STATIONED_USER_ID 入驻商ID
+	* @apiSuccess {number} obj.BRAND_ID		品牌ID
+	* @apiSuccess {number} obj.PRODUCT_TYPE_ID			商品类别ID  
+	* @apiSuccess {string} obj.ITEMNUMBER			货号   
+	* @apiSuccess {string} obj.PRODUCT_NAME		商品名称,不允许重名      
+	* @apiSuccess {number} obj.YEAR		年份
+	* @apiSuccess {string} obj.SEASON	季节
+	* @apiSuccess {string} obj.SEX			性别（男童、女童、中性）
+	* @apiSuccess {string} obj.CREATE_DATE			创建日期
+	* @apiSuccess {number} obj.CREATE_USER_ID		创建人
+	* @apiSuccess {string} obj.UPDATE_DATE			编辑日期
+	* @apiSuccess {number} obj.UPDATE_USER_ID		编辑人ID
+	* @apiSuccess {string} obj.APPROVAL_DATE		审批日期
+	* @apiSuccess {number} obj.APPROVAL_USER_ID		审批人ID
+	* @apiSuccess {string} obj.UNIT			计量单位
+	* @apiSuccess {string} obj.PRODUCT_IMG_URL		商品主图路径
+	* @apiSuccess {string} obj.PRODUCT_STATE		商品状态
+	* @apiSuccess {number} obj.IS_OUTSTOCK			是否支持缺货订购（0：不支持，1：支持）
+	* @apiSuccess {number} obj.IS_OUTSTOCK_DAY		备货周期
+	* @apiSuccess {string} obj.PRODUCT_CONTENT		商品详情
+	* @apiSuccess {number} obj.IS_PRESALE		是否为商品预售（0：不是，1：是预售）
+	* @apiSuccess {string} obj.PRESALE_DEADLINE_DATE		预售截至日期
+	* @apiSuccess {string} obj.LAST_UP_DATE		上新日期
+	* @apiSuccess {number} obj.UP_PERIOD		上新周期（默认5天）
+	* @apiSuccess {string} obj.STATE		状态 1（草稿）     2（待审批）    3（已审核通过）    4（已驳回）  -1(已归档历史记录)
+	* @apiSuccess {number} obj.DISTRICT_TEMPLET_ID 区域模板ID
+    */
+	@RequestMapping(value = "/pending_approval_list", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet queryPendingApprovalProductList(HttpServletRequest request) {
+		return Transform.GetResult(productService.queryPendingApprovalProductList(request));
+	}
+	
+	/**
+    *
+    * @api {post} /{project_name}/product/pending_approval_detail 待审批商品详情
+    * @apiGroup product
+    * @apiDescription  入驻商发布的待审批详情
+    * @apiVersion 0.0.1
+
+	* @apiParam {number} id				申请ID 
+
+    * @apiSuccess {boolean} state 接口获取数据是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    * @apiSuccess {object} obj 待审批商品详情
+    * @apiSuccess {string} obj.product_flag 01-新发布商品 02-商品更新
+    * @apiSuccess {object} obj.base_info 待审批商品基本信息
+    * @apiSuccess {number} obj.base_info.ID			主键ID
+    * @apiSuccess {number} obj.base_info.STATIONED_USER_ID 入驻商ID
+	* @apiSuccess {number} obj.base_info.BRAND_ID		品牌ID
+	* @apiSuccess {number} obj.base_info.PRODUCT_TYPE_ID			商品类别ID  
+	* @apiSuccess {string} obj.base_info.ITEMNUMBER			货号   
+	* @apiSuccess {string} obj.base_info.PRODUCT_NAME		商品名称,不允许重名      
+	* @apiSuccess {number} obj.base_info.YEAR		年份
+	* @apiSuccess {string} obj.base_info.SEASON	季节
+	* @apiSuccess {string} obj.base_info.SEX			性别（男童、女童、中性）
+	* @apiSuccess {string} obj.base_info.CREATE_DATE			创建日期
+	* @apiSuccess {number} obj.base_info.CREATE_USER_ID		创建人
+	* @apiSuccess {string} obj.base_info.UPDATE_DATE			编辑日期
+	* @apiSuccess {number} obj.base_info.UPDATE_USER_ID		编辑人ID
+	* @apiSuccess {string} obj.base_info.APPROVAL_DATE		审批日期
+	* @apiSuccess {number} obj.base_info.APPROVAL_USER_ID		审批人ID
+	* @apiSuccess {string} obj.base_info.UNIT			计量单位
+	* @apiSuccess {string} obj.base_info.PRODUCT_IMG_URL		商品主图路径
+	* @apiSuccess {string} obj.base_info.PRODUCT_STATE		商品状态
+	* @apiSuccess {number} obj.base_info.IS_OUTSTOCK			是否支持缺货订购（0：不支持，1：支持）
+	* @apiSuccess {number} obj.base_info.IS_OUTSTOCK_DAY		备货周期
+	* @apiSuccess {string} obj.base_info.PRODUCT_CONTENT		商品详情
+	* @apiSuccess {number} obj.base_info.IS_PRESALE		是否为商品预售（0：不是，1：是预售）
+	* @apiSuccess {string} obj.base_info.PRESALE_DEADLINE_DATE		预售截至日期
+	* @apiSuccess {string} obj.base_info.LAST_UP_DATE		上新日期
+	* @apiSuccess {number} obj.base_info.UP_PERIOD		上新周期（默认5天）
+	* @apiSuccess {string} obj.base_info.STATE		状态 1（草稿）     2（待审批）    3（已审核通过）    4（已驳回）  -1(已归档历史记录)
+	* @apiSuccess {number} obj.base_info.DISTRICT_TEMPLET_ID 区域模板ID
+	* 
+	* @apiSuccess {string} obj.base_info.OLD_PRODUCT_NAME		商品名称,不允许重名 (old)     
+	* @apiSuccess {string} obj.base_info.OLD_SEX			性别（男童、女童、中性）(old)
+	* @apiSuccess {string} obj.base_info.OLD_UNIT			计量单位(old)
+	* @apiSuccess {string} obj.base_info.OLD_PRODUCT_IMG_URL		商品主图路径(old)
+	* @apiSuccess {string} obj.base_info.OLD_PRODUCT_STATE		商品状态(old)
+	* @apiSuccess {number} obj.base_info.OLD_IS_OUTSTOCK			是否支持缺货订购（0：不支持，1：支持）(old)
+	* @apiSuccess {number} obj.base_info.OLD_IS_OUTSTOCK_DAY		备货周期(old)
+	* @apiSuccess {string} obj.base_info.OLD_PRODUCT_CONTENT		商品详情(old)
+	* @apiSuccess {number} obj.base_info.OLD_IS_PRESALE		是否为商品预售（0：不是，1：是预售）(old)
+	* @apiSuccess {string} obj.base_info.OLD_PRESALE_DEADLINE_DATE		预售截至日期(old)
+	* @apiSuccess {string} obj.base_info.OLD_LAST_UP_DATE		上新日期(old)
+	* @apiSuccess {number} obj.base_info.OLD_UP_PERIOD		上新周期（默认5天）(old)
+	* @apiSuccess {number} obj.base_info.OLD_DISTRICT_TEMPLET_ID 区域模板ID(old)
+	* 
+	* @apiSuccess {object[]} obj.params_info 待审批商品参数信息
+	* @apiSuccess {number} obj.params_info.STATIONED_USER_ID 入驻商ID
+	* @apiSuccess {number} obj.params_info.PRODUCT_APPLY_ID  申请ID 
+	* @apiSuccess {number} obj.params_info.PARAMETER_ID 商品参数ID
+	* @apiSuccess {string} obj.params_info.PARAMETER_VALUE 商品参数值
+	* @apiSuccess {string} obj.params_info.OLD_PARAMETER_VALUE 商品参数值(old)
+	* 
+	* @apiSuccess {object[]} obj.skus_info 待审批商品sku信息
+	* @apiSuccess {number} obj.skus_info.ID sku主键ID
+	* @apiSuccess {number} obj.skus_info.STATIONED_USER_ID  入驻商ID 
+	* @apiSuccess {number} obj.skus_info.PRODUCT_APPLY_ID 申请ID
+	* @apiSuccess {string} obj.skus_info.PRODUCT_COLOR 商品颜色
+	* @apiSuccess {string} obj.skus_info.PRODUCT_SPECS 商品规格
+	* @apiSuccess {string} obj.skus_info.PRODUCT_SIZE 商品尺码
+	* @apiSuccess {string} obj.skus_info.PRODUCT_COLOR_IMGURL 商品颜色图片
+	* @apiSuccess {number} obj.skus_info.PRODUCT_QUOTE  商品报价 
+	* @apiSuccess {number} obj.skus_info.PRODUCT_PRIZE_TAG  吊牌价 
+	* @apiSuccess {number} obj.skus_info.PRODUCT_PRIZE_SALE  销售价 
+	* @apiSuccess {number} obj.skus_info.PRODUCT_PRIZE_COST  成本价 
+	* @apiSuccess {number} obj.skus_info.PRODUCT_WARNING_COUNT  库存预警数 
+	* @apiSuccess {number} obj.skus_info.PRODUCT_WEIGHT  商品重量 
+	* @apiSuccess {string} obj.skus_info.PRODUCT_GBCODE 国标码
+	* @apiSuccess {number} obj.skus_info.PRODUCT_INLONG  内长
+	* @apiSuccess {number} obj.skus_info.PRODUCT_BOOK_COUNT  商品预售数量,仅预售商品需要填写该字段 
+	* @apiSuccess {string} obj.skus_info.STATE  上架状态（待上架、上架、下架）  
+	* @apiSuccess {number} obj.skus_info.SORT_ID 排序，从小到大
+	* 
+	* @apiSuccess {string} obj.skus_info.OLD_PRODUCT_COLOR 商品颜色(old)
+	* @apiSuccess {string} obj.skus_info.OLD_PRODUCT_SPECS 商品规格(old)
+	* @apiSuccess {string} obj.skus_info.OLD_PRODUCT_SIZE 商品尺码(old)
+	* @apiSuccess {string} obj.skus_info.OLD_PRODUCT_COLOR_IMGURL 商品颜色图片(old)
+	* @apiSuccess {number} obj.skus_info.OLD_PRODUCT_QUOTE  商品报价 (old)
+	* @apiSuccess {number} obj.skus_info.OLD_PRODUCT_PRIZE_TAG  吊牌价 (old)
+	* @apiSuccess {number} obj.skus_info.OLD_PRODUCT_PRIZE_SALE  销售价 (old)
+	* @apiSuccess {number} obj.skus_info.OLD_PRODUCT_PRIZE_COST  成本价 (old)
+	* @apiSuccess {number} obj.skus_info.OLD_PRODUCT_WARNING_COUNT  库存预警数 (old)
+	* @apiSuccess {number} obj.skus_info.OLD_PRODUCT_WEIGHT  商品重量 (old)
+	* @apiSuccess {string} obj.skus_info.OLD_PRODUCT_GBCODE 国标码(old)
+	* @apiSuccess {number} obj.skus_info.OLD_PRODUCT_INLONG  内长(old)
+	* @apiSuccess {number} obj.skus_info.OLD_PRODUCT_BOOK_COUNT  商品预售数量,仅预售商品需要填写该字段 (old)
+	* @apiSuccess {string} obj.skus_info.OLD_STATE  上架状态（待上架、上架、下架）(old)  
+	* @apiSuccess {number} obj.skus_info.OLD_SORT_ID 排序，从小到大(old)
+    */
+	@RequestMapping(value = "/pending_approval_detail", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet queryPendingApprovalProductDetail(HttpServletRequest request) {
+		return Transform.GetResult(productService.queryPendingApprovalProductDetail(request));
+	}
+
+
+	/** 
+	* @api {post} /{project_name}/product/approve 待审批商品审批通过
+    * @apiGroup product
+    * @apiDescription  待审批商品审批通过
+    * @apiVersion 0.0.1
+    * 
+	* @apiParam {number} id				待审批ID 
+	* 
+    * @apiSuccess {boolean} state 接口审核是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    */
+	@RequestMapping(value = "/approve", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet productApproved(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try{
+			pr=productService.productApproved(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+	}
+	
+	/** 
+	* @api {post} /{project_name}/product/reject 待审批商品审批驳回
+    * @apiGroup product
+    * @apiDescription  待审批商品审批驳回
+    * @apiVersion 0.0.1
+    * 
+	* @apiParam {number} id				待审批ID 
+    * @apiSuccess {boolean} state 接口审核驳回是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    */
+	@RequestMapping(value = "/reject", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet productRejected(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try{
+			pr=productService.productRejected(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+	}
+	
+	/**
+    *
+    * @api {post} /{project_name}/product/list 商品列表[已审批]
+    * @apiGroup product
+    * @apiDescription  入驻商品发布成功的商品列表
+    * @apiVersion 0.0.1
+
+	* @apiParam {number} pageIndex				页码 （第几页） 
+	* @apiParam {number} pageSize				每页多少条   
+
+    * @apiSuccess {boolean} state 接口获取数据是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    * @apiSuccess {object[]} obj 商品列表
+    * @apiSuccess {number} obj.ID			主键ID
+    * @apiSuccess {number} obj.STATIONED_USER_ID 入驻商ID
+	* @apiSuccess {number} obj.BRAND_ID		品牌ID
+	* @apiSuccess {number} obj.PRODUCT_TYPE_ID			商品类别ID  
+	* @apiSuccess {string} obj.ITEMNUMBER			货号   
+	* @apiSuccess {string} obj.PRODUCT_NAME		商品名称,不允许重名      
+	* @apiSuccess {number} obj.YEAR		年份
+	* @apiSuccess {string} obj.SEASON	季节
+	* @apiSuccess {string} obj.SEX			性别（男童、女童、中性）
+	* @apiSuccess {string} obj.CREATE_DATE			创建日期
+	* @apiSuccess {number} obj.CREATE_USER_ID		创建人
+	* @apiSuccess {string} obj.UPDATE_DATE			编辑日期
+	* @apiSuccess {number} obj.UPDATE_USER_ID		编辑人ID
+	* @apiSuccess {string} obj.APPROVAL_DATE		审批日期
+	* @apiSuccess {number} obj.APPROVAL_USER_ID		审批人ID
+	* @apiSuccess {string} obj.UNIT			计量单位
+	* @apiSuccess {string} obj.PRODUCT_IMG_URL		商品主图路径
+	* @apiSuccess {string} obj.PRODUCT_STATE		商品状态
+	* @apiSuccess {number} obj.IS_OUTSTOCK			是否支持缺货订购（0：不支持，1：支持）
+	* @apiSuccess {number} obj.IS_OUTSTOCK_DAY		备货周期
+	* @apiSuccess {string} obj.PRODUCT_CONTENT		商品详情
+	* @apiSuccess {number} obj.IS_PRESALE		是否为商品预售（0：不是，1：是预售）
+	* @apiSuccess {string} obj.PRESALE_DEADLINE_DATE		预售截至日期
+	* @apiSuccess {string} obj.LAST_UP_DATE		上新日期
+	* @apiSuccess {number} obj.UP_PERIOD		上新周期（默认5天）
+	* @apiSuccess {number} obj.DISTRICT_TEMPLET_ID 区域模板ID
+    */
+	@RequestMapping(value = "/list", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet queryProductList(HttpServletRequest request) {
+		return Transform.GetResult(productService.queryProductList(request));
+	}
+	
+	/**
+    *
+    * @api {post} /{project_name}/product/detail 待审批商品详情
+    * @apiGroup product
+    * @apiDescription  入驻商发布的待审批详情
+    * @apiVersion 0.0.1
+
+	* @apiParam {string} itemnumber				商品货号 
+
+    * @apiSuccess {boolean} state 接口获取数据是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    * @apiSuccess {object} obj 商品详情
+    * @apiSuccess {object} obj.base_info 商品基本信息
+    * @apiSuccess {number} obj.base_info.ID			主键ID
+    * @apiSuccess {number} obj.base_info.STATIONED_USER_ID 入驻商ID
+	* @apiSuccess {number} obj.base_info.BRAND_ID		品牌ID
+	* @apiSuccess {number} obj.base_info.PRODUCT_TYPE_ID			商品类别ID  
+	* @apiSuccess {string} obj.base_info.ITEMNUMBER			货号   
+	* @apiSuccess {string} obj.base_info.PRODUCT_NAME		商品名称,不允许重名      
+	* @apiSuccess {number} obj.base_info.YEAR		年份
+	* @apiSuccess {string} obj.base_info.SEASON	季节
+	* @apiSuccess {string} obj.base_info.SEX			性别（男童、女童、中性）
+	* @apiSuccess {string} obj.base_info.CREATE_DATE			创建日期
+	* @apiSuccess {number} obj.base_info.CREATE_USER_ID		创建人
+	* @apiSuccess {string} obj.base_info.UPDATE_DATE			编辑日期
+	* @apiSuccess {number} obj.base_info.UPDATE_USER_ID		编辑人ID
+	* @apiSuccess {string} obj.base_info.APPROVAL_DATE		审批日期
+	* @apiSuccess {number} obj.base_info.APPROVAL_USER_ID		审批人ID
+	* @apiSuccess {string} obj.base_info.UNIT			计量单位
+	* @apiSuccess {string} obj.base_info.PRODUCT_IMG_URL		商品主图路径
+	* @apiSuccess {string} obj.base_info.PRODUCT_STATE		商品状态
+	* @apiSuccess {number} obj.base_info.IS_OUTSTOCK			是否支持缺货订购（0：不支持，1：支持）
+	* @apiSuccess {number} obj.base_info.IS_OUTSTOCK_DAY		备货周期
+	* @apiSuccess {string} obj.base_info.PRODUCT_CONTENT		商品详情
+	* @apiSuccess {number} obj.base_info.IS_PRESALE		是否为商品预售（0：不是，1：是预售）
+	* @apiSuccess {string} obj.base_info.PRESALE_DEADLINE_DATE		预售截至日期
+	* @apiSuccess {string} obj.base_info.LAST_UP_DATE		上新日期
+	* @apiSuccess {number} obj.base_info.UP_PERIOD		上新周期（默认5天）
+	* @apiSuccess {string} obj.base_info.STATE		状态 1（草稿）     2（待审批）    3（已审核通过）    4（已驳回）  -1(已归档历史记录)
+	* @apiSuccess {number} obj.base_info.DISTRICT_TEMPLET_ID 区域模板ID
+	* 
+	* @apiSuccess {object[]} obj.params_info 商品参数信息
+	* @apiSuccess {number} obj.params_info.STATIONED_USER_ID 入驻商ID
+	* @apiSuccess {string} obj.params_info.PRODUCT_ITEMNUMBER  商品货号 
+	* @apiSuccess {number} obj.params_info.PARAMETER_ID 商品参数ID
+	* @apiSuccess {string} obj.params_info.PARAMETER_VALUE 商品参数值
+	* 
+	* @apiSuccess {object[]} obj.skus_info 商品sku信息
+	* @apiSuccess {number} obj.skus_info.ID sku主键ID
+	* @apiSuccess {number} obj.skus_info.STATIONED_USER_ID  入驻商ID 
+	* @apiSuccess {number} obj.skus_info.PRODUCT_ITEMNUMBER 商品货号
+	* @apiSuccess {string} obj.skus_info.PRODUCT_COLOR 商品颜色
+	* @apiSuccess {string} obj.skus_info.PRODUCT_SPECS 商品规格
+	* @apiSuccess {string} obj.skus_info.PRODUCT_SIZE 商品尺码
+	* @apiSuccess {string} obj.skus_info.PRODUCT_COLOR_IMGURL 商品颜色图片
+	* @apiSuccess {number} obj.skus_info.PRODUCT_QUOTE  商品报价 
+	* @apiSuccess {number} obj.skus_info.PRODUCT_PRIZE_TAG  吊牌价 
+	* @apiSuccess {number} obj.skus_info.PRODUCT_PRIZE_SALE  销售价 
+	* @apiSuccess {number} obj.skus_info.PRODUCT_PRIZE_COST  成本价 
+	* @apiSuccess {number} obj.skus_info.PRODUCT_WARNING_COUNT  库存预警数 
+	* @apiSuccess {number} obj.skus_info.PRODUCT_WEIGHT  商品重量 
+	* @apiSuccess {string} obj.skus_info.PRODUCT_GBCODE 国标码
+	* @apiSuccess {number} obj.skus_info.PRODUCT_INLONG  内长
+	* @apiSuccess {number} obj.skus_info.PRODUCT_BOOK_COUNT  商品预售数量,仅预售商品需要填写该字段 
+	* @apiSuccess {number} obj.skus_info.PRODUCT_TOTAL_COUNT  总库存 
+	* @apiSuccess {number} obj.skus_info.PRODUCT_OCCUPY_COUNT  总占用量 
+	* @apiSuccess {number} obj.skus_info.PRODUCT_ORDER_OCCUPY_COUNT  订单占用量 
+	* @apiSuccess {string} obj.skus_info.STATE  上架状态（待上架、上架、下架）  
+	* @apiSuccess {number} obj.skus_info.SORT_ID 排序，从小到大
+    */
+	@RequestMapping(value = "/detail", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet queryProductDetail(HttpServletRequest request) {
+		return Transform.GetResult(productService.queryProductDetail(request));
+	}
+
+	/** 
+	* @api {post} /{project_name}/product/edit 商品编辑（运费模板设置）
+    * @apiGroup product
+    * @apiDescription  商品编辑（运费模板设置）
+    * @apiVersion 0.0.1
+    * 
+	* @apiParam {string} itemnumber				货号 
+    * @apiSuccess {boolean} state 接口审核驳回是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    */
+	@RequestMapping(value = "/edit", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet productEdit(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try{
+			pr=productService.productEdit(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+	}
+	
+	/** 
+	* @api {post} /{project_name}/product/sold_out 商品强制下架
+    * @apiGroup product
+    * @apiDescription  商品强制下架
+    * @apiVersion 0.0.1
+    * 
+	* @apiParam {string} itemnumber				货号 
+    * @apiSuccess {boolean} state 接口审核驳回是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    */
+	@RequestMapping(value = "/sold_out", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet productSoldOut(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try{
+			pr=productService.productSoldOut(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+	}
+	
+	/** 
+	* @api {post} /{project_name}/product/season 商品季节获取【下拉框】
+    * @apiGroup product
+    * @apiDescription  商品季节获取【下拉框】
+    * @apiVersion 0.0.1
+    * 
+    * @apiSuccess {boolean} state 接口审核驳回是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    */
+	@RequestMapping(value = "/season", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet queryProductSeason(HttpServletRequest request) {
+		return Transform.GetResult(productService.queryProductSeason(request));
+	}
+	
+	/** 
+	* @api {post} /{project_name}/product/batch_sold_out 商品批量强制下架
+    * @apiGroup product
+    * @apiDescription  商品批量强制下架
+    * @apiVersion 0.0.1
+    * 
+	* @apiParam {string} ids				商品ID集合，逗号分隔
+    * @apiSuccess {boolean} state 接口是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    */
+	@RequestMapping(value = "/batch_sold_out", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet productBatchSoldOut(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try{
+			pr=productService.productBatchSoldOut(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+	}
+
+	/**
+    *
+    * @api {post} /{project_name}/product/spec_list 商品规格颜色列表
+    * @apiGroup product
+    * @apiDescription  商品规格颜色列表
+    * @apiVersion 0.0.1
+
+	* @apiParam {string} itemnumber				货号
+	* @apiParam {string} user_name				用户名 (用于获取用户销售价) 选填
+
+    * @apiSuccess {boolean} state 接口获取数据是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    * @apiSuccess {object[]} obj 规格颜色列表
+    * @apiSuccess {string} obj.ID               规格id
+    * @apiSuccess {string} obj.PRODUCT_COLOR
+    * @apiSuccess {string} obj.PRODUCT_SPECS			
+    */
+	@RequestMapping(value = "/spec_list", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet productSpecList(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try{
+			pr=productService.queryProductSpecList(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr);
+	}
+	/**
+    *
+    * @api {post} /{project_name}/product/member_product_list 会员选择商品
+    * @apiGroup product
+    * @apiDescription  会员选择商品
+    * @apiVersion 0.0.1
+
+	* @apiParam {number} pageIndex				页码 （第几页） 
+	* @apiParam {number} pageSize				每页多少条   
+
+    * @apiSuccess {boolean} state 接口获取数据是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    * @apiSuccess {object[]} obj 商品列表
+    * @apiSuccess {number} obj.ID			主键ID
+    * @apiSuccess {number} obj.STATIONED_USER_ID 入驻商ID
+	* @apiSuccess {number} obj.BRAND_ID		品牌ID
+	* @apiSuccess {number} obj.PRODUCT_TYPE_ID			商品类别ID  
+	* @apiSuccess {string} obj.ITEMNUMBER			货号   
+	* @apiSuccess {string} obj.PRODUCT_NAME		商品名称,不允许重名      
+	* @apiSuccess {number} obj.YEAR		年份
+	* @apiSuccess {string} obj.SEASON	季节
+	* @apiSuccess {string} obj.SEX			性别（男童、女童、中性）
+	* @apiSuccess {string} obj.CREATE_DATE			创建日期
+	* @apiSuccess {number} obj.CREATE_USER_ID		创建人
+	* @apiSuccess {string} obj.UPDATE_DATE			编辑日期
+	* @apiSuccess {number} obj.UPDATE_USER_ID		编辑人ID
+	* @apiSuccess {string} obj.APPROVAL_DATE		审批日期
+	* @apiSuccess {number} obj.APPROVAL_USER_ID		审批人ID
+	* @apiSuccess {string} obj.UNIT			计量单位
+	* @apiSuccess {string} obj.PRODUCT_IMG_URL		商品主图路径
+	* @apiSuccess {string} obj.PRODUCT_STATE		商品状态
+	* @apiSuccess {number} obj.IS_OUTSTOCK			是否支持缺货订购（0：不支持，1：支持）
+	* @apiSuccess {number} obj.IS_OUTSTOCK_DAY		备货周期
+	* @apiSuccess {string} obj.PRODUCT_CONTENT		商品详情
+	* @apiSuccess {number} obj.IS_PRESALE		是否为商品预售（0：不是，1：是预售）
+	* @apiSuccess {string} obj.PRESALE_DEADLINE_DATE		预售截至日期
+	* @apiSuccess {string} obj.LAST_UP_DATE		上新日期
+	* @apiSuccess {number} obj.UP_PERIOD		上新周期（默认5天）
+	* @apiSuccess {number} obj.DISTRICT_TEMPLET_ID 区域模板ID
+    */
+	@RequestMapping(value = "/member_product_list", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet querymemberProductList(HttpServletRequest request) {
+		return Transform.GetResult(productService.querymemberProductList(request));
+	}
+	
+	
+	/**
+    *
+    * @api {post} /{project_name}/product/distribution_list 分销商品列表
+    * @apiGroup product
+    * @apiDescription  分销商品列表
+    * @apiVersion 0.0.1
+
+	* @apiParam {number} pageIndex				页码 （第几页） 
+	* @apiParam {number} pageSize				每页多少条   
+
+    * @apiSuccess {boolean} state 接口获取数据是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    * @apiSuccess {object[]} obj 商品列表
+    * @apiSuccess {number} obj.ID			主键ID
+    * @apiSuccess {number} obj.STATIONED_USER_ID 入驻商ID
+	* @apiSuccess {number} obj.BRAND_ID		品牌ID
+	* @apiSuccess {number} obj.PRODUCT_TYPE_ID			商品类别ID  
+	* @apiSuccess {string} obj.ITEMNUMBER			货号   
+	* @apiSuccess {string} obj.PRODUCT_NAME		商品名称,不允许重名      
+	* @apiSuccess {number} obj.YEAR		年份
+	* @apiSuccess {string} obj.SEASON	季节
+	* @apiSuccess {string} obj.SEX			性别（男童、女童、中性）
+	* @apiSuccess {string} obj.CREATE_DATE			创建日期
+	* @apiSuccess {number} obj.CREATE_USER_ID		创建人
+	* @apiSuccess {string} obj.UPDATE_DATE			编辑日期
+	* @apiSuccess {number} obj.UPDATE_USER_ID		编辑人ID
+	* @apiSuccess {string} obj.APPROVAL_DATE		审批日期
+	* @apiSuccess {number} obj.APPROVAL_USER_ID		审批人ID
+	* @apiSuccess {string} obj.UNIT			计量单位
+	* @apiSuccess {string} obj.PRODUCT_IMG_URL		商品主图路径
+	* @apiSuccess {string} obj.PRODUCT_STATE		商品状态
+	* @apiSuccess {number} obj.IS_OUTSTOCK			是否支持缺货订购（0：不支持，1：支持）
+	* @apiSuccess {number} obj.IS_OUTSTOCK_DAY		备货周期
+	* @apiSuccess {string} obj.PRODUCT_CONTENT		商品详情
+	* @apiSuccess {number} obj.IS_PRESALE		是否为商品预售（0：不是，1：是预售）
+	* @apiSuccess {string} obj.PRESALE_DEADLINE_DATE		预售截至日期
+	* @apiSuccess {string} obj.LAST_UP_DATE		上新日期
+	* @apiSuccess {number} obj.UP_PERIOD		上新周期（默认5天）
+	* @apiSuccess {number} obj.DISTRICT_TEMPLET_ID 区域模板ID
+    */
+	@RequestMapping(value = "/distribution_list", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet queryDistributionProductList(HttpServletRequest request) {
+		return Transform.GetResult(productService.queryDistributionProductList(request));
+	}
+	
+	/**
+    *
+    * @api {post} /{project_name}/product/distribution_add 添加移除分销商品
+    * @apiGroup product
+    * @apiDescription  分销商品列表
+    * @apiVersion 0.0.1
+    * @apiParam {String[]} ids				分销商品ids
+	* @apiParam {number} IS_DISTRIBUTION				是否支持分销
+    * @apiSuccess {boolean} state 接口获取数据是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    */
+	@RequestMapping(value = "/distribution_edit", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet queryDistributionProductEdit(HttpServletRequest request) {
+		return Transform.GetResult(productService.queryDistributionProductEdit(request));
+	}
+	
+	/**
+    *
+    * @api {post} /{project_name}/product/update_sale_sort 修改商品是否销量排序
+    * @apiGroup product
+    * @apiDescription  修改商品是否销量排序
+    * @apiVersion 0.0.1
+    * @apiParam {number} id							商品ID
+	* @apiParam {number} is_sale_sort				是否销量排序   1.是    2.否
+    * @apiSuccess {boolean} state 接口获取数据是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    */
+	@RequestMapping(value = "/update_sale_sort", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet productUpdateSaleSort(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try{
+			pr=productService.productUpdateSaleSort(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+		//return Transform.GetResult(productService.productUpdateSaleSort(request));
+	}
+	
+	/**
+	 * 
+	 * @api {post} /{project_name}/product_apply/site_delay 获取商品的站点延后显示时间
+	 * @apiGroup product_apply
+	 * @apiDescription 获取商品的站点延后显示时间
+	 * @apiVersion 0.0.1
+	 * 
+	 * @apiParam {number} public_user_stationed_user_id 	入驻商id
+	 * @apiParam {number} product_id 			商品申请id,表tbl_product_info_apply主键
+	 * 
+	 * 
+	 * @apiSuccess {boolean} state 接口获取数据是否成功.true:成功 false:失败
+	 * @apiSuccess {string} message 接口返回信息注释.
+	 * @apiSuccess {object[]} obj 商品颜色数据集合
+	 * @apiSuccess {number} obj.STATIONED_USER_ID  		入驻商ID
+	 * @apiSuccess {number} obj.PRODUCT_ID  			商品ID
+	 * @apiSuccess {number} obj.SITE_ID  				站点ID
+	 * @apiSuccess {number} obj.DELAY_DAYS  			延后显示天数
+	 * @apiSuccess {number} obj.WEIGHTING  				实际加权值
+	 * @apiSuccess {number} obj.TEMP_WEIGHTING  		暂加权值
+	 */
+	@RequestMapping(value = "/site_delay", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet queryProductSiteDelay(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try {
+			pr = productService.queryProductSiteDelay(request);
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			pr.setMessage(e.getMessage());
+		}
+		return Transform.GetResult(pr);
+	}
+	
+	@RequestMapping(value = "/site_delay_edit", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet productSiteDelayedit(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try{
+			pr=productService.productSiteDelayedit(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+	}
+	/**
+	 * 根据货号获取商品基本信息
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/detail_Base", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet queryProcuctInfoDetail_Base(HttpServletRequest request){
+		return Transform.GetResult(productService.queryProcuctInfoDetail_Base(request));
+	}
+	
+	/**
+	 * 根据货号获取商品颜色信息
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/color_list", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet queryColorListByItemnumber(HttpServletRequest request) {
+		return Transform.GetResult(productService.queryColorListByItemnumber(request));
+	}
+	
+	/**
+	 * 根据货号以及颜色获取商品规格信息
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/specs_list", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet querySpecsListByItemnumberAndColor(HttpServletRequest request) {
+		return Transform.GetResult(productService.querySpecsListByItemnumberAndColor(request));
+	}
+	
+	/**
+	 * 根据货号以及颜色和规格获取商品尺码信息
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/size_list", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet querySizeListByItemnumberAndColorAndSpecs(HttpServletRequest request) {
+		return Transform.GetResult(productService.querySizeListByItemnumberAndColorAndSpecs(request));
+	}
+	
+	/**
+	 * 根据商品货号查询尺码和内长
+	 * 
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/commodity_details", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet queryCommodityListByItemNumber(HttpServletRequest request){
+		return Transform.GetResult(productService.queryCommodityListByItemNumber(request));
+	}
+	
+	/**
+	 * 根据货号查询商品参数
+	 * 
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/param", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet queryProductParam(HttpServletRequest request){
+		return Transform.GetResult(productService.queryProductParam(request));
+	}
+	
+	/**
+	 * 商品主推款标识设置
+	 * 
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/main_product_flag_set", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet productMainProductFlagSet(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try{
+			pr=productService.productMainProductFlagSet(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+	}
+	/**
+	 * 新品标签启用/禁用
+	 * 
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/update_new_product_label", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet productUpdateNewProductLabel(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try{
+			pr=productService.productUpdateNewProductLabel(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+	}
+	
+	/**
+	 * 热卖标签启用/禁用
+	 * 
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/update_hot_sale_label", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet productUpdateHotSaleLabel(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try{
+			pr=productService.productUpdateHotSaleLabel(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+	}
+
+}

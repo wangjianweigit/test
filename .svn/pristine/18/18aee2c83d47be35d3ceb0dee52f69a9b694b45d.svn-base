@@ -1,0 +1,211 @@
+package com.tk.oms.basicinfo.service;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import com.tk.oms.basicinfo.dao.MqErrorLogDao;
+import com.tk.sys.util.GridResult;
+import com.tk.sys.util.HttpUtil;
+import com.tk.sys.util.Jackson;
+import com.tk.sys.util.MqQueueKeyEnum;
+import com.tk.sys.util.PageUtil;
+import com.tk.sys.util.ProcessResult;
+import com.tk.sys.util.Transform;
+
+/**
+ * 
+ * Copyright (c), 2017, Tongku
+ * FileName : MqErrorLogService.java
+ * 
+ *
+ * @author yejingquan
+ * @version 1.00
+ * @date 2018年9月19日
+ */
+@Service("MqErrorLogService")
+public class MqErrorLogService {
+	private Log logger = LogFactory.getLog(this.getClass());
+	
+	@Resource
+	private MqErrorLogDao mqErrorLogDao;
+	@Resource
+	private RabbitTemplate rabbitTemplate;
+	
+	/**
+	 * 查询mq错误日志列表
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryMqErrorLogListForPage(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+            //分页参数
+            GridResult pageParamResult = PageUtil.handlePageParams(paramMap);
+            if (pageParamResult != null) {
+                return pageParamResult;
+            }
+            
+            if((!StringUtils.isEmpty(paramMap.get("flag")))&&paramMap.get("flag") instanceof String){
+            	paramMap.put("flag",paramMap.get("flag").toString().split(","));
+			}
+            
+            //查询记录数
+            int count = mqErrorLogDao.queryMqErrorLogCount(paramMap);
+            //查询列表
+            List<Map<String, Object>> list = mqErrorLogDao.queryMqErrorLogListForPage(paramMap);
+            if (list != null) {
+                gr.setState(true);
+                gr.setMessage("获取成功");
+                gr.setObj(list);
+                gr.setTotal(count);
+            } else {
+                gr.setState(true);
+                gr.setMessage("无数据");
+            }
+        } catch (Exception e) {
+            gr.setState(false);
+            gr.setMessage(e.getMessage());
+            logger.error(e.getMessage());
+        }
+        return gr;
+	}
+
+	/**
+	 * 更新错误日志
+	 * @param request
+	 * @return
+	 */
+	@Transactional
+	@SuppressWarnings("unchecked")
+	public ProcessResult updateMqErrorLog(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            if (StringUtils.isEmpty(paramMap.get("id"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数id");
+                return pr;
+            }
+            
+            //更新错误日志
+            mqErrorLogDao.updateMqErrorLog(paramMap);
+            //查询错误日志详情
+            Map<String, Object> map = mqErrorLogDao.queryMqErrorLogDetail(paramMap);
+            if(StringUtils.isEmpty(map.get("MESSAGE"))) {
+            	throw new RuntimeException("消息体为空！");
+            }else {
+            	/*************************<MQ>错误日志推送消息**************************/
+    			Map<String, Object> mqMap = (Map<String, Object>) Jackson.readJson2Object(map.get("MESSAGE").toString(), Map.class);// json字符串转Map
+    			rabbitTemplate.convertAndSend(MqQueueKeyEnum.ESB_PRODUCT_PRIZE_TAG_UPDATE.getKey(), Jackson.writeObject2Json(mqMap));
+            }
+            pr.setState(true);
+            pr.setMessage("处理成功");
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e.getMessage());
+        }
+        return pr;
+	}
+	/**
+	 * 批量处理错误日志
+	 * @param request
+	 * @return
+	 */
+	@Transactional
+	@SuppressWarnings("unchecked")
+	public ProcessResult batchUpdateMqErrorLog(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            if (StringUtils.isEmpty(paramMap.get("ids"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数ids");
+                return pr;
+            }
+            
+            //更新错误日志
+            mqErrorLogDao.batchUpdateMqErrorLog(paramMap);
+            //查询错误日志列表
+            List<Map<String, Object>> dataList = mqErrorLogDao.queryMqErrorLogList(paramMap);
+            for(Map<String, Object> map : dataList) {
+            	if(StringUtils.isEmpty(map.get("MESSAGE"))) {
+                	throw new RuntimeException("消息体为空！");
+                }else {
+                	/*************************<MQ>错误日志推送消息**************************/
+        			Map<String, Object> mqMap = (Map<String, Object>) Jackson.readJson2Object(map.get("MESSAGE").toString(), Map.class);// json字符串转Map
+        			rabbitTemplate.convertAndSend(MqQueueKeyEnum.ESB_PRODUCT_PRIZE_TAG_UPDATE.getKey(), Jackson.writeObject2Json(mqMap));
+                }
+            }
+            pr.setState(true);
+            pr.setMessage("处理成功");
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e.getMessage());
+        }
+        return pr;
+	}
+	/**
+	 * 历史数据修复
+	 * @param request
+	 * @return
+	 */
+	public ProcessResult allUpdateProduct(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+        try {
+            //1.查询联营商家关联的商品
+        	List<Map<String, Object>> productList = mqErrorLogDao.queryStoreProductList();
+        	for(Map<String, Object> p : productList) {
+        		Map<String, Object> param = new HashMap<String, Object>();
+        		param.put("product_itemnumber", p.get("PRODUCT_ITEMNUMBER"));
+        		//查询商品吊牌价
+        		List<Map<String, Object>> skuList = mqErrorLogDao.queryProductPrizeTag(param);
+        		
+        		Map<String, Object> mqMap = new HashMap<String, Object>();
+				mqMap.put("product_itemnumber", p.get("PRODUCT_ITEMNUMBER"));
+				mqMap.put("skuList", skuList);
+				rabbitTemplate.convertAndSend(MqQueueKeyEnum.ESB_PRODUCT_PRIZE_TAG_UPDATE.getKey(), Jackson.writeObject2Json(mqMap));
+        	}
+            
+            pr.setState(true);
+            pr.setMessage("处理成功");
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e.getMessage());
+        }
+        return pr;
+	}
+	
+	
+}

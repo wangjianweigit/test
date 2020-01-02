@@ -1,0 +1,316 @@
+package com.tk.oms.returns.dao;
+
+import java.util.List;
+import java.util.Map;
+
+import org.apache.ibatis.annotations.Param;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface ReturnsDao {
+
+	/**
+	 * 获取退货单列表
+	 */
+	public List<Map<String,Object>> queryReturnsList(Map<String,Object> paramMap);
+	/**
+	 * 获取退货单总数
+	 */
+	public int queryReturnsCount(Map<String,Object> paramMap);
+	/**
+	 * 获取退货单详情
+	 */
+	public Map<String, Object> queryReturnsDetail(Map<String,Object> paramMap);
+	/**
+	 * 获取退货单商品列表
+	 */
+	public List<Map<String,Object>> queryReturnsProductList(Map<String,Object> paramMap);
+	/**
+	 * 获取订单已申请退货商品列表
+	 */
+	public List<Map<String, Object>> queryReturnsedProductList(Map<String, Object> paramMap);
+	/**
+	 * 获取订单已申请退货商品数量
+	 */
+	public int queryReturnsedProductCount(Map<String, Object> paramMap);
+	/**
+	 * 获取订单可申请退货商品列表
+	 */
+	public List<Map<String, Object>> queryCanReturnProductList(Map<String, Object> paramMap);
+	/**
+	 * 获取订单可申请退货商品数量
+	 */
+	public int queryCanReturnProductCount(Map<String, Object> paramMap);
+	/**
+	 * 获取订单可申请退货最大物流费用
+	 */
+	public Map<String, Object> queryCanReturnMaxFreightMoney(Map<String, Object> paramMap);
+	/**
+	 * 生成退货单号
+	 */
+	public String queryNewReturnNumber(Map<String, Object> paramMap);
+	/**
+	 * 生成退货单商品
+	 */
+	public int insertOrderReturnProduct(List<Map<String, Object>> order_return_product_list);
+	/**
+	 * 校验申请退货商品是否可全退
+	 */
+	public int checkReturnProductCount(Map<String, Object> paramMap);
+	/**
+	 * 生成退货单
+	 */
+	public int insertOrderReturnInfo(Map<String, Object> paramMap);
+	/**
+	 * 查询退款订单审核列表
+	 */
+	public List<Map<String, Object>> queryOrderRefundList(Map<String, Object> param);
+	/**
+	 * 查询退款订单审核记录数
+	 */
+	public int queryOrderRefundCount(Map<String, Object> param);
+	/**
+	 * 根据退款单号查询退款单信息
+	 * @param returns_number
+	 * @return
+     */
+	Map<String, Object> queryOrderReturnsByReturnNumber(String returns_number);
+	/**
+	 * 执行订单退款操作
+	 * @param params
+	 * @return
+     */
+	public void orderRefundPerform(Map<String, Object> params);
+	/**
+	 * 执行退款驳回操作
+	 * @param params
+     */
+	public void orderRefundRejectPerform(Map<String, Object> params);
+
+	/**
+	 * 订单退货退款计算商品分配金额
+	 * @param return_number
+	 * @return
+	 */
+	public int insertOrderReturnMoney(@Param("return_number") String return_number);
+
+	/**
+	 * 根据退款单号更新正常结算单金额
+	 *
+	 * @return
+     */
+	public int updateSettlementAmountByReturnNumber();
+
+	/**
+	 * 根据退款单号更新授信结算单金额
+	 *
+	 * @return
+     */
+	public int updateCreditSettlementAmountByReturnNumber();
+
+	/**
+	 * 根据退款单号删除结算金额<0的记录
+	 *
+	 * @param return_number
+	 * @return
+     */
+	public int deleteSettlementByReturnNumber(@Param("return_number") String return_number);
+
+	/**
+	 * 增加入驻商资金流水
+	 *
+	 * @param return_number
+	 * @return
+     */
+	public int insertStationedCapitalLogs(@Param("return_number") String return_number);
+	/**
+	 * 退货退款列表
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> queryReturnInfoList(Map<String, Object> paramMap);
+	/**
+	 * 退货退款数量
+	 * @param paramMap
+	 * @return
+	 */
+	public int queryReturnInfoCount(Map<String, Object> paramMap);
+	/**
+	 * 退货退款详情
+	 * @param paramMap
+	 * @return
+	 */
+	public Map<String, Object> queryReturnInfoDetail(Map<String, Object> paramMap);
+	/**
+	 * 退货退款商品列表
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> queryReturnInfoProductList(Map<String, Object> paramMap);
+	/**
+	 * 退货退款审批
+	 * @param paramMap
+	 * @return
+	 */
+	public int checkReturnInfo(Map<String, Object> paramMap);
+	/**
+	 * 插入退货临时商品【计算应退运费】
+	 */
+	public int insertTmpOrderReturnProduct(List<Map<String, Object>> order_return_product_list);
+	/**
+	 * 计算应退运费
+	 */
+	public Map<String, Object> queryReturnProductLogisticsMoney(@Param("order_number") String order_number);
+	/**
+	 * 查询 申请 可退 不可退 商品列表
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> queryCanReturn(Map<String, Object> paramMap);
+	/**
+	 *查询货号凭证
+	 * @param return_number
+	 * @return
+	 */
+	public List<Map<String, Object>> queryReturnImages(String return_number);
+	/**
+	 * 根据退款单号和货号查询凭证
+	 * @param paramMap
+	 * @return
+	 */
+	public List<String> queryImgsByItemnumber(Map<String, Object> paramMap);
+	/**
+	 * 根据退款单号查询物流凭证
+	 * @param return_number
+	 * @return
+	 */
+	public List<String> queryLogisticsImages(String return_number);
+	
+	/**
+	 * 查询异常商品
+	 * @param return_number
+	 * @return
+	 */
+	public List<Map<String,Object>> queryUnusualProduct(String return_number);
+
+	/**
+	 * 获取退款方式
+	 *
+	 * @param returnNumber
+	 * @return
+     */
+	int queryReturnType(@Param("return_number") String returnNumber);
+
+	/**
+	 * 增加临时退款信息
+	 *
+	 * @param returnNumber
+	 * @return
+     */
+	int insertTmpReturnInfoNormal(@Param("return_number") String returnNumber);
+
+	/**
+	 * 添加月结临时退款信息
+	 *
+	 * @param returnNumber
+	 * @return
+     */
+	int insertTmpReturnInfoCredit(@Param("return_number") String returnNumber);
+	
+	/**
+	 * 查询退款商品零售价总金额
+	 *
+	 * @param paramMap
+	 * @return
+     */
+	Map<String, Object> queryReturnProductStorePrice(Map<String, Object> paramMap);
+	
+	/**
+	 * 更新店铺账户押金余额
+	 * @param paramMap
+	 * @return
+	 */
+	int updateStoreBankAccountBalance(Map<String, Object> paramMap);
+	
+	/**
+	 * 店铺货品押金退款记录
+	 * @param paramMap
+	 * @return
+	 */
+	int insertStoreGoodsDepositAccountRecord(Map<String, Object> paramMap);
+	/**
+	 * 货品押金退款记录
+	 * @param paramMap
+	 * @return
+	 */
+	int insertGoodsDepositAccountRecord(Map<String, Object> paramMap);
+	/**
+	 * 退款单备注标记
+	 * @param paramMap
+	 * @return
+	 */
+	int orderReturnMarkRemark(Map<String, Object> paramMap);
+
+	/**
+	 * 更新清分任务状态
+	 *
+	 * @return
+     */
+	int updateBussSettlementState();
+
+	/**
+	 * 增加锁
+	 *
+	 * @return
+     */
+	int lockTable();
+
+	/**
+	 * 更新充值卡记录
+	 * @param paramMap
+	 * @return
+	 */
+	int updateUserMbrCard(Map<String, Object> paramMap);
+
+	/**
+	 * 新增会员卡收支记录
+	 * @param paramMap
+	 * @return
+	 */
+	int insertUserMbrCardUseRecord(Map<String, Object> paramMap);
+
+	/**
+	 * 查询退货统计数量
+	 * @param params
+	 * @return
+	 */
+	Map<String, Object> getDetailByOrderAndReturnNumber(Map<String, Object> params);
+
+	/**
+	 * 通过ID查询用户会员卡信息
+	 * @param param
+	 * @return
+	 */
+	Map<String, Object> getUserMbrCardByUserId(@Param("user_id")long param);
+
+	/**
+	 * 校验余额是否被篡改
+	 * @param user_id 用户ID
+	 * @return 0.被篡改   1.未被篡改
+	 */
+	int checkBalance(@Param("user_id")long user_id);
+
+	/**
+	 * 获取退款商品需要自动上架的SKU
+	 * @param returnNumber
+	 * @return
+	 */
+	List<Long> queryReturnProductSkuAutoShelf(@Param("returnNumber") String returnNumber);
+
+	/**
+	 * 修改退款商品为上架状态
+	 * @param list
+	 * @return
+	 */
+	int updateReturnProductSkuAutoShelf(List<Long> list);
+}

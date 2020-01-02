@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 入驻商申请提现操作DAO -->
+<mapper namespace="com.tk.oms.finance.dao.StationedWithdrawalDao">
+	<sql id="all_colum">
+		swa.ID,
+	    swa.WITHDRAWAL_NUMBER,
+	    swa.STATIONED_USER_ID,
+	    swa.WITHDRAWAL_AMOUNT,
+	    swa.APPROVAL_USER_ID,
+	    to_char(swa.APPROVAL_DATE,'yyyy-mm-dd hh24:mi:ss') APPROVAL_DATE,
+	    swa.REMIT_USER_ID,
+	    to_char(swa.REMIT_DATE,'yyyy-mm-dd hh24:mi:ss') REMIT_DATE,
+	    swa.STATE,
+	    swa.BUSS_BANK_CARD_ID,
+	    swa.REMARK,
+	    to_char(swa.CREATE_DATE,'yyyy-mm-dd hh24:mi:ss') CREATE_DATE,
+	    swa.CREATE_USER_ID,
+	    swa.REJECT_REASON,
+	    swa.PLAYMONEY_VOUCHER_URL
+	</sql>
+    <!--分页获取入驻商提现申请单列表-->
+    <select id="queryListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select a.*,rownum rn from (
+            	   SELECT 
+            	   <include refid="all_colum"></include>,
+                   sui1.USER_NAME,
+                   sui1.COMPANY_NAME,
+                   sui1.CONTACT_PHONE_NUMBER,
+                   sui1.LEGAL_PERSONALITY,
+                   swa.BIND_TYPE,
+                   swa.BANK_CARD,
+                   swa.BANK_NAME,
+                   (select USER_REALNAME from tbl_sys_user_info sui where sui.id = swa.APPROVAL_USER_ID) APPROVAL_USER_REALNAME,
+				   (select USER_REALNAME from tbl_sys_user_info sui where sui.id = swa.REMIT_USER_ID) REMIT_USER_REALNAME                
+                   FROM
+                    TBL_STATIONED_WITHDRAWAL_APPLY swa
+                    LEFT JOIN TBL_STATIONED_USER_INFO sui1 ON swa.STATIONED_USER_ID = sui1.id
+                    LEFT JOIN TBL_BANK_CARD bc on swa.BUSS_BANK_CARD_ID = bc.id
+                    LEFT JOIN TBL_DIC_BANK db on BC.BANK_CODE = db.BANK_CODE
+                    LEFT JOIN TBL_DIC_CNAPS_BANK dcb on bc.BANK_CODE = dcb.BANK_NO
+                    WHERE swa.IS_DELETE = '1'
+                    	 <if test="state!=null and state.size()>0">
+					    	and swa.state in 
+					    	 <foreach item="s" collection="state" open="(" separator="," close=")">
+					    	 		#{s,jdbcType=INTEGER}
+					    	 </foreach>
+					     </if>
+					      <if test="withdrawal_number!=null and withdrawal_number!=''">
+						    	 and swa.withdrawal_number like concat(concat('%', #{withdrawal_number,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="user_name!=null and user_name!=''">
+						    	 and sui1.user_name like concat(concat('%', #{user_name,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="company_name!=null and company_name!=''">
+						    	 and sui1.company_name like concat(concat('%', #{company_name,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="contact_phone_number!=null and company_name!=''">
+						    	 and sui1.contact_phone_number like concat(concat('%', #{contact_phone_number,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="bank_card!=null and bank_card!=''">
+						    	 and swa.bank_card like concat(concat('%', #{bank_card,jdbcType=VARCHAR}),'%')
+						  </if>
+						  <if test="start_date != null and start_date != '' ">
+							    AND	swa.CREATE_DATE &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+						  </if>
+						  <if test="end_date != null and end_date != '' ">
+							    AND	swa.CREATE_DATE &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+						  </if>
+						  <if test="start_approval_date != null and start_approval_date != '' ">
+							    AND	swa.APPROVAL_DATE &gt;= to_date(#{start_approval_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+						  </if>
+						  <if test="end_approval_date != null and end_approval_date != '' ">
+							    AND	swa.APPROVAL_DATE &lt;= to_date(#{end_approval_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+						  </if>
+						  ORDER BY swa.CREATE_DATE DESC
+            ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--获取入驻商提现申请总数-->
+    <select id="queryListForCount" parameterType="java.util.Map" resultType="int">
+         		   SELECT 
+            	   count(1)
+                   FROM
+                    TBL_STATIONED_WITHDRAWAL_APPLY swa
+                    LEFT JOIN TBL_STATIONED_USER_INFO sui1 ON swa.STATIONED_USER_ID = sui1.id
+                    WHERE swa.IS_DELETE = '1'
+                    	 <if test="state!=null and state.size()>0">
+					    	and swa.state in 
+					    	 <foreach item="s" collection="state" open="(" separator="," close=")">
+					    	 		#{s,jdbcType=INTEGER}
+					    	 </foreach>
+					     </if>
+					      <if test="withdrawal_number!=null and withdrawal_number!=''">
+						    	 and swa.withdrawal_number like concat(concat('%', #{withdrawal_number,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="user_name!=null and user_name!=''">
+						    	 and sui1.user_name like concat(concat('%', #{user_name,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="company_name!=null and company_name!=''">
+						    	 and sui1.company_name like concat(concat('%', #{company_name,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="contact_phone_number!=null and company_name!=''">
+						    	 and sui1.contact_phone_number like concat(concat('%', #{contact_phone_number,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="bank_card!=null and bank_card!=''">
+						    	 and swa.bank_card like concat(concat('%', #{bank_card,jdbcType=VARCHAR}),'%')
+						  </if>
+						  <if test="start_date != null and start_date != '' ">
+							    AND	swa.CREATE_DATE &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+						  </if>
+						  <if test="end_date != null and end_date != '' ">
+							    AND	swa.CREATE_DATE &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+						  </if>
+						  <if test="start_approval_date != null and start_approval_date != '' ">
+							    AND	swa.APPROVAL_DATE &gt;= to_date(#{start_approval_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+						  </if>
+						  <if test="end_approval_date != null and end_approval_date != '' ">
+							    AND	swa.APPROVAL_DATE &lt;= to_date(#{end_approval_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+						  </if>
+    </select>
+    <!-- 根据ID查询充值记录 -->
+    <select id="queryById" parameterType="long" resultType="java.util.Map">
+      	   	   SELECT 
+        	   <include refid="all_colum"></include>,
+               sui1.USER_NAME,
+               sui1.COMPANY_NAME,
+               sui1.CONTACT_PHONE_NUMBER,
+               sui1.LEGAL_PERSONALITY,
+               swa.BIND_TYPE,
+               swa.BANK_CARD,
+               swa.BANK_NAME,
+               (select USER_REALNAME from tbl_sys_user_info sui where sui.id = swa.APPROVAL_USER_ID) APPROVAL_USER_REALNAME,
+			   (select USER_REALNAME from tbl_sys_user_info sui where sui.id = swa.REMIT_USER_ID) REMIT_USER_REALNAME,
+				swa.TRAN_LOGNO
+               FROM
+                TBL_STATIONED_WITHDRAWAL_APPLY swa
+                LEFT JOIN TBL_STATIONED_USER_INFO sui1 ON swa.STATIONED_USER_ID = sui1.id
+                WHERE swa.IS_DELETE = '1' AND swa.id = #{id,jdbcType=INTEGER}
+    </select>
+    <!-- 入驻商提现审批 -->
+    <update id="approval" parameterType="java.util.Map">
+    	UPDATE TBL_STATIONED_WITHDRAWAL_APPLY swa SET
+    	swa.STATE = #{state,jdbcType=VARCHAR},
+    	swa.APPROVAL_USER_ID =  #{public_user_id,jdbcType=INTEGER},
+    	swa.APPROVAL_DATE =   sysdate,
+    	swa.REJECT_REASON =  #{reject_reason,jdbcType=VARCHAR}
+        WHERE swa.IS_DELETE = '1' AND swa.id = #{id,jdbcType=INTEGER}
+    </update>
+    <!-- 入驻商提现打款 -->
+    <update id="pay" parameterType="java.util.Map">
+    	UPDATE TBL_STATIONED_WITHDRAWAL_APPLY swa SET
+    	swa.STATE = #{state,jdbcType=VARCHAR},
+    	swa.REMIT_USER_ID =  #{public_user_id,jdbcType=INTEGER},
+    	swa.REMIT_DATE =   sysdate,
+    	swa.PLAYMONEY_VOUCHER_URL = #{voucher_img_url,jdbcType=VARCHAR}
+        WHERE swa.IS_DELETE = '1' AND swa.id = #{id,jdbcType=INTEGER}
+    </update>
+</mapper>

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.marketing.dao.RegionProductDao">
+   <sql id="all_column">
+      id, parent_id, name
+	</sql>
+	<!-- 查询省市区域信息，无参数则表示查询省份 -->
+    <select id="queryDicRegionByParentId" resultType="java.util.Map" parameterType="java.util.Map">
+     	SELECT
+		<include refid="all_column" />,
+		(select count(1) FROM tbl_dic_region tdr where parent_id = dr.id) isParent
+		from tbl_dic_region dr
+		where is_display = 1 
+		<if test="parent_id!=null">
+			and parent_id = #{parent_id,jdbcType=INTEGER}
+		</if>
+    </select>
+    <!-- 查询省市区域信息 -->
+    <select id="queryDicRegionByParentIdWidthChildren" resultType="java.util.Map" parameterType="java.util.Map">
+     	SELECT
+		<include refid="all_column" />,
+		(select count(1) FROM tbl_dic_region tdr where parent_id = dr.id) isParent
+		from tbl_dic_region dr
+		where is_display = 1
+		and parent_id = #{parent_id,jdbcType=INTEGER}
+    </select>
+	<!-- 查询所有省市县数据信息 -->
+	<select id="queryDicRegionWithoutCounty" resultType="java.util.Map" resultMap="regionListMap">
+		select a.id,a.name,a.parent_id,(select count(1) from tbl_dic_region b where b.parent_id = a.id) child,level 
+		  from tbl_dic_region a 
+		  where level &lt; 4
+		 start with parent_id=0 
+		 connect by prior id = parent_id
+	</select>
+	<resultMap id="regionListMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="parent_id" property="pId"/>
+        <result column="child" property="child"/>
+    </resultMap>
+	<!-- 查询某一个地区的商品列表 -->
+	<select id="queryRegionProductList" parameterType="java.util.Map" resultType="java.util.Map">
+		select *
+		  from (select a.*, rownum num
+			 from (
+				select tpi.id,
+				       tpi.itemnumber,
+				       tpi.product_img_url,
+				       tpi.product_name,
+				       (SELECT BRAND_NAME FROM TBL_DIC_PRODUCT_BRAND TDPB WHERE TDPB.ID = TPI.BRAND_ID)  AS BRAND,
+                       (SELECT NAME FROM TBL_DIC_PRODUCT_SEASON TDPS WHERE TDPS.ID = TPI.SEASON_ID)  AS SEASON,
+                       tpi.year,
+                       tpi.state
+				  from tbl_product_info tpi,
+				       (select distinct aa.template_id
+				          from tbl_district_templet_rel aa,
+				               (select a.id, a.name, a.parent_id
+				                      from tbl_dic_region a
+				                     where level &lt; 4
+				                start with id = #{id,jdbcType=INTEGER}
+				                connect by prior id = parent_id) bb
+				         where aa.region_id = bb.id) aa
+				 where tpi.district_templet_id = aa.template_id
+			) a
+			where rownum  &lt; = #{end_rownum,jdbcType=INTEGER})
+		where num &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 查询某一个地区的商品总数 -->
+	<select id="queryRegionProductCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_product_info tpi,
+		       (select distinct aa.template_id
+		          from tbl_district_templet_rel aa,
+		               (    select a.id, a.name, a.parent_id
+		                      from tbl_dic_region a
+		                     where level &lt; 4
+		                start with id = #{id,jdbcType=INTEGER}
+		                connect by prior id = parent_id) bb
+		         where aa.region_id = bb.id) aa
+		 where tpi.district_templet_id = aa.template_id
+	</select>
+</mapper>

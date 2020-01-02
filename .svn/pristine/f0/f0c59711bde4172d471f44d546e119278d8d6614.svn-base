@@ -1,0 +1,24 @@
+package com.tk.oms.finance.dao;
+
+import java.util.Map;
+
+import org.springframework.stereotype.Repository;
+
+import com.tk.sys.common.BaseDao;
+
+@Repository
+public interface StationedWithdrawalDao  extends BaseDao<Map<String,Object>> {
+	/**
+	 * 入驻商提现申请审批
+	 * @param params
+	 * @return
+	 */
+    int approval(Map<String,Object> params);
+    /**
+     * 入驻商提现申请打款
+     * @param params
+     * @return
+     */
+    int pay(Map<String,Object> params);
+
+}

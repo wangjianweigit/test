@@ -1,0 +1,643 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tk.analysis.member.dao.MemberAnalysisOperationDao">
+	<!-- DW:平台+业务的权限条件 -->
+	<sql id="dw_public_py_where">
+	   <!-- 童库平台 -->
+	   <if test="public_user_platform_type ==1">
+	   		and dm.stationed_user_id = 1
+	   		<if test="public_user_type != null and public_user_type == 2"><!-- 管理员 -->
+	   			<!-- 业务权限 -->
+	   			and dm.store_id in 
+	   			<foreach collection="ids" item="item" open="(" close=")" separator=",">
+				 	#{item,jdbcType=INTEGER}
+				 </foreach>
+       		</if>
+       		<if test="public_user_type != null and public_user_type == 3"><!-- 业务员 -->
+			    and dm.ywy_user_id = #{public_user_id,jdbcType=INTEGER}
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 4"><!-- 业务经理 -->
+			    and dm.ywjl_user_id = #{public_user_id,jdbcType=INTEGER}
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 5"><!-- 店长 -->
+			    and dm.dz_user_id = #{public_user_id,jdbcType=INTEGER}
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 6"><!-- 营业员 -->
+	        	and dm.store_id in 
+	        	<foreach collection="ids" item="item" open="(" close=")" separator=",">
+				 	#{item,jdbcType=INTEGER}
+				 </foreach>
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 9"><!-- 销售管理 -->
+	        	and dm.ywjl_user_id in 
+	        	<foreach collection="ids" item="item" open="(" close=")" separator=",">
+				 	#{item,jdbcType=INTEGER}
+				 </foreach>
+	        </if>
+	   </if>
+	   <!-- 私有平台 -->
+	   <if test="public_user_platform_type ==2">
+			and dm.stationed_user_id = #{public_user_stationed_user_id,jdbcType=INTEGER}
+	   </if>
+	   <!-- 全部 -->
+	   <if test="public_user_platform_type ==9">
+	   		and dm.member_key > 0
+	   		<if test="public_user_type != null and public_user_type == 2"><!-- 管理员 -->
+	   			<!-- 业务权限 -->
+	   			and dm.store_id in 
+	   			<foreach collection="ids" item="item" open="(" close=")" separator=",">
+				 	#{item,jdbcType=INTEGER}
+				 </foreach>
+       		</if>
+       		<if test="public_user_type != null and public_user_type == 3"><!-- 业务员 -->
+			    and dm.ywy_user_id = #{public_user_id,jdbcType=INTEGER}
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 4"><!-- 业务经理 -->
+			    and dm.ywjl_user_id = #{public_user_id,jdbcType=INTEGER}
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 5"><!-- 店长 -->
+			    and dm.dz_user_id = #{public_user_id,jdbcType=INTEGER}
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 6"><!-- 营业员 -->
+	        	and dm.store_id in 
+	        	<foreach collection="ids" item="item" open="(" close=")" separator=",">
+				 	#{item,jdbcType=INTEGER}
+				 </foreach>
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 9"><!-- 销售管理 -->
+	        	and dm.ywjl_user_id in 
+	        	<foreach collection="ids" item="item" open="(" close=")" separator=",">
+				 	#{item,jdbcType=INTEGER}
+				 </foreach>
+	        </if>
+	   </if>
+	</sql>
+							<!-- #################        会员概况         ################ -->
+	<!-- 会员总数 -->
+	<select id="r_queryMemberTotal" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(*)
+		  from dim_member dm
+		 where dm.user_state in (1,2)
+		 <include refid="dw_public_py_where"/>
+	</select>
+	<!-- 昨日新增会员 -->
+	<select id="r_queryMemberAddCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(*)
+          from dim_member dm
+         where dm.user_state in (1,2)
+           and to_char(dm.create_date,'yyyy-mm-dd') = to_char(sysdate - 1,'yyyy-mm-dd')
+           <include refid="dw_public_py_where"/>
+	</select>
+	<!-- 沉睡会员 -->
+	<select id="r_queryMemberSleepCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(*)
+		  from fact_member_sleep t1,dim_member dm
+		 where t1.member_key = dm.member_key
+		   and dm.user_state in (1,2)
+		   <include refid="dw_public_py_where"/>
+	</select>
+	<!-- 近3月异常会员 -->
+	<select id="r_queryMemberAbnormalCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(*)
+		  from fact_member_abnormal t1,dim_member dm
+		 where t1.date_type = 2
+		   and t1.member_key = dm.member_key
+		   and dm.user_state in (1,2)
+		   <include refid="dw_public_py_where"/>
+	</select>
+	<!-- 昨日活跃会员 -->
+	<select id="r_queryMemberLivelyCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(distinct t1.member_key)
+		  from fact_user_log_pv_d t1,dim_date dt,dim_member dm
+		 where t1.log_date_key = dt.date_key
+		   and dt.date_short = to_char(sysdate - 1,'yyyymmdd')
+		   and t1.member_key = dm.member_key
+		   and dm.user_state in (1,2)
+		   <include refid="dw_public_py_where"/>
+	</select>
+	<!-- 成交会员 -->
+	<select id="r_queryMemberPayCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(distinct t1.member_key)
+		  from fact_order t1,dim_member dm
+		 where t1.payment_date_key > 0
+		   and t1.member_key = dm.member_key
+		   and dm.user_state in (1,2)
+		   <include refid="dw_public_py_where"/>
+	</select>
+	<!-- 折线图 新增会员<天> -->
+	<select id="r_queryMemberAddCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+	  select to_char(dm.create_date,'hh24')||':00' as create_date, count(*) member_add_count
+        from dim_member dm
+       where to_char(dm.create_date,'yyyy-mm-dd') >= #{old_start_date,jdbcType=VARCHAR}
+         and to_char(dm.create_date,'yyyy-mm-dd') &lt;= #{old_end_date,jdbcType=VARCHAR}
+         and dm.user_state in (1,2)
+		 <include refid="dw_public_py_where"/>
+       group by to_char(dm.create_date,'hh24')
+	</select>
+	<!-- 折线图 活跃会员<天> -->
+	<select id="r_queryMemberLivelyCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_value as create_date,count(distinct a.member_key) member_lively_count
+		  from
+		(select t1.log_time_key,t1.member_key
+		  from fact_user_log t1,dim_date dt,dim_member dm
+		 where t1.log_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.member_key = dm.member_key
+		   and dm.user_state in (1,2)
+		   <include refid="dw_public_py_where"/>) a,dim_time dt
+           where a.log_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+	</select>
+	<!-- 折线图 成交会员<天> -->
+	<select id="r_queryMemberPayCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_value as create_date,count(distinct a.member_key) member_pay_count
+		  from
+		(select t1.payment_date_time_key,t1.member_key
+		  from fact_order t1,dim_date dt,dim_member dm
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.member_key = dm.member_key
+		   and dm.user_state in (1,2)
+		   <include refid="dw_public_py_where"/>) a,dim_time dt
+           where a.payment_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+	</select>
+	<!-- 折线图 新增会员 -->
+	<select id="r_queryMemberAddCount_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+	  select to_char(dm.create_date,'yyyy-mm-dd') as create_date, count(*) member_add_count
+        from dim_member dm
+       where to_char(dm.create_date,'yyyy-mm-dd') >= #{old_start_date,jdbcType=VARCHAR}
+         and to_char(dm.create_date,'yyyy-mm-dd') &lt;= #{old_end_date,jdbcType=VARCHAR}
+         and dm.user_state in (1,2)
+		 <include refid="dw_public_py_where"/>
+       group by to_char(dm.create_date,'yyyy-mm-dd')
+	</select>
+	<!-- 折线图 活跃会员 -->
+	<select id="r_queryMemberLivelyCount_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		<choose>
+			<when test="query_type == 'other'">
+				select dt.date_values as create_date,count(distinct t1.member_key) member_lively_count
+				  from fact_user_log_pv_d t1,dim_date dt,dim_member dm
+				 where t1.log_date_key = dt.date_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.member_key = dm.member_key
+				   and dm.user_state in (1,2)
+				   <include refid="dw_public_py_where"/>
+				   group by dt.date_values
+			</when>
+			<otherwise>
+				select dt.date_values as create_date,count(distinct t1.member_key) member_lively_count
+				  from fact_user_log t1,dim_date dt,dim_member dm
+				 where t1.log_date_key = dt.date_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.member_key = dm.member_key
+				   and dm.user_state in (1,2)
+				   <include refid="dw_public_py_where"/>
+				   group by dt.date_values
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 折线图 成交会员 -->
+	<select id="r_queryMemberPayCount_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.date_values as create_date,count(distinct t1.member_key) member_pay_count
+		  from fact_order t1,dim_date dt,dim_member dm
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.member_key = dm.member_key
+		   and dm.user_state in (1,2)
+		   <include refid="dw_public_py_where"/>
+		   group by dt.date_values
+	</select>
+	<!-- 会员总数 -->
+	<select id="r_queryMemberCount" parameterType="java.util.Map" resultType="int">
+		select count(*)
+		  from dim_member dm
+		 where dm.user_state in (1,2)
+		 <include refid="dw_public_py_where"/>
+	</select>
+	<!-- 查询默认排序的会员成交信息 -->
+	<select id="r_queryMemberPayTopListBy_Default" parameterType="java.util.Map" resultType="string">
+		<choose>
+			<when test="query_type == 'other'">
+				select user_id
+				  from (select a.*,rownum rn
+				  from (select dm.user_id,nvl(t1.payment_money,0) pay_money
+				  from dim_member dm,
+			   (select dm.member_key,nvl(sum(t1.pay_total_moeny),0) as payment_money
+				  from fact_user_order_d t1,dim_date dt,dim_member dm
+				 where t1.date_key = dt.date_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.member_key = dm.member_key
+				   and dm.user_state in (1,2)
+				   <include refid="dw_public_py_where"/>
+				   group by dm.member_key) t1
+		          where dm.member_key = t1.member_key(+)
+		            and dm.user_state in (1,2)
+		            <include refid="dw_public_py_where"/>
+				   order by pay_money desc) a
+				    where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+				where rn &gt;#{start_rownum,jdbcType=INTEGER}
+			</when>
+			<otherwise>
+				select user_id
+				  from (select a.*,rownum rn
+				  from (select dm.user_id,nvl(t1.payment_money,0) + nvl(t2.earnest_money,0) pay_money
+				  from dim_member dm,
+			   (select dm.member_key,nvl(sum(t1.payment_money),0) - nvl(sum(t1.pre_earnest_money),0) as payment_money
+				  from fact_order t1,dim_date dt,dim_member dm
+				 where t1.payment_date_key = dt.date_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.member_key = dm.member_key
+				   and dm.user_state in (1,2)
+				   <include refid="dw_public_py_where"/>
+				   group by dm.member_key) t1,
+			   (select dm.member_key,nvl(sum(t1.earnest_money),0) earnest_money
+		          from fact_pre_order t1,dim_date dt,dim_member dm
+		         where t1.payment_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+			       and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		           and t1.member_key = dm.member_key
+		           and dm.user_state in (1,2)
+				   <include refid="dw_public_py_where"/>
+		           group by dm.member_key) t2
+		          where dm.member_key = t1.member_key(+)
+		            and dm.member_key = t2.member_key(+)
+		            and dm.user_state in (1,2)
+		            <include refid="dw_public_py_where"/>
+				   order by pay_money desc) a
+				    where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+				where rn &gt;#{start_rownum,jdbcType=INTEGER}
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 会员列表 -->
+	<select id="r_queryMemberList" parameterType="java.util.Map" resultType="java.util.Map">
+		select id as user_id,
+			   login_name,
+			   user_manage_name,
+			   user_state,
+			   case when t.user_company_address_province > 0 then a.name||','||b.name
+               else '' end as address,
+			   case when t.referee_user_realname is null then t.market_supervision_user_realna
+               else t.referee_user_realname end yw_name,
+               to_char(t.user_last_login_date, 'yyyy-mm-dd hh24:mi:ss') user_last_login_date
+		  from qx_user_info t
+		  	   left join dim_dic_region a on a.region_id = t.user_company_address_province
+		  	   left join dim_dic_region b on b.region_id = t.user_company_address_city
+		 where user_name in
+		 <foreach collection="userList" item="item" open="(" close=")" separator=",">
+		 	#{item,jdbcType=VARCHAR}
+		 </foreach>
+		 order by decode(t.user_name
+		 <foreach collection="userList" item="item" index="_index" open="," close="" separator=",">
+            #{item},${_index}
+         </foreach>)
+	</select>
+	<!-- 查询成交金额,成交商品数 -->
+	<select id="r_queryMemberPayCountMoney" parameterType="java.util.Map" resultType="java.util.Map">
+		<choose>
+			<when test="query_type == 'other'">
+				select dm.user_id,nvl(sum(t1.pay_total_moeny),0) as pay_money,
+					   nvl(sum(t1.pay_total_product_count),0) pay_count
+				  from fact_user_order_d t1,dim_date dt,dim_member dm
+				 where t1.date_key = dt.date_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.member_key = dm.member_key
+				   and dm.user_id in
+				  <foreach collection="userList" item="item" open="(" close=")" separator=",">
+					 #{item,jdbcType=VARCHAR}
+				  </foreach>
+				  group by dm.user_id
+			</when>
+			<otherwise>
+				select dm.user_id,nvl(sum(t1.payment_money),0) - nvl(sum(t1.pre_earnest_money),0) as pay_money,
+						nvl(sum(t1.product_count),0) pay_count
+				  from fact_order t1,dim_date dt,dim_member dm
+				 where t1.payment_date_key = dt.date_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.member_key = dm.member_key
+				   and dm.user_id in
+				  <foreach collection="userList" item="item" open="(" close=")" separator=",">
+					 #{item,jdbcType=VARCHAR}
+				  </foreach>
+				  group by dm.user_id
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 查询预定订单的定金 -->
+	<select id="r_queryMemberPreFirstMoney" parameterType="java.util.Map" resultType="java.util.Map">
+		select dm.user_id,nvl(sum(t1.earnest_money),0) pre_first_money
+		  from fact_pre_order t1,dim_date dt,dim_member dm
+		 where t1.payment_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.member_key = dm.member_key
+		   and dm.user_id in
+		  <foreach collection="userList" item="item" open="(" close=")" separator=",">
+			 #{item,jdbcType=VARCHAR}
+		  </foreach>
+		  group by dm.user_id
+	</select>
+	<!-- 查询最近一次成交时间 -->
+	<select id="r_queryMemberLastPayDate" parameterType="java.util.Map" resultType="java.util.Map">
+        select user_name as user_id,to_char(max(payment_date), 'yyyy-mm-dd hh24:mi:ss') pay_date
+          from qx_order_info 
+          where payment_state = 2
+            and user_name in 
+            <foreach collection="userList" item="item" open="(" close=")" separator=",">
+		 	 #{item,jdbcType=VARCHAR}
+		    </foreach>
+          group by user_name
+	</select>
+	<!-- 查询最近一次成交金额 -->
+	<select id="r_queryMemberLastPayMoney" parameterType="java.util.Map" resultType="java.util.Map">
+		select t.user_name as user_id,nvl(t.payment_money,0) - nvl(t.pre_earnest_money,0) as pay_money
+          from qx_order_info t,(<foreach collection="payDateList" item="item" separator="union all">
+          							select #{item.USER_ID,jdbcType=VARCHAR} user_id,
+          							       #{item.PAY_DATE,jdbcType=VARCHAR} pay_date
+          							  from dual
+          						</foreach>) t1
+          where t.user_name = t1.user_id
+            and t.payment_date = to_date(t1.pay_date, 'yyyy-mm-dd hh24:mi:ss')
+	</select>
+	<!-- 查询最近一次预定订单支付时间 -->
+	<select id="r_queryMemberLastPrePayDate" parameterType="java.util.Map" resultType="java.util.Map">
+		select user_id,to_char(max(payment_date), 'yyyy-mm-dd hh24:mi:ss') pay_date
+          from qx_pre_order_info 
+          where payment_state = 2
+            and user_id in 
+            <foreach collection="userList" item="item" open="(" close=")" separator=",">
+			 #{item,jdbcType=INTEGER}
+			</foreach>
+          group by user_id
+	</select>
+	<!-- 查询最近一次预定订单的定金 -->
+	<select id="r_queryMemberLastPreFirstMoney" parameterType="java.util.Map" resultType="java.util.Map">
+		select t.user_id,nvl(t.earnest_money,0) as pre_first_money
+		  from qx_pre_order_info t,(<foreach collection="prePayDateList" item="item" separator="union all">
+          							select #{item.USER_ID,jdbcType=INTEGER} user_id,
+          							       #{item.PAY_DATE,jdbcType=VARCHAR} pay_date
+          							  from dual
+          						  </foreach>) t1
+		 where t.user_id = t1.user_id
+		   and t.payment_date = to_date(t1.pay_date, 'yyyy-mm-dd hh24:mi:ss')
+	</select>
+	<!-- 查询默认排序的会员退款信息 -->
+	<select id="r_queryMemberReturnTopListBy_Default" parameterType="java.util.Map" resultType="string">
+		<choose>
+			<when test="query_type == 'other'">
+				select user_id
+				  from (select a.*,rownum rn
+				  from (select dm.user_id,nvl(t1.return_money,0) return_money
+				  from dim_member dm,(select t1.member_key,nvl(sum(t1.refund_total_money),0) as return_money
+				  from fact_user_refund_d t1,dim_date dt,dim_member dm
+				 where t1.date_key = dt.date_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.member_key = dm.member_key
+				   and dm.user_state in (1,2)
+				   <include refid="dw_public_py_where"/>
+				   group by t1.member_key) t1
+				   where dm.member_key = t1.member_key(+)
+				   <include refid="dw_public_py_where"/>
+				   and dm.user_state in (1,2)
+				   order by return_money desc) a
+				    where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+				where rn &gt;#{start_rownum,jdbcType=INTEGER}
+			</when>
+			<otherwise>
+				select user_id
+				  from (select a.*,rownum rn
+				  from (select dm.user_id,nvl(t1.return_money,0) return_money
+				  from dim_member dm,(select t1.member_key,nvl(sum(t1.after_sales_total_money),0) as return_money
+				  from fact_after_sales_order t1,dim_date dt,dim_member dm
+				 where t1.aso_refund_date_key = dt.date_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.member_key = dm.member_key
+				   and dm.user_state in (1,2)
+				   <include refid="dw_public_py_where"/>
+				   group by t1.member_key) t1
+				   where dm.member_key = t1.member_key(+)
+				   <include refid="dw_public_py_where"/>
+				   and dm.user_state in (1,2)
+				   order by return_money desc) a
+				    where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+				where rn &gt;#{start_rownum,jdbcType=INTEGER}
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 查询已退款总额,退款商品数 -->
+	<select id="r_queryMemberReturnCountMoney" parameterType="java.util.Map" resultType="java.util.Map">
+		<choose>
+			<when test="query_type == 'other'">
+				select dm.user_id,nvl(sum(t1.refund_total_money),0) as return_money,nvl(sum(t1.refund_total_product_count),0) return_count
+				  from fact_user_refund_d t1,dim_date dt,dim_member dm
+				 where t1.date_key = dt.date_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.member_key = dm.member_key
+				   and dm.user_id in
+				   <foreach collection="userList" item="item" open="(" close=")" separator=",">
+					 #{item,jdbcType=VARCHAR}
+				   </foreach>
+				 group by dm.user_id
+			</when>
+			<otherwise>
+				select dm.user_id,nvl(sum(t1.after_sales_total_money),0) as return_money,nvl(sum(t1.after_sales_product_count),0) return_count
+				  from fact_after_sales_order t1,dim_date dt,dim_member dm
+				 where t1.aso_refund_date_key = dt.date_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.member_key = dm.member_key
+				   and dm.user_id in
+				   <foreach collection="userList" item="item" open="(" close=")" separator=",">
+					 #{item,jdbcType=VARCHAR}
+				   </foreach>
+				 group by dm.user_id
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 查询待退款金额,待退款笔数 -->
+	<select id="r_queryMemberStayReturnMoneyNum" parameterType="java.util.Map" resultType="java.util.Map">
+		select dm.user_id,nvl(sum(t1.after_sales_total_money),0) as return_money,count(1) return_num
+		  from fact_after_sales_order t1,dim_date dt,dim_member dm,(select after_sales_order_key from dim_after_sales_order where (refund_state = 1 or return_state in (2,3,4,5,6,7))) t2
+		 where t1.aso_create_date_key = dt.date_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+           and t1.member_key = dm.member_key
+           and t1.after_sales_order_key = t2.after_sales_order_key
+           and dm.user_id in 
+           <foreach collection="userList" item="item" open="(" close=")" separator=",">
+			 #{item,jdbcType=VARCHAR}
+		   </foreach>
+         group by dm.user_id
+	</select>
+	<!-- 异常会员排行 -->
+	<select id="r_queryMemberAbnormalRank" parameterType="java.util.Map" resultType="java.util.Map">
+		select *
+		  from (
+		select dm.login_name,t1.pv_count,t1.pay_money,t1.flag_type
+		  from fact_member_abnormal t1,dim_member dm
+		 where t1.date_type = 2
+		   and t1.member_key = dm.member_key
+		   and dm.user_state in (1,2)
+		   <include refid="dw_public_py_where"/>)
+		 where rownum &lt; = #{num,jdbcType=INTEGER}
+	</select>
+	<!-- 沉睡会员排行 -->
+	<select id="r_queryMemberSleepRank" parameterType="java.util.Map" resultType="java.util.Map">
+		select *
+		  from (
+		select dm.login_name,t1.not_login_time,t1.login_count,t1.pay_money
+		  from fact_member_sleep t1,dim_member dm
+		 where t1.member_key = dm.member_key
+		   and dm.user_state in (1,2)
+		   <include refid="dw_public_py_where"/>
+		 order by t1.not_login_time desc)
+		 where rownum &lt; = #{num,jdbcType=INTEGER}
+	</select>
+	<!-- 异常会员饼图 -->
+	<select id="r_queryMemberWarningAbnormal_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select '异常会员' as page_name,count(*) cnt
+		  from fact_member_abnormal t1,dim_member dm
+		 where t1.date_type = #{date_type,jdbcType=INTEGER}
+		   and t1.member_key = dm.member_key
+		   and dm.user_state in (1,2)
+		   <include refid="dw_public_py_where"/>
+		 union all
+		select '会员总数' as page_name,count(*) cnt
+		  from dim_member dm
+		 where dm.user_state in (1,2)
+		 <include refid="dw_public_py_where"/>
+	</select>
+	<!-- 异常会员总数 -->
+	<select id="r_queryMemberAbnormalListCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from fact_member_abnormal t1,dim_member dm
+		 where t1.date_type = #{date_type,jdbcType=INTEGER}
+		   and t1.member_key = dm.member_key
+		   and dm.user_state in (1,2)
+		 <if test="flag_types != null and flag_types != ''">
+		 	and t1.flag_type in
+		 	<foreach collection="flag_types" item="item" open="(" close=")" separator=",">
+			 	#{item}
+		    </foreach>
+		 </if>
+		 <include refid="dw_public_py_where"/>
+	</select>
+	<!-- 异常会员列表 -->
+	<select id="r_queryMemberAbnormalListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+		select t.*
+		  from (select a.*,rownum rn
+		  		  from (select dm.user_id,dm.login_name,t1.order_money,
+						   t1.pay_money,
+						   t1.not_return_money,
+						   t1.return_money,
+						   t1.pv_count,
+						   t1.flag_type,
+						   t2.last_pay_date
+					  from fact_member_abnormal t1,dim_member dm,
+					  	   (select t1.member_key,max(dt.date_values) as last_pay_date
+                              from fact_order t1,dim_date dt
+                             where t1.payment_date_key = dt.date_key
+                               group by t1.member_key) t2
+					 where t1.date_type = #{date_type,jdbcType=INTEGER}
+					   and t1.member_key = dm.member_key
+					   and t1.member_key = t2.member_key(+)
+					   and dm.user_state in (1,2)
+					 <if test="flag_types != null and flag_types != ''">
+					 	and t1.flag_type in
+					 	<foreach collection="flag_types" item="item" open="(" close=")" separator=",">
+						 	#{item}
+					    </foreach>
+					 </if>
+					 <include refid="dw_public_py_where"/>
+					 <if test="sort!=null and sort!='' and sort_by!=null and sort_by!=''">
+						order by ${sort} ${sort_by} nulls last
+					 </if>) a  where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) t
+		 	where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	
+	<!-- 沉睡会员饼图 -->
+	<select id="r_queryMemberSleep_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select '沉睡会员' as page_name,count(*) cnt
+		  from fact_member_sleep t1,dim_member dm
+		 where t1.member_key = dm.member_key
+		   and dm.user_state in (1,2)
+		   <include refid="dw_public_py_where"/>
+		 union all
+		select '会员总数' as page_name,count(*) cnt
+		  from dim_member dm
+		 where dm.user_state in (1,2)
+		 <include refid="dw_public_py_where"/>
+	</select>
+	<!-- 沉睡会员总数 -->
+	<select id="r_queryMemberSleepListCount" parameterType="java.util.Map" resultType="int">
+		select count(*)
+		  from fact_member_sleep t1,dim_member dm
+		 where t1.member_key = dm.member_key
+		   and dm.user_state in (1,2)
+		   <include refid="dw_public_py_where"/>
+	</select>
+	<!-- 沉睡会员列表 -->
+	<select id="r_queryMemberSleepListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+		select t.*
+		  from (select a.*,rownum rn
+		  		  from (select dm.user_id,dm.login_name,t1.not_login_time
+					  from fact_member_sleep t1,dim_member dm
+					 where t1.member_key = dm.member_key
+					   and dm.user_state in (1,2)
+					   <include refid="dw_public_py_where"/>
+					   order by t1.not_login_time desc) a  where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) t
+		 	where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 折线图 会员活跃度<月> -->
+	<select id="r_queryMemberLivelyCountM_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+	    select dt.year_month_number as create_date, count(distinct t1.member_key)  member_lively_count
+          from fact_user_log_pv_d t1,dim_date dt,dim_member dm
+         where t1.log_date_key = dt.date_key
+           and dt.year4 = #{year,jdbcType=INTEGER}
+           and t1.member_key = dm.member_key
+           and dm.user_state in (1,2)
+		   <include refid="dw_public_py_where"/>
+         group by dt.year_month_number
+	</select>
+	<!-- 会员活跃度列表 -->
+	<select id="r_queryMemberLivelyList" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.date_values as create_date,dt.day_in_month as cnt,count(distinct t1.member_key) member_lively_count
+          from fact_user_log_pv_d t1,dim_date dt,dim_member dm
+         where t1.log_date_key = dt.date_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+           and t1.member_key = dm.member_key
+           and dm.user_state in (1,2)
+           <include refid="dw_public_py_where"/>
+         group by dt.date_values,dt.day_in_month
+         order by dt.date_values
+	</select>
+	<!-- 会员活跃度列表<月> -->
+	<select id="r_queryMemberLivelyListM" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.year_month_number as create_date,dt.month_number as cnt,count(distinct t1.member_key) member_lively_count
+          from fact_user_log_pv_d t1,dim_date dt,dim_member dm
+         where t1.log_date_key = dt.date_key
+           and dt.year4 = #{year,jdbcType=INTEGER}
+           and t1.member_key = dm.member_key
+           and dm.user_state in (1,2)
+           <include refid="dw_public_py_where"/>
+         group by dt.year_month_number,dt.month_number
+         order by dt.year_month_number
+	</select>
+</mapper>

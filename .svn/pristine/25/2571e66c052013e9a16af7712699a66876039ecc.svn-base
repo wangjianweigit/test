@@ -1,0 +1,139 @@
+package com.tk.oms.sysuser.service;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
+import com.tk.oms.sysuser.dao.SysUserLogsDao;
+import com.tk.oms.sysuser.entity.SysUserLogs;
+import com.tk.sys.util.HttpUtil;
+import com.tk.sys.util.ProcessResult;
+import com.tk.sys.util.Transform;
+
+/**
+* Copyright (c), 2016, Tongku
+* FileName : SysUserLogsService.java
+* 系统用户日志业务处理类
+* @author  wangpeng
+* @date 2016-06-20
+* @version1.00
+*/
+@Service("SysUserLogsService")
+public class SysUserLogsService {
+
+	@Resource
+	private SysUserLogsDao sysUserLogsDao;
+	private int pageIndex = 1;//默认起始页
+    private int pageSize = 15;//默认分页大小
+
+	/**
+	 * 通用流程提交或审批
+	 */
+	public ProcessResult addSysUserLogs(HttpServletRequest request){
+		ProcessResult pr = new ProcessResult();
+		pr.setState(false);
+		pr.setMessage("日志记录失败");
+        try {
+        	String json = HttpUtil.getRequestInputStream(request);
+        	SysUserLogs sysUserLogs = (SysUserLogs) Transform.GetPacket(json, SysUserLogs.class);
+			//检查参数
+			if(sysUserLogs.getUser_id()==null||sysUserLogs.getUser_id()==0){
+	                pr.setMessage("缺少必要的参数");
+	                return pr;
+	        }
+            String post_param_extra = "";
+            String post_param = "";
+            int len = 1300;
+			if(sysUserLogs.getPost_param().length() > len) {
+			    post_param = sysUserLogs.getPost_param().substring(0, len);
+			    post_param_extra = sysUserLogs.getPost_param().substring(len+1);
+                sysUserLogs.setPost_param(post_param);
+            }
+			/**********************插入日志信息****begin**************************/
+			sysUserLogsDao.addSysUserLogs(sysUserLogs);
+			/**********************插入日志信息****end**************************/
+
+			if(!StringUtils.isEmpty(post_param_extra)) {
+                Map<String, Object> detailMap = new HashMap<String, Object>();
+                detailMap.put("log_id", sysUserLogs.getId());
+                detailMap.put("post_param_extra", post_param_extra);
+                sysUserLogsDao.insertDetail(detailMap);
+            }
+			pr.setState(true);
+			pr.setMessage("日志记录成功");
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+		}
+		return pr;
+        	
+	}
+	  /**
+     * 获取用户操作日志列表
+     * @param request
+     * @return
+     */
+    public ProcessResult queryListPage(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        Map<String,Object> params = new HashMap<String,Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if(!StringUtils.isEmpty(json))
+                params = (HashMap<String,Object>) Transform.GetPacket(json,Map.class);
+			if (params.containsKey("pageIndex")) {
+				try {
+					pageIndex = Integer.parseInt(params.get("pageIndex").toString());
+				} catch (Exception e) {
+				}
+			}
+			pageIndex = pageIndex <= 0 ? 0 : pageIndex - 1;
+			// 分页大小
+			if (params.containsKey("pageSize")) {
+				try {
+					pageSize = Integer.parseInt(params.get("pageSize").toString());
+				} catch (Exception e) {
+				}
+			}
+			int start_row_num = (pageIndex) * pageSize;
+			int end_row_num = (pageIndex + 1) * pageSize;
+			params.put("start_row_num", start_row_num);
+			params.put("end_row_num", end_row_num);
+            List<Map<String,Object>> list = sysUserLogsDao.queryUserLogsForPage(params);
+            pr.setState(true);
+            pr.setMessage("获取数据列表成功");
+            pr.setObj(list);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+    }
+    /**
+     * 获取用户操作日志总数
+     * @param request
+     * @return
+     */
+    public ProcessResult queryUserLogsCount(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        Map<String,Object> params = new HashMap<String,Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if(!StringUtils.isEmpty(json))
+                params = (HashMap<String,Object>) Transform.GetPacket(json,Map.class);
+            int total = sysUserLogsDao.queryUserLogsCount(params);
+            pr.setState(true);
+            pr.setMessage("获取成功");
+            pr.setObj(total);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+    }
+}

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.sysuser.dao.SysRoleNodeDao">
+	
+	<!-- 新增角色相关菜单或节点 -->
+    <insert id="insert" parameterType="java.util.HashMap">
+        insert into tbl_sys_role_node(id,role_id,node_id)
+        select seq_sys_role_node.nextval,#{role_id} role_id,node_id from (
+        <foreach collection="role_nodes" open="(" close=")" item="item" separator="union all">
+            select
+            #{item.node_id,jdbcType=INTEGER} as node_id
+            from dual
+        </foreach>
+        )
+    </insert>
+    
+    <!-- 删除角色或节点的相关关联信息 -->
+    <delete id="delete"  parameterType="java.util.HashMap">
+         delete from tbl_sys_role_node 
+         <where>
+         	<if test="role_id!=null and role_id!=0 ">
+                role_id = #{role_id,jdbcType=INTEGER}
+            </if>
+            <if test="node_id!=null and node_id!=0 ">
+                and node_id = #{node_id,jdbcType=INTEGER}
+            </if>
+         </where> 
+    </delete>
+
+	<resultMap type="java.util.HashMap" id="roleNodeMap">
+		<result column="id" property="id"/>
+		<result column="node_name" property="name"/>
+		<result column="level" property="pid"/>
+		<result column="chk" property="chk"/>
+		<result column="menu_type" property="menu_type"/>
+	</resultMap>
+
+	<!-- 查询菜单或按钮节点列表，如果有权限则选中 -->
+    <select id="queryList" resultMap="roleNodeMap" parameterType="java.util.HashMap">
+         select id,node_name,level,nvl(c.node_id,0) chk,a.menu_type from tbl_sys_node a,
+		(select node_id, role_id from tbl_sys_role_node where role_id = #{role_id,jdbcType=INTEGER}) c 
+			where  a.id = c.node_id(+) 
+            and is_delete = '0'
+            start with parent_id=0
+            connect by prior id=parent_id
+            order siblings by sort_id asc
+    </select>
+</mapper>

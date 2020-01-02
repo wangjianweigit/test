@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.contribution.dao.ContributionWaitDao">
+	<!-- 待缴款单字段 -->
+	<sql id="all_column">
+		cw.id,
+        cw.sale_user_name,
+        cw.contribution_type,
+        cw.order_number,
+        cw.contribution_money,
+        to_char (cw.create_date, 'yyyy-mm-dd hh24:mi:ss') create_date,
+        u.user_realname,
+        u.user_name,
+        cw.state,
+        cw.contribution_number,
+        to_char (cw.contribution_date, 'yyyy-mm-dd hh24:mi:ss') contribution_date,
+        cw.receipt_type,
+        cw.xdr_user_type,
+        cw.md_id,
+        (select store_name from tbl_store_info where id = cw.md_id) store_name
+	</sql>
+	<!-- 查询待缴款单列表 -->
+	<select id="queryContributionWaitList" parameterType="java.util.Map" resultType="java.util.Map">
+		select *
+		from (select A.*, rownum rn
+		from (
+			select <include refid="all_column"/>
+			from tbl_contribution_wait cw
+		    left join tbl_sys_user_info u on cw.sale_user_name = u.user_name
+			<where>
+				<if test="states != null and states.length!=0">
+					and cw.state in
+					<foreach item="item" index="index" collection="states" open="(" separator="," close=")">
+						#{item,jdbcType=INTEGER}
+					</foreach>
+				</if>
+				<if test="market_supervision_user_id != null and market_supervision_user_id != 0">
+					and exists (select 1 from tbl_store_info tsi where tsi.id = cw.md_id and tsi.manager_user_id = #{market_supervision_user_id,jdbcType=INTEGER})
+				</if>
+				<if test="referee_user_id != null and referee_user_id != 0">
+					and u.id = #{referee_user_id,jdbcType=VARCHAR}
+				</if>
+				<if test="store_id != null and store_id != 0">
+					and cw.md_id = #{store_id,jdbcType=INTEGER}
+					and cw.xdr_user_type in('5','6')
+				</if>
+				<if test="receipt_type != null and receipt_type != ''">
+					and cw.receipt_type = #{receipt_type,jdbcType=VARCHAR}
+				</if>
+				<if test="order_number != null and order_number != ''">
+					and cw.order_number like '%'|| #{order_number,jdbcType=VARCHAR}||'%'
+				</if>
+				<if test="start_date != null and start_date != ''">
+					and cw.create_date &gt; to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+				</if>
+				<if test="end_date != null and end_date != ''">
+					and cw.create_date &lt; to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+				</if>
+				<if test="public_user_type != null and public_user_type == 2">
+					and (exists (select 1 from tbl_sys_user_store tsus where tsus.store_id = cw.md_id and tsus.user_id = #{public_user_id,jdbcType=INTEGER})
+						 or exists (select 1 from tbl_store_user_rel tsur where tsur.type = 3 and tsur.user_id = u.id and tsur.store_id in (select store_id from tbl_sys_user_store tsus where tsus.user_id = #{public_user_id,jdbcType=INTEGER}) )
+					)
+				</if>
+				<if test="public_user_type != null and public_user_type == 3">
+					and cw.sale_user_name = #{public_user_name,jdbcType=VARCHAR}
+				</if>
+				<if test="public_user_type != null and public_user_type == 4">
+					and cw.sale_user_name = #{public_user_name,jdbcType=VARCHAR}
+				</if>
+				<if test="public_user_type != null and public_user_type == 5">
+					and exists(select 1 from tbl_store_info tsi where tsi.id = cw.md_id and tsi.shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER})
+				</if>
+				<if test="public_user_type != null and public_user_type == 6">
+					and 1 = 2
+				</if>
+				<if test="public_user_type != null and public_user_type == 9">
+					and 1 = 2
+				</if>
+			</where>
+			order by create_date desc
+		) A
+		where rownum  &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 查询待缴款单数量 -->
+	<select id="queryContributionWaitCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_contribution_wait cw
+		<where>
+				<if test="states != null and states.length!=0">
+					cw.state in
+					<foreach item="item" index="index" collection="states" open="(" separator="," close=")">
+						#{item,jdbcType=INTEGER}
+					</foreach>
+				</if>
+				<if test="sale_user_name != null and sale_user_name != '' and browse_all==null">
+					and cw.sale_user_name = #{sale_user_name,jdbcType=VARCHAR}
+				</if>
+				<if test="md_id != null and md_id != 0 and browse_all==null">
+					and cw.md_id = #{md_id,jdbcType=INTEGER}
+					and cw.xdr_user_type in('5','6')
+				</if>
+				<if test="receipt_type != null and receipt_type != ''">
+					and cw.receipt_type = #{receipt_type,jdbcType=VARCHAR}
+				</if>
+				<if test="order_number != null and order_number != ''">
+					and cw.order_number like '%'|| #{order_number,jdbcType=VARCHAR}||'%'
+				</if>
+				<if test="start_date != null and start_date != ''">
+					and cw.create_date &gt; to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+				</if>
+				<if test="end_date != null and end_date != ''">
+					and cw.create_date &lt; to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+				</if>
+				<if test="public_user_type != null and public_user_type == 2">
+					and (exists (select 1 from tbl_sys_user_store tsus where tsus.store_id = cw.md_id and tsus.user_id = #{public_user_id,jdbcType=INTEGER})
+						 or exists (select 1 from tbl_store_user_rel tsur where tsur.type = 3 and tsur.user_id = u.id and tsur.store_id in (select store_id from tbl_sys_user_store tsus where tsus.user_id = #{public_user_id,jdbcType=INTEGER}) )
+					)
+				</if>
+				<if test="public_user_type != null and public_user_type == 3">
+					and cw.sale_user_name = #{public_user_name,jdbcType=VARCHAR}
+				</if>
+				<if test="public_user_type != null and public_user_type == 4">
+					and cw.sale_user_name = #{public_user_name,jdbcType=VARCHAR}
+				</if>
+				<if test="public_user_type != null and public_user_type == 5">
+					and exists(select 1 from tbl_store_info tsi where tsi.id = cw.md_id and tsi.shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER})
+				</if>
+				<if test="public_user_type != null and public_user_type == 6">
+					and 1 = 2
+				</if>
+				<if test="public_user_type != null and public_user_type == 9">
+					and 1 = 2
+				</if>
+		</where>
+	</select>
+	<!-- 根据ID查询待缴款单 -->
+	<select id="queryById" parameterType="long" resultType="java.util.Map">
+		select <include refid="all_column"/>
+		from tbl_contribution_wait cw
+		left join tbl_sys_user_info u on cw.create_user_id = u.id
+		where cw.id = #{id,jdbcType=INTEGER}
+	</select>
+	<!-- 更新缴款信息 -->
+	<update id="update" parameterType="java.util.Map">
+		update tbl_contribution_wait
+		<set>
+			<if test="contribution_number != null and contribution_number != ''">
+				contribution_number = #{contribution_number,jdbcType=VARCHAR},
+			</if>
+			<if test="state != null and state != ''">
+				state = #{state,jdbcType=INTEGER},
+			</if>
+		</set>
+		where id in
+		<foreach collection="ids" item="item" index="index" open="(" close=")" separator=",">
+			#{item,jdbcType=INTEGER}
+		</foreach>
+	</update>
+	<!-- 统计缴款金额 -->
+	<select id="sumTotalMoney" parameterType="java.lang.String" resultType="java.util.Map">
+		select sum(contribution_money) total_money, max(receipt_type) receipt_type
+		from tbl_contribution_wait
+		where id in
+		<foreach collection="array" item="item" index="index" open="(" close=")" separator=",">
+			#{item,jdbcType=INTEGER}
+		</foreach>
+		and receipt_type in ('现金支付','现金充值')
+	</select>
+	<!--获取充值现金缴款详细信息-->
+	<select id="queryCashPaymentDetailForRecharge" parameterType="java.util.Map" resultType="java.util.Map">
+		select
+		    ucr.record_number,
+		    ucr.turnover_number,
+		    to_char (ucr.create_date, 'yyyy-mm-dd hh24:mi:ss') create_date,
+		    ucr.collect_user_name,
+		    ucr.collect_user_manager_name,
+		    ucr.state,
+		    ucr.money,
+		    ucr.voucher_img_url,
+		    ucr.remark,
+		    ucr.check_user_name,
+		    ucr.check_user_business_name,
+		    to_char (ucr.check_date, 'yyyy-mm-dd hh24:mi:ss') check_date,
+		    ucr.parent_acc_subject_name,
+            (select store_name from tbl_store_info where id = ucr.md_id and rownum &lt;=1) as md_name,
+            (select user_realname from tbl_sys_user_info where user_name = ucr.ywjl_user_name) as  ywjl_user_realname,
+            (select user_realname from tbl_sys_user_info where user_name = ucr.ywy_user_name) as  ywy_user_realname,
+            ucr.record_channel,
+            decode(ucr.charge_type,1,'正常充值',2,'预付充值') charge_type
+		from
+		    tbl_user_charge_record ucr
+		where
+		    ucr.record_number = #{record_number}
+	</select>
+	
+	<!-- 生成缴款单详情信息 -->
+	<insert id="insertContributionOrderDetail" parameterType="java.util.Map">
+		insert into  tbl_contribution_order_detail (contribution_number,contribution_wait_id)
+		select a.* from
+		(
+		<foreach collection="ids" item="item" index="index" separator="UNION">
+			select 
+				   #{contribution_number,jdbcType=VARCHAR},
+				   #{item,jdbcType=INTEGER}
+			from dual	   
+		</foreach>
+		) a
+	</insert>
+	<!-- 检测用户是否有查看所有的代缴款订单的权限 -->
+	<select id="checkUserRoleNode" parameterType="long" resultType="int">
+		select count(1) from tbl_sys_role_node where role_id in (
+		    select role_id from tbl_sys_user_role  where user_id = #{user_id,jdbcType=INTEGER}
+		) and node_id = 1000104
+	</select>
+	<!-- 代客户充值验款通过后，产生一条代缴款单记录 -->
+	<insert id="insertWaitByUserCharge" parameterType="long">
+		insert into TBL_CONTRIBUTION_WAIT(
+	    ID,
+	    SALE_USER_NAME,
+	    CONTRIBUTION_TYPE,
+	    ORDER_NUMBER,
+	    CONTRIBUTION_MONEY,
+	    CREATE_DATE,
+	    CREATE_USER_ID,
+	    CREATE_USER_NAME,
+	    STATE,
+	    RECEIPT_TYPE,
+	    XDR_USER_TYPE,
+	    MD_ID,
+	    CHARGE_TYPE
+	) select
+	 SEQ_CONTRIBUTION_WAIT.nextval  ID,
+	 sui.USER_NAME SALE_USER_NAME,
+	 case when ucr.charge_type = 1 then 2
+	 else 3 end CONTRIBUTION_TYPE,
+	 ucr.RECORD_NUMBER ORDER_NUMBER,
+	 ucr.MONEY CONTRIBUTION_MONEY,
+	 sysdate CREATE_DATE,
+	 ucr.AGENCY_USER_ID CREATE_USER_ID,
+	 sui.USER_REALNAME   CREATE_USER_NAME,
+	 1 STATE,
+	 ucr.RECORD_CHANNEL RECEIPT_TYPE,
+	 ucr.AGENCY_USER_TYPE   XDR_USER_TYPE,
+	 ucr.MD_ID MD_ID,
+	 ucr.charge_type
+	 FROM TBL_USER_CHARGE_RECORD ucr
+	 LEFT JOIN TBL_SYS_USER_INFO sui on ucr.AGENCY_USER_ID = sui.id
+	 where ucr.id = #{id,jdbcType=INTEGER}
+	</insert>
+</mapper>

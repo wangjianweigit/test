@@ -1,0 +1,83 @@
+package com.tk.oms.analysis.service;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import com.tk.sys.util.*;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.stereotype.Service;
+
+import com.tk.oms.analysis.dao.MemberLogDao;
+import org.springframework.util.StringUtils;
+
+@Service("memberLogService")
+public class MemberLogService {
+	private Log logger = LogFactory.getLog(this.getClass());
+	@Resource
+	private MemberLogDao memberLogDao;
+	
+	/**
+	 * 查询会员日志列表
+	 * @param request
+	 * @return
+	 */
+	public GridResult queryMemberLogList(HttpServletRequest request) {
+		GridResult pr = new GridResult();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			Map<String,Object> params = (Map<String,Object>)Transform.GetPacket(json, Map.class);
+			GridResult pageParamResult = PageUtil.handlePageParams(params);
+			if(pageParamResult!=null){
+				return pageParamResult;
+			}
+			List<Map<String,Object>> userList = null;
+			int userCount=memberLogDao.queryCountForPage(params);
+			userList = memberLogDao.queryListForPage(params);
+			pr.setState(true);
+			pr.setMessage("获取会员日志列表数据成功");
+			pr.setObj(userList);
+			pr.setTotal(userCount);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			logger.error(e);
+		}
+		return pr;
+	}
+
+    /**
+     * 获取日志详情
+     * @param request
+     * @return
+     */
+    public ProcessResult queryDetail(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        Map<String, Object> paramMap = new HashMap<String, Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+
+            if(!StringUtils.isEmpty(json)) {
+                paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            }
+            Map<String, Object> data = memberLogDao.queryDetail(paramMap);
+            if (data != null ) {
+                pr.setState(true);
+                pr.setMessage("查询成功!");
+                pr.setObj(data);
+            } else {
+                pr.setMessage("数据不存在");
+                pr.setState(false);
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error("查询失败："+e.getMessage());
+        }
+        return pr;
+    }
+}

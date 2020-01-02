@@ -1,0 +1,176 @@
+package com.tk.oms.member.control;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import com.tk.oms.member.service.RetailStoreApprovalService;
+import com.tk.sys.util.Packet;
+import com.tk.sys.util.ProcessResult;
+import com.tk.sys.util.Transform;
+
+/**
+*
+* Copyright (c), 2019, Tongku
+* FileName : StoreApprovalControl
+* 店铺审核(新零售小程序)
+*
+* @author liujialong
+* @version 1.00
+* @date 2019/6/26
+*/
+@Controller
+@RequestMapping("/retail_store_approval")
+public class RetailStoreApprovalControl {
+	
+	@Resource
+    private RetailStoreApprovalService retailStoreApprovalService;
+	
+	
+	/**
+	 * 新零售小程序店铺审核列表
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/list", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryStoreApprovalList(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        try {
+            pr = retailStoreApprovalService.queryStoreApprovalList(request);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return Transform.GetResult(pr);
+    }
+	/**
+	 * 新零售小程序店铺审核详情
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/detail", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryStoreApprovalDetail(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        try {
+            pr = retailStoreApprovalService.queryStoreApprovalDetail(request);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return Transform.GetResult(pr);
+    }
+	
+	/**
+	 * 新零售小程序店铺编辑详情
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/user_info_detail", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryRetailStoreApprovalUserInfoDetail(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        try {
+            pr = retailStoreApprovalService.queryRetailStoreApprovalUserInfoDetail(request);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return Transform.GetResult(pr);
+    }
+	
+	/**
+	 * 新零售小程序店铺编辑
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/user_info_edit", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet editRetailStoreApprovalUserInfo(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        try {
+            pr = retailStoreApprovalService.editRetailStoreApprovalUserInfo(request);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return Transform.GetResult(pr);
+    }
+	
+	/**
+	 * 新零售小程序店铺审核（权限审核）
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/user_audit", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet auditUserStoreApproval(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        try {
+            pr = retailStoreApprovalService.auditUserStoreApproval(request);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return Transform.GetResult(pr);
+    }
+	
+	/**
+	 * 新零售小程序店铺实名认证列表
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/cert_list", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryStoreCertList(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        try {
+            pr = retailStoreApprovalService.queryStoreCertList(request);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return Transform.GetResult(pr);
+    }
+	/**
+	 * 新零售小程序店铺实名认证详情
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/cert_detail", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryStoreCertDetail(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        try {
+            pr = retailStoreApprovalService.queryStoreCertDetail(request);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return Transform.GetResult(pr);
+    }
+	
+	/**
+	 * 新零售小程序店铺实名认证详情
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/cert_audit", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet auditStoreCertDetail(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        try {
+            pr = retailStoreApprovalService.auditStoreCert(request);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return Transform.GetResult(pr);
+    }
+
+}

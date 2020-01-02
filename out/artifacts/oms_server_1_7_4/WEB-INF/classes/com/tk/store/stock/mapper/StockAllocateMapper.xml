@@ -1,0 +1,602 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.store.stock.dao.StockAllocateDao">
+	<!-- 库存调拨数量 -->
+	<select id="queryStockAllocateCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		 from tbl_stock_allocate t
+		 <where>
+		 	<if test="allocate_number !=null and allocate_number !=''">
+		 		and allocate_number = #{allocate_number,jdbcType=VARCHAR}
+		 	</if>
+		 	<if test="in_user_id !=null and in_user_id !=''">
+		 		and in_user_id = #{in_user_id,jdbcType=INTEGER}
+		 	</if>
+		 	<if test="out_user_id !=null and out_user_id !=''">
+		 		and out_user_id = #{out_user_id,jdbcType=INTEGER}
+		 	</if>
+		 	<if test="start_date != null and start_date != '' ">
+			    and create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+		    </if>
+		    <if test="end_date != null and end_date != '' ">
+			    and create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+		    </if>
+		 	<if test="create_user_name !=null and create_user_name !=''">
+		 		and exists (select 1 from tbl_sys_user_info where id = t.create_user_id and user_realname like '%'||#{create_user_name,jdbcType=VARCHAR}||'%')
+		 	</if>
+		 	<if test="approval_state !=null and approval_state !=''">
+		 		and approval_state = #{approval_state,jdbcType=INTEGER}
+		 	</if>
+		 	<if test="state !=null and state !=''">
+		 		and state in 
+		 		<foreach item="item" collection="state" open="(" separator="," close=")">
+	   	 			#{item,jdbcType=INTEGER}
+	   	 		</foreach>
+		 	</if>
+		 	and exists(
+		   	   select 1 from tbl_store_user_manage t1 
+		 		 where (id = t.in_user_id or id = t.out_user_id)
+		 		 and exists (
+		   	   select 1 from tbl_user_info tui 
+		   	   <where>
+	   	  		    1=1
+	   	  		    and tui.id = t1.user_id
+		        <if test="public_user_type != null and public_user_type == 3">
+		            and 1=2
+		        </if>
+		        <if test="public_user_type != null and public_user_type == 4">
+		            and tui.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+		        </if>
+		        <if test="public_user_type != null and public_user_type == 5">
+		            and 1=2
+		        </if>
+		        <if test="public_user_type != null and public_user_type == 6">
+		            and 1=2
+		        </if>
+		        <if test="public_user_type != null and public_user_type == 7">
+					and tui.supervisor_user_id = #{public_user_id,jdbcType=INTEGER}
+		        </if>
+		        <if test="public_user_type != null and public_user_type == 9">
+		            and tui.partner_user_id = #{public_user_id,jdbcType=INTEGER}
+		        </if>
+	   	   	</where>))
+		 </where>
+	</select>
+	<!-- 库存调拨列表 -->
+	<select id="queryStockAllocateListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+			select a.*,rownum rn from (
+				select t.id,
+				       t.allocate_number,
+				       t.state,
+				       (select store_name from tbl_store_user_manage where id = t.in_user_id) in_user_name,
+				       (select store_name from tbl_store_user_manage where id = t.out_user_id) out_user_name,
+				       (select user_realname from tbl_sys_user_info where id = t.create_user_id) create_user_name,
+				       to_char(t.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+				       (select user_realname from tbl_sys_user_info where id = t.approval_user_id) approval_user_name,
+				       to_char(t.approval_date,'yyyy-mm-dd hh24:mi:ss') approval_date,
+				       t.approval_state,
+				       t.rejected_reason,
+				       nvl((select allot_all_flag from tbl_store_trade where trade_number = t.allocate_number),0) allot_all_flag,
+				       t.diff_attr_type
+				 from tbl_stock_allocate t
+				 <where>
+				 	<if test="allocate_number !=null and allocate_number !=''">
+				 		and allocate_number = #{allocate_number,jdbcType=VARCHAR}
+				 	</if>
+				 	<if test="in_user_id !=null and in_user_id !=''">
+				 		and in_user_id = #{in_user_id,jdbcType=INTEGER}
+				 	</if>
+				 	<if test="out_user_id !=null and out_user_id !=''">
+				 		and out_user_id = #{out_user_id,jdbcType=INTEGER}
+				 	</if>
+				 	<if test="start_date != null and start_date != '' ">
+					    and create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+				    </if>
+				    <if test="end_date != null and end_date != '' ">
+					    and create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+				    </if>
+				 	<if test="create_user_name !=null and create_user_name !=''">
+				 		and exists (select 1 from tbl_sys_user_info where id = t.create_user_id and user_realname like '%'||#{create_user_name,jdbcType=VARCHAR}||'%')
+				 	</if>
+				 	<if test="approval_state !=null and approval_state !=''">
+				 		and approval_state = #{approval_state,jdbcType=INTEGER}
+				 	</if>
+				 	<if test="state !=null and state !=''">
+				 		and state in 
+				 		<foreach item="item" collection="state" open="(" separator="," close=")">
+			   	 			#{item,jdbcType=INTEGER}
+			   	 		</foreach>
+				 	</if>
+				 	and exists(
+				   	   select 1 from tbl_store_user_manage t1 
+				 		 where (id = t.in_user_id or id = t.out_user_id)
+				 		 and exists (
+				   	   select 1 from tbl_user_info tui 
+				   	   <where>
+			   	  		    1=1
+			   	  		    and tui.id = t1.user_id
+				        <if test="public_user_type != null and public_user_type == 3">
+				            and 1=2
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 4">
+				            and tui.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 5">
+				            and 1=2
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 6">
+				            and 1=2
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 7">
+							and tui.supervisor_user_id = #{public_user_id,jdbcType=INTEGER}
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 9">
+				            and tui.partner_user_id = #{public_user_id,jdbcType=INTEGER}
+				        </if>
+			   	   </where>))
+				 </where>
+				 order by t.approval_state asc,t.create_date desc) a
+		 	where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 获取调拨单详情 -->
+	<select id="queryStockAllocateDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select allocate_number,
+			   in_user_id,
+			   (select store_name from tbl_store_user_manage where id = t.in_user_id) in_user_name,
+			   out_user_id,
+		       (select store_name from tbl_store_user_manage where id = t.out_user_id) out_user_name,
+		       (select user_id from tbl_store_user_manage where id = t.in_user_id) in_agent_id,
+		       (select user_id from tbl_store_user_manage where id = t.out_user_id) out_agent_id,
+		       (select user_realname from tbl_sys_user_info where id = t.approval_user_id) approval_user_name,
+		       to_char(t.approval_date,'yyyy-mm-dd hh24:mi:ss') approval_date,
+		       t.create_user_id,
+		       (select user_realname from tbl_sys_user_info where id = t.create_user_id) create_user_name,
+		       to_char(t.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+		       t.approval_state,
+		       t.rejected_reason,
+		       nvl((select sum(allocate_count) from tbl_stock_allocate_detail where allocate_number = t.allocate_number),0) allocate_count,
+		       (select agent_store_id from tbl_store_user_manage where id = t.in_user_id) in_agent_store_id,
+		       (select agent_store_id from tbl_store_user_manage where id = t.out_user_id) out_agent_store_id
+		  from tbl_stock_allocate t
+		 where allocate_number = #{allocate_number,jdbcType=VARCHAR}
+	</select>
+	<!-- 获取调拨单商品数据 -->
+	<select id="queryStockAllocateProductDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select t1.id,
+			   t1.itemnumber as product_itemnumber,
+               t1.product_img_url,
+               (select type_name from tbl_dic_product_type tdpt where tdpt.id = t1.product_type_id)  as product_type,
+               (select brand_name from tbl_dic_product_brand tdpb where tdpb.id = t1.brand_id)  as brand,
+               t1.year,
+               (select name from tbl_dic_product_season tdps where tdps.id = t1.season_id)  as season
+		  from (select product_itemnumber from tbl_stock_allocate_detail where allocate_number = #{allocate_number,jdbcType=VARCHAR} group by product_itemnumber) t,tbl_product_info t1
+	     where t.product_itemnumber = t1.itemnumber(+)
+	       order by t.product_itemnumber
+	</select>
+	<!-- 获取调拨单商品sku数据 -->
+	<select id="queryStockAllocateDetailSku" parameterType="java.util.Map" resultType="java.util.Map">
+         select t.product_itemnumber,
+                t.allocate_count,
+                t.product_sku
+           from tbl_stock_allocate_detail t
+          where t.allocate_number = #{allocate_number,jdbcType=VARCHAR}
+	</select>
+	<!-- 查询商品所属分类 -->
+	<select id="queryProductTypeByItemnumber" parameterType="java.util.Map" resultType="string">
+		select (select type_name from tbl_dic_product_type where id = tpi.product_type_id) product_type
+		  from tbl_product_info tpi
+		 where itemnumber = #{ITEMNUMBER,jdbcType=VARCHAR}
+	</select>
+	<!-- 查询商品分组信息 -->
+	<select id="queryProductGroup" parameterType="java.util.Map" resultType="java.util.Map">
+		select t1.id,
+			   t1.itemnumber as product_itemnumber,
+               t1.product_img_url,
+               (select type_name from tbl_dic_product_type tdpt where tdpt.id = t1.product_type_id)  as product_type,
+               (select brand_name from tbl_dic_product_brand tdpb where tdpb.id = t1.brand_id)  as brand,
+               t1.year,
+               (select name from tbl_dic_product_season tdps where tdps.id = t1.season_id)  as season
+	      from tbl_product_info t1
+	       where t1.itemnumber in
+	       	<foreach item="item" collection="product_itemnumbers" open="(" separator="," close=")">
+	       	 #{item,jdbcType=VARCHAR}	       	
+	       	</foreach>
+	         order by t1.itemnumber
+	</select>
+	<!-- 审批 -->
+	<update id="approvalStockAllocate" parameterType="java.util.Map">
+		update tbl_stock_allocate
+		   set approval_state = #{approval_state,jdbcType=INTEGER},
+		   	   <if test="rejected_reason != null and rejected_reason !=''">
+		   	   rejected_reason = #{rejected_reason,jdbcType=VARCHAR},
+		   	   </if>
+		   	   <if test="state != null and state !=''">
+		   	   state = #{state,jdbcType=INTEGER},
+		   	   </if>
+		   	   approval_user_id = #{public_user_id,jdbcType=INTEGER},
+		   	   approval_date = sysdate
+		 where allocate_number = #{allocate_number,jdbcType=VARCHAR}
+ 	</update>
+ 	<!-- 新增调拨单 -->
+	<insert id="insertStockAllocate" parameterType="java.util.Map">
+		insert into tbl_stock_allocate
+		(
+			id,
+			allocate_number,
+			in_user_id,
+			out_user_id,
+			create_user_id,
+			approval_state
+		) values (
+			seq_stock_allocate.nextVal,
+			#{allocate_number,jdbcType=VARCHAR},
+			#{in_user_id,jdbcType=INTEGER},
+			#{out_user_id,jdbcType=INTEGER},
+			#{public_user_id,jdbcType=INTEGER},
+			#{approval_state,jdbcType=INTEGER}
+		)
+	</insert>
+	<!-- 新增调拨单明细 -->
+	<insert id="insertStockAllocateDetail" parameterType="java.util.Map">
+		insert into tbl_stock_allocate_detail
+		(
+			id,
+			allocate_number,
+			product_itemnumber,
+			product_sku,
+			allocate_count
+		) values (
+			seq_stock_allocate_detail.nextVal,
+			#{allocate_number,jdbcType=VARCHAR},
+			#{product_itemnumber,jdbcType=VARCHAR},
+			#{product_sku,jdbcType=INTEGER},
+			#{allocate_count,jdbcType=INTEGER}
+		)
+	</insert>
+	<!-- 是否更换调出调入门店 -->
+	<select id="queryStockAllocateIsExist" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_stock_allocate
+		 where allocate_number = #{allocate_number,jdbcType=VARCHAR}
+		   and out_user_id = #{out_user_id,jdbcType=INTEGER}
+		   and in_user_id = #{in_user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 更新调拨单基本信息 -->
+	<update id="updateStockAllocate" parameterType="java.util.Map">
+		update tbl_stock_allocate
+		   set <if test="in_user_id != null and in_user_id !=''">in_user_id = #{in_user_id,jdbcType=INTEGER},</if>
+			   <if test="out_user_id != null and out_user_id !=''">out_user_id = #{out_user_id,jdbcType=INTEGER},</if>
+			   <if test="approval_state != null and approval_state !=''">approval_state = #{approval_state,jdbcType=INTEGER}</if>
+			   <if test="diff_attr_type != null and diff_attr_type !=''">
+			   diff_attr_type = #{diff_attr_type,jdbcType=INTEGER},
+			   cancel_ver_user_id = #{public_user_id,jdbcType=INTEGER},
+			   cancel_ver_date = sysdate
+			   </if>
+			   <if test="state != null and state != ''">
+			   state = #{state, jdbcType=INTEGER}
+			   </if>
+		 where allocate_number = #{allocate_number,jdbcType=VARCHAR}
+	</update>
+	
+	<!-- 是否存在商品sku -->
+	<select id="queryProductSkuIsExist" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_stock_allocate_detail
+		 where allocate_number = #{allocate_number,jdbcType=VARCHAR}
+		   and product_sku = #{product_sku,jdbcType=INTEGER}
+	</select>
+	<!-- 更新调拨单明细 -->
+	<update id="updateStockAllocateDetail" parameterType="java.util.Map" >
+		update tbl_stock_allocate_detail
+		   set allocate_count = #{allocate_count,jdbcType=INTEGER}
+		 where allocate_number = #{allocate_number,jdbcType=VARCHAR}
+		   and product_sku = #{product_sku,jdbcType=INTEGER}
+	</update>
+	<!-- 查询商品库存信息【推送】 -->
+	<select id="queryProductStockSku" parameterType="java.util.Map" resultType="java.util.Map">
+		select tpi.product_name,
+		       (select brand_name from tbl_dic_product_brand where id = tpi.brand_id) brand,
+		       t.product_itemnumber as item_id,
+		       tpi.product_img_url,
+		       tps.product_group_member as product_size,
+		       tps.product_color,
+		       t.product_sku as sku_id,
+		       t.allocate_count as count
+		      from tbl_stock_allocate_detail t, tbl_product_info tpi,tbl_product_sku tps
+		     where t.allocate_number =  #{allocate_number,jdbcType=VARCHAR}
+		       and t.product_itemnumber = tpi.itemnumber(+)
+		       and t.product_sku = tps.id(+)
+		       order by t.product_itemnumber,tps.product_color,tps.product_group_member
+	</select>
+	<!-- 获取差异列表 -->
+	<select id="queryDiffList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+			select t.product_itemnumber,
+			       tpi.product_name,
+			       tpi.product_img_url,
+			       (select brand_name from tbl_dic_product_brand where id = tpi.brand_id) brand,
+			       tps.product_color,
+			       tps.product_group_member as product_size,
+			       nvl(t1.in_count, 0)+nvl(t2.diff_count, 0) out_count,
+			       nvl(t1.in_count, 0) in_count,
+			       nvl(t2.diff_count, 0) diff_count
+			  from (select product_itemnumber, product_sku
+			          from tbl_store_trade_detail
+			         where trade_number = #{allocate_number,jdbcType=VARCHAR}
+			         group by product_itemnumber, product_sku) t,
+			       (select product_itemnumber, product_sku, count(1) in_count
+			          from tbl_store_trade_detail
+			         where trade_number = #{allocate_number,jdbcType=VARCHAR}
+			           and allot_in_storage_flag = 1
+			         group by product_itemnumber, product_sku) t1,
+			       (select product_itemnumber, product_sku, count(1) diff_count
+			          from tbl_store_trade_detail
+			         where trade_number = #{allocate_number,jdbcType=VARCHAR}
+			           and allot_in_storage_flag = 0
+			         group by product_itemnumber, product_sku) t2,
+			       tbl_product_info tpi,
+			       tbl_product_sku tps
+			 where t.product_itemnumber = tpi.itemnumber(+)
+			   and t.product_sku = tps.id(+)
+			   and t.product_itemnumber = t1.product_itemnumber(+)
+			   and t.product_sku = t1.product_sku(+)
+			   and t.product_itemnumber = t2.product_itemnumber(+)
+			   and t.product_sku = t2.product_sku(+))
+			order by diff_count desc,product_itemnumber asc
+	</select>
+	<!-- 获取调拨信息【调拨任务】 -->
+	<select id="queryAllotTaskDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select id,
+			   in_store_id as in_user_id,
+			   (select store_name from tbl_store_user_manage where id = t.out_store_id) out_user_name,
+			   out_store_id as out_user_id
+		  from tbl_store_allot_task t
+		 where id = #{task_id,jdbcType=INTEGER}
+	</select>
+	<!-- 获取商品分组【调拨任务】 -->
+	<select id="queryProductGroupByTask" parameterType="java.util.Map" resultType="java.util.Map">
+		select t1.id,
+			   t1.itemnumber as product_itemnumber,
+               t1.product_img_url,
+               (select type_name from tbl_dic_product_type tdpt where tdpt.id = t1.product_type_id)  as product_type,
+               (select brand_name from tbl_dic_product_brand tdpb where tdpb.id = t1.brand_id)  as brand,
+               t1.year,
+               (select name from tbl_dic_product_season tdps where tdps.id = t1.season_id)  as season
+          from tbl_product_info t1,tbl_store_allot_task_detail t2
+         where t1.itemnumber = t2.itemnumber
+           and t2.task_id = #{task_id,jdbcType=INTEGER}
+           order by t1.itemnumber
+	</select>
+	<!-- 删除调拨任务 -->
+	<delete id="deleteAllotTask" parameterType="java.util.Map">
+		delete from tbl_store_allot_task where id = #{task_id,jdbcType=INTEGER}
+	</delete>
+	<!-- 删除调拨任务详情 -->
+	<delete id="deleteAllotTaskDetail" parameterType="java.util.Map">
+		delete from tbl_store_allot_task_detail where task_id = #{task_id,jdbcType=INTEGER}
+	</delete>
+	<!-- 门店ID转化 -->
+	<select id="storeIdToAgentStoreId" parameterType="java.util.Map" resultType="java.util.Map">
+		select (select agent_store_id from tbl_store_user_manage where id = #{in_user_id,jdbcType=INTEGER}) in_agent_store_id,
+		       (select agent_store_id from tbl_store_user_manage where id = #{out_user_id,jdbcType=INTEGER}) out_agent_store_id,
+		       (select user_id from tbl_store_user_manage where id = #{out_user_id,jdbcType=INTEGER}) out_agent_id
+		  from dual
+	</select>
+	<!-- 查询商家id -->
+	<select id="queryAgentId" parameterType="java.util.Map" resultType="string">
+		select t.user_id
+		  from tbl_store_user_manage t, tbl_user_info t1
+		 where t.user_id = t1.id
+		   and t1.user_state = 1
+		   and t.agent_store_id in
+		   <foreach collection="stores" item="item" open="(" separator="," close=")">
+		   		#{item}
+		   </foreach>
+		   group by t.user_id
+	</select>
+	<!-- 获取商品颜色尺码信息 -->
+	<select id="getProductInfo" parameterType="java.util.Map" resultType="java.util.Map">
+		select (select to_char(wm_concat(product_group_member)) from tbl_product_sku where product_group = '颜色' and product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}) product_color,
+			   (select min(product_group_member)||'-'|| max(product_group_member) from tbl_product_sku where product_group = '尺码' and product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}) product_size
+          from dual
+	</select>
+	<!-- 获取商家ID -->
+	<select id="getAgentId" parameterType="java.util.Map" resultType="string">
+		select user_id from tbl_store_user_manage where 1=1
+		<if test="agent_store_id != null and agent_store_id != ''">
+			and agent_store_id = #{agent_store_id,jdbcType=INTEGER}
+		</if>
+		<if test="out_user_id != null and out_user_id != ''">
+			and id = #{out_user_id,jdbcType=INTEGER}
+		</if>
+		
+	</select>
+	<!-- 新零售门店下拉框 -->
+	<resultMap type="java.util.Map" id="storeSelectMap">
+		<result column="agent_store_id" property="id"/>
+		<result column="store_name" property="option"/>
+	</resultMap>
+	<select id="storeSelect" parameterType="java.util.Map" resultMap="storeSelectMap">
+		select agent_store_id,store_name
+	      from tbl_store_user_manage t
+			where approval_state = 1
+			  and exists (
+				select 1 from tbl_user_info tui
+				  where t.user_id = tui.id
+				    and tui.user_state = 1
+				    <if test="public_user_type != null and public_user_type == 3">
+			            and 1=2
+			        </if>
+			        <if test="public_user_type != null and public_user_type == 4">
+			            and 1=2
+			        </if>
+			        <if test="public_user_type != null and public_user_type == 5">
+			            and 1=2
+			        </if>
+			        <if test="public_user_type != null and public_user_type == 6">
+			            and 1=2
+			        </if>
+			        <if test="public_user_type != null and public_user_type == 7">
+						and 1=2
+			        </if>
+			        <if test="public_user_type != null and public_user_type == 9">
+			            and tui.partner_user_id = #{public_user_id,jdbcType=INTEGER}
+			        </if>)
+				 	and agent_store_id is not null
+	</select>
+	<resultMap type="java.util.Map" id="storeGroupMap">
+		<result column="id" property="id"/>
+		<result column="group_name" property="option"/>
+	</resultMap>
+	<!-- 门店分组下拉框 -->
+	<select id="storeGroupSelect" parameterType="java.util.Map" resultMap="storeGroupMap">
+		select id,group_name
+		  from tbl_store_store_group
+	</select>
+	<!-- 门店分组详情 -->
+	<select id="queryStoreGroupDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select id,group_name,store_id
+		  from tbl_store_store_group
+		 where id = #{id, jdbcType=INTEGER}
+	</select>
+	<!-- 是否存在相同分组名称 -->
+	<select id="queryGroupNameIsExists" parameterType="java.util.Map" resultType="int">
+		select count(1) from tbl_store_store_group where group_name = #{group_name,jdbcType=VARCHAR}
+	</select>
+	<!-- 新增门店分组 -->
+	<insert id="insertStoreGroup" parameterType="java.util.Map">
+		insert into tbl_store_store_group
+			(
+				id,
+				group_name,
+				store_id,
+				create_user_id
+			) values (
+				seq_store_store_group.nextVal,
+				#{group_name,jdbcType=VARCHAR},
+				#{store_id,jdbcType=VARCHAR},
+				#{public_user_id,jdbcType=INTEGER}
+			)
+	</insert>
+	<!-- 删除门店分组 -->
+	<delete id="deleteStoreGroup" parameterType="java.util.Map">
+		delete from tbl_store_store_group where id = #{id, jdbcType=INTEGER}
+	</delete>
+	<!-- 新增调拨单(调出调入) -->
+	<insert id="insertStockAllocateOutIn" parameterType="java.util.Map">
+		insert into tbl_stock_allocate
+		(
+			id,
+			allocate_number,
+			in_user_id,
+			out_user_id,
+			create_user_id,
+			approval_state
+		) values (
+			seq_stock_allocate.nextVal,
+			#{allocate_number,jdbcType=VARCHAR},
+			(select id from tbl_store_user_manage where agent_store_id = #{in_agent_store_id,jdbcType=INTEGER}),
+			(select id from tbl_store_user_manage where agent_store_id = #{out_agent_store_id,jdbcType=INTEGER}),
+			#{public_user_id,jdbcType=INTEGER},
+			2
+		)
+	</insert>
+	<!-- 获取调拨信息(调出) -->
+	<select id="queryAllotOutTask" parameterType="java.util.Map" resultType="java.util.Map">
+		select t1.store_name,
+			   t1.agent_store_id
+		  from tbl_store_allot_task t,tbl_store_user_manage t1
+		 where t.id = #{task_id,jdbcType=INTEGER}
+		   and t.out_store_id = t1.id
+	</select>
+	<!-- 获取调拨任务商品(调出) -->
+	<select id="queryProductOutTask" parameterType="java.util.Map" resultType="string">
+		select itemnumber
+		  from tbl_store_allot_task_detail
+		 where task_id = #{task_id,jdbcType=INTEGER}
+	</select>
+	<!-- 查看要货/退货单数量 -->
+	<select id="storeOrderQueryCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from (select t1.product_itemnumber,
+				   sum(count) product_count
+			  from tbl_store_order_apply t,tbl_store_order_apply_detail t1
+			 where t.type = #{type,jdbcType=INTEGER}
+			   and t.state = 2
+			   and t.store_id = #{user_id,jdbcType=INTEGER}
+			   and t.order_number = t1.order_number
+			   <if test="product_itemnumber != null and product_itemnumber != ''">
+			   	   and t1.product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+			   </if>
+			   <if test="start_date != null and start_date != '' ">
+				   and t.create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+			   </if>
+			   <if test="end_date != null and end_date != '' ">
+				   and t.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+			   </if>
+			   group by t1.product_itemnumber) t2,tbl_product_info tpi
+			   where t2.product_itemnumber = tpi.itemnumber
+	</select>
+	<!-- 查看要货/退货单列表 -->
+	<select id="storeOrderQueryListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+			select a.*,rownum rn from (
+				select t2.product_itemnumber,
+					   t2.product_count,
+					   tpi.product_name,
+					   tpi.product_img_url,
+					   (select brand_name from tbl_dic_product_brand where id = tpi.brand_id) brand,
+					   (select name from tbl_dic_product_season tdps where tdps.id = tpi.season_id)  as season,
+					   tpi.year
+				  from (select t1.product_itemnumber,
+						   sum(count) product_count
+					  from tbl_store_order_apply t,tbl_store_order_apply_detail t1
+					 where t.type = #{type,jdbcType=INTEGER}
+					   and t.state = 2
+					   and t.store_id = #{user_id,jdbcType=INTEGER}
+					   and t.order_number = t1.order_number
+					   <if test="product_itemnumber != null and product_itemnumber != ''">
+					   	   and t1.product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+					   </if>
+					   <if test="start_date != null and start_date != '' ">
+						   and t.create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+					   </if>
+					   <if test="end_date != null and end_date != '' ">
+						   and t.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+					   </if>
+					   group by t1.product_itemnumber) t2,tbl_product_info tpi
+					   where t2.product_itemnumber = tpi.itemnumber
+					   order by t2.product_itemnumber) a
+		 	where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 获取商品要货/退货数量 -->
+	<select id="getStoreOrderProductCount" parameterType="java.util.Map" resultType="int">
+		select nvl(sum(count),0)
+		  from tbl_store_order_apply_detail t
+		 where product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+		   and exists (select 1 from tbl_store_order_apply where order_number = t.order_number and state = 2 and type = #{type,jdbcType=INTEGER} and store_id = #{store_id,jdbcType=INTEGER})
+	</select>
+	<!-- 获取商品sku要货/退货数量 -->
+	<select id="getStoreOrderSkuCount" parameterType="java.util.Map" resultType="java.util.Map">
+		select product_sku,nvl(sum(count),0) count
+		  from tbl_store_order_apply_detail t
+		 where product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+		   and exists (select 1 from tbl_store_order_apply where order_number = t.order_number and state = 2 and type = #{type,jdbcType=INTEGER} and store_id = #{store_id,jdbcType=INTEGER})
+		   group by product_sku
+	</select>
+	<!-- 获取门店ID -->
+	<select id="getStoreId" parameterType="java.util.Map" resultType="string">
+		select id from tbl_store_user_manage where agent_store_id = #{user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 更新调拨单清分交易的付款状态 -->
+	<update id="updateStoreTradePaymentState" parameterType="java.util.Map">
+		update tbl_store_trade
+		   set payment_state = 2
+		  where trade_number = #{allocate_number,jdbcType=VARCHAR}
+	</update>
+</mapper>

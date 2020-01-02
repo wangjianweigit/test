@@ -1,0 +1,437 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.decoration.dao.DecorateTemplateDao">
+
+	<!--通用查询条件-->
+	<sql id="general_condition">
+		<if test="template_name != null and template_name != ''">
+			and dt.template_name like '%'||#{template_name,jdbcType=VARCHAR}||'%'
+		</if>
+		<if test="start_date != null and start_date != ''">
+			and dt.effective_start_date &gt; to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+		</if>
+		<if test="end_date != null and end_date != ''">
+			and dt.effective_start_date &lt; to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+		</if>
+		<if test="states != null and states != ''">
+			and dt.state in
+			<foreach item="item" index="index" collection="states" open="(" separator="," close=")">
+				#{item,jdbcType=CHAR}
+			</foreach>
+		</if>
+
+	</sql>
+	<!--分页查询平台装修模板列表-->
+	<select id="queryListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+		    select a.*,rownum rn from (
+		        select
+		            dt.id,
+		            dt.template_name,
+		            to_char(dt.effective_start_date,'yyyy-mm-dd hh24:mi:ss') effective_start_date,
+		            to_char(dt.effective_end_date,'yyyy-mm-dd hh24:mi:ss') effective_end_date,
+		            dt.remark,
+		            dt.state,
+		            dt.site_id,
+		            dt.site_name,
+		            dt.home_page_id,
+		            dt.is_sys_page
+		        from (
+		                select
+                        ddt.id,
+                        ddt.site_id,
+                        ddt.template_name,
+                        ddt.remark,
+                        ddt.effective_start_date,
+                        ddt.effective_end_date,
+                        to_char(ddt.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+                        ddt.create_user_id,
+                         case
+		                    when ddt.effective_start_date = (select max (effective_start_date) from tbl_decorate_template where support_flag = #{support_flag,jdbcType=VARCHAR} and site_id = #{public_user_site_id,jdbcType=INTEGER} and effective_start_date &lt;= sysdate) then '0'
+		                    when ddt.effective_start_date &gt; (select max (effective_start_date) from tbl_decorate_template where support_flag = #{support_flag,jdbcType=VARCHAR} and site_id = #{public_user_site_id,jdbcType=INTEGER} and effective_start_date &lt;= sysdate) then '1'
+		                    else '2' end state,
+						case when (select count(1) from TBL_DECORATE_PAGE where TEMPLATE_ID =ddt.id and PAGE_TYPE = 2) = 0
+							then (select NVL(min(ID),0) from TBL_DECORATE_PAGE where TEMPLATE_ID =ddt.id and HOME_PAGE_FLAG = 2)
+							else (select NVL(min(ID),0) from TBL_DECORATE_PAGE where TEMPLATE_ID =ddt.id and PAGE_TYPE = 2) end as  HOME_PAGE_ID,
+						case when (select count(1) from TBL_DECORATE_PAGE where TEMPLATE_ID =ddt.id and PAGE_TYPE = 2) = 0 then 1 else 2 end is_sys_page,
+                        si.NAME site_name
+                    from
+                        tbl_decorate_template ddt
+                        left join TBL_SITE_INFO si on ddt.site_id = si.id
+                        WHERE ddt.support_flag = #{support_flag,jdbcType=VARCHAR}
+		        ) dt
+		        where
+		        dt.site_id = #{public_user_site_id,jdbcType=INTEGER} <include refid="general_condition"/>
+		        order by dt.create_date desc
+		    ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+		) where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+
+	<!--查询平台装修模板总数-->
+	<select id="queryListForCount" parameterType="java.util.Map" resultType="int">
+		select
+		    count(dt.id)
+		from(
+		    select
+		        id,
+		        site_id,
+		        template_name,
+		        remark,
+		        effective_start_date,
+		        effective_end_date,
+		        to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+		        create_user_id,
+		        case
+		            when effective_start_date = (SELECT MAX (effective_start_date) FROM tbl_decorate_template WHERE site_id = #{public_user_site_id,jdbcType=INTEGER} and effective_start_date &lt;= SYSDATE) then '0'
+		            when effective_start_date &gt; (SELECT MAX (effective_start_date) FROM tbl_decorate_template WHERE site_id = #{public_user_site_id,jdbcType=INTEGER} and effective_start_date &lt;= SYSDATE) then '1'
+		            else '2' end state
+		    from tbl_decorate_template
+			where support_flag = #{support_flag,jdbcType=VARCHAR}
+		) dt where dt.site_id = #{public_user_site_id,jdbcType=INTEGER} <include refid="general_condition"/>
+	</select>
+
+	<!--通过ID获取平台装修模板-->
+	<resultMap id="allDecorateMap" type="java.util.Map">
+		<result column="id" property="id"/>
+		<result column="site_id" property="site_id"/>
+		<result column="template_name" property="template_name"/>
+		<result column="remark" property="remark"/>
+		<result column="effective_start_date" property="effective_start_date"/>
+		<result column="effective_end_date" property="effective_end_date"/>
+		<result column="create_date" property="create_date"/>
+		<result column="create_user_id" property="create_user_id"/>
+		<result column="support_flag" property="support_flag"/>
+	</resultMap>
+	<select id="queryById" parameterType="long" resultMap="allDecorateMap">
+		select
+		    dt.id,
+		    dt.site_id,
+		    dt.template_name,
+		    dt.remark,
+		    to_char(dt.effective_start_date,'yyyy-mm-dd hh24:mi:ss') effective_start_date,
+		    to_char(dt.effective_end_date,'yyyy-mm-dd hh24:mi:ss') effective_end_date,
+		    to_char(dt.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+		    dt.create_user_id,
+		    dt.support_flag
+		from
+		    tbl_decorate_template dt
+		where
+		    dt.id = #{id,jdbcType=INTEGER}
+	</select>
+
+	<!--通过模板名称获取平台装修模板数量-->
+	<select id="queryCountByName" parameterType="java.util.Map" resultType="int">
+		select
+		    count(dt.id)
+		from
+		    tbl_decorate_template dt
+		where
+		    dt.template_name = #{template_name,jdbcType=VARCHAR}
+		    and dt.site_id = #{site_id,jdbcType=INTEGER}
+		<if test="id != null and id != 0">
+			and id != #{id,jdbcType=INTEGER}
+		</if>
+	</select>
+
+	<!--新增平台装修模板-->
+	<insert id="insert" parameterType="java.util.Map">
+		<selectKey keyProperty="id" resultType="int" order="BEFORE">
+			select seq_decorate_template.nextval from dual
+		</selectKey>
+		insert into tbl_decorate_template(
+		    id,
+		    site_id,
+		    template_name,
+		    remark,
+		    effective_start_date,
+		    effective_end_date,
+		    create_date,
+		    create_user_id,
+		    support_flag
+		) values(
+		    #{id,jdbcType=INTEGER},
+		    #{site_id,jdbcType=INTEGER},
+		    #{template_name,jdbcType=VARCHAR},
+		    #{remark,jdbcType=VARCHAR},
+		    to_date(#{effective_start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS'),
+		    to_date(#{effective_end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS'),
+		    sysdate,
+		    #{public_user_id,jdbcType=INTEGER},
+		    #{support_flag,jdbcType=VARCHAR}
+		)
+	</insert>
+
+	<!--平台装修模板传送-->
+	<select id="decorateTemplateTransfer" statementType="CALLABLE" parameterType="java.util.Map">
+		<![CDATA[
+			CALL TEMPLATE_TRANSFER(
+					#{template_id,mode=IN,jdbcType=VARCHAR},
+					#{site_id,mode=IN,jdbcType=VARCHAR},
+					#{public_user_id,mode=IN,jdbcType=VARCHAR},
+					#{output_status,mode=OUT,jdbcType=VARCHAR},
+					#{output_msg,mode=OUT,jdbcType=VARCHAR}
+				)
+			]]>
+	</select>
+
+	<!--更新平台装修模板-->
+	<update id="update" parameterType="java.util.Map">
+		update
+		    tbl_decorate_template
+		<set>
+			<if test="template_name != null and template_name != ''">
+				template_name = #{template_name,jdbcType=VARCHAR},
+			</if>
+			<if test="remark != null and remark != ''">
+				remark = #{remark,jdbcType=VARCHAR},
+			</if>
+			<if test="effective_start_date != null and effective_start_date != ''">
+				effective_start_date = to_date(#{effective_start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS'),
+			</if>
+			<if test="effective_end_date != null and effective_end_date != ''">
+				effective_end_date = to_date(#{effective_end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS'),
+			</if>
+			<if test="bottom_nav != null and bottom_nav != ''">
+				bottom_nav = #{bottom_nav,jdbcType=VARCHAR},
+			</if>
+			<if test="top_nav != null and top_nav != ''">
+				top_nav = #{top_nav,jdbcType=VARCHAR},
+			</if>
+		</set>
+		where id = #{id,jdbcType=INTEGER}
+	</update>
+
+	<!--删除平台装修模板-->
+	<delete id="deleted" parameterType="java.util.Map">
+		delete from
+		    tbl_decorate_template
+		where
+		    id = #{id,jdbcType=INTEGER}
+	</delete>
+
+	<resultMap id="appIcoTemplateConfigList" type="java.util.Map">
+		<result column="id" property="id" />
+		<result column="template_name" property="template_name" />
+		<result column="enable_state" property="enable_state" />
+		<result column="effect_start_time" property="effect_start_time" />
+		<result column="effect_end_time" property="effect_end_time" />
+		<result column="effect_state" property="effect_state" />
+		<result column="create_date" property="create_date" />
+	</resultMap>
+	<sql id="appIcoTemplateConfigWhere">
+		<where>
+			AND delete_flag = 0
+			<if test="effect_start_time != null and effect_start_time != '' ">
+				and to_date(#{effect_start_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS') between effect_start_time and effect_end_time
+			</if>
+			<if test="effect_end_time != null and effect_end_time != '' ">
+				AND to_date(#{effect_end_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS') between effect_start_time and effect_end_time
+			</if>
+			<if test="template_name !=null and template_name != ''">
+				and template_name like #{template_name, jdbcType=VARCHAR}||'%'
+			</if>
+			<if test="effect_state !=null and effect_state != ''">
+				<trim prefix="and " prefixOverrides="or ">
+					<foreach item="item" collection="effect_state" open="(" separator="or " close=")">
+							<if test="item ==1">
+								 effect_start_time &gt; sysdate
+							</if>
+							<if test="item ==2">
+								 effect_start_time &lt;= sysdate and effect_end_time &gt;= sysdate
+							</if>
+							<if test="item ==3">
+								effect_end_time &lt; sysdate
+							</if>
+					</foreach>
+				</trim>
+			</if>
+		</where>
+	</sql>
+	<!--分页获取app模板配置列表-->
+	<select id="listAppIcoTemplateConfig" parameterType="java.util.Map" resultMap="appIcoTemplateConfigList">
+		select t.*,
+			case when effect_start_time &gt; sysdate then 1
+				 when effect_start_time &lt;= sysdate and effect_end_time &gt;= sysdate then 2
+				 when effect_end_time &lt; sysdate then 3
+				 else 0
+			end effect_state,
+			to_char(effect_start_time, 'YYYY-MM-DD HH24:MI:SS') as effect_start_time,
+			to_char(effect_end_time, 'YYYY-MM-DD HH24:MI:SS') as effect_end_time,
+			to_char(create_date, 'YYYY-MM-DD HH24:MI:SS') as create_date
+		 from (
+				select a.*,rownum rn from (
+					select id,
+						template_name,
+						enable_state,
+						effect_start_time,
+						effect_end_time,
+						create_date
+					from tbl_app_icon_template_config<include refid="appIcoTemplateConfigWhere"/>
+				) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+		) t where t.rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+
+	<!--查询app模板配置记录数-->
+	<select id="countAppIcoTemplateConfig" parameterType="java.util.Map" resultType="int">
+		  select count(1) from tbl_app_icon_template_config <include refid="appIcoTemplateConfigWhere" />
+	</select>
+
+	<!--获取app模板配置数据-->
+	<select id="getAppIcoTemplateConfigInfo" parameterType="java.util.Map" resultType="com.tk.oms.decoration.dto.AppIcoConfigDTO">
+		select id,
+			   template_name,
+			   enable_state,
+			   effect_start_time,
+			   effect_end_time,
+			   head_general_url,
+			   head_activity_url,
+			   head_mall_url,
+			   head_movie_url,
+			   head_replacement_order_url,
+			   bottom_index_url,
+			   bottom_index_check_url,
+			   bottom_msg_url,
+			   bottom_msg_check_url,
+			   bottom_my_url,
+			   bottom_my_check_url,
+			   bottom_class_url,
+			   bottom_class_check_url,
+			   bottom_purchase_url,
+			   bottom_purchase_check_url,
+			   bottom_background_url,
+			   create_date
+		  from tbl_app_icon_template_config where id = #{id ,jdbcType=INTEGER}
+	</select>
+
+	<!--新增模板配置信息-->
+	<insert id="insertAppIcoTemplateConfig" parameterType="com.tk.oms.decoration.dto.AppIcoConfigParamDTO">
+		INSERT INTO TBL_APP_ICON_TEMPLATE_CONFIG (
+		  id ,
+		  template_name ,
+		  enable_state ,
+		  effect_start_time ,
+		  effect_end_time ,
+		  head_general_url ,
+		  head_activity_url ,
+		  head_mall_url ,
+		  head_movie_url ,
+		  head_replacement_order_url ,
+		  bottom_index_url ,
+		  bottom_index_check_url ,
+		  bottom_msg_url ,
+		  bottom_msg_check_url ,
+		  bottom_my_url ,
+		  bottom_my_check_url ,
+		  bottom_class_url ,
+		  bottom_class_check_url ,
+		  bottom_purchase_url ,
+		  bottom_purchase_check_url ,
+		  bottom_background_url ,
+		  create_date,
+		  creater_id
+	  	)
+		VALUES (
+		  SEQ_APP_ICON_TEMPLATE_CONFIG.nextval,
+		  #{template_name, jdbcType=VARCHAR},
+		  #{enable_state, jdbcType=VARCHAR} ,
+		  #{effect_start_time, jdbcType=DATE} ,
+		  #{effect_end_time, jdbcType=DATE} ,
+		  #{head_general_url, jdbcType=VARCHAR} ,
+		  #{head_activity_url, jdbcType=VARCHAR} ,
+		  #{head_mall_url, jdbcType=VARCHAR} ,
+		  #{head_movie_url, jdbcType=VARCHAR} ,
+		  #{head_replacement_order_url, jdbcType=VARCHAR} ,
+		  #{bottom_index_url, jdbcType=VARCHAR} ,
+		  #{bottom_index_check_url, jdbcType=VARCHAR} ,
+		  #{bottom_msg_url, jdbcType=VARCHAR} ,
+		  #{bottom_msg_check_url, jdbcType=VARCHAR} ,
+		  #{bottom_my_url, jdbcType=VARCHAR} ,
+		  #{bottom_my_check_url, jdbcType=VARCHAR} ,
+		  #{bottom_class_url, jdbcType=VARCHAR} ,
+		  #{bottom_class_check_url, jdbcType=VARCHAR} ,
+		  #{bottom_purchase_url, jdbcType=VARCHAR} ,
+		  #{bottom_purchase_check_url, jdbcType=VARCHAR} ,
+		  #{bottom_background_url, jdbcType=VARCHAR} ,
+		  sysdate ,
+		  #{public_user_id, jdbcType=INTEGER}
+		)
+	</insert>
+
+	<!--修改模板配置信息-->
+	<update id="updateAppIcoTemplateConfig" parameterType="com.tk.oms.decoration.dto.AppIcoConfigParamDTO">
+		update tbl_app_icon_template_config
+		<set>
+			<if test="template_name != null and template_name != ''">
+				template_name = #{template_name, jdbcType=VARCHAR},
+			</if>
+			<if test="enable_state != null and enable_state != ''">
+				enable_state = #{enable_state, jdbcType=INTEGER},
+			</if>
+			<if test="effect_start_time != null and effect_start_time != ''">
+				effect_start_time = to_date(#{effect_start_time, jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS'),
+			</if>
+			<if test="effect_end_time != null and effect_end_time != ''">
+				effect_end_time = to_date(#{effect_end_time, jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS'),
+			</if>
+			<if test="head_general_url != null and head_general_url != ''">
+				head_general_url = #{head_general_url, jdbcType=VARCHAR},
+			</if>
+			<if test="head_activity_url != null and head_activity_url != ''">
+				head_activity_url = #{head_activity_url, jdbcType=VARCHAR},
+			</if>
+			<if test="head_mall_url != null and head_mall_url != ''">
+				head_mall_url = #{head_mall_url, jdbcType=VARCHAR},
+			</if>
+			<if test="head_movie_url != null and head_movie_url != ''">
+				head_movie_url = #{head_movie_url, jdbcType=VARCHAR},
+			</if>
+			<if test="head_replacement_order_url != null and head_replacement_order_url != ''">
+				head_replacement_order_url = #{head_replacement_order_url, jdbcType=VARCHAR},
+			</if>
+			<if test="bottom_index_url != null and bottom_index_url != ''">
+				bottom_index_url = #{bottom_index_url, jdbcType=VARCHAR},
+			</if>
+			<if test="bottom_index_check_url != null and bottom_index_check_url != ''">
+				bottom_index_check_url = #{bottom_index_check_url, jdbcType=VARCHAR},
+			</if>
+			<if test="bottom_msg_url != null and bottom_msg_url != ''">
+				bottom_msg_url = #{bottom_msg_url, jdbcType=VARCHAR},
+			</if>
+			<if test="bottom_msg_check_url != null and bottom_msg_check_url != ''">
+				bottom_msg_check_url = #{bottom_msg_check_url, jdbcType=VARCHAR},
+			</if>
+			<if test="bottom_my_url != null and bottom_my_url != ''">
+				bottom_my_url = #{bottom_my_url, jdbcType=VARCHAR},
+			</if>
+			<if test="bottom_my_check_url != null and bottom_my_check_url != ''">
+				bottom_my_check_url = #{bottom_my_check_url, jdbcType=VARCHAR},
+			</if>
+			<if test="bottom_class_url != null and bottom_class_url != ''">
+				bottom_class_url = #{bottom_class_url, jdbcType=VARCHAR},
+			</if>
+			<if test="bottom_class_check_url != null and bottom_class_check_url != ''">
+				bottom_class_check_url = #{bottom_class_check_url, jdbcType=VARCHAR},
+			</if>
+			<if test="bottom_purchase_url != null and bottom_purchase_url != ''">
+				bottom_purchase_url = #{bottom_purchase_url, jdbcType=VARCHAR},
+			</if>
+			<if test="bottom_purchase_check_url != null and bottom_purchase_check_url != ''">
+				bottom_purchase_check_url = #{bottom_purchase_check_url, jdbcType=VARCHAR},
+			</if>
+			<if test="bottom_background_url != null and bottom_background_url != ''">
+				bottom_background_url = #{bottom_background_url, jdbcType=VARCHAR},
+			</if>
+			update_date = sysdate,
+			update_id = #{public_user_id, jdbcType=INTEGER}
+		</set>
+		where id = #{id, jdbcType=INTEGER}
+	</update>
+
+	<!--逻辑删除模板配置信息-->
+	<delete id="deleteAppIcoTemplateConfigInfo" parameterType="java.util.Map">
+		update tbl_app_icon_template_config set delete_flag =1,update_date = sysdate,update_id = #{operation_user_id, jdbcType=INTEGER} where id = #{id, jdbcType=INTEGER}
+	</delete>
+
+</mapper>

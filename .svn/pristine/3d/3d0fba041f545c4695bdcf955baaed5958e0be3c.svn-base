@@ -1,0 +1,502 @@
+package com.tk.oms.member.service;
+
+import com.tk.oms.member.dao.DealerSalesStatisticsDao;
+import com.tk.sys.config.EsbConfig;
+import com.tk.sys.util.*;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 
+ * Copyright (c), 2017, Tongku
+ * FileName : DealerSalesStatisticsService
+ * 经销商销售报表业务处理类
+ * 
+ * @author wangjianwei
+ * @version 1.00
+ * @date 2017/11/21 9:05
+ */
+@Service("DealerSalesStatisticsService")
+public class DealerSalesStatisticsService {
+
+    @Value("${retail_service_url}")
+    private String retailServiceUrl;
+
+    @Resource
+    private DealerSalesStatisticsDao dealerSalesStatisticsDao;
+
+    /**
+     * 分页获取经销商销售列表数据
+     * @param request
+     * @return
+     */
+    public GridResult queryDealerSalesListForPage(HttpServletRequest request) {
+        GridResult gr = new GridResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                gr.setState(false);
+                gr.setMessage("缺少参数");
+                return gr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            if (StringUtils.isEmpty(params.get("start_date"))) {
+                gr.setState(false);
+                gr.setMessage("缺少参数[start_date]本期开始时间");
+                return gr;
+            }
+            if (StringUtils.isEmpty(params.get("end_date"))) {
+                gr.setState(false);
+                gr.setMessage("缺少参数[end_date]本期结束时间");
+                return gr;
+            }
+            if (StringUtils.isEmpty(params.get("prev_time_start"))) {
+                gr.setState(false);
+                gr.setMessage("缺少参数[prev_time_start]上期开始时间");
+                return gr;
+            }
+            if (StringUtils.isEmpty(params.get("prev_time_end"))) {
+                gr.setState(false);
+                gr.setMessage("缺少参数[prev_time_end]上期结束时间");
+                return gr;
+            }
+            GridResult pageParamResult = PageUtil.handlePageParams(params);
+            if (pageParamResult != null) {
+                return pageParamResult;
+            }
+            int total = this.dealerSalesStatisticsDao.queryDealerSalesListForCount(params);
+            List<Map<String, Object>> list = this.dealerSalesStatisticsDao.queryDealerSalesListForPage(params);
+
+            if (list != null && list.size() > 0) {
+                //  封装调用远程接口所需参数
+                ArrayList arrayList = new ArrayList();
+                Map<String, Object> sendMap = new HashMap<String, Object>(10);
+                for(Map<String, Object> account : list){
+                    arrayList.add(account.get("ID"));
+                }
+                sendMap.put("ACCOUNT", arrayList);
+                sendMap.put("CURRENT_TIME_START", params.get("start_date"));
+                sendMap.put("CURRENT_TIME_END", params.get("end_date"));
+                sendMap.put("PREV_TIME_START", params.get("prev_time_start"));
+                sendMap.put("PREV_TIME_END", params.get("prev_time_end"));
+                Map<String, Object> resPr = (Map<String, Object>) this.queryForPost(sendMap, retailServiceUrl + "open/Order/agentSalesReport");
+                if("1".equals(resPr.get("state").toString())){
+                    List<Map<String, Object>> returnList = (List<Map<String, Object>>)resPr.get("data");
+                    for (Map<String, Object> data : list){
+                        for (Map<String, Object> returnMap : returnList){
+                            if(data.get("ID").toString().equals(returnMap.get("ACCOUNT").toString())){
+                                returnMap.put("LOGIN_NAME", data.get("LOGIN_NAME"));
+                                returnMap.put("USER_MANAGE_NAME", data.get("USER_MANAGE_NAME"));
+                            }
+                        }
+                    }
+                    Map<String, Object> retMap = new HashMap<String, Object>();
+                    //  总合计
+                    retMap.put("totalData", resPr.get("sum"));
+                    //  列表数据
+                    retMap.put("list", returnList);
+                    gr.setMessage("获取经销商销售列表成功!");
+                    gr.setObj(retMap);
+                }else{
+                    gr.setMessage(resPr.get("message").toString());
+                }
+            } else {
+                gr.setMessage("无数据");
+                Map<String, Object> retMap = new HashMap<String, Object>();
+                Map<String, Object> sumMap = new HashMap<String, Object>();
+                sumMap.put("ORDER_TOTAL", 0);
+                sumMap.put("SALE_COUNT", 0);
+                sumMap.put("PAY_TOTAL", 0);
+                sumMap.put("REFUND_MONEY", 0);
+                sumMap.put("REFUND_NUM", 0);
+                sumMap.put("MEMBER_ADD", 0);
+                sumMap.put("VISIT_COUNT", 0);
+                sumMap.put("SCAN_COUNT", 0);
+                sumMap.put("PREV_ORDER_TOTAL", 0);
+                sumMap.put("PREV_SALE_COUNT", 0);
+                sumMap.put("PREV_PAY_TOTAL", 0);
+                sumMap.put("PREV_REFUND_MONEY", 0);
+                sumMap.put("PREV_REFUND_NUM", 0);
+                sumMap.put("PREV_MEMBER_ADD", 0);
+                sumMap.put("PREV_VISIT_COUNT", 0);
+                sumMap.put("PREV_SCAN_COUNT", 0);
+                //  总合计
+                retMap.put("totalData", sumMap);
+                //  列表数据
+                retMap.put("list", new ArrayList());
+                gr.setObj(retMap);
+            }
+            gr.setState(true);
+            gr.setTotal(total);
+        } catch (Exception e) {
+            gr.setState(false);
+            gr.setMessage(e.getMessage());
+            e.printStackTrace();
+        }
+        return gr;
+    }
+
+    /**
+     * 获取经销商订单销售列表
+     * @param request
+     * @return
+     * @throws Exception
+     */
+    public ProcessResult queryDealerSalesOrderDetailList(HttpServletRequest request){
+        ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            if (StringUtils.isEmpty(params.get("account"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[account]经销商用户");
+                return pr;
+            }
+            if (StringUtils.isEmpty(params.get("start_date"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[start_date]本期开始时间");
+                return pr;
+            }
+            if (StringUtils.isEmpty(params.get("start_date"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[start_date]本期结束时间");
+                return pr;
+            }
+            Map<String, Object> sendMap = new HashMap<String, Object>(5);
+            sendMap.put("ACCOUNT", params.get("account"));
+            sendMap.put("TIME_START", params.get("start_date"));
+            sendMap.put("TIME_END", params.get("end_date"));
+            //  发送请求
+            Map<String, Object> resPr = (Map<String, Object>) this.queryForPost(sendMap, retailServiceUrl + "open/Order/goodsOrderSalesDetail");
+            if ("1".equals(resPr.get("state").toString())) {
+                List<Map<String, Object>> list = (List<Map<String, Object>>)resPr.get("data");
+                if(list.size() ==0){
+                    pr.setMessage("无数据");
+                }else{
+                    pr.setMessage("获取经销商订单销售列表成功");
+                    pr.setObj(list);
+                }
+                pr.setState(true);
+            }else{
+                pr.setMessage(resPr.get("message").toString());
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+    }
+
+    /**
+     * 获取经销商销售商品明细列表
+     * @param request
+     * @return
+     * @throws Exception
+     */
+    public ProcessResult queryDealerSalesProductDetailList(HttpServletRequest request){
+        ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            if (StringUtils.isEmpty(params.get("account"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[account]经销商用户");
+                return pr;
+            }
+            if (StringUtils.isEmpty(params.get("start_date"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[start_date]本期开始时间");
+                return pr;
+            }
+            if (StringUtils.isEmpty(params.get("start_date"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[start_date]本期结束时间");
+                return pr;
+            }
+            Map<String, Object> sendMap = new HashMap<String, Object>(5);
+            sendMap.put("ACCOUNT", params.get("account"));
+            sendMap.put("TIME_START", params.get("start_date"));
+            sendMap.put("TIME_END", params.get("end_date"));
+            //  发送请求
+            Map<String, Object> resPr = (Map<String, Object>) this.queryForPost(sendMap, retailServiceUrl + "open/Order/goodsOrderProductSalesDetail");
+            if ("1".equals(resPr.get("state").toString())) {
+                List<Map<String, Object>> list = (List<Map<String, Object>>)resPr.get("data");
+                if(list.size() ==0){
+                    pr.setMessage("无数据");
+                }else{
+                    pr.setMessage("获取经销商销售商品明细列表成功");
+                    pr.setObj(list);
+                }
+                pr.setState(true);
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+    }
+
+    /**
+     * 获取经销商销售金额明细列表
+     * @param request
+     * @return
+     * @throws Exception
+     */
+    public ProcessResult queryDealerSalesMoneyDetailList(HttpServletRequest request){
+        ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            if (StringUtils.isEmpty(params.get("account"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[account]经销商用户");
+                return pr;
+            }
+            if (StringUtils.isEmpty(params.get("start_date"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[start_date]本期开始时间");
+                return pr;
+            }
+            if (StringUtils.isEmpty(params.get("start_date"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[start_date]本期结束时间");
+                return pr;
+            }
+            Map<String, Object> sendMap = new HashMap<String, Object>(5);
+            sendMap.put("ACCOUNT", params.get("account"));
+            sendMap.put("TIME_START", params.get("start_date"));
+            sendMap.put("TIME_END", params.get("end_date"));
+            //  发送请求
+            Map<String, Object> resPr = (Map<String, Object>) this.queryForPost(sendMap, retailServiceUrl + "open/Order/goodsOrderPayDetail");
+            if ("1".equals(resPr.get("state").toString())) {
+                List<Map<String, Object>> resultList = (List<Map<String, Object>>)resPr.get("data");
+                if(resultList.size() == 0){
+                    pr.setMessage("无数据");
+                }else{
+                    pr.setMessage("获取经销商销售金额明细列表成功");
+                    pr.setObj(resultList);
+                }
+                pr.setState(true);
+            }else{
+                pr.setMessage(resPr.get("message").toString());
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+    }
+
+    /**
+     * 获取经销商微商城商品浏览排行明细
+     * @param request
+     * @return
+     * @throws Exception
+     */
+    public ProcessResult queryScanDetailList(HttpServletRequest request){
+        ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            if (StringUtils.isEmpty(params.get("account"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[account]经销商用户");
+                return pr;
+            }
+            if (StringUtils.isEmpty(params.get("start_date"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[start_date]本期开始时间");
+                return pr;
+            }
+            if (StringUtils.isEmpty(params.get("start_date"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[start_date]本期结束时间");
+                return pr;
+            }
+            Map<String, Object> sendMap = new HashMap<String, Object>(5);
+            sendMap.put("ACCOUNT", params.get("account").toString());
+            sendMap.put("TIME_START", params.get("start_date"));
+            sendMap.put("TIME_END", params.get("end_date"));
+            //  发送请求
+            Map<String, Object> resPr = (Map<String, Object>) this.queryForPost(sendMap, retailServiceUrl + "open/Order/wxshopItemScanRange");
+            if ("1".equals(resPr.get("state").toString())) {
+                List<Map<String, Object>> resultList = (List<Map<String, Object>>)resPr.get("data");
+                if(resultList.size() == 0){
+                    pr.setMessage("无数据");
+                }else{
+                    pr.setMessage("获取经销商微商城商品浏览排行明细成功");
+                    pr.setObj(resultList);
+                }
+                pr.setState(true);
+            }else{
+                pr.setMessage(resPr.get("msg").toString());
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+    }
+
+
+    /**
+     * 获取经销商微商城访客数排行明细
+     * @param request
+     * @return
+     * @throws Exception
+     */
+    public ProcessResult queryVisitDetailList(HttpServletRequest request){
+        ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            if (StringUtils.isEmpty(params.get("account"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[account]经销商用户");
+                return pr;
+            }
+            if (StringUtils.isEmpty(params.get("start_date"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[start_date]本期开始时间");
+                return pr;
+            }
+            if (StringUtils.isEmpty(params.get("start_date"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[start_date]本期结束时间");
+                return pr;
+            }
+            Map<String, Object> sendMap = new HashMap<String, Object>(5);
+            sendMap.put("ACCOUNT", params.get("account").toString());
+            sendMap.put("TIME_START", params.get("start_date"));
+            sendMap.put("TIME_END", params.get("end_date"));
+            //  发送请求
+            Map<String, Object> resPr = (Map<String, Object>) this.queryForPost(sendMap, retailServiceUrl + "open/Order/wxshopVistorRange");
+            if ("1".equals(resPr.get("state").toString())) {
+                List<Map<String, Object>> resultList = (List<Map<String, Object>>)resPr.get("data");
+                if(resultList.size() == 0){
+                    pr.setMessage("无数据");
+                }else{
+                    pr.setMessage("获取经销商微商城访客数排行明细成功");
+                    pr.setObj(resultList);
+                }
+                pr.setState(true);
+            }else{
+                pr.setMessage(resPr.get("message").toString());
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+    }
+
+
+    /**
+     * 获取经销商会员下单转换率明细列表
+     * @param request
+     * @return
+     * @throws Exception
+     */
+    public ProcessResult queryConversionRateDetailDetailList(HttpServletRequest request){
+        ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            if (StringUtils.isEmpty(params.get("account"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[account]经销商用户");
+                return pr;
+            }
+            if (StringUtils.isEmpty(params.get("start_date"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[start_date]本期开始时间");
+                return pr;
+            }
+            if (StringUtils.isEmpty(params.get("start_date"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[start_date]本期结束时间");
+                return pr;
+            }
+            Map<String, Object> sendMap = new HashMap<String, Object>(5);
+            sendMap.put("ACCOUNT", params.get("account").toString());
+            sendMap.put("TIME_START", params.get("start_date"));
+            sendMap.put("TIME_END", params.get("end_date"));
+            //  发送请求
+            Map<String, Object> resPr = (Map<String, Object>) this.queryForPost(sendMap, retailServiceUrl + "open/Order/wxshopScan");
+            if ("1".equals(resPr.get("state").toString())) {
+                List<Map<String, Object>> resultList = (List<Map<String, Object>>)resPr.get("data");
+                if(resultList.size() == 0){
+                    pr.setMessage("无数据");
+                }else{
+                    pr.setMessage("获取经销商会员下单转换率明细列表成功");
+                    pr.setObj(resultList);
+                }
+                pr.setState(true);
+            }else{
+                pr.setMessage(resPr.get("message").toString());
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+    }
+
+    /**
+     * 发送post请求
+     * @param obj
+     * @param url
+     * @return
+     * @throws Exception
+     */
+    public Object queryForPost(Map<String,Object> obj,String url) throws Exception{
+        String params = "";
+        if(obj != null){
+            //  加密数据
+            Packet packet = Transform.GetResult(obj, EsbConfig.ERP_FORWARD_KEY_NAME);
+            //  对象转json、字符串
+            params = Jackson.writeObject2Json(packet);
+        }
+        //  发送至服务端
+        String json = HttpClientUtil.post(url, params);
+        return Transform.GetPacketJzb(json,Map.class);
+    }
+}

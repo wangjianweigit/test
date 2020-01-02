@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.member.dao.MemberPreloadChargeDao">
+
+    <!-- 会员预充值申请 -->
+    <insert id="insert" parameterType="java.util.Map">
+        <selectKey keyProperty="id" resultType="int" order="BEFORE">
+            select SEQ_USER_PRELOAD_CHARGE_RECORD.nextval from dual
+        </selectKey>
+        insert into TBL_USER_PRELOAD_CHARGE_RECORD(
+            id,
+            record_number,
+            record_channel,
+            collect_user_name,
+            money,
+            third_number,
+            voucher_img_url,
+            agency_user_id,
+            agency_user_type,
+            create_date,
+            state,
+            tran_number
+        )values (
+            #{id,jdbcType=INTEGER},
+            GETAUTONUMBER('ycz'),
+            #{record_channel,jdbcType=VARCHAR},
+            #{collect_user_name,jdbcType=VARCHAR},
+            #{money,jdbcType=FLOAT},
+            #{third_number,jdbcType=VARCHAR},
+            #{voucher_img_url,jdbcType=VARCHAR},
+            #{public_user_id,jdbcType=VARCHAR},
+            #{public_user_type,jdbcType=VARCHAR},
+            sysdate,
+            '1',
+            GETTHIRDLOGNUMBER('1')
+        )
+    </insert>
+
+    <!-- 分页查询用户预充值申请列表 -->
+    <select id="queryListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+        select * FROM (
+            select a.*,case when a.agency_user_id is null then (select user_manage_name from tbl_user_info where id = a.collect_user_name)
+                else
+                (select user_realname from tbl_sys_user_info ui where a.agency_user_id=ui.id) end create_user_name, rownum num FROM (
+                select
+                    r.id,
+                    r.record_number,
+                    r.record_channel,
+                    r.remark,
+                    r.collect_user_name,
+                    r.money,
+                    r.state,
+                    r.turnover_number,
+                    r.voucher_img_url,
+                    r.agency_user_id,
+                    r.agency_user_type,
+                    to_char(r.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+                    r.check_user_name,
+                    (select user_realname from tbl_sys_user_info ui where id = r.check_user_name) check_user_business_name,
+                    to_char(r.check_date,'yyyy-mm-dd hh24:mi:ss') check_date,
+                    r.check_reject_reason,
+                    r.tran_number,
+                    i.user_manage_name,
+                    i.login_name
+                from tbl_user_preload_charge_record r,
+                    tbl_user_info i
+                <where>
+                    r.collect_user_name = i.user_name
+                    <if test="state != null">
+                        and r.state in
+                        <foreach item="item" collection="state" open="(" separator="," close=")">
+                            #{item}
+                        </foreach>
+                    </if>
+                    <if test="record_number!=null and record_number!='' ">
+                        and r.record_number =#{record_number,jdbcType=INTEGER}
+                    </if>
+                    <if test="record_channel!=null and record_channel!='' ">
+                        and r.record_channel =#{record_channel,jdbcType=VARCHAR}
+                    </if>
+                    <if test="start_date != null and start_date != ''">
+                        and r.create_date &gt;= TO_DATE(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+                    </if>
+                    <if test="end_date != null and end_date != ''">
+                        and r.create_date &lt;= TO_DATE(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+                    </if>
+                    <if test="login_name!=null and login_name!=''">
+                        and i.login_name = #{login_name,jdbcType=VARCHAR}
+                    </if>
+                    <if test="user_manage_name!=null and user_manage_name!=''">
+                        and i.user_manage_name = #{user_manage_name,jdbcType=VARCHAR}
+                    </if>
+                </where>
+            order by r.create_date desc
+        ) a where ROWNUM  &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where num &gt;#{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!-- 查询用户预充值申请记录数 -->
+    <select id="queryListForCount" parameterType="java.util.Map" resultType="int">
+        SELECT
+          COUNT (1)
+        FROM tbl_user_preload_charge_record a,tbl_user_info b
+        <where>
+            a.collect_user_name = b.user_name
+            <if test="state != null">
+                and a.state in
+                <foreach item="item" collection="state" open="(" separator="," close=")">
+                    #{item}
+                </foreach>
+            </if>
+            <if test="record_number!=null and record_number!='' ">
+                and record_number =#{record_number,jdbcType=INTEGER}
+            </if>
+            <if test="record_channel!=null and record_channel!='' ">
+                 and a.record_channel =#{record_channel,jdbcType=VARCHAR}
+             </if>
+            <if test="start_date != null and start_date != ''">
+                and a.create_date &gt;= TO_DATE(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+            </if>
+            <if test="end_date != null and end_date != ''">
+                and a.create_date &lt;= TO_DATE(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+            </if>
+            <if test="login_name!=null and login_name!=''">
+                and b.login_name = #{login_name,jdbcType=VARCHAR}
+            </if>
+            <if test="user_manage_name!=null and user_manage_name!=''">
+                and b.user_manage_name = #{user_manage_name,jdbcType=VARCHAR}
+            </if>
+        </where>
+    </select>
+
+    <!-- 根据id查询用户预充值记录信息 -->
+    <select id="queryById" parameterType="long" resultType="java.util.Map">
+        select a.id,
+                a.record_number,
+                a.record_channel,
+                a.remark,
+                a.collect_user_name,
+                a.money,
+                a.third_number,
+                a.state,
+                a.voucher_img_url,
+                a.agency_user_id,
+                a.agency_user_type,
+                to_char(a.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+                a.check_user_name,
+                a.check_user_business_name,
+                to_char(a.check_date,'yyyy-mm-dd hh24:mi:ss') check_date,
+                a.check_reject_reason,
+                a.turnover_number,
+                a.tran_number,
+                b.login_name,
+                b.user_manage_name,
+                case when a.agency_user_id is null then (select user_manage_name from tbl_user_info where id = a.collect_user_name)
+                else
+                (select user_realname from tbl_sys_user_info ui where a.agency_user_id=ui.id) end create_user_name,
+                (select user_realname from tbl_sys_user_info ui where id = check_user_name) check_user_realname
+        from tbl_user_preload_charge_record a,tbl_user_info b
+        where a.collect_user_name = b.user_name and a.id = #{id,jdbcType=INTEGER}
+    </select>
+
+    <!-- 用户预充值审批、驳回 -->
+    <update id="update" parameterType="java.util.Map">
+        update tbl_user_preload_charge_record
+        <set>
+            <if test="type == 'approve'">
+                <!-- 审批 -->
+                state = 2,
+            </if>
+            <if test="type == 'reject'">
+                <!-- 驳回 -->
+                state = 3,
+                check_reject_reason = #{check_reject_reason,jdbcType=VARCHAR},
+            </if>
+            check_user_name = #{public_user_id,jdbcType=VARCHAR},
+            check_user_business_name = #{public_user_name,jdbcType=VARCHAR},
+            check_date = sysdate
+        </set>
+        where id = #{id,jdbcType=INTEGER}
+    </update>
+
+    <!--保存会员预充值收支记录-->
+    <insert id="insertIncomeRecord" parameterType="java.util.Map">
+        INSERT INTO TBL_USER_ACCOUNT_RECORD (
+            id,
+            record_number,
+            record_item_number,
+            record_channel,
+            record_type,
+            remark,
+            create_date,
+            collect_user_name,
+            collect_user_manager_name,
+            accountants_subject_id,
+            accountants_subject_name,
+            parent_acc_subject_id,
+            parent_acc_subject_name,
+            money,
+            surplus_money,
+            docket_number,
+            create_user,
+            user_name,
+            check_user_name,
+            check_user_business_name,
+            check_date,
+            turnover_number,
+            ywjl_user_name,
+            ywy_user_name,
+            md_id,
+            xdr_user_type,
+            xdr_user_name,
+            state,
+            credit_balance
+        )
+        SELECT
+            SEQ_USER_ACCOUNT_RECORD.nextval AS ID,
+            GETAUTONUMBER('SZ') AS RECORD_NUMBER,
+            1 AS RECORD_ITEM_NUMBER,
+            '余额' RECORD_CHANNEL,
+            '收款' RECORD_TYPE,
+            ('招商会现金预充值，转入单号：' ||tucr.record_number) as REMARK,
+            sysdate as CREATE_DATE,
+            tucr.collect_user_name,
+            ui.user_manage_name as COLLECT_USER_MANAGER_NAME,
+            '1001CZ' ACCOUNTANTS_SUBJECT_ID,
+			'充值' ACCOUNTANTS_SUBJECT_NAME,
+			1001 PARENT_ACC_SUBJECT_ID,
+			'现金' PARENT_ACC_SUBJECT_NAME,
+            tucr.MONEY,
+            (select account_balance from tbl_bank_account a where a.user_id = tucr.collect_user_name) as SURPLUS_MONEY,
+            tucr.record_number as DOCKET_NUMBER,
+            #{public_user_name,jdbcType=VARCHAR} as CREATE_USER,
+            tucr.collect_user_name as USER_NAME,
+            #{public_user_name,jdbcType=VARCHAR}  CHECK_USER_NAME,
+            #{public_user_realname,jdbcType=VARCHAR}  CHECK_USER_BUSINESS_NAME,
+            sysdate as CHECK_DATE,
+            tucr.record_number as TURNOVER_NUMBER,
+            (select a.user_name from tbl_sys_user_info a where a.id = ui.market_supervision_user_id) as YWJL_USER_NAME,
+            (select a.user_name from tbl_sys_user_info a where a.id = ui.referee_user_id) as YWY_USER_NAME,
+            ui.store_id as MD_ID,
+            tucr.agency_user_type as XDR_USER_TYPE,
+            (select a.user_name from tbl_sys_user_info a where a.id = tucr.agency_user_id) as XDR_USER_NAME,
+            '已审核',
+            (SELECT nvl(credit_money_balance, 0) from TBL_BANK_ACCOUNT where USER_ID = ui.id)
+        FROM TBL_USER_PRELOAD_CHARGE_RECORD tucr,
+            tbl_user_info ui
+        WHERE tucr.collect_user_name = ui.id and tucr.ID = #{id,jdbcType=INTEGER}
+    </insert>
+</mapper>

@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tk.oms.finance.dao.RechargeAuditingDao">
+	<sql id="user_select_column">
+		id,
+		record_number,
+		record_item_number,
+		record_channel,
+		record_type,
+		remark,
+		to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+		collect_user_name,
+		collect_user_manager_name,
+		accountants_subject_id,
+		accountants_subject_name,
+		parent_acc_subject_id,
+		parent_acc_subject_name,
+		money,
+		count,
+		surplus_money,
+		state,
+		docket_number,
+		create_user,
+		user_name,
+		check_user_name,
+		check_user_business_name,
+		to_char(check_date,'yyyy-mm-dd hh24:mi:ss') check_date,
+		check_reject_reason,
+		turnover_number,
+		third_number,
+		voucher_img_url,
+		ywjl_user_name,
+		md_id,
+		ywy_user_name   
+	</sql>
+	 <!-- 通用查询条件 -->
+    <sql id="user_where_record">
+        <where>
+        	  1=1
+        	<if test="record_number != null and record_number != ''">
+	            and info.record_number = #{record_number}
+	        </if>
+	        <if test="login_name != null and login_name != ''">
+	            and exists (select 1 from tbl_user_info tt where tt.user_name=info.user_name and tt.login_name like '%'||#{login_name}||'%') 
+	        </if>
+	        <if test="user_realname != null and user_realname != ''">
+	            and info.collect_user_manager_name like '%'||#{user_realname}||'%'
+	        </if>
+        </where>
+    </sql>
+	
+	<!-- 充值审批列表 -->
+	<select id="queryRechargeAuditingList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+            select a.*, rownum num from (
+                select <include refid="user_select_column"/>,
+                (select user_realname from tbl_sys_user_info where user_name = info.create_user) as  sale_user_realname,
+                (select store_name from tbl_store_info where id = info.md_id and rownum &lt;=1) as  md_name,
+                (select login_name from tbl_user_info where user_name = info.user_name) as login_name
+                from tbl_user_account_audit_record info
+                <include refid="user_where_record"/>
+                and info.record_channel in ('现金转账','现金充值','POS刷卡')
+                order by info.create_date desc
+            ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where num &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 充值审批数量 -->
+	<select id="queryRechargeAuditingCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+          from tbl_user_account_audit_record info
+          <include refid="user_where_record"/>
+           and info.record_channel in ('现金转账','现金充值','POS刷卡')
+	</select>
+	<!-- 充值审批详情 -->
+	<select id="queryRechargeAuditingDetail" parameterType="java.util.Map" resultType="java.util.Map">
+         select <include refid="user_select_column"/>,
+         (select user_realname from tbl_sys_user_info where user_name = info.create_user) sale_user_realname,
+         (select store_name from tbl_store_info where id = info.md_id and rownum &lt;=1) as  md_name, 
+         (select login_name from tbl_user_info where user_name = info.user_name) as login_name
+         from tbl_user_account_audit_record info 
+         <where>
+			<if test="record_number != null and record_number != ''">
+	            and info.record_number = #{record_number}
+	        </if>
+	        <if test="turnover_number != null and turnover_number != ''">
+	            and info.turnover_number = #{turnover_number}
+	        </if>
+        </where>
+         order by info.create_date asc
+	</select>
+	<!-- 充值审批通过，驳回 -->
+	<select id="rechargeAuditing" statementType="CALLABLE" parameterType="java.util.Map">
+		<![CDATA[
+			call pro_recharge_auditing(
+					#{operate_type,mode=IN,jdbcType=VARCHAR},
+					null,
+					null,
+					null,
+					null,
+					null,
+					null,
+					#{regect_reason,mode=IN,jdbcType=DOUBLE},
+					#{record_number,mode=IN,jdbcType=VARCHAR},
+					#{user_name,mode=IN,jdbcType=VARCHAR},
+					null,
+					null,
+					#{output_status,mode=OUT,jdbcType=VARCHAR},
+					#{output_msg,mode=OUT,jdbcType=VARCHAR}
+				)
+			]]>
+	</select>
+</mapper>

@@ -1,0 +1,106 @@
+package com.tk.analysis.home.service;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
+import com.tk.analysis.home.dao.HomeAnalysisDao;
+import com.tk.oms.sysuser.entity.SysUserInfo;
+import com.tk.oms.sysuser.service.SysUserInfoService;
+import com.tk.sys.util.HttpClientUtil;
+import com.tk.sys.util.HttpUtil;
+import com.tk.sys.util.ProcessResult;
+import com.tk.sys.util.Transform;
+
+@Service("HomeAnalysisService")
+public class HomeAnalysisService {
+	
+	@Resource
+	private HomeAnalysisDao homeAnalysisDao;
+	@Resource
+    private SysUserInfoService sysUserInfoService;
+	/**OA服务地址*/
+    @Value("${oa_service_url}")
+    private String oa_service_url;
+    /** 客户端系统Id */
+	@Value("${oauth.oauth_client_id}")
+	private String oauth_client_id;
+	
+	/**
+	 * 获取用户可用平台列表
+	 * @param request
+	 * @return
+	 */
+	public ProcessResult getUserPlatformList(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+	        //  校验是否传入参数
+            if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+			//  判断id是否已传入
+            SysUserInfo userinfo = (SysUserInfo) Transform.GetPacket(json, SysUserInfo.class);
+            if(userinfo.getId()==0) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数user_id");
+            	return pr;
+            }
+			//  获取系统用户登录OA的openId
+            String openId = sysUserInfoService.getSysUserOAOpenIdById(userinfo.getId());
+            if(StringUtils.isEmpty(openId)){
+                pr.setState(false);
+                pr.setMessage("获取openId失败");
+                return pr;
+            }
+            int isManager = 0;
+            if(userinfo.getId() == 1) {
+            	isManager = 1;
+            }
+			Map<String, Object> paramMap = new HashMap<String, Object>();
+			paramMap.put("clientId", oauth_client_id);
+			paramMap.put("openId", openId);
+			paramMap.put("isManager", isManager);
+
+			pr = HttpClientUtil.postToOAByReverse(oa_service_url + "oauth2/user/get_data_auth", paramMap);
+			
+			if(!pr.getState()){
+                pr.setState(false);
+                pr.setMessage("获取用户平台权限失败，请联系管理员！");
+                return pr;
+            }
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+		}
+		return pr;
+	}
+	/**
+	 * 根据用户ID查询用户权限信息
+	 * @param paramMap
+	 * @return
+	 */
+	public List<String> queryByUserId(Map<String, Object> paramMap) {
+		int platform_type = Integer.parseInt(paramMap.get("public_user_platform_type").toString()) ;
+		List<String> list = new ArrayList<String>();
+		if(platform_type == 1 && ("2".equals(paramMap.get("public_user_type")+"") || "6".equals(paramMap.get("public_user_type")+"") || "9".equals(paramMap.get("public_user_type")+""))) {
+			//根据用户ID查询用户权限信息
+			list = homeAnalysisDao.r_queryByUserId(paramMap);
+			if(list == null || list.size() <= 0) {
+				list = new ArrayList<String>();
+				list.add("0");
+			}
+		}
+		return list;
+	}
+}

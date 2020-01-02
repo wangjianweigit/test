@@ -1,0 +1,485 @@
+package com.tk.oms.basicinfo.service;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+import com.tk.oms.basicinfo.dao.SiteInfoDao;
+import com.tk.sys.util.GridResult;
+import com.tk.sys.util.HttpUtil;
+import com.tk.sys.util.PageUtil;
+import com.tk.sys.util.ProcessResult;
+import com.tk.sys.util.Transform;
+
+
+@Service("BasicInfoService")
+public class SiteInfoService {
+	@Resource
+	private SiteInfoDao siteInfoDao;
+	/**
+	 * 添加通知记录
+	 * 
+	 * @param request
+	 * @return
+	 */
+	@Transactional
+	public ProcessResult addSiteInfo(HttpServletRequest request)throws Exception{
+		ProcessResult pr = new ProcessResult();
+		try {
+			Map<String, Object> info = new HashMap<String, Object>();
+			String json = HttpUtil.getRequestInputStream(request);
+			if (!StringUtils.isEmpty(json)){
+				info = (Map<String, Object>) Transform.GetPacket(json,Map.class);
+			}
+			// 起始页页码
+			if (info == null || Integer.parseInt(info.get("discount").toString())==0|| StringUtils.isEmpty(info.get("create_user_id"))) {
+				pr.setState(false);
+				pr.setMessage("缺少参数");
+				return pr;
+			}
+			float discount=Integer.parseInt(info.get("discount").toString());
+			discount=(float)discount/100;
+			info.put("discount", discount);
+			if(siteInfoDao.checkSiteName(info)<=0){
+				if (siteInfoDao.insertSiteInfo(info) > 0) {
+					Map<String, Object> map = new HashMap<String, Object>();
+					String parent_warehouse_ids=info.get("parent_warehouse_id").toString();
+					String[] parent_warehouse_id=parent_warehouse_ids.split(",");
+					String[] warehouse_id=info.get("warehouse_id").toString().split(",");
+					map.put("site_id", info.get("id"));
+					for(int i=0;i<parent_warehouse_id.length;i++){
+						map.put("parent_warehouse_id", parent_warehouse_id[i]);
+						map.put("warehouse_id", warehouse_id[i]);
+						//新增站点仓库信息
+						siteInfoDao.insertSiteWarehouse(map);
+					}
+					pr.setState(true);
+					pr.setMessage("新增站点成功");
+					pr.setObj(info);
+				} else {
+					pr.setState(false);
+					pr.setMessage("新增站点失败");
+					pr.setObj(info);
+				}
+			}else{
+				pr.setState(false);
+				pr.setMessage("站点名称已存在，请修改");
+				pr.setObj(info);
+			}
+		} catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e);
+        }
+		return pr;
+	}
+	/**
+	 * 编辑
+	 * 
+	 * @param request
+	 * @return
+	 */
+	@Transactional
+	public ProcessResult editSiteInfo(HttpServletRequest request) throws Exception {
+		ProcessResult pr = new ProcessResult();
+		try{
+		Map<String, Object> info = new HashMap<String, Object>();
+		String json = HttpUtil.getRequestInputStream(request);
+		if (!StringUtils.isEmpty(json))
+			info = (Map<String, Object>) Transform.GetPacket(json,Map.class);
+		// 起始页页码
+		if (info == null|| Integer.parseInt(info.get("id").toString())==0) {
+			pr.setState(false);
+			pr.setMessage("缺少参数");
+			return pr;
+		}
+		float discount=Integer.parseInt(info.get("discount").toString());
+		discount=(float)discount/100;
+		info.put("discount", discount);
+		if (siteInfoDao.updateSiteInfo(info) > 0) {
+			if(StringUtils.isEmpty(info.get("state"))){
+				Map<String, Object> map = new HashMap<String, Object>();
+				String parent_warehouse_ids=info.get("parent_warehouse_id").toString();
+				String[] parent_warehouse_id=parent_warehouse_ids.split(",");
+				String[] warehouse_id=info.get("warehouse_id").toString().split(",");
+				map.put("site_id", info.get("id"));
+				//先删除站点仓库关联
+				siteInfoDao.deleteSiteWarehouse(map);
+				for(int i=0;i<parent_warehouse_id.length;i++){
+					map.put("parent_warehouse_id", parent_warehouse_id[i]);
+					map.put("warehouse_id", warehouse_id[i]);
+					//新增站点仓库关联信息
+					siteInfoDao.insertSiteWarehouse(map);
+				}
+			}
+			pr.setState(true);
+			pr.setMessage("编辑站点成功");
+			pr.setObj(info);
+			} else {
+				pr.setState(false);
+				pr.setMessage("编辑站点失败");
+				pr.setObj(info);
+			}
+		} catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e);
+        }
+		return pr;
+	}
+	/**
+	 * 删除站点
+	 * 
+	 * @param request
+	 * @return
+	 */
+	@Transactional
+	public ProcessResult removeSiteInfo(HttpServletRequest request)throws Exception{
+		ProcessResult pr = new ProcessResult();
+		try {
+			Map<String, Object> info = new HashMap<String, Object>();
+			String json = HttpUtil.getRequestInputStream(request);
+			if (!StringUtils.isEmpty(json))
+				info = (Map<String, Object>) Transform.GetPacket(json,
+						Map.class);
+			// 起始页页码
+			if (info == null|| Integer.parseInt(info.get("id").toString())==0) {
+				pr.setState(false);
+				pr.setMessage("缺少参数");
+				return pr;
+			}
+			Map<String, Object> map = new HashMap<String, Object>();
+			map.put("site_id", info.get("id"));
+			if (siteInfoDao.deleteSiteInfo(info) > 0) {
+				siteInfoDao.deleteSiteWarehouse(map);
+				pr.setState(true);
+				pr.setMessage("删除站点成功");
+				pr.setObj(info);
+			} else {
+				pr.setState(false);
+				pr.setMessage("删除站点失败");
+				pr.setObj(info);
+			}
+		} catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e);
+        }
+		return pr;
+	}
+	
+	
+	/**
+	 * 启用禁用站点
+	 * 
+	 * @param request
+	 * @return
+	 */
+	@Transactional
+	public ProcessResult siteInfoUpdateState(HttpServletRequest request)throws Exception{
+		ProcessResult pr = new ProcessResult();
+		try {
+			Map<String, Object> info = new HashMap<String, Object>();
+			String json = HttpUtil.getRequestInputStream(request);
+			if (!StringUtils.isEmpty(json))
+				info = (Map<String, Object>) Transform.GetPacket(json,
+						Map.class);
+			// 起始页页码
+			if (info == null || Integer.parseInt(info.get("id").toString())==0 || StringUtils.isEmpty("state")) {
+				pr.setState(false);
+				pr.setMessage("缺少参数");
+				return pr;
+			}
+			Map<String, Object> map = new HashMap<String, Object>();
+			if (siteInfoDao.updateSiteInfoState(info) > 0) {
+				pr.setState(true);
+				pr.setMessage("更新状态成功");
+				pr.setObj(info);
+			} else {
+				pr.setState(false);
+				pr.setMessage("更新状态失败");
+				pr.setObj(info);
+			}
+		} catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e);
+        }
+		return pr;
+	}
+	/**
+	 * 排序
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult sort(HttpServletRequest request)throws Exception {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        }
+	        if(paramMap.size() == 0) {
+            	pr.setState(false);
+            	pr.setMessage("参数缺失");
+                return pr;
+            }
+	        if(StringUtils.isEmpty(paramMap.get("type"))){
+		        if(StringUtils.isEmpty(paramMap.get("siteid1"))||StringUtils.isEmpty(paramMap.get("warehouseid1"))||
+		           StringUtils.isEmpty(paramMap.get("siteid2"))||StringUtils.isEmpty(paramMap.get("warehouseid2"))){
+	                pr.setState(false);
+	                pr.setMessage("参数错误，缺少参数");
+	                return pr;
+	            }
+		        Map<String, Object> param1=new HashMap<String,Object>();
+		        Map<String, Object> param2=new HashMap<String,Object>();
+		        param1.put("site_id", paramMap.get("siteid1"));
+		        param1.put("parent_warehouse_id", paramMap.get("warehouseid1"));
+		        param2.put("site_id", paramMap.get("siteid2"));
+		        param2.put("parent_warehouse_id", paramMap.get("warehouseid2"));
+		        Map<String, Object> t1 = siteInfoDao.querySiteWarehouseById(param1);
+		        Map<String, Object> t2 = siteInfoDao.querySiteWarehouseById(param2);
+		        t1.put("site_id", paramMap.get("siteid1"));
+		        t1.put("parent_warehouse_id", paramMap.get("warehouseid1"));
+	            t1.put("sortid", t2.get("SORT_NUMBER"));
+	            t2.put("site_id", paramMap.get("siteid2"));
+		        t2.put("parent_warehouse_id", paramMap.get("warehouseid2"));
+	            t2.put("sortid", t1.get("SORT_NUMBER"));
+	            if(siteInfoDao.updateSiteWarehouseSort(t1)>0&&siteInfoDao.updateSiteWarehouseSort(t2)>0){
+	                pr.setState(true);
+	                pr.setMessage("排序字段修改成功");
+	                pr.setObj(null);
+	            } else {
+	                pr.setState(false);
+	                pr.setMessage("排序字段修改失败");
+	            }
+	        }else{
+            	if(StringUtils.isEmpty(paramMap.get("siteid"))||StringUtils.isEmpty(paramMap.get("warehouseid"))){
+                    pr.setState(false);
+                    pr.setMessage("参数缺失，参数ID为空");
+                    return pr;
+                }
+            	paramMap.put("site_id", paramMap.get("siteid"));
+        		paramMap.put("parent_warehouse_id", paramMap.get("warehouseid"));
+            	if(siteInfoDao.updateSiteWarehouseSort(paramMap)>0){
+            		pr.setState(true);
+                    pr.setMessage("排序字段修改成功");
+            	}else{
+            		pr.setState(false);
+                    pr.setMessage("排序字段修改失败");
+            	}
+            }
+		} catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e);
+        }
+        return pr;
+	}
+	
+	/**
+	 * 分页查询站点列表
+	 * 
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryList(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> params = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if (!StringUtils.isEmpty(json))
+				params = (Map<String, Object>) Transform.GetPacket(json,
+						Map.class);
+			GridResult pageParamResult = PageUtil.handlePageParams(params);
+			if(pageParamResult!=null){
+				return pageParamResult;
+			}
+			if((!StringUtils.isEmpty(params.get("state")))&&params.get("state") instanceof String){
+				params.put("state",(params.get("state")+"").split(","));
+			}
+			int siteInfoCount=siteInfoDao.querySiteInfoCount(params);
+			List<Map<String, Object>> list = siteInfoDao.queryListForPage(params);
+			if (list != null && list.size() > 0) {
+				gr.setState(true);
+				gr.setMessage("查询成功!");
+				gr.setObj(list);
+				gr.setTotal(siteInfoCount);
+			} else {
+				gr.setState(true);
+				gr.setMessage("无数据");
+			}
+
+		} catch (IOException e) {
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+		}
+		return gr;
+	}
+	
+	/**
+	 * 查询所有站点
+	 * 
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryAllList(HttpServletRequest request) {
+		GridResult pr = new GridResult();
+		Map<String, Object> params = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if (!StringUtils.isEmpty(json))
+				params = (Map<String, Object>) Transform.GetPacket(json,Map.class);
+			List<Map<String, Object>> list = siteInfoDao.queryAllList(params);
+			pr.setState(true);
+			pr.setMessage("查询站点列表成功");
+			pr.setObj(list);
+
+		} catch (IOException e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+		}
+		return pr;
+	}
+	
+	
+	/**
+	 * 站点详情查询
+	 * 
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryDetail(HttpServletRequest request) {
+		GridResult pr = new GridResult();
+		Map<String, Object> params = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if (!StringUtils.isEmpty(json)){
+				params = (Map<String, Object>) Transform.GetPacket(json,Map.class);
+			}
+			Map<String, Object> siteInfoDetail = siteInfoDao.querySiteInfoDetail(params);
+			params.put("site_id", params.get("id"));
+			List<Map<String, Object>> siteWarehouseList=siteInfoDao.querySiteWarehouseList(params);
+			String [] warehouse_id=new String[siteWarehouseList.size()];
+			for(int i=0;i<siteWarehouseList.size();i++){
+				warehouse_id[i]=siteWarehouseList.get(i).get("WAREHOUSE_ID").toString().trim();
+			}
+			String [] parent_warehouse_id=new String[siteWarehouseList.size()];
+			for(int i=0;i<siteWarehouseList.size();i++){
+				parent_warehouse_id[i]=siteWarehouseList.get(i).get("PARENT_WAREHOUSE_ID").toString().trim();
+			}
+			siteInfoDetail.put("warehouse_id", warehouse_id);
+			siteInfoDetail.put("parent_warehouse_id", parent_warehouse_id);
+			pr.setState(true);
+			pr.setMessage("查询站点详情成功");
+			pr.setObj(siteInfoDetail);
+
+		} catch (IOException e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+		}
+		return pr;
+	}
+	/**
+	 * 查询仓库列表
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryWarehouseList(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(StringUtils.isEmpty(json)) {
+				pr.setState(false);
+				pr.setMessage("缺少参数");
+				return pr;
+			}
+			Map<String, Object> params = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+			List<Map<String, Object>> dataList=siteInfoDao.queryWarehouseParentInfoList(params);
+			for(int i=0;i<dataList.size();i++){
+				List<Map<String, Object>> childer = siteInfoDao.queryWarehouseChilderInfoList(dataList.get(i));
+				dataList.get(i).put("childerList", childer);
+			}
+			pr.setState(true);
+			pr.setMessage("查询成功");
+			pr.setObj(dataList);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+		}
+		return pr;
+	}
+	
+	/**
+	 * 查询站点关联仓库列表
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult querySiteWarehouseList(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(StringUtils.isEmpty(json)) {
+				pr.setState(false);
+				pr.setMessage("缺少参数");
+				return pr;
+			}
+			Map<String, Object> params = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+			if(StringUtils.isEmpty(params.get("site_id"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数site_id");
+				return pr;
+			}
+			List<Map<String, Object>> siteWarehouseList = siteInfoDao.querySiteWarehouseList(params);
+			pr.setState(true);
+			pr.setMessage("获取站点仓库成功");
+			pr.setObj(siteWarehouseList);
+		} catch (IOException e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+	/**
+     * 查询仓库列表
+     * @param request
+     * @return
+     */
+	public ProcessResult queryPlatformWarehouseList(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+         Map<String,Object> params=new HashMap<String,Object>();
+        try {
+        	String json = HttpUtil.getRequestInputStream(request);
+			if (!StringUtils.isEmpty(json)){
+				params = (Map<String, Object>) Transform.GetPacket(json,Map.class);
+			}
+            // 查询仓库列表
+            List<Map<String, Object>> warehouseList = siteInfoDao.queryPlatformWarehouseList();
+
+            pr.setState(true);
+            pr.setMessage("OK");
+            pr.setObj(warehouseList);
+
+        } catch (IOException e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+
+        return pr;
+	}
+}

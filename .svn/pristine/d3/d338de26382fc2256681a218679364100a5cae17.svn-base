@@ -1,0 +1,662 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tk.oms.finance.dao.FinanceStatisticsDao">
+	<!--商家客户资金查询汇总(按商家)列表-->
+	<select id="queryStationedFundSummaryList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+            select a.*,rownum num from (
+				select company_name,
+			       user_name,
+			       (select to_char (
+			                  wm_concat (
+			                     case
+			                        when merchants_type = 1 then '入驻商'
+			                        when merchants_type = 2 then '供应商'
+			                        when merchants_type = 3 then '云仓货主'
+			                        else '私有平台商家'
+			                     end))
+			          from tbl_merchants_type mt
+			         where mt.stationed_user_id = sui.id) as merchants_type,
+			       (select account_balance from tbl_bank_account tba where tba.user_id = sui.id) as account_balance,
+			       (select deposit_money from tbl_bank_account tba where tba.user_id = sui.id) as deposit_money,
+			       (select deposit_money_balance from tbl_bank_account tba where tba.user_id = sui.id) as deposit_money_balance,
+			       nvl((select sum (settlement_amount - settled_amount) money
+			          from tbl_buss_settlement_info a
+			         where a.settlement_user_id = sui.id
+			               and a.is_delete = '0'
+			               and a.settlement_state in ('1', '3')
+			               and bank_account_type = '1'),0) as wait_settlement_money
+			  from tbl_stationed_user_info sui
+			 where stationed_user_type = '2'
+			       and state = 2
+			       and exists
+			              (select 1
+			                 from tbl_merchants_type mt
+			                where mt.stationed_user_id = sui.id
+			                      and mt.merchants_type in (1, 2, 3))
+			       <if test="company_name !=null and company_name !=''">
+					   and sui.company_name like concat(concat('%', #{company_name,jdbcType=VARCHAR}),'%')
+				   </if> 
+				   <if test="user_name !=null and user_name !=''">
+					   and sui.user_name=#{user_name,jdbcType=VARCHAR}
+				   </if>
+				   <if test="sort !=null and sort !=''">
+					   order by ${sort} ${sort_by},id
+				   </if>
+		   	) a
+			where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+		) where num &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 商家客户资金查询汇总(按商家)数量 -->
+	<select id="queryStationedFundSummaryCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+			  from tbl_stationed_user_info sui
+			 where stationed_user_type = '2'
+			       and state = 2
+			       and exists
+			              (select 1
+			                 from tbl_merchants_type mt
+			                where mt.stationed_user_id = sui.id
+			                      and mt.merchants_type in (1, 2, 3))
+			       <if test="company_name !=null and company_name !=''">
+					   and sui.company_name like concat(concat('%', #{company_name,jdbcType=VARCHAR}),'%')
+				   </if> 
+				   <if test="user_name !=null and user_name !=''">
+					   and sui.user_name=#{user_name,jdbcType=VARCHAR}
+				   </if>
+	</select>
+	<!-- 商家客户资金查询汇总合计(按商家) -->
+	<select id="queryStationedFundSummaryTotal" parameterType="java.util.Map" resultType="java.util.Map">
+		 SELECT nvl(SUM (account_balance),0) account_balance,
+		       nvl(SUM (DEPOSIT_MONEY),0) DEPOSIT_MONEY,
+		       nvl(SUM (DEPOSIT_MONEY_BALANCE),0) DEPOSIT_MONEY_BALANCE,
+		       nvl(SUM (wait_settlement_money),0) wait_settlement_money
+		  FROM (SELECT (SELECT ACCOUNT_BALANCE
+		                  FROM TBL_BANK_ACCOUNT tba
+		                 WHERE tba.user_id = sui.id)
+		                  ACCOUNT_BALANCE,
+		               (SELECT DEPOSIT_MONEY
+		                  FROM TBL_BANK_ACCOUNT tba
+		                 WHERE tba.user_id = sui.id)
+		                  DEPOSIT_MONEY,
+		               (SELECT DEPOSIT_MONEY_BALANCE
+		                  FROM TBL_BANK_ACCOUNT tba
+		                 WHERE tba.user_id = sui.id)
+		                  DEPOSIT_MONEY_BALANCE,
+		               (SELECT SUM (settlement_amount - settled_amount) money
+		                  FROM TBL_BUSS_SETTLEMENT_INFO a
+		                 WHERE     A.SETTLEMENT_USER_ID = sui.id
+		                       AND a.is_delete = '0'
+		                       AND a.settlement_state IN ('1', '3')
+		                       AND bank_account_type = '1')
+		                  wait_settlement_money
+		          FROM tbl_stationed_user_info sui
+		         WHERE     stationed_user_type = '2'
+		               AND state = 2
+		               AND EXISTS
+		                      (SELECT 1
+		                         FROM tbl_merchants_type mt
+		                        WHERE     mt.stationed_user_id = sui.id
+		                              AND mt.merchants_type IN (1, 2, 3))
+		               <if test="company_name !=null and company_name !=''">
+						   and sui.company_name like concat(concat('%', #{company_name,jdbcType=VARCHAR}),'%')
+					   </if> 
+					   <if test="user_name !=null and user_name !=''">
+						   and sui.user_name=#{user_name,jdbcType=VARCHAR}
+					   </if>              
+					   )
+	</select>
+	<!--商家客户资金查询汇总(按会员)列表-->
+	<select id="queryUserFundSummaryList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+            select a.*,rownum num from (
+				select tui.login_name,
+			       tui.user_manage_name,
+			       tba.account_balance,
+			       nvl(tba.frozen_balance,0) not_withdraw_money,
+			       nvl((tba.account_balance - tba.frozen_balance),0) as can_withdraw_money,
+			       tba.credit_money,
+			       tba.credit_money_balance
+			    from tbl_user_info tui
+			       left join tbl_bank_account tba on tui.id = tba.user_id
+			    where tui.user_type = 1 and tui.user_state = 1
+			       <if test="user_manage_name !=null and user_manage_name !=''">
+					   and tui.user_manage_name like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%')
+				   </if> 
+				   <if test="login_name !=null and login_name !=''">
+					   and tui.login_name=#{login_name,jdbcType=VARCHAR}
+				   </if>
+				   <if test="sort !=null and sort !=''">
+					   order by ${sort} ${sort_by},tui.id
+				   </if>
+		   	) a
+			where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+		) where num &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 商家客户资金查询汇总(按会员)数量 -->
+	<select id="queryUserFundSummaryCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		    from tbl_user_info tui
+		  where tui.user_type = 1 and tui.user_state = 1
+		       <if test="user_manage_name !=null and user_manage_name !=''">
+				   and tui.user_manage_name like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%')
+			   </if> 
+			   <if test="login_name !=null and login_name !=''">
+				   and tui.login_name=#{login_name,jdbcType=VARCHAR}
+			   </if>
+	</select>
+	<!-- 商家客户资金查询汇总合计(按会员) -->
+	<select id="queryUserFundSummaryTotal" parameterType="java.util.Map" resultType="java.util.Map">
+		 SELECT nvl(SUM(ACCOUNT_BALANCE),0) ACCOUNT_BALANCE,
+		       nvl(SUM(not_withdraw_money),0) not_withdraw_money,
+		       nvl(SUM(can_withdraw_money),0)can_withdraw_money,
+		       nvl(SUM(CREDIT_MONEY),0) CREDIT_MONEY,
+		       nvl(SUM(CREDIT_MONEY_BALANCE),0) CREDIT_MONEY_BALANCE
+		  FROM (SELECT tba.ACCOUNT_BALANCE,
+		               tba.FROZEN_BALANCE not_withdraw_money,
+		               (tba.ACCOUNT_BALANCE - tba.FROZEN_BALANCE)
+		                  AS can_withdraw_money,
+		               tba.CREDIT_MONEY,
+		               tba.CREDIT_MONEY_BALANCE
+		          FROM tbl_user_info tui
+		               LEFT JOIN tbl_bank_account tba ON tui.id = tba.user_id
+		         WHERE tui.user_type = 1 AND tui.user_state = 1
+		         <if test="user_manage_name !=null and user_manage_name !=''">
+				   	  and tui.user_manage_name like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%')
+			     </if> 
+			   <if test="login_name !=null and login_name !=''">
+				      and tui.login_name=#{login_name,jdbcType=VARCHAR}
+			   </if>)
+	</select>
+	<!-- 支付统计报表核销-->
+    <update id="insertOrUpdatePayReportStatisticsAprv" parameterType="java.util.Map">
+    	merge into tbl_pay_report_statistics_aprv c1 using
+        (
+               select
+               		<if test="remark !=null and remark !=''">
+		            	#{remark,jdbcType=INTEGER} as remark,
+				     </if> 
+                   #{pay_platform,jdbcType=VARCHAR} as pay_platform,
+                   to_date(#{received_date,jdbcType=VARCHAR},'YYYY/MM/DD') as received_date,
+                   #{state,jdbcType=INTEGER} as state,
+                   #{public_user_id,jdbcType=INTEGER} as create_user_id,
+                   #{public_user_id,jdbcType=INTEGER} as end_user_id
+               from dual
+        ) t1 on (c1.pay_platform = t1.pay_platform and c1.received_date=t1.received_date)
+        when matched then
+        update set
+            c1.state = t1.state,
+            <if test="remark !=null and remark !=''">
+            	c1.remark = t1.remark,
+		     </if> 
+            c1.end_date = sysdate,
+            c1.end_user_id=t1.end_user_id
+        when not matched then
+        insert (
+            id,
+            pay_platform,
+            received_date,
+            state,
+            <if test="remark !=null and remark !=''">
+            	remark,
+		    </if> 
+		    create_date,
+		    create_user_id,
+		    end_date,
+		    end_user_id
+        ) values (
+            seq_pay_report_statistics_aprv.nextval,
+            t1.pay_platform,
+            t1.received_date,
+            t1.state,
+            <if test="remark !=null and remark !=''">
+            	t1.remark,
+		    </if>
+		    sysdate,
+		    t1.create_user_id,
+		    sysdate,
+		    t1.end_user_id
+        )
+    </update>
+    <!--查询支付统计报表列表-->
+	<select id="queryPayStatisticsReportList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+            select a.*,rownum num from (
+            	select tpcdc.pay_channel as pay_platform,
+            		   tpcdc.service_rate,
+            		   tpcdc.precision,
+            		   nvl(tt.recharge_money,0) recharge_money,
+            		   nvl(tt.transac_money,0) transac_money,
+            		   nvl(tt.pay_money,0) pay_money,
+            		   nvl(tt.service_money,0) service_money,
+            		   nvl(tt.actual_money,0) actual_money,
+            		   nvl((select state from tbl_pay_report_statistics_aprv tprsa where tprsa.pay_platform=tpcdc.pay_channel and tprsa.received_date=to_date(#{received_date,jdbcType=VARCHAR},'YYYY/MM/DD')),1) as state, 
+            		   (select remark from tbl_pay_report_statistics_aprv tprsa where tprsa.pay_platform=tpcdc.pay_channel and tprsa.received_date=to_date(#{received_date,jdbcType=VARCHAR},'YYYY/MM/DD')) as remark, 
+            		   (select to_char(end_date,'yyyy-mm-dd hh24:mi:ss') from tbl_pay_report_statistics_aprv tprsa where tprsa.pay_platform=tpcdc.pay_channel and tprsa.RECEIVED_DATE=to_date(#{received_date,jdbcType=VARCHAR},'YYYY/MM/DD')) as end_date
+            	  from tbl_pay_channel_data_config tpcdc 
+	            	   left join(
+	            		    select t1.pay_platform,
+							       sum(t1.money) as pay_money,
+							       sum(case when t1.type = 1 then t1.money else 0 end ) as transac_money,
+							       sum(case when t1.type = 2 then t1.money else 0 end ) as recharge_money,
+							       sum(round (t1.money * t2.service_rate, t2.precision)) as  service_money,
+							       sum(t1.money - round (t1.money * t2.service_rate, t2.precision))  as actual_money
+							  from tbl_pay_report_statistics t1, tbl_pay_channel_data_config t2
+							 where     t1.pay_platform = t2.pay_channel
+							       and t1.transact_date &gt;= to_date (#{received_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss') - t2.seconds / 86400
+							       and t1.transact_date &lt; (to_date (#{received_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss') + 1) - t2.seconds / 86400
+							       <if test="record_channel !=null and record_channel !=''">
+									and t2.pay_channel=#{record_channel,jdbcType=VARCHAR}
+								   </if>
+							  group by t1.pay_platform) tt
+						on tpcdc.pay_channel=tt.pay_platform
+					<where>
+						<if test="record_channel !=null and record_channel !=''">
+							and tpcdc.pay_channel=#{record_channel,jdbcType=VARCHAR}
+						</if>
+					</where>
+					order by tpcdc.id
+		   	) a
+			where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+		) where num &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	 <!--查询支付统计报表列表总数-->
+	<select id="queryPayStatisticsReportCount" parameterType="java.util.Map" resultType="int">
+		select count(1) 
+		  from tbl_pay_channel_data_config tpcdc 
+		<where>
+			<if test="record_channel !=null and record_channel !=''">
+				and tpcdc.pay_channel=#{record_channel,jdbcType=VARCHAR}
+			</if>
+		</where>
+	</select>
+	<!-- 查询支付统计报表详情 -->
+	<select id="queryPayStatisticsReportDetailList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+            select a.*,rownum num from (
+            	 	select tprs.order_number || '_' || tprs.pay_seq order_number_pay_seq,
+            			   (select login_name from tbl_user_info where id=top.user_name) login_name,
+             			   (select user_manage_name from tbl_user_info where id=top.user_name) user_manage_name,
+             			   top.other_fee,
+                           to_char(top.pay_date,'yyyy-mm-dd hh24:mi:ss') pay_date
+ 					from tbl_pay_report_statistics tprs,tbl_order_payment top,tbl_pay_channel_data_config tpcdc
+                   where tprs.order_number=top.order_number
+                        and tprs.pay_platform = tpcdc.pay_channel
+                        and tprs.pay_seq=top.pay_seq
+  			     		and tprs.transact_date &gt;= to_date(#{received_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS') - tpcdc.seconds / 86400
+  			     		and tprs.transact_date &lt;  (to_date(#{received_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS') + 1) - tpcdc.seconds / 86400
+     					and tprs.pay_platform=#{pay_platform,jdbcType=VARCHAR}
+     					and top.pay_state=2 and top.pay_type in(1,4,5)
+				 		<if test="user_type !=null and user_type !='' and user_type==1">
+				 			and exists (select 1 from tbl_user_info tui where tui.user_name=top.user_name and tui.user_type=1)
+				 		</if>
+				 		<if test="user_type !=null and user_type !='' and user_type==5">
+				 			and exists (select 1 from tbl_user_info tui where tui.user_name=top.user_name and tui.user_type=5)
+				 		</if>
+				       <if test="order_number_pay_seq !=null and order_number_pay_seq !=''">
+						    and tprs.order_number || '_' || tprs.pay_seq=#{order_number_pay_seq,jdbcType=VARCHAR}
+					   </if> 
+					   <if test="pay_start_date !=null and pay_start_date !=''">
+			      			and top.pay_date &gt;= to_date(#{pay_start_date},'yyyy-mm-dd hh24:mi:ss')
+			           </if>
+			           <if test="pay_end_date !=null and pay_end_date !=''">
+			       			and top.pay_date &lt;= to_date(#{pay_end_date},'yyyy-mm-dd hh24:mi:ss')
+			           </if>
+			           <if test="user_name !=null and user_name !=''">
+						   and exists(select 1 from tbl_user_info tui where tui.user_name=top.user_name and tui.login_name=#{user_name,jdbcType=VARCHAR})
+					   </if> 
+					   <if test="user_manage_name !=null and user_manage_name !=''">
+						   and exists(select 1 from tbl_user_info tui where tui.user_name=top.user_name and tui.user_manage_name like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%'))
+					   </if> 
+					    order by top.pay_date desc
+		   	) a
+			where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+		) where num &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!--查询支付统计报表列表总数-->
+	<select id="queryPayStatisticsReportDetailCount" parameterType="java.util.Map" resultType="int">
+		  select count(1)
+			from tbl_pay_report_statistics tprs,tbl_order_payment top,tbl_pay_channel_data_config tpcdc
+           where tprs.order_number=top.order_number
+                 and tprs.pay_platform = tpcdc.pay_channel
+                 and tprs.pay_seq=top.pay_seq
+  			     and tprs.transact_date &gt;= to_date(#{received_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS') - tpcdc.seconds / 86400
+  			     and tprs.transact_date &lt;  (to_date(#{received_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS') + 1) - tpcdc.seconds / 86400
+  				 and tprs.pay_platform = #{pay_platform,jdbcType=VARCHAR}
+  				 and top.pay_state=2 
+  				 and top.pay_type in(1,4,5)
+	 		<if test="user_type !=null and user_type !='' and user_type==1">
+	 			and exists (select 1 from tbl_user_info tui where tui.user_name=top.user_name and tui.user_type=1)
+	 		</if>
+	 		<if test="user_type !=null and user_type !='' and user_type==5">
+	 			and exists (select 1 from tbl_user_info tui where tui.user_name=top.user_name and tui.user_type=5)
+	 		</if>
+	       <if test="order_number_pay_seq !=null and order_number_pay_seq !=''">
+			    and tprs.order_number || '_' || tprs.pay_seq=#{order_number_pay_seq,jdbcType=VARCHAR}
+		   </if> 
+		   <if test="pay_start_date !=null and pay_start_date !=''">
+      			and top.pay_date &gt;= to_date(#{pay_start_date},'yyyy-mm-dd hh24:mi:ss')
+           </if>
+           <if test="pay_end_date !=null and pay_end_date !=''">
+       			and top.pay_date &lt;= to_date(#{pay_end_date},'yyyy-mm-dd hh24:mi:ss')
+           </if>
+           <if test="user_name !=null and user_name !=''">
+			   and exists(select 1 from tbl_user_info tui where tui.user_name=top.user_name and tui.login_name=#{user_name,jdbcType=VARCHAR})
+		   </if> 
+		   <if test="user_manage_name !=null and user_manage_name !=''">
+			   and exists(select 1 from tbl_user_info tui where tui.user_name=top.user_name and tui.user_manage_name like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%'))
+		   </if> 
+	</select>
+	<!-- 查询支付统计报表详情 -->
+	<select id="queryPayStatisticsReportMergeDetailList" parameterType="java.util.Map" resultType="java.util.Map">
+			select order_number,
+			(SELECT ORDER_STATE FROM TBL_ORDER_INFO TOI WHERE TOI.ORDER_NUMBER=T.ORDER_NUMBER)ORDER_STATE,
+			(SELECT PRODUCT_MONEY FROM TBL_ORDER_INFO TOI WHERE TOI.ORDER_NUMBER=T.ORDER_NUMBER)PRODUCT_MONEY
+			 from TBL_ORDER_UNION_PAY_DETAIL T
+				where PAY_TRADE_NUMBER=#{pay_trade_number,jdbcType=VARCHAR}
+	</select>
+	<!-- 查询支付统计报表详情 (现金渠道)-->
+	<select id="queryPayStatisticsReportDetailCashList" parameterType="java.util.Map" resultType="java.util.Map">
+		select t.*,
+			   (select login_name from tbl_user_info where id=t.user_name) login_name,
+			   (select user_manage_name from tbl_user_info where id=t.user_name) user_manage_name,
+			   to_char(t.payment_date,'yyyy-mm-dd hh24:mi:ss') pay_date,
+			   pay_trade_number as order_number_pay_seq
+	      from (
+            select a.*,rownum num 
+              from (
+				 select toup.PAY_TRADE_NUMBER,
+	            		   toi.user_name,
+	                       min( pay_date) as payment_date ,
+	                       sum(payment_money) as OTHER_FEE
+				   from tbl_order_union_pay  toup,tbl_order_info toi,TBL_ORDER_UNION_PAY_DETAIL toupd 
+				  where toup.pay_trade_number=toupd.pay_trade_number
+						and toi.order_number=toupd.order_number
+						and exists(select 1 
+						             from tbl_pay_report_statistics tprs,tbl_pay_channel_data_config tpcdc
+						            where tprs.pay_platform = tpcdc.pay_channel
+		  			     				  and tprs.transact_date &gt;= to_date(#{received_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS') - tpcdc.seconds / 86400
+		  			                      and tprs.transact_date &lt;  (to_date(#{received_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS') + 1) - tpcdc.seconds / 86400
+		  			                      and tprs.order_number = toupd.pay_trade_number
+						    )
+						and toi.payment_type in('POS刷卡','现金支付','现金转账')
+						and toi.payment_state = 2
+						and toup.state=1
+						<if test="user_type !=null and user_type !='' and user_type==1">
+				 			and exists (select 1 from tbl_user_info tui where tui.id=toi.user_name and tui.user_type=1)
+				 		</if>
+				 		<if test="user_type !=null and user_type !='' and user_type==5">
+				 			and exists (select 1 from tbl_user_info tui where tui.id=toi.user_name and tui.user_type=5)
+				 		</if>
+						<if test="pay_start_date !=null and pay_start_date !=''">
+						      and toup.pay_date &gt;= to_date(#{pay_start_date},'yyyy-mm-dd hh24:mi:ss')
+						</if>
+						<if test="pay_end_date !=null and pay_end_date !=''">
+						       and toup.pay_date &lt;= to_date(#{pay_end_date},'yyyy-mm-dd hh24:mi:ss')
+						</if>
+						<if test="order_number_pay_seq !=null and order_number_pay_seq !=''">
+						    and toup.PAY_TRADE_NUMBER=#{order_number_pay_seq,jdbcType=VARCHAR}
+					    </if> 
+					    <if test="user_name !=null and user_name !=''">
+						   and exists(select 1 from tbl_user_info tui where tui.id=toi.user_name and tui.login_name=#{user_name,jdbcType=VARCHAR})
+						</if> 
+						<if test="user_manage_name !=null and user_manage_name !=''">
+						   and exists(select 1 from tbl_user_info tui where tui.id=toi.user_name and tui.user_manage_name like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%'))
+						</if> 
+					group by toup.PAY_TRADE_NUMBER,toi.user_name
+					order by toup.PAY_TRADE_NUMBER desc
+		   		   ) a
+			where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+		) t where num &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!--查询支付统计报表详情总数 (现金渠道)-->
+	<select id="queryPayStatisticsReportDetailCashCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_order_union_pay  toup,tbl_order_info toi,tbl_order_union_pay_detail toupd 
+		  where toup.pay_trade_number=toupd.pay_trade_number
+				and toi.order_number=toupd.order_number
+				and exists(select 1 
+				             from tbl_pay_report_statistics tprs,tbl_pay_channel_data_config tpcdc
+				            where tprs.pay_platform = tpcdc.pay_channel
+  			     				  and tprs.transact_date &gt;= to_date(#{received_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS') - tpcdc.seconds / 86400
+  			                      and tprs.transact_date &lt;  (to_date(#{received_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS') + 1) - tpcdc.seconds / 86400
+  			                      and tprs.order_number = toupd.pay_trade_number
+				    )
+				and toi.payment_type in('POS刷卡','现金支付','现金转账')
+				and toi.payment_state = 2
+				and toup.state=1
+				<if test="user_type !=null and user_type !='' and user_type==1">
+		 			and exists (select 1 from tbl_user_info tui where tui.id=toi.user_name and tui.user_type=1)
+		 		</if>
+		 		<if test="user_type !=null and user_type !='' and user_type==5">
+		 			and exists (select 1 from tbl_user_info tui where tui.id=toi.user_name and tui.user_type=5)
+		 		</if>
+				<if test="pay_start_date !=null and pay_start_date !=''">
+				    and toup.pay_date &gt;= to_date(#{pay_start_date},'yyyy-mm-dd hh24:mi:ss')
+				</if>
+				<if test="pay_end_date !=null and pay_end_date !=''">
+				    and toup.pay_date &lt;= to_date(#{pay_end_date},'yyyy-mm-dd hh24:mi:ss')
+				</if>
+				<if test="order_number_pay_seq !=null and order_number_pay_seq !=''">
+				    and toup.PAY_TRADE_NUMBER=#{order_number_pay_seq,jdbcType=VARCHAR}
+			    </if> 
+			    <if test="user_name !=null and user_name !=''">
+				    and exists(select 1 from tbl_user_info tui where tui.id=toi.user_name and tui.login_name=#{user_name,jdbcType=VARCHAR})
+				</if> 
+				<if test="user_manage_name !=null and user_manage_name !=''">
+				    and exists(select 1 from tbl_user_info tui where tui.id=toi.user_name and tui.user_manage_name like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%'))
+				</if> 
+	</select>
+	<!-- 查询支付统计报表数据配置列表 -->
+	<select id="queryPayStatisticsReportDataConfig" parameterType="java.util.Map" resultType="java.util.Map">
+			SELECT 
+				ID,
+				PAY_CHANNEL,
+				SERVICE_RATE,
+				PRECISION,
+				CURE_DATE,
+				CALCULAT_MODE
+			FROM TBL_PAY_CHANNEL_DATA_CONFIG
+	</select>
+	<!--支付统计报表数据配置保存-->
+    <update id="payStatisticsReportSaveDataConfig" parameterType="java.util.Map">
+        merge into tbl_pay_channel_data_config c1 using
+        (
+            <foreach collection="data_config_list" item="item" index="index" separator="UNION">
+                select
+                    #{item.pay_channel, jdbcType=VARCHAR} as pay_channel,
+                    #{item.service_rate, jdbcType=INTEGER} as service_rate,
+                    #{item.precision, jdbcType=INTEGER} as precision,
+                    #{item.cure_date, jdbcType=VARCHAR} as cure_date,
+                    #{item.seconds, jdbcType=VARCHAR} as seconds,
+                    #{item.calculat_mode, jdbcType=INTEGER} as calculat_mode
+                from dual
+            </foreach>
+        ) t1 on (c1.pay_channel = t1.pay_channel)
+        when matched then
+        update set
+            c1.service_rate = t1.service_rate,
+            c1.precision = t1.precision,
+            c1.cure_date = t1.cure_date,
+            c1.seconds = t1.seconds,
+            c1.calculat_mode = t1.calculat_mode
+    </update>
+    <!-- 查询每个支付渠道的实收金额-->
+	<select id="queryPayPlatformActualMoney" parameterType="java.util.Map" resultType="java.util.Map">
+		select nvl(sum(actual_money),0) actual_money from(   
+			select 
+				nvl(round(money-(money*service_rate),precision),0) actual_money
+			from(
+				select 
+					money,
+					(select service_rate from tbl_pay_channel_data_config tpcdc where tpcdc.pay_channel=t.pay_platform) as service_rate,
+					(select precision from tbl_pay_channel_data_config tpcdc where tpcdc.pay_channel=t.pay_platform) as precision
+				 from tbl_pay_report_statistics t
+				 where pay_platform= #{pay_platform, jdbcType=VARCHAR} 
+				 and received_date=to_date(#{received_date,jdbcType=VARCHAR},'YYYY/MM/DD')
+			 )
+		 )
+	</select>
+	<!-- 查询支付统计报表充值记录详情列表 -->
+	<select id="queryPayStatisticsReportRechargeDetailList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+            select a.*,rownum num from (
+            	select * from(
+            	 select (select user_manage_name
+                          from tbl_user_info tui
+                         where tui.id = tucr.collect_user_name)
+                          user_manage_name,
+                        tucr.money,
+                        to_char (nvl(tucr.check_date,tucr.create_date), 'yyyy-mm-dd hh24:mi:ss') check_date,
+                        tucr.record_number 
+                   from tbl_pay_report_statistics tprs,tbl_user_charge_record tucr,tbl_pay_channel_data_config tpcdc
+				  where tprs.order_number=tucr.record_number 
+					    and tprs.pay_platform = tpcdc.pay_channel
+  			     		and tprs.transact_date &gt;= to_date(#{received_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS') - tpcdc.seconds / 86400
+  			            and tprs.transact_date &lt;  (to_date(#{received_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS') + 1) - tpcdc.seconds / 86400
+						and tucr.state=2
+						and tprs.pay_platform=#{pay_platform,jdbcType=VARCHAR}
+				  		<if test="user_type !=null and user_type !='' and user_type==1">
+				 			and exists (select 1 from tbl_user_info tui where tui.id=tucr.collect_user_name and tui.user_type=1)
+				 		</if>
+				 		<if test="user_type !=null and user_type !='' and user_type==5">
+				 			and exists (select 1 from tbl_user_info tui where tui.id=tucr.collect_user_name and tui.user_type=5)
+				 		</if>
+				 		<choose>
+							<when test="pay_platform !=null and pay_platform !='' and pay_platform==现金">
+								<if test="recharge_start_date !=null and recharge_start_date !=''">
+								      and tucr.check_date &gt;= to_date(#{recharge_start_date},'yyyy-mm-dd hh24:mi:ss')
+								</if>
+						  		<if test="recharge_end_date !=null and recharge_end_date !=''">
+								       and tucr.check_date &lt;= to_date(#{recharge_end_date},'yyyy-mm-dd hh24:mi:ss')
+								</if>
+							</when>
+							<otherwise>
+								<if test="recharge_start_date !=null and recharge_start_date !=''">
+								      and tucr.create_date &gt;= to_date(#{recharge_start_date},'yyyy-mm-dd hh24:mi:ss')
+								</if>
+						  		<if test="recharge_end_date !=null and recharge_end_date !=''">
+								       and tucr.create_date &lt;= to_date(#{recharge_end_date},'yyyy-mm-dd hh24:mi:ss')
+								</if>
+							</otherwise>
+						</choose>
+						<if test="user_manage_name !=null and user_manage_name !=''">
+						    and exists(select 1 from tbl_user_info tui where tui.id=tucr.collect_user_name and tui.user_manage_name like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%'))
+						</if>
+				  union all
+					select (select user_manage_name
+                              from tbl_user_info tui
+                             where tui.id = tucr.collect_user_name)
+                            user_manage_name,
+                            tucr.money,
+                            to_char (nvl(tucr.check_date,tucr.create_date), 'yyyy-mm-dd hh24:mi:ss') check_date,
+                            tucr.record_number 
+                       from tbl_pay_report_statistics tprs,tbl_user_preload_charge_record tucr,tbl_pay_channel_data_config tpcdc
+					  where tprs.order_number=tucr.record_number 
+						  	and tprs.pay_platform = tpcdc.pay_channel
+	  			     		and tprs.transact_date &gt;= to_date(#{received_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS') - tpcdc.seconds / 86400
+	  			            and tprs.transact_date &lt;  (to_date(#{received_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS') + 1) - tpcdc.seconds / 86400
+							and tucr.state=2
+							and tprs.pay_platform=#{pay_platform,jdbcType=VARCHAR}
+					  		<if test="user_type !=null and user_type !='' and user_type==1">
+					 			and exists (select 1 from tbl_user_info tui where tui.id=tucr.collect_user_name and tui.user_type=1)
+					 		</if>
+					 		<if test="user_type !=null and user_type !='' and user_type==5">
+					 			and exists (select 1 from tbl_user_info tui where tui.id=tucr.collect_user_name and tui.user_type=5)
+					 		</if>
+					  		<choose>
+								<when test="pay_platform !=null and pay_platform !='' and pay_platform==现金">
+									<if test="recharge_start_date !=null and recharge_start_date !=''">
+									      and tucr.check_date &gt;= to_date(#{recharge_start_date},'yyyy-mm-dd hh24:mi:ss')
+									</if>
+							  		<if test="recharge_end_date !=null and recharge_end_date !=''">
+									       and tucr.check_date &lt;= to_date(#{recharge_end_date},'yyyy-mm-dd hh24:mi:ss')
+									</if>
+								</when>
+								<otherwise>
+									<if test="recharge_start_date !=null and recharge_start_date !=''">
+									      and tucr.create_date &gt;= to_date(#{recharge_start_date},'yyyy-mm-dd hh24:mi:ss')
+									</if>
+							  		<if test="recharge_end_date !=null and recharge_end_date !=''">
+									       and tucr.create_date &lt;= to_date(#{recharge_end_date},'yyyy-mm-dd hh24:mi:ss')
+									</if>
+								</otherwise>
+							</choose>
+							<if test="user_manage_name !=null and user_manage_name !=''">
+							    and exists(select 1 from tbl_user_info tui where tui.id=tucr.collect_user_name and tui.user_manage_name like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%'))
+							</if> 
+				  )t 
+				  order by t.check_date desc
+		   	) a
+			where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+		) where num &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!--查询支付统计报表充值记录详情列表数量-->
+	<select id="queryPayStatisticsReportRechargeDetailCount" parameterType="java.util.Map" resultType="int">
+	 select count(1) 
+	   from (select (SELECT user_manage_name
+                        FROM tbl_user_info tui
+                       WHERE tui.id = tucr.collect_user_name)
+                        user_manage_name,
+                     tucr.money,
+                     TO_CHAR (tucr.check_date, 'yyyy-mm-dd hh24:mi:ss') check_date,
+                     tucr.record_number 
+               from tbl_pay_report_statistics tprs,tbl_user_charge_record tucr,tbl_pay_channel_data_config tpcdc
+			  where tprs.order_number=tucr.record_number 
+				  	and tprs.pay_platform = tpcdc.pay_channel
+  			     	and tprs.transact_date &gt;= to_date(#{received_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS') - tpcdc.seconds / 86400
+  			        and tprs.transact_date &lt;  (to_date(#{received_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS') + 1) - tpcdc.seconds / 86400
+					and tucr.state=2
+					and tprs.pay_platform=#{pay_platform,jdbcType=VARCHAR}
+			  		<if test="user_type !=null and user_type !='' and user_type==1">
+			 			and exists (select 1 from tbl_user_info tui where tui.id=tucr.collect_user_name and tui.user_type=1)
+			 		</if>
+			 		<if test="user_type !=null and user_type !='' and user_type==5">
+			 			and exists (select 1 from tbl_user_info tui where tui.id=tucr.collect_user_name and tui.user_type=5)
+			 		</if>
+			  		<if test="recharge_start_date !=null and recharge_start_date !=''">
+					      and tucr.create_date &gt;= to_date(#{recharge_start_date},'yyyy-mm-dd hh24:mi:ss')
+					</if>
+			  		<if test="recharge_end_date !=null and recharge_end_date !=''">
+					       and tucr.create_date &lt;= to_date(#{recharge_end_date},'yyyy-mm-dd hh24:mi:ss')
+					</if>
+					<if test="user_manage_name !=null and user_manage_name !=''">
+					    and exists(select 1 from tbl_user_info tui where tui.id=tucr.collect_user_name and tui.user_manage_name like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%'))
+					</if>
+		     union all
+			 select (select user_manage_name
+                        from tbl_user_info tui
+                       where tui.id = tucr.collect_user_name) as user_manage_name,
+                    tucr.money,
+                    to_char (tucr.check_date, 'yyyy-mm-dd hh24:mi:ss') check_date,
+                    tucr.record_number 
+               from tbl_pay_report_statistics tprs,tbl_user_preload_charge_record tucr,tbl_pay_channel_data_config tpcdc
+			  where tprs.order_number=tucr.record_number 
+				  	and tprs.pay_platform = tpcdc.pay_channel
+	  			    and tprs.transact_date &gt;= to_date(#{received_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS') - tpcdc.seconds / 86400
+	  			    and tprs.transact_date &lt;  (to_date(#{received_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS') + 1) - tpcdc.seconds / 86400
+					and tucr.state=2
+					and tprs.pay_platform=#{pay_platform,jdbcType=VARCHAR}
+			  		<if test="user_type !=null and user_type !='' and user_type==1">
+			 			and exists (select 1 from tbl_user_info tui where tui.id=tucr.collect_user_name and tui.user_type=1)
+			 		</if>
+			 		<if test="user_type !=null and user_type !='' and user_type==5">
+			 			and exists (select 1 from tbl_user_info tui where tui.id=tucr.collect_user_name and tui.user_type=5)
+			 		</if>
+			  		<if test="recharge_start_date !=null and recharge_start_date !=''">
+					      and tucr.create_date &gt;= to_date(#{recharge_start_date},'yyyy-mm-dd hh24:mi:ss')
+					</if>
+			  		<if test="recharge_end_date !=null and recharge_end_date !=''">
+					       and tucr.create_date &lt;= to_date(#{recharge_end_date},'yyyy-mm-dd hh24:mi:ss')
+					</if>
+					<if test="user_manage_name !=null and user_manage_name !=''">
+					    and exists(select 1 from tbl_user_info tui where tui.id=tucr.collect_user_name and tui.user_manage_name like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%'))
+					</if> 
+	           )t 
+	</select>
+	<!--查询经销商ID-->
+	<select id="queryAllAccountIds" parameterType="java.util.Map" resultType="string">
+		select to_char(wm_concat(id)) from tbl_user_info where distribution_state = 1
+	</select>
+</mapper>

@@ -1,0 +1,595 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.notice.dao.ActivityNoticeDao">
+
+    <!-- 活动通知内容列表 -->
+    <select id="queryActivityNoticeContextList" parameterType="java.util.Map" resultType="java.util.Map">
+        select *
+        from (select a.*, rownum num
+            from (select
+                    nc.id,
+                    si.name as site_name,
+                    text_content,
+                    nc.state,
+                    nc.name,
+                    to_char (nc.create_date, 'YYYY-MM-DD HH24:MI:SS') as create_date
+                    from tbl_notice_context nc, tbl_site_info si
+                    <where>
+                        nc.site_id = si.id(+)
+                        <if test="site_id != null and site_id !=0">
+                            and nc.site_id = #{site_id,jdbcType=INTEGER}
+                        </if>
+                        <if test="name != null and name != ''">
+                            and nc.name = #{name,jdbcType=VARCHAR}
+                        </if>
+                        <if test="state != null and state != ''">
+                            <foreach collection="state" open="and (" close=")" item="item" separator=" or ">
+                                nc.state = #{item,jdbcType=VARCHAR}
+                            </foreach>
+                        </if>
+                        <if test="create_start_time != null and create_start_time != ''">
+                            and nc.create_date &gt;= to_date(#{create_start_time},'YYYY-MM-DD HH24:MI:SS')
+                        </if>
+                        <if test="create_end_time != null and create_end_time != ''">
+                            and nc.create_date &lt;= to_date(#{create_end_time},'YYYY-MM-DD HH24:MI:SS')
+                        </if>
+                    </where>
+                    order by nc.create_date desc
+              ) a
+          where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+        where num &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!-- 活动通知内容记录数 -->
+    <select id="queryActivityNoticeContextCount" parameterType="java.util.Map" resultType="int">
+        select
+            count(1)
+        from tbl_notice_context nc, tbl_site_info si
+        <where>
+            nc.site_id = si.id(+)
+            <if test="site_id != null and site_id !=0">
+                and nc.site_id = #{site_id,jdbcType=INTEGER}
+            </if>
+            <if test="name != null and name != ''">
+                and nc.name = #{name,jdbcType=VARCHAR}
+            </if>
+            <if test="state != null and state != ''">
+                <foreach collection="state" open="and (" close=")" item="item" separator=" or ">
+                    nc.state = #{item,jdbcType=CHAR}
+                </foreach>
+            </if>
+            <if test="create_start_time != null and create_start_time != ''">
+                and nc.create_date &gt;= to_date(#{create_start_time},'YYYY-MM-DD HH24:MI:SS')
+            </if>
+            <if test="create_end_time != null and create_end_time != ''">
+                and nc.create_date &lt;= to_date(#{create_end_time},'YYYY-MM-DD HH24:MI:SS')
+            </if>
+        </where>
+    </select>
+
+    <!-- 根据id查询活动通知内容 -->
+    <select id="queryActivityNoticeContextById" parameterType="long" resultType="java.util.Map" >
+        select site_id,name,nvl(text_content,'') AS text_content,state,nvl(remark,'') AS remark from tbl_notice_context where id = #{id,jdbcType=INTEGER}
+    </select>
+
+    <!-- 新增活动通知内容 -->
+    <insert id="insertActivityNoticeContext" parameterType="java.util.Map" >
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT SEQ_NOTICE_CONTEXT.nextval FROM dual
+        </selectKey>
+       insert into tbl_notice_context
+       (
+            id,
+            site_id,
+            name,
+            text_content,
+            create_user_id,
+            create_date,
+            remark,
+            state
+       )
+       values
+       (
+            #{id, jdbcType=INTEGER},
+            #{site_id, jdbcType=INTEGER},
+            #{name, jdbcType=VARCHAR},
+            #{text_content, jdbcType=VARCHAR},
+            #{create_user_id, jdbcType=INTEGER},
+            sysdate,
+            #{remark, jdbcType=VARCHAR},
+            #{state, jdbcType=CHAR}
+       )
+    </insert>
+
+    <!-- 修改活动通知内容 -->
+    <update id="updateActivityNoticeContext" parameterType="java.util.Map">
+        UPDATE tbl_notice_context
+        <set>
+            <if test="site_id != null and site_id !=0">
+                site_id = #{site_id, jdbcType=VARCHAR},
+            </if>
+            <if test="name != null and name != ''">
+                name = #{name, jdbcType=VARCHAR},
+            </if>
+            <if test="text_content != null">
+                text_content = #{text_content, jdbcType=VARCHAR},
+            </if>
+            <if test="remark != null">
+                remark = #{remark, jdbcType=VARCHAR},
+            </if>
+            <if test="state != null and state != ''">
+                state = #{state, jdbcType=CHAR}
+            </if>
+        </set>
+        WHERE id = #{id, jdbcType=INTEGER}
+    </update>
+
+    <!-- 根据id删除活动通知内容 -->
+    <delete id="deleteActivityNoticeContext" parameterType="long">
+        DELETE TBL_NOTICE_CONTEXT WHERE ID = #{id, jdbcType=INTEGER}
+    </delete>
+
+    <!-- 查询所有活动通知内容 -->
+    <select id="queryActivityNoticeContextSelect" parameterType="java.util.Map" resultType="java.util.Map">
+       SELECT TEXT_CONTENT,NAME,ID FROM TBL_NOTICE_CONTEXT WHERE STATE=2
+        <if test="id != null and id != ''">
+            AND ID = #{id, jdbcType=INTEGER}
+        </if>
+        ORDER BY CREATE_DATE desc
+    </select>
+
+    <!-- 活动通知发送信息列表 -->
+    <select id="queryActivityNoticeSendInfoList" parameterType="java.util.Map" resultType="java.util.Map">
+        	select 
+				cc.*,
+				(SELECT si.name FROM tbl_site_info si WHERE cc.site_id = si.id) AS site_name,
+                nvl((select count(1) from tbl_member_notice_detail mnd where mnd.notice_id = cc.id),0) total_amount,
+                nvl((select count(1) from tbl_member_notice_detail mnd where mnd.notice_id = cc.id and mnd.state=2),0) success_amount,
+                nvl((select count(1) from tbl_member_notice_detail mnd where mnd.notice_id = cc.id and mnd.state=3),0) fail_amount
+				
+			from (
+	        	select *
+	            from (select a.*, rownum num
+	                from (SELECT
+	                			ni.site_id,
+	                            ni.id,
+	                            nvl(ni.text_content,'--') as text_content,
+	                            ni.notice_channel,
+	                            ni.state,
+	                            to_char (ni.send_date, 'yyyy-mm-dd hh24:mi:ss') as send_date
+	                            from tbl_member_notice_info ni
+	                     <where>
+	                          1=1
+	                         <if test="text_content != null and text_content != ''">
+	                             and ni.text_content LIKE concat(concat('%',#{text_content}),'%')
+	                         </if>
+	                         <if test="send_start_time != null and send_start_time != ''">
+	                             and ni.send_date &gt;= to_date(#{send_start_time},'YYYY-MM-DD HH24:MI:SS')
+	                         </if>
+	                         <if test="send_end_time != null and send_end_time != ''">
+	                             and ni.send_date &lt;= to_date(#{send_end_time},'YYYY-MM-DD HH24:MI:SS')
+	                         </if>
+	                         <if test="notice_channel != null and notice_channel != ''">
+	                             <foreach collection="notice_channel" open="and (" close=")" item="item" separator=" or ">
+	                                 <!-- 短信 -->
+	                                 <if test="1 == item">
+	                                     ni.notice_channel = #{item,jdbcType=CHAR}
+	                                 </if>
+	                                 <!-- 邮件 -->
+	                                 <if test="2 == item">
+	                                     ni.notice_channel = #{item,jdbcType=CHAR}
+	                                 </if>
+	                                 <!-- 站内信 -->
+	                                 <if test="3 == item">
+	                                     ni.notice_channel = #{item,jdbcType=CHAR}
+	                                 </if>
+	                             </foreach>
+	                         </if>
+	                         order by ni.send_date desc
+	                     </where>
+	                    ) a
+	            where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+	        where num &gt; #{start_rownum,jdbcType=INTEGER}
+        ) cc
+    </select>
+
+    <!-- 活动通知发送信息记录数 -->
+    <select id="queryActivityNoticeSendInfoCount" parameterType="java.util.Map" resultType="int">
+        select
+            count(1)
+        from tbl_member_notice_info ni,tbl_notice_context nc
+        <where>
+            ni.text_content = nc.text_content
+            <if test="name != null and name != ''">
+                and nc.name = #{name, jdbcType=VARCHAR}
+            </if>
+            <if test="send_start_time != null and send_start_time != ''">
+                and ni.send_date &gt;= to_date(#{send_start_time},'YYYY-MM-DD HH24:MI:SS')
+            </if>
+            <if test="send_end_time != null and send_end_time != ''">
+                and ni.send_date &lt;= to_date(#{send_end_time},'YYYY-MM-DD HH24:MI:SS')
+            </if>
+            <if test="notice_channel != null and notice_channel != ''">
+                <foreach collection="notice_channel" open="and (" close=")" item="item" separator=" or ">
+                    <!-- 短信 -->
+                    <if test="1 == item">
+                        ni.notice_channel = #{item,jdbcType=CHAR}
+                    </if>
+                    <!-- 邮件 -->
+                    <if test="2 == item">
+                        ni.notice_channel = #{item,jdbcType=CHAR}
+                    </if>
+                    <!-- 站内信 -->
+                    <if test="3 == item">
+                        ni.notice_channel = #{item,jdbcType=CHAR}
+                    </if>
+                </foreach>
+            </if>
+        </where>
+    </select>
+
+    <!-- 新增活动通知发送信息 -->
+    <insert id="insertActivityNoticeSendInfo" parameterType="java.util.Map">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT SEQ_MEMBER_NOTICE_INFO.nextval FROM dual
+        </selectKey>
+        insert into tbl_member_notice_info (
+            id,
+            site_id,
+            text_content,
+            send_date,
+            state,
+            create_user_id,
+            create_date,
+            notice_template_id,
+            notice_channel,
+            notice_title
+        )
+        values
+        (
+            #{id, jdbcType=INTEGER},
+            #{site_id, jdbcType=INTEGER},
+            #{text_content, jdbcType=VARCHAR},
+            to_date(#{send_date},'YYYY-MM-DD HH24:mi:ss'),
+            0,
+            #{create_user_id, jdbcType=INTEGER},
+            sysdate,
+            #{notice_template_id,jdbcType=INTEGER},
+            #{notice_channel,jdbcType=CHAR},
+            #{notice_title, jdbcType=VARCHAR}
+        )
+    </insert>
+
+    <!-- 新增活动通知发送信息 -->
+    <update id="updateActivityNoticeSendInfo" parameterType="java.util.Map">
+        UPDATE tbl_member_notice_info
+        <set>
+            <if test="site_id != null and site_id !=0">
+                site_id = #{site_id, jdbcType=VARCHAR},
+            </if>
+            <if test="text_content != null and text_content != ''">
+                text_content = #{text_content, jdbcType=VARCHAR},
+            </if>
+            <if test="send_date != null and send_date != ''">
+                send_date = to_date(#{send_date},'YYYY-MM-DD HH24:mi:ss'),
+            </if>
+            <if test="remark != null">
+                remark = #{remark, jdbcType=VARCHAR},
+            </if>
+            <if test="notice_channel != null and notice_channel != ''">
+                notice_channel = #{notice_channel, jdbcType=CHAR},
+            </if>
+            <if test="notice_id != null and notice_id != ''">
+                notice_id = #{notice_id, jdbcType=INTEGER},
+            </if>
+        </set>
+        WHERE id = #{notice_id, jdbcType=INTEGER}
+    </update>
+
+    <!-- 根据id查询活动通知发送信息 -->
+    <select id="queryActivityNoticeSendInfoById" parameterType="long" resultType="java.util.Map" >
+        SELECT ni.id,
+           ni.state,
+           ni.notice_channel,
+           ni.text_content,
+           nc.name,
+           to_char(ni.send_date,'YYYY-MM-DD HH24:mi:ss') as send_date
+         FROM tbl_member_notice_info ni, tbl_notice_context nc
+        WHERE ni.text_content = nc.text_content(+) AND ni.id = #{notice_id, jdbcType=INTEGER}
+
+    </select>
+
+    <!-- 根据活动通知id查询活动通知明细 -->
+    <select id="queryActivityNoticeSendDetailByNoticeId" parameterType="long" resultType="java.util.Map">
+        select
+           nd.id,
+           nd.user_name,
+           nd.phone_number,
+           si.store_name,
+           sui.user_name as referee_user_name
+        from
+           tbl_member_notice_detail nd,
+           tbl_user_info ui,
+           tbl_sys_user_info sui,
+           tbl_store_info si
+        where
+            nd.user_name = ui.user_name(+)
+            AND ui.id = si.create_user_id(+)
+            AND ui.referee_user_id = sui.id
+            AND nd.notice_id = #{notice_id,jdbcType=INTEGER}
+    </select>
+
+    <!-- 批量新增活动通知发送明细 -->
+    <insert id="insertActivityNoticeSendDetailByBatch" parameterType="java.util.List">
+        insert into tbl_member_notice_detail (
+            id,
+            notice_id,
+            user_name,
+            state,
+            phone_number
+        )
+        select SEQ_MEMBER_NOTICE_DETAIL.NEXTVAL,A.* from(
+        <foreach collection="list" item="item" index="index" separator="UNION">
+            select
+            #{item.notice_id,jdbcType=INTEGER},
+            #{item.user_name,jdbcType=VARCHAR},
+            0,
+            #{item.phone_number,jdbcType=VARCHAR}
+            from dual
+        </foreach>
+        ) A
+    </insert>
+
+    <insert id="insertActivityNoticeSendDetailByCheckAll" parameterType="java.util.List">
+        insert into tbl_member_notice_detail (
+            id,
+            notice_id,
+            state,
+            user_name,
+            phone_number
+        )
+        SELECT SEQ_MEMBER_NOTICE_DETAIL.NEXTVAL,
+                notice_id,
+                state,
+                user_name,
+                phone_number
+        from(
+            SELECT
+                #{id, jdbcType=INTEGER} as notice_id,
+                0 as state,
+                a.user_name,
+                a.user_manage_mobilephone as phone_number
+            FROM tbl_user_info a
+            LEFT JOIN tbl_sys_user_info c ON a.referee_user_id = c.id
+            LEFT JOIN tbl_store_info e ON a.store_id = e.id
+            <where>
+                1=1
+                <if test="user_name != null and user_name != ''">
+                    and a.user_name = #{user_name,jdbcType=VARCHAR}
+                </if>
+                <if test="user_manage_name != null and user_manage_name != ''">
+                    and a.user_manage_name = #{user_manage_name,jdbcType=VARCHAR}
+                </if>
+                <if test="referee_user_id != null and referee_user_id !=0">
+                    and c.id = #{referee_user_id,jdbcType=INTEGER}
+                </if>
+                <if test="login_name != null and login_name !=''">
+                    and a.login_name = #{login_name,jdbcType=VARCHAR}
+                </if>
+                <if test="store_id != null and store_id !=0">
+                    and e.id = #{store_id,jdbcType=INTEGER}
+                </if>
+                <if test="market_supervision_user_id != null and market_supervision_user_id !=0">
+                    and a.market_supervision_user_id = #{market_supervision_user_id,jdbcType=INTEGER}
+                </if>
+                <if test="mobilephone != null and mobilephone !=''">
+                    and a.user_manage_mobilephone = #{mobilephone,jdbcType=VARCHAR}
+                </if>
+                <if test="user_state != null and user_state != ''">
+                    and a.user_state in
+                    <foreach item="item" collection="user_state" open="(" separator="," close=")">
+                        #{item}
+                    </foreach>
+                </if>
+                <if test="public_user_site_id !=null and public_user_site_id != ''">
+                    and a.site_id = #{public_user_site_id,jdbcType=INTEGER}
+                </if>
+            </where>
+
+        )
+    </insert>
+
+    <!-- 查询发送活动通知明细记录数 -->
+    <select id="queryActivityNoticeSendDetailCountByNoticeId" parameterType="long" resultType="int">
+        SELECT COUNT (1) FROM TBL_MEMBER_NOTICE_DETAIL where notice_id = #{notice_id,jdbcType=INTEGER}
+    </select>
+
+    <!-- 根据活动通知id删除发送明细 -->
+    <delete id="deleteActivityNoticeSendDetailByNoticeId" parameterType="long">
+        DELETE TBL_MEMBER_NOTICE_DETAIL where notice_id = #{notice_id,jdbcType=INTEGER}
+    </delete>
+
+    <!-- 根据活动通知id删除通知信息 -->
+    <delete id="deleteActivityNoticeInfoByNoticeId" parameterType="long">
+        DELETE TBL_MEMBER_NOTICE_INFO where id = #{notice_id,jdbcType=INTEGER}
+    </delete>
+
+
+    <!-- 根据id查询活动通知明细信息 -->
+    <select id="queryActivityNoticeDetailById" parameterType="long" resultType="java.util.Map" >
+        select * from TBL_MEMBER_NOTICE_DETAIL where notice_id = #{id,jdbcType=INTEGER}
+    </select>
+
+    <!-- 取消活动通知发送 -->
+    <update id="updateActivityNoticeInfoByCancelSend" parameterType="long">
+        update TBL_MEMBER_NOTICE_INFO SET STATE = 3 WHERE id in
+        <foreach collection="ids" open="(" close=")" item="item" separator=",">
+            <if test="item != null and item != 0">
+                #{item,jdbcType=INTEGER}
+            </if>
+        </foreach>
+    </update>
+
+    <!-- 分页查询会员列表 -->
+    <select id="queryMemberList" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT * FROM (
+            SELECT a.*, ROWNUM num FROM (
+                SELECT
+                    a.id,
+                    a.user_name,
+                    a.login_name,
+                    a.user_state,
+                    a.user_manage_mobilephone,
+                    a.user_manage_current_address,
+                    case a.user_resource when '1' then '自行注册' when '2' then '后台注册' end user_resource,
+                    e.store_name,
+                    a.user_manage_name,
+                    c.user_name referee_user_name,
+                    a.market_supervision_user_realna,
+                    a.user_company_address_deails,
+                    (case ba.score when null then ' ' else (select grade_name from tbl_user_grade_info sg where min_score &lt;= ba.score and max_score &gt; ba.score and rownum &lt; = 1) end) score_grade
+                FROM
+                    tbl_user_info a
+                    LEFT JOIN tbl_sys_user_info c ON a.referee_user_id = c.id
+                    LEFT JOIN tbl_store_info e ON a.store_id = e.id
+                    left join tbl_bank_account ba on a.id = ba.user_id
+                <where>
+                    1=1
+                    <if test="user_name != null and user_name != ''">
+                        and a.user_name = #{user_name,jdbcType=VARCHAR}
+                    </if>
+                    <if test="user_manage_name != null and user_manage_name != ''">
+                        and a.user_manage_name = #{user_manage_name,jdbcType=VARCHAR}
+                    </if>
+                    <if test="referee_user_id != null and referee_user_id !=0">
+                        and c.id = #{referee_user_id,jdbcType=INTEGER}
+                    </if>
+                    <if test="login_name != null and login_name !=''">
+                        and a.login_name = #{login_name,jdbcType=VARCHAR}
+                    </if>
+                    <if test="store_id != null and store_id !=0">
+                        and e.id = #{store_id,jdbcType=INTEGER}
+                    </if>
+                    <if test="market_supervision_user_id != null and market_supervision_user_id !=0">
+                        and a.market_supervision_user_id = #{market_supervision_user_id,jdbcType=INTEGER}
+                    </if>
+                    <if test="mobilephone != null and mobilephone !=''">
+                        and a.user_manage_mobilephone = #{mobilephone,jdbcType=VARCHAR}
+                    </if>
+                    <if test="user_state != null and user_state != ''">
+                        and a.user_state IN
+                        <foreach item="item" collection="user_state" open="(" separator="," close=")">
+                            #{item}
+                        </foreach>
+                    </if>
+                    <if test="search_type == 'active_notice' and public_user_site_id !=null and public_user_site_id != ''">
+                         and a.site_id = #{public_user_site_id,jdbcType=INTEGER}
+                    </if>
+                    <if test="site_id !=null and site_id != 0">
+                        and a.site_id = #{site_id,jdbcType=INTEGER}
+                    </if>
+                    <if test="distribution_state != null and distribution_state == 0">
+                        and (a.distribution_state != 1 or a.distribution_state is null)
+                    </if>
+                    <if test="decoration_state != null and decoration_state == 0">
+                        and (a.decoration_state != 1 or a.decoration_state is null)
+                    </if>
+                    <if test="group_id != null and group_id != 0">
+                        and not exists(select 1 from tbl_user_group_detail where a.id = user_id and group_id = #{group_id,jdbcType=INTEGER})
+                    </if>
+                    <if test="review_user_group_id != null and review_user_group_id !='' and review_user_group_id != 0">
+                        and not exists(select 1 from tbl_review_user_group_detail where a.id = user_id and user_group_id = #{review_user_group_id,jdbcType=INTEGER})
+                    </if>
+                    <if test="user_list != null and user_list != ''">
+                        and a.id not IN
+                            <foreach item="item" collection="user_list" open="(" separator="," close=")">
+                                #{item,jdbcType=INTEGER}
+                            </foreach>
+                    </if>
+                    <if test="user_type != null">
+						and a.user_type IN
+			                <foreach item="item" collection="user_type" open="(" separator="," close=")">
+								#{item}
+							</foreach>
+					</if>
+					<if test="user_company_type != null and user_company_type != ''">
+						and a.user_company_type = #{user_company_type,jdbcType=INTEGER}
+					</if>
+                </where>
+            ) a WHERE ROWNUM &lt;= #{end_rownum,jdbcType=INTEGER})
+         WHERE num &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!-- 分页查询会员列表记录数 -->
+    <select id="queryMemberListCount" parameterType="java.util.Map" resultType="int">
+        SELECT COUNT (1) FROM tbl_user_info a
+        LEFT JOIN tbl_sys_user_info c ON a.referee_user_id = c.id
+        LEFT JOIN tbl_store_info e ON a.store_id = e.id
+        <where>
+            1=1
+            <if test="user_name != null and user_name != ''">
+                and a.user_name = #{user_name,jdbcType=VARCHAR}
+            </if>
+            <if test="user_manage_name != null and user_manage_name != ''">
+                and a.user_manage_name = #{user_manage_name,jdbcType=VARCHAR}
+            </if>
+            <if test="referee_user_id != null and referee_user_id !=0">
+                and c.id = #{referee_user_id,jdbcType=INTEGER}
+            </if>
+            <if test="login_name != null and login_name !=''">
+                and a.login_name = #{login_name,jdbcType=VARCHAR}
+            </if>
+            <if test="store_id != null and store_id !=0">
+                and e.id = #{store_id,jdbcType=INTEGER}
+            </if>
+            <if test="market_supervision_user_id != null and market_supervision_user_id !=0">
+                and a.market_supervision_user_id = #{market_supervision_user_id,jdbcType=INTEGER}
+            </if>
+            <if test="mobilephone != null and mobilephone !=''">
+                and a.user_manage_mobilephone = #{mobilephone,jdbcType=VARCHAR}
+            </if>
+            <if test="user_state != null and user_state != ''">
+                and a.user_state IN
+                <foreach item="item" collection="user_state" open="(" separator="," close=")">
+                    #{item}
+                </foreach>
+            </if>
+            <if test="search_type == 'active_notice' and public_user_site_id !=null and public_user_site_id != ''">
+                and a.site_id = #{public_user_site_id,jdbcType=INTEGER}
+            </if>
+            <if test="site_id !=null and site_id != 0">
+                and a.site_id = #{site_id,jdbcType=INTEGER}
+            </if>
+            <if test="distribution_state != null and distribution_state == 0">
+                and (a.distribution_state != 1 or a.distribution_state is null)
+            </if>
+            <if test="decoration_state != null and decoration_state == 0">
+                and (a.decoration_state != 1 or a.decoration_state is null)
+            </if>
+            <if test="group_id != null and group_id != 0">
+                and not exists(select 1 from tbl_user_group_detail where a.id = user_id and group_id = #{group_id,jdbcType=INTEGER})
+            </if>
+            <if test="review_user_group_id != null and review_user_group_id !='' and review_user_group_id != 0">
+                and not exists(select 1 from tbl_review_user_group_detail where a.id = user_id and user_group_id = #{review_user_group_id,jdbcType=INTEGER})
+            </if>
+            <if test="user_list != null and user_list != ''">
+                and a.id not IN
+                <foreach item="item" collection="user_list" open="(" separator="," close=")">
+                    #{item,jdbcType=INTEGER}
+                </foreach>
+            </if>
+            <if test="user_type != null">
+				and a.user_type IN
+	                <foreach item="item" collection="user_type" open="(" separator="," close=")">
+						#{item}
+					</foreach>
+			</if>
+			<if test="user_company_type != null and user_company_type != ''">
+				and a.user_company_type = #{user_company_type,jdbcType=INTEGER}
+			</if>
+        </where>
+    </select>
+
+</mapper>

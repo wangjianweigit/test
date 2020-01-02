@@ -1,0 +1,392 @@
+package com.tk.oms.marketing.control;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import com.tk.oms.marketing.service.ActivityProductService;
+import com.tk.sys.util.Packet;
+import com.tk.sys.util.ProcessResult;
+import com.tk.sys.util.Transform;
+
+/**
+ * 
+ * Copyright (c), 2017, Tongku
+ * FileName : ActivityControl
+ * 促销活动商品管理
+ * 
+ * @author shifan
+ * @version 1.00
+ * @date 2017-4-13
+ */
+@Controller
+@RequestMapping("/activity_product")
+public class ActivityProductControl {
+
+	@Resource
+	private ActivityProductService activityProductService;
+	
+
+	/**
+    *
+    * @api {post} /{project_name}/activity_product/list 活动已参与的商品列表
+    * @apiGroup activity_product
+    * @apiDescription  促销活动已参与的商品列表
+    * @apiVersion 0.0.1
+
+	* @apiParam {number} pageIndex				页码 （第几页） 
+	* @apiParam {number} pageSize				每页多少条   
+
+    * @apiSuccess {boolean} state 接口获取数据是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    * @apiSuccess {object[]} obj 已参与活动的商品列表
+    * @apiSuccess {number} obj.ID    主键ID
+    * @apiSuccess {number} obj.STATIONED_USER_ID    所属入驻商ID，表TBL_STATIONED_USER_INFO主键
+    * @apiSuccess {number} obj.ACTIVITY_ID    活动ID
+    * @apiSuccess {string} obj.PRODUCT_ITEMNUMBER    商品货号
+    * @apiSuccess {string} obj.PRODUCT_IMG_URL    商品图片，参加活动的商品可自定义主图
+    * @apiSuccess {number} obj.ACTIVITY_DISCOUNT    折扣率 示例（1为没有折扣，0.9为9折）
+    * @apiSuccess {string} obj.CREATE_DATE    创建时间
+    * @apiSuccess {number} obj.CREATE_USER_ID    创建用户ID
+    */
+	@RequestMapping(value = "/list", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet queryActivityProductList(HttpServletRequest request) {
+		return Transform.GetResult(activityProductService.queryActivityProductList(request));
+	}
+	
+	/**
+    *
+    * @api {post} /{project_name}/activity_product/pending_approval_list 参与活动的待审批商品列表
+    * @apiGroup activity_product
+    * @apiDescription  参与促销活动的待审批商品列表
+    * @apiVersion 0.0.1
+
+	* @apiParam {number} pageIndex				页码 （第几页） 
+	* @apiParam {number} pageSize				每页多少条   
+
+    * @apiSuccess {boolean} state 接口获取数据是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    * @apiSuccess {object[]} obj 参与促销活动的待审批商品列表
+    * @apiSuccess {number} obj.ID    ID
+    * @apiSuccess {number} obj.ACTIVITY_ID    活动ID
+    * @apiSuccess {number} obj.STATIONED_USER_ID    所属入驻商ID，表TBL_STATIONED_USER_INFO主键
+    * @apiSuccess {string} obj.PRODUCT_ITEMNUMBER    商品货号
+    * @apiSuccess {string} obj.PRODUCT_IMG_URL    商品图片，参加活动的商品可自定义主图
+    * @apiSuccess {number} obj.ACTIVITY_DISCOUNT    折扣率 示例（1为没有折扣，0.9为9折）
+    * @apiSuccess {string} obj.CREATE_DATE    创建时间
+    * @apiSuccess {number} obj.CREATE_USER_ID    创建用户ID
+    * @apiSuccess {string} obj.STATE    审批状态 1（草稿）     2（待审批）    3（已审核通过）    4（已驳回）  
+    * @apiSuccess {number} obj.APPROVAL_USER_ID    审批人
+    * @apiSuccess {string} obj.APPROVAL_DATE    审批时间
+    * @apiSuccess {string} obj.APPROVAL_REMARK    审批备注，审批驳回原因等
+    */
+	@RequestMapping(value = "/pending_approval_list", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet queryPendingApprovalActivityProductList(HttpServletRequest request) {
+		return Transform.GetResult(activityProductService.queryPendingApprovalActivityProductList(request));
+	}
+
+	/** 
+	* @api {post} /{project_name}/activity_product/approved 待审批促销活动商品审批通过
+    * @apiGroup activity_product
+    * @apiDescription  待审批促销活动商品审批通过
+    * @apiVersion 0.0.1
+    * 
+	* @apiParam {number} id				待审批ID 
+	* 
+    * @apiSuccess {boolean} state 接口审核是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    */
+	@RequestMapping(value = "/approve", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet activitypProductApproved(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try{
+			pr=activityProductService.activityProductApproved(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+	}
+	
+	/** 
+	* @api {post} /{project_name}/activity_product/reject 待审批促销活动商品审批驳回
+    * @apiGroup activity_product
+    * @apiDescription  待审批促销活动商品审批驳回
+    * @apiVersion 0.0.1
+    * 
+	* @apiParam {number} id				待审批ID 
+    * @apiSuccess {boolean} state 接口审核驳回是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    */
+	@RequestMapping(value = "/reject", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet activityProductRejected(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try{
+			pr=activityProductService.activityProductRejected(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+	}
+	
+
+	/**
+    *
+    * @api {post} /{project_name}/activity_product/sku_list 活动已参与的商品sku列表
+    * @apiGroup activity_product
+    * @apiDescription  促销活动已参与的商品sku列表
+    * @apiVersion 0.0.1
+
+	* @apiParam {number} activity_id				活动id 
+	* @apiParam {string} product_itemnumber			商品货号  
+
+    * @apiSuccess {boolean} state 接口获取数据是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    * @apiSuccess {object[]} obj 已参与活动的商品sku列表
+    * @apiSuccess {number} obj.ACTIVITY_ID    		    活动ID
+    * @apiSuccess {string} obj.PRODUCT_ITEMNUMBER     商品货号
+    * @apiSuccess {number} obj.PRODUCT_SKU    		    商品SKU
+    * @apiSuccess {number} obj.LOCKED_STOCK_AMOUNT    预售数量
+    * @apiSuccess {string} obj.PRODUCT_COLOR     	    商品颜色
+    * @apiSuccess {string} obj.PRODUCT_SPECS     	    商品规格
+    * @apiSuccess {string} obj.PRODUCT_GROUP_MEMBER   商品尺码
+    */
+	@RequestMapping(value = "/sku_list", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet queryActivityProductSkuList(HttpServletRequest request) {
+		return Transform.GetResult(activityProductService.queryActivityProductSkuList(request));
+	}
+	
+	/**
+    *
+    * @api {post} /{project_name}/activity_product/penging_approval_sku_list 参与活动的待审批商品sku列表
+    * @apiGroup activity_product
+    * @apiDescription  参与促销活动的待审批商品sku列表
+    * @apiVersion 0.0.1
+
+	* @apiParam {number} activity_id				活动id 
+	* @apiParam {string} product_itemnumber			商品货号  
+
+	* @apiSuccess {boolean} state 接口获取数据是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    * @apiSuccess {object[]} obj 已参与活动的商品sku列表
+    * @apiSuccess {number} obj.ACTIVITY_ID    		    活动ID
+    * @apiSuccess {string} obj.PRODUCT_ITEMNUMBER     商品货号
+    * @apiSuccess {number} obj.PRODUCT_SKU    		    商品SKU
+    * @apiSuccess {number} obj.LOCKED_STOCK_AMOUNT    预售数量
+    * @apiSuccess {string} obj.PRODUCT_COLOR     	    商品颜色
+    * @apiSuccess {string} obj.PRODUCT_SPECS     	    商品规格
+    * @apiSuccess {string} obj.PRODUCT_GROUP_MEMBER   商品尺码
+    */
+	@RequestMapping(value = "/penging_approval_sku_list", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet queryPendingApprovalActivityProductSkuList(HttpServletRequest request) {
+		return Transform.GetResult(activityProductService.queryPendingApprovalActivityProductSkuList(request));
+	}
+	
+	/**
+    *
+    * @api {post} /{project_name}/activity_product/sku_stock_list 参与活动的商品sku库存列表
+    * @apiGroup activity_product
+    * @apiDescription  参与活动的商品sku库存列表
+    * @apiVersion 0.0.1
+
+	* @apiParam {number} activity_id				活动id 
+	* @apiParam {string} product_itemnumber			商品货号  
+
+    * @apiSuccess {boolean} state 接口获取数据是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    * @apiSuccess {object[]} obj 参与活动的待审批商品sku列表
+    * @apiSuccess {number} obj.ACTIVITY_ID    活动ID
+    * @apiSuccess {string} obj.PRODUCT_ITEMNUMBER    商品货号
+    * @apiSuccess {number} obj.PRODUCT_SKU    商品SKU
+    * @apiSuccess {number} obj.WAREHOUSE_ID    仓库ID
+    * @apiSuccess {number} obj.LOCKED_STOCK_AMOUNT    锁定库存数量
+    */
+	@RequestMapping(value = "/sku_stock_list", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet queryActivityProductSkuStockList(HttpServletRequest request) {
+		return Transform.GetResult(activityProductService.queryActivityProductSkuStockList(request));
+	}
+	
+	/** 
+	* @api {post} /{project_name}/activity_product/sort 活动商品排序
+    * @apiGroup activity_product
+    * @apiDescription  活动商品排序
+    * @apiVersion 0.0.1
+    * 
+	* @apiParam {number} activity_id		待审批ID 
+    * @apiSuccess {boolean} state 接口审核驳回是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    */
+	@RequestMapping(value = "/sort", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet activityProductSort(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try{
+			pr=activityProductService.activityProductSort(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+	}
+	
+	/** 
+	* @api {post} /{project_name}/activity_product/force_quit 活动商品强制退出
+    * @apiGroup activity_product
+    * @apiDescription  活动商品排序
+    * @apiVersion 0.0.1
+    * 
+	* @apiParam {number} activity_product_id		待退出活动商品ID 
+    * @apiSuccess {boolean} state 接口审核驳回是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    */
+	@RequestMapping(value = "/force_quit", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet activityProductForceQuit(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try{
+			pr=activityProductService.activityProductForceQuit(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+	}
+	/**
+    *
+    * @api {post} /{project_name}/activity_product/pre_sku_list 预售活动预售数量列表
+    * @apiGroup activity_product
+	 * @apiDescription  预售活动商品预售数量SKU列表
+    * @apiVersion 0.0.1
+
+	* @apiParam {number} activity_id				活动id 
+	* @apiParam {string} product_itemnumber			商品货号  
+	* @apiParam {int} approval						是否已通过审批
+	* 													<p>1:待审批</>
+	* 													<p>2:已经审批</>
+	* @apiSuccess {boolean} state 接口获取数据是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    * @apiSuccess {object[]} obj 已参与活动的商品sku列表
+    * @apiSuccess {number} obj.ACTIVITY_ID    		    活动ID
+    * @apiSuccess {string} obj.PRODUCT_ITEMNUMBER     商品货号
+    * @apiSuccess {number} obj.PRODUCT_SKU    		    商品SKU
+    * @apiSuccess {number} obj.LOCKED_STOCK_AMOUNT    预售数量
+    * @apiSuccess {string} obj.PRODUCT_COLOR     	    商品颜色
+    * @apiSuccess {string} obj.PRODUCT_SPECS     	    商品规格
+    * @apiSuccess {string} obj.PRODUCT_GROUP_MEMBER   商品尺码
+    */
+	@RequestMapping(value = "/pre_sku_list", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet queryPreSellActivityProductSkuList(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try{
+			pr=activityProductService.queryPreSellActivityProductSkuList(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+	}
+	
+	/**
+	 * 活动商品审批(批量)
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/approval_product", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet approvalProduct(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try {
+			pr = activityProductService.approvalProduct(request);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			e.printStackTrace();
+		}
+		return Transform.GetResult(pr);
+	}
+	/**
+	 * 获取商品最低活动价格
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/min_price", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet queryActivityProductPrice(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try {
+			pr = activityProductService.queryActivityProductPrice(request);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			e.printStackTrace();
+		}
+		return Transform.GetResult(pr);
+	}
+	/**
+	 * 获取活动商品图片水印模板列表
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/watermark/template/list", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet queryActivityProductImgTemplateList(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try {
+			pr = activityProductService.queryActivityProductImgTemplateList(request);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			e.printStackTrace();
+		}
+		return Transform.GetResult(pr);
+	}
+	/**
+	 *  单个活动商品水印图片持久化
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/create/watermark/img/single", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet createWatermarkImgSingle(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try {
+			pr = activityProductService.createWatermarkImgSingle(request);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			e.printStackTrace();
+		}
+		return Transform.GetResult(pr);
+	}
+	/**
+	 *  批量持久化活动商品水印图片
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/create/watermark/img/batch", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet createWatermarkImgBatch(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try {
+			pr = activityProductService.createWatermarkImgBatch(request);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			e.printStackTrace();
+		}
+		return Transform.GetResult(pr);
+	}
+}

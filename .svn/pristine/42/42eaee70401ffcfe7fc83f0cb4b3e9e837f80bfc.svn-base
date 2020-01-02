@@ -1,0 +1,885 @@
+package com.tk.oms.returns.service;
+
+import java.math.BigDecimal;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import com.tk.store.finance.dao.StoreMoneyDao;
+import com.tk.sys.config.EsbConfig;
+import com.tk.sys.util.*;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+import com.tk.oms.member.dao.MemberInfoDao;
+import com.tk.oms.order.dao.OrderDao;
+import com.tk.oms.returns.dao.ReturnsDao;
+
+@Service("ReturnsService")
+public class ReturnsService {
+
+	@Value("${sms_service_url}")
+    private String sms_service_url;// --消息提醒
+
+
+	@Resource
+	private ReturnsDao returnsDao;
+	@Resource
+	private OrderDao orderDao;
+	@Resource
+	private MemberInfoDao memberInfoDao;
+	@Resource
+	private StoreMoneyDao storeMoneyDao;
+	@Resource
+	private UserMbrCardInfoService userMbrCardInfoService;
+
+	@Resource(name = "esbRabbitTemplate")
+	private RabbitTemplate esbRabbitTemplate;
+
+	private Log logger = LogFactory.getLog(this.getClass());
+
+	@Value("${esb_service_url}")
+	private String esb_service_url;
+
+	/**
+	 * 获取退货单列表
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryReturnsList(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			GridResult pageParamResult = PageUtil.handlePageParams(paramMap);
+			if(pageParamResult!=null){
+				return pageParamResult;
+			}
+			if((!StringUtils.isEmpty(paramMap.get("state")))&&paramMap.get("state") instanceof String){
+				paramMap.put("state",(paramMap.get("state")+"").split(","));
+			}
+			if(StringUtils.isEmpty(paramMap.get("order_type"))){
+				gr.setState(false);
+				gr.setMessage("缺少单据类型参数");
+				return gr;
+			}
+			List<Map<String, Object>> list = returnsDao.queryReturnsList(paramMap);
+			int count = returnsDao.queryReturnsCount(paramMap);
+			if (list != null && list.size() > 0) {
+				gr.setMessage("获取数据成功");
+				gr.setObj(list);
+			} else {
+				gr.setMessage("无数据");
+			}
+			gr.setState(true);
+			gr.setTotal(count);
+		} catch (Exception e) {
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+		}
+		return gr;
+	}
+	
+	/**
+	 * 获取退货单详情
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryReturnsDetail(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			Map<String,Object> resultMap = new HashMap<String,Object>();
+			//获取待退货单详情基本信息
+			Map<String,Object> detail = returnsDao.queryReturnsDetail(paramMap);
+			if(detail!=null){
+				//获取退货单商品详情信息
+				List<Map<String,Object>> productList = returnsDao.queryReturnsProductList(paramMap);
+				paramMap.put("order_number", detail.get("ORDER_NUMBER"));
+				Map<String,Object> orderDetail=orderDao.queryOrderDetail(paramMap);
+				resultMap.put("base_info", detail);
+				resultMap.put("product_info", productList);
+				resultMap.put("order_info", orderDetail);
+				pr.setMessage("获取数据成功");
+				pr.setObj(resultMap);
+			} else {
+				pr.setMessage("无数据");
+			}
+			pr.setState(true);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+		}
+		return pr;
+	}
+
+	/**
+	 * 退货单申请
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult returnsApply(HttpServletRequest request) throws Exception {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			if(StringUtils.isEmpty(paramMap.get("order_number"))||StringUtils.isEmpty(paramMap.get("public_user_id"))
+				||StringUtils.isEmpty(paramMap.get("return_sku_list"))||StringUtils.isEmpty(paramMap.get("return_freight_money"))
+				||StringUtils.isEmpty(paramMap.get("return_remark"))){
+				pr.setMessage("缺少参数");
+				pr.setState(false);
+				return pr;
+			}
+			//生成退货单号
+			String return_number=returnsDao.queryNewReturnNumber(paramMap);
+			paramMap.put("return_number", return_number);
+			List<Map<String,Object>> order_return_product_list=(List<Map<String,Object>>)paramMap.get("return_sku_list");
+			for(Map<String,Object> temp:order_return_product_list){
+				temp.put("return_number", return_number);
+			}
+			//插入退货单商品表
+			int num=returnsDao.insertOrderReturnProduct(order_return_product_list);
+			if(num<1){
+				throw new RuntimeException("插入退货商品失败");
+			}
+			//增加可退运费是否有效值的处理
+			returnsDao.insertTmpOrderReturnProduct(order_return_product_list);
+			Map<String,Object> logisticsMoneyMap=returnsDao.queryReturnProductLogisticsMoney(paramMap.get("order_number").toString());
+			//Map<String,Object> logisticsMoneyMap=returnsDao.queryCanReturnMaxFreightMoney(paramMap);
+			BigDecimal maxLogisticsMoney=(BigDecimal)logisticsMoneyMap.get("RETURN_LOGISTICS_MONEY");
+			if(new BigDecimal((String)paramMap.get("return_freight_money")).subtract(maxLogisticsMoney).doubleValue()>0){
+				throw new RuntimeException("申请退货运费可退余额不足，提交失败");
+			}
+			//增加退货单商品的数量校验及运费校验处理
+			int num_err=returnsDao.checkReturnProductCount(paramMap);
+			if( num_err > 0){
+				throw new RuntimeException("申请退货商品部分可退数量不足，提交失败");
+			}
+			//插入退货单商品
+			num=returnsDao.insertOrderReturnInfo(paramMap);
+			if(num<1){
+				throw new RuntimeException("插入退货单失败");
+			}
+			pr.setMessage("操作成功");
+			pr.setState(true);
+			pr.setObj(return_number);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+	
+	/**
+	 * 退货单申请
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult returnsCanApply(HttpServletRequest request) throws Exception {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			if(StringUtils.isEmpty(paramMap.get("order_number"))){
+				pr.setMessage("缺少参数");
+				pr.setState(false);
+				return pr;
+			}
+			Map<String,Object> resultMap=new HashMap<String,Object>();
+			
+			Map<String,Object> orderMap=orderDao.queryOrderDetail(paramMap);
+			if(orderMap!=null){
+				resultMap.put("order_info", orderMap);//退货订单信息
+				List<Map<String,Object>> orderDeliverProductList=orderDao.queryDeliverProductList(paramMap);
+				
+				resultMap.put("deliver_info", orderDeliverProductList);//订单发货信息
+				resultMap.put("deliver_count",orderDao.queryDeliverProductCount(paramMap));
+				
+				List<Map<String,Object>> orderReturnsedProductList=returnsDao.queryReturnsedProductList(paramMap);
+				resultMap.put("returns_info", orderReturnsedProductList);//订单已申请退货信息
+				resultMap.put("returns_count",returnsDao.queryReturnsedProductCount(paramMap));
+				
+				List<Map<String,Object>> orderCanReturnsedProductList=returnsDao.queryCanReturnProductList(paramMap);
+				resultMap.put("can_return_info", orderCanReturnsedProductList);//订单可申请退货信息
+				resultMap.put("can_return_count",returnsDao.queryCanReturnProductCount(paramMap));
+				Map<String,Object> canReturnFreightMoneyMap= returnsDao.queryCanReturnMaxFreightMoney(paramMap);
+				resultMap.put("can_return_freight_money",canReturnFreightMoneyMap==null?0:canReturnFreightMoneyMap.get("MAX_RETURN_LOGISTICS_MONEY"));
+				pr.setMessage("操作成功");
+				pr.setState(true);
+				pr.setObj(resultMap);
+			}else{
+				pr.setMessage("订单不存在");
+				pr.setState(false);
+			}
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+
+	/**
+	 * 分页查询退款订单审核列表
+	 *
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryOrderRefundApprovalList(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		try {
+			// 获取传入参数
+			String json = HttpUtil.getRequestInputStream(request);
+			// 解析传入参数
+			Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+			// 分页参数
+			GridResult pageParamResult = PageUtil.handlePageParams(paramMap);
+			if (pageParamResult != null) {
+				return pageParamResult;
+			}
+			if(StringUtils.isEmpty(paramMap.get("order_type"))){
+				gr.setState(false);
+				gr.setMessage("缺少单据类型参数");
+				return gr;
+			}
+			// 退款状态
+			if (paramMap.containsKey("refund_state") && !StringUtils.isEmpty(paramMap.get("refund_state"))) {
+				String[] refund_state = paramMap.get("refund_state").toString().split(",");
+				if (refund_state.length > 1) {
+					paramMap.put("refund_state", paramMap.get("refund_state"));
+				} else {
+					paramMap.put("refund_state", paramMap.get("refund_state").toString().split(","));
+				}
+			}
+			// 记录数
+			int count = returnsDao.queryOrderRefundCount(paramMap);
+			// 数据列表
+			List<Map<String, Object>> list = returnsDao.queryOrderRefundList(paramMap);
+			if (list != null) {
+				gr.setState(true);
+				gr.setMessage("获取成功");
+				gr.setObj(list);
+				gr.setTotal(count);
+			} else {
+				gr.setState(true);
+				gr.setMessage("无数据");
+			}
+		} catch (Exception e) {
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+		}
+		return gr;
+	}
+
+	/**
+	 * 退款订单审批
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult approvalOrderRefund(HttpServletRequest request) throws Exception{
+		ProcessResult pr = new ProcessResult();
+		String output_msg = "";
+		try {
+			// 获取传入参数
+			String json = HttpUtil.getRequestInputStream(request);
+			if (StringUtils.isEmpty(json)) {
+				pr.setState(false);
+				pr.setMessage("缺少参数");
+				return pr;
+			}
+
+			// 解析传入参数
+			Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+			if (!paramMap.containsKey("return_number") || StringUtils.isEmpty(paramMap.get("return_number"))) {
+				pr.setState(false);
+				pr.setMessage("缺少参数return_number");
+				return pr;
+			}
+
+			if (!paramMap.containsKey("refund_operation_name") || StringUtils.isEmpty(paramMap.get("refund_operation_name"))) {
+				pr.setState(false);
+				pr.setMessage("缺少参数refund_operation_name");
+				return pr;
+			}
+			Map<String, Object> returnOrder = returnsDao.queryOrderReturnsByReturnNumber(paramMap.get("return_number").toString());
+			if(returnOrder == null){
+				pr.setState(false);
+				pr.setMessage("退款单【"+paramMap.get("return_number").toString()+"】不存在");
+				return pr;
+			}
+			if(returnOrder.get("STATE").equals("2")){
+				pr.setState(false);
+				pr.setMessage("该退款单已审批通过");
+				return pr;
+			}
+			if(returnOrder.get("STATE").equals("3")){
+				pr.setState(false);
+				pr.setMessage("该退款单已驳回");
+				return pr;
+			}
+
+			String returnNumber = paramMap.get("return_number").toString();
+
+			Map<String, Object> param = new HashMap<String, Object>();
+			param.put("operate_type", "01");//操作类型：退款
+			param.put("return_number", returnNumber);//退款单号
+			param.put("refund_operation_name", paramMap.get("refund_operation_name").toString());//操作人
+			//执行订单退款
+			returnsDao.orderRefundPerform(param);
+			String output_status = String.valueOf(param.get("output_status"));//状态 0-失败 1-成功
+			output_msg = String.valueOf(param.get("output_msg"));//当成功时为：操作失败   当失败是：为错误消息内容
+			if(ResponseSateEnum.SUCCESS.getValue().equals(output_status)) {//成功
+				//初始化会员卡查询参数
+				Map<String, Object> cardParamsMap = new HashMap<String, Object>(16);
+				cardParamsMap.put("order_number", returnOrder.get("ORDER_NUMBER"));
+				cardParamsMap.put("return_number", returnNumber);
+				//查询相关订单信息
+				Map<String, Object> detailMap = this.returnsDao.getDetailByOrderAndReturnNumber(cardParamsMap);
+				//判断该订单使用有使用会员卡 1.没有使用 2.有使用
+				if (detailMap != null && Integer.parseInt(detailMap.get("IS_USE_CARD") + "") == 2) {
+					//获取用户会员卡记录信息
+					long userId = Long.parseLong(detailMap.get("USER_ID").toString());
+					Map<String, Object> userMbrCard = this.returnsDao.getUserMbrCardByUserId(userId);
+					if (userMbrCard == null) {
+						pr.setState(false);
+						pr.setMessage("用户会员卡记录信息异常");
+						return pr;
+					}
+					int EXPIRATION_FLAG = Integer.parseInt(userMbrCard.get("EXPIRATION_FLAG").toString());//会员卡过期标志位 0.未过期   1.已过期
+					if (EXPIRATION_FLAG == 0) {//会员卡未过期才进行反充
+						//会员卡剩余余额
+						BigDecimal cardBalance = new BigDecimal(userMbrCard.get("CARD_BALANCE") + "");
+						//退货总金额
+						BigDecimal totalReturnPrice = new BigDecimal(detailMap.get("TOTAL_RETURN_PRICE") + "");
+						userMbrCard.put("CARD_BALANCE", cardBalance.add(totalReturnPrice));
+						
+						if(!userMbrCardInfoService.updateUserMbrCardInfo(userId, userMbrCard)){
+							throw new RuntimeException("更新会员卡信息失败");
+						}
+						/**
+						 * 封装增加会员卡使用记录参数
+						 * 增加会员卡使用记录
+						 */
+						Map<String, Object> userRecordMap = new HashMap<String, Object>(16);
+						userRecordMap.put("mbr_card_id", Long.parseLong(userMbrCard.get("ID") + ""));
+						userRecordMap.put("order_number", returnNumber);
+						userRecordMap.put("type", 4);
+						userRecordMap.put("used_amount", detailMap.get("TOTAL_RETURN_PRICE"));
+						userRecordMap.put("remark", "退货单退款,会员卡额度返还。退货单号：" +returnNumber+"(订单号:"+ returnOrder.get("ORDER_NUMBER")+")");
+						if (this.returnsDao.insertUserMbrCardUseRecord(userRecordMap) < 0) {
+							throw new RuntimeException("记录会员卡收支记录失败");
+						}
+					}
+				}
+
+				// 退款清分数据异常生成改造 -- by wanghai 20190710
+				Map<String, Object> messageMap = new HashMap<String, Object>();
+				messageMap.put("returnNumber", returnNumber);
+				// 发送清分退款明细消息
+				esbRabbitTemplate.convertAndSend(MqQueueKeyEnum.ESB_LIQUIDATION_ORDER_RETURN.getKey(), Jackson.writeObject2Json(messageMap));
+
+				//店铺会员订单操作
+				Map<String, Object> userParam=new HashMap<String,Object>();
+				userParam.put("id", returnOrder.get("USER_NAME"));
+				userParam.put("user_id", returnOrder.get("USER_NAME"));
+				Map<String, Object> userInfo=memberInfoDao.queryMemberInfoById(userParam);
+				if(Integer.parseInt(userInfo.get("USER_TYPE").toString())==2){
+					Map<String,Object> storeBankAccount=storeMoneyDao.queryStoreBankAccountForUpdate(userParam);
+					Map<String,Object> acc=new HashMap<String,Object>();
+					acc.put("user_id", returnOrder.get("USER_NAME"));
+					acc.put("recharge_money", returnOrder.get("PRODUCT_MONEY"));//批发价
+					acc.put("store_recharge_money", returnsDao.queryReturnProductStorePrice(returnOrder).get("RETURN_PRODUCT_STORE_PRICE"));//零售价
+					acc.put("product_count", returnOrder.get("PRODUCT_COUNT"));
+					acc.put("return_number", returnOrder.get("RETURN_NUMBER"));
+					acc.put("collect_user_id", returnOrder.get("USER_NAME"));
+					acc.put("collect_user_manager_name", userInfo.get("USER_MANAGE_NAME"));
+					acc.put("collect_store_name", userInfo.get("USER_CONTROL_STORE_NAME"));
+					acc.put("collect_user_partner_id", userInfo.get("PARTNER_USER_ID"));
+					acc.put("goods_deposit_balance", storeBankAccount.get("GOODS_DEPOSIT_BALANCE"));//原账户货品押金余额
+					acc.put("store_goods_deposit_balance", storeBankAccount.get("STORE_GOODS_DEPOSIT_BALANCE"));//原账户店铺货品押金余额
+					String goodsDepositRemark = "门店订货退款，货品押金收入（交易号："+returnOrder.get("RETURN_NUMBER")+"）";
+					String storeGoodsDepositRemark = "门店订货退款，店铺货品押金收入（交易号："+returnOrder.get("RETURN_NUMBER")+"）";
+					acc.put("goodsDepositRemark", goodsDepositRemark);
+					acc.put("storeGoodsDepositRemark", storeGoodsDepositRemark);
+					Map<String,Object> codeParams=new HashMap<String,Object>();
+					codeParams.put("user_id", returnOrder.get("USER_NAME"));
+					codeParams.put("c_user_type", "old");
+					//获取用户key
+					String user_key = storeMoneyDao.queryUserKey(codeParams);
+					codeParams.put("user_key", user_key);
+					codeParams.put("goods_deposit_balance", storeBankAccount.get("GOODS_DEPOSIT_BALANCE"));
+					codeParams.put("store_goods_deposit_balance", storeBankAccount.get("STORE_GOODS_DEPOSIT_BALANCE"));
+					//获取授信校验码
+					Map<String,Object> resCode= storeMoneyDao.getCheck_Code(codeParams);
+					if(!storeBankAccount.get("GOODS_DEPOSIT_BAL_CHECKCODE").equals(resCode.get("GOODS_DEPOSIT_BAL_CHECKCODE"))||!storeBankAccount.get("STORE_GOODS_DPST_BAL_CHECKCODE").equals(resCode.get("STORE_GOODS_DPST_BAL_CHECKCODE"))){
+						pr.setState(false);
+						pr.setMessage("押金余额发生篡改，无法完成当前操作!");
+						return pr;
+					}
+					//更新账户余额和验证码
+					codeParams.put("c_user_type", "new");
+					//获取用户key
+					String newKey= storeMoneyDao.queryUserKey(codeParams);
+					codeParams.put("c_user_key", newKey);
+					acc.put("c_user_key", newKey);
+					//更新账户押金余额以及店铺押金余额
+					if(returnsDao.updateStoreBankAccountBalance(acc)<=0){
+						throw new RuntimeException("更新押金余额失败");
+					}
+					//更新用户账户key
+					if(storeMoneyDao.updateSysUserCacheKey(codeParams)<=0){
+						throw new RuntimeException("更新用户账户key错误");
+					}
+					//新增充值记录
+					if(returnsDao.insertStoreGoodsDepositAccountRecord(acc)>0 && returnsDao.insertGoodsDepositAccountRecord(acc)>0){
+						pr.setState(true);
+						pr.setMessage("审批成功");
+					}else{
+						throw new RuntimeException("审批失败");
+					}
+
+				}
+				//  获取订单退款之后需要自动上架的SKU
+				List<Long> list = returnsDao.queryReturnProductSkuAutoShelf(returnNumber);
+				if(list.size() >0){
+					//  订单退款成功之后SKU自动上架
+					returnsDao.updateReturnProductSkuAutoShelf(list);
+					returnsDao.updateReturnProductInfoAutoShelf(list);
+				}
+				pr.setState(true);
+				pr.setMessage(output_msg);
+			}else{
+				throw new RuntimeException(output_msg);
+			}
+		} catch (Exception e) {
+			logger.error(e.getMessage());
+			throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+
+	/**
+	 * 退款订单驳回
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult rejectOrderRefund(HttpServletRequest request){
+		ProcessResult pr = new ProcessResult();
+		try {
+			// 获取传入参数
+			String json = HttpUtil.getRequestInputStream(request);
+			if (StringUtils.isEmpty(json)) {
+				pr.setState(false);
+				pr.setMessage("缺少参数");
+				return pr;
+			}
+
+			// 解析传入参数
+			Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+			if (!paramMap.containsKey("return_number") || StringUtils.isEmpty(paramMap.get("return_number"))) {
+				pr.setState(false);
+				pr.setMessage("缺少参数return_number");
+				return pr;
+			}
+			if (!paramMap.containsKey("return_reject_reson") || StringUtils.isEmpty(paramMap.get("return_reject_reson"))) {
+				pr.setState(false);
+				pr.setMessage("缺少参数return_reject_reson");
+				return pr;
+			}
+			if (!paramMap.containsKey("refund_operation_name") || StringUtils.isEmpty(paramMap.get("refund_operation_name"))) {
+				pr.setState(false);
+				pr.setMessage("缺少参数refund_operation_name");
+				return pr;
+			}
+			Map<String, Object> returnOrder = returnsDao.queryOrderReturnsByReturnNumber(paramMap.get("return_number").toString());
+			if(returnOrder == null){
+				pr.setState(false);
+				pr.setMessage("退款单【"+paramMap.get("return_number").toString()+"】不存在");
+				return pr;
+			}
+			if(returnOrder.get("STATE").equals("2")){
+				pr.setState(false);
+				pr.setMessage("该退款单已审批通过");
+				return pr;
+			}
+			if(returnOrder.get("STATE").equals("3")){
+				pr.setState(false);
+				pr.setMessage("该退款单已驳回");
+				return pr;
+			}
+			Map<String, Object> param = new HashMap<String, Object>();
+			param.put("operate_type", "02");//操作类型: 驳回
+			param.put("return_number", paramMap.get("return_number").toString());//退款单号
+			param.put("return_reject_reson", paramMap.get("return_reject_reson").toString());//退款驳回原因
+			param.put("refund_operation_name", paramMap.get("refund_operation_name").toString());//操作人
+			//执行订单退款驳回
+			returnsDao.orderRefundRejectPerform(param);
+			String output_status = String.valueOf(param.get("output_status"));//状态 0-失败 1-成功
+			String output_msg = String.valueOf(param.get("output_msg"));//当成功时为：操作失败   当失败是：为错误消息内容
+			if(ResponseSateEnum.SUCCESS.getValue().equals(output_status)) {//成功
+				pr.setState(true);
+				pr.setMessage(output_msg);
+			}else{
+				pr.setState(false);
+				pr.setMessage(output_msg);
+			}
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage("驳回失败");
+		}
+		return pr;
+	}
+	
+	/**
+	 * 计算退款商品应退运费
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult applyLogisticsMoney(HttpServletRequest request){
+		ProcessResult pr = new ProcessResult();
+		try {
+			// 获取传入参数
+			String json = HttpUtil.getRequestInputStream(request);
+			if (StringUtils.isEmpty(json)) {
+				pr.setState(false);
+				pr.setMessage("缺少参数");
+				return pr;
+			}
+
+			// 解析传入参数
+			Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+			if (!paramMap.containsKey("order_number") || StringUtils.isEmpty(paramMap.get("order_number"))) {
+				pr.setState(false);
+				pr.setMessage("缺少参数order_number");
+				return pr;
+			}
+			if (!paramMap.containsKey("return_sku_list") || StringUtils.isEmpty(paramMap.get("return_sku_list"))) {
+				pr.setState(false);
+				pr.setMessage("缺少参数return_sku_list");
+				return pr;
+			}
+			List<Map<String,Object>> return_sku_list = (List<Map<String,Object>>)paramMap.get("return_sku_list");
+			if(return_sku_list.isEmpty()||return_sku_list.size()<1){
+				pr.setState(false);
+				pr.setMessage("缺少参数，退款商品为空");
+				return pr;
+			}
+			int num=returnsDao.insertTmpOrderReturnProduct(return_sku_list);
+			if(num<1){
+				pr.setState(false);
+				pr.setMessage("退款商品操作失败");
+				return pr;
+			}
+			Map<String,Object> logisticsMoneyMap=returnsDao.queryReturnProductLogisticsMoney(paramMap.get("order_number").toString());
+			pr.setState(true);
+			pr.setMessage("退款商品运费计算成功");
+			pr.setObj(logisticsMoneyMap);
+			return pr;
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage("退款商品运费计算失败"+e.getMessage());
+		}
+		return pr;
+	}
+	/**
+	 * 退货退款列表
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryReturnInfoList(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			GridResult pageParamResult = PageUtil.handlePageParams(paramMap);
+			if(pageParamResult!=null){
+				return pageParamResult;
+			}
+			if((!StringUtils.isEmpty(paramMap.get("apply_state")))&&paramMap.get("apply_state") instanceof String){
+				paramMap.put("apply_state",(paramMap.get("apply_state")+"").split(","));
+			}
+			//退货退款列表
+			List<Map<String, Object>> list = returnsDao.queryReturnInfoList(paramMap);
+			//退货退款数量
+			int count = returnsDao.queryReturnInfoCount(paramMap);
+			if (list != null && list.size() > 0) {
+				gr.setMessage("获取数据成功");
+				gr.setObj(list);
+			} else {
+				gr.setMessage("无数据");
+			}
+			gr.setState(true);
+			gr.setTotal(count);
+		} catch (Exception e) {
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+		}
+		return gr;
+	}
+	/**
+	 * 退货退款详情
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryReturnInfoDetail(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			Map<String,Object> resultMap = new HashMap<String,Object>();
+			//获取待退货退款详情基本信息
+			Map<String,Object> detail = returnsDao.queryReturnInfoDetail(paramMap);
+			if(detail!=null){
+				//获取退货退款商品详情信息
+				//List<Map<String,Object>> productList = returnsDao.queryReturnInfoProductList(paramMap);
+				paramMap.put("return_number", detail.get("RETURN_NUMBER"));
+				//申请列表
+				paramMap.put("type", "1");
+				List<Map<String,Object>> applyReturnProduct=returnsDao.queryCanReturn(paramMap);
+				resultMap.put("apply_return_product", applyReturnProduct);
+				//可退列表
+				paramMap.put("type", "2");
+				List<Map<String,Object>> canReturnProduct=returnsDao.queryCanReturn(paramMap);
+				resultMap.put("can_return_product", canReturnProduct);
+				//不可退列表
+				paramMap.put("type", "3");
+				List<Map<String,Object>> canNotReturnProduct=returnsDao.queryCanReturn(paramMap);
+				resultMap.put("can_not_return_product", canNotReturnProduct);
+				//查询货号凭证
+				List<Map<String,Object>> itemnumber_images=returnsDao.queryReturnImages(paramMap.get("return_number")+"");
+				//查询物流凭证
+				List<String> logistics_images=returnsDao.queryLogisticsImages(paramMap.get("return_number")+"");
+				//查询异常商品
+				List<Map<String,Object>> unusual_product=returnsDao.queryUnusualProduct(paramMap.get("return_number")+"");
+				resultMap.put("base_info", detail);
+				resultMap.put("itemnumber_images", itemnumber_images);
+				resultMap.put("logistics_images", logistics_images);
+				resultMap.put("unusual_product", unusual_product);
+				pr.setMessage("获取数据成功");
+				pr.setObj(resultMap);
+			} else {
+				pr.setMessage("无数据");
+			}
+			pr.setState(true);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+		}
+		return pr;
+	}
+	/**
+	 * 退货退款审批
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult checkReturnInfo(HttpServletRequest request) throws Exception{
+		ProcessResult pr = new ProcessResult();
+		try {
+			// 获取传入参数
+			String json = HttpUtil.getRequestInputStream(request);
+			if (StringUtils.isEmpty(json)) {
+				pr.setState(false);
+				pr.setMessage("缺少参数");
+				return pr;
+			}
+
+			// 解析传入参数
+			Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+			if (!paramMap.containsKey("return_number") || StringUtils.isEmpty(paramMap.get("return_number"))) {
+				pr.setState(false);
+				pr.setMessage("缺少参数return_number");
+				return pr;
+			}
+			if (!paramMap.containsKey("apply_state") || StringUtils.isEmpty(paramMap.get("apply_state"))) {
+				pr.setState(false);
+				pr.setMessage("缺少参数apply_state");
+				return pr;
+			}
+			
+			Map<String, Object> returnOrder = returnsDao.queryReturnInfoDetail(paramMap);
+			if(returnOrder == null){
+				pr.setState(false);
+				pr.setMessage("退货单【"+paramMap.get("return_number").toString()+"】不存在");
+				return pr;
+			}
+			if("2".equals(returnOrder.get("APPLY_STATE")+"")){
+				pr.setState(false);
+				pr.setMessage("该退货单已审批通过");
+				return pr;
+			}
+			if("6".equals(returnOrder.get("APPLY_STATE")+"")){
+				pr.setState(false);
+				pr.setMessage("该退货单已驳回");
+				return pr;
+			}
+			if("7".equals(returnOrder.get("APPLY_STATE")+"")){
+				pr.setState(false);
+				pr.setMessage("该退货单已撤销");
+				return pr;
+			}
+			
+			if(returnsDao.checkReturnInfo(paramMap) >0){
+				if("2".equals(paramMap.get("apply_state"))){
+					//获取退货单信息
+					Map<String, Object> returnInfo = returnsDao.queryReturnInfoDetail(paramMap);
+					try {
+						//审批完成推送通知
+						returnInfo.put("id", returnInfo.get("CREATE_USER_NAME"));
+						Map<String,Object> userMap = memberInfoDao.queryMemberInfoById(returnInfo);
+						Map<String,Object> smsMap = new HashMap<String,Object>();
+						smsMap.put("openid", userMap.get("OPENID"));							//下单人微信OPENID
+						smsMap.put("type", "12");								//消息类型
+						smsMap.put("mobile", userMap.get("USER_MANAGE_MOBILEPHONE"));//下单人手机号码
+						Map<String,Object> param = new HashMap<String,Object>();
+						param.put("return_number", returnInfo.get("RETURN_NUMBER"));			//退货单号
+						param.put("receive_name", returnInfo.get("RETURN_AFTER_SALE_NAME"));		//售后人
+						param.put("receive_mobile", returnInfo.get("RETURN_AFTER_SALE_MOBILE"));		//售后联系方式
+						param.put("receive_address", returnInfo.get("RETURN_AFTER_SALE_ADDRESS"));		//售后联系地址
+						smsMap.put("param", param);
+						//发送短信或微信提醒
+						pr = (ProcessResult) this.queryForPost(smsMap,sms_service_url);
+						if(!pr.getState()){
+							logger.error(pr.getMessage());
+						}
+					} catch (Exception e) {
+						e.printStackTrace();
+						pr = new ProcessResult();
+					}
+					try {
+
+						//封装发送移动通知参数---退货申请已受理
+						Map<String, Object> pushParamsMap = new HashMap<String, Object>();
+						//需要发送的消息模板类型 （1：普通订单；2：预付待付定金订单；3：预付订单尾款 7.退货申请已受理）
+						pushParamsMap.put("sceneType", 7);
+						Map<String, Object> targetValueMap = new HashMap<String, Object>();
+						targetValueMap.put("userId", returnInfo.get("CREATE_USER_NAME"));
+						targetValueMap.put("returnNumber", returnInfo.get("RETURN_NUMBER"));
+						pushParamsMap.put("targetValue", targetValueMap);
+						//发送移动通知
+						ProcessResult pushPr = (ProcessResult) this.queryForPost(pushParamsMap, esb_service_url + "appPush/notice");
+						if (pushPr.getState()) {
+							Map<String, Object> pushMap = (Map<String, Object>) pushPr.getObj();
+							logger.info("退货申请已受理,推送消息成功。订单号：" + returnInfo.get("RETURN_NUMBER").toString() + ",消息ID：" + pushMap.get("messageId") + ",requestId:" + pushMap.get("messageId"));
+						} else {
+							logger.info("退货申请已受理,推送消息失败:" + pushPr.getMessage());
+						}
+					} catch (Exception e) {
+						e.printStackTrace();
+						pr = new ProcessResult();
+					}
+				}
+				pr.setState(true);
+				pr.setMessage("操作成功");
+			}else{
+				pr.setState(false);
+				pr.setMessage("审批失败");
+			}
+		} catch (Exception e) {
+			logger.error(e.getMessage());
+			throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+	
+	 public Object queryForPost(Map<String,Object> obj,String url) throws Exception{
+	        String params = "";
+	        if(obj != null){
+	            Packet packet = Transform.GetResult(obj,EsbConfig.ERP_FORWARD_KEY_NAME);//加密数据
+	            params = Jackson.writeObject2Json(packet);//对象转json、字符串
+	        }
+	        //发送至服务端(设置3秒超时时间)
+	        String json = HttpClientUtil.post(url, params,3000);
+	        return  Transform.GetPacket(json,ProcessResult.class,EsbConfig.ERP_REVERSE_KEY_NAME);
+		}
+	 
+	 /**
+		 * 退货退款审批
+		 * @param request
+		 * @return
+		 */
+		@SuppressWarnings("unchecked")
+		@Transactional
+		public ProcessResult orderReturnMarkRemark(HttpServletRequest request) throws Exception{
+			ProcessResult pr = new ProcessResult();
+			try {
+				// 获取传入参数
+				String json = HttpUtil.getRequestInputStream(request);
+				if (StringUtils.isEmpty(json)) {
+					pr.setState(false);
+					pr.setMessage("缺少参数");
+					return pr;
+				}
+
+				// 解析传入参数
+				Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+				if (!paramMap.containsKey("return_number") || StringUtils.isEmpty(paramMap.get("return_number"))) {
+					pr.setState(false);
+					pr.setMessage("缺少参数return_number");
+					return pr;
+				}
+				if (!paramMap.containsKey("mark_remark") || StringUtils.isEmpty(paramMap.get("mark_remark"))) {
+					pr.setState(false);
+					pr.setMessage("缺少参数mark_remark");
+					return pr;
+				}
+				
+				Map<String, Object> returnOrder = returnsDao.queryOrderReturnsByReturnNumber(paramMap.get("return_number")+"");
+				if(returnOrder == null){
+					pr.setState(false);
+					pr.setMessage("退货单【"+paramMap.get("return_number").toString()+"】不存在");
+					return pr;
+				}
+				//退款单备注标记
+				int count=returnsDao.orderReturnMarkRemark(paramMap);
+				if(count<=0){
+					pr.setState(false);
+					pr.setMessage("退款单备注标记失败");
+					return pr;
+				}
+				pr.setState(true);
+				pr.setMessage("退款单备注标记成功");
+			} catch (Exception e) {
+				logger.error(e.getMessage());
+				throw new RuntimeException(e.getMessage());
+			}
+			return pr;
+		}
+}

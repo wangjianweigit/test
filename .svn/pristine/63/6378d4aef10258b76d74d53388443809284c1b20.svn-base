@@ -1,0 +1,305 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.pvtp.order.dao.PvtpReturnOrderDao">
+	<sql id="all_column">
+			TORI.ID,
+			TORI.RETURN_NUMBER,
+			TORI.ORDER_NUMBER,
+			TORI.USER_NAME,
+			TORI.USER_MANAGE_NAME,
+			TORI.PRODUCT_MONEY,
+			TORI.PRODUCT_COUNT,
+			TORI.LOGISTICS_MONEY,
+			TORI.DF_MONEY,
+			TORI.RETURN_TOTAL_MONEY,
+			TORI.STATE,
+			TORI.RETURN_REMARK,
+			TORI.APPLY_TYPE,
+			TORI.APPLY_USER_NAME,
+			TORI.APPLY_USER_REALNAME,
+			TO_CHAR(TORI.CREATE_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  CREATE_DATE,
+			TORI.CHECK_USER_NAME,
+			TORI.CHECK_USER_REALNAME,
+			TO_CHAR(TORI.CHECK_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  CHECK_DATE,
+			TORI.CHECK_CANCLE_REASON,
+			TORI.MARK_REMARK,
+			TORI.STATIONED_USER_ID
+	</sql>
+	<sql id="returnInfo_column">
+			tri.id,
+            tri.return_number,
+            nvl(tri.refund_product_money,0) refund_product_money,
+            tri.apply_state,
+            tri.create_user_name,
+            to_char(tri.create_date,'yyyy-mm-dd hh24:mi:ss')  as  create_date,
+            to_char(tri.return_product_confirm_date,'yyyy-mm-dd hh24:mi:ss')  as  return_product_confirm_date,
+            tri.check_user_name,
+            to_char(tri.check_date,'yyyy-mm-dd hh24:mi:ss')  as  check_date,
+            tri.check_cancel_reason,
+            nvl(tri.return_total_money,0) return_total_money,
+            tri.return_reason,
+            tri.return_remark,
+            tri.return_logistics_company,
+            tri.return_logistics_remark,
+            tri.return_logistics_number,
+            nvl(tri.buyer_freight_money,0) buyer_freight_money,
+            nvl(tri.seller_freight_money,0) seller_freight_money,
+            nvl(tri.compensate_money,0) compensate_money,
+            nvl(tri.debit_money,0) debit_money,
+            to_char(tri.return_logistics_create_date,'yyyy-mm-dd hh24:mi:ss') return_logistics_create_date,
+            to_char(tri.cancel_date,'yyyy-mm-dd hh24:mi:ss') cancel_date,
+            to_char(tri.confirm_receive_date,'yyyy-mm-dd hh24:mi:ss') confirm_receive_date,
+            to_char(tri.refund_date,'yyyy-mm-dd hh24:mi:ss') refund_date,
+            DECODE(tri.return_type,'1','政策退换货','2','品质退换货','3','样品退货') return_type,
+            tri.return_product_count,
+            tri.seller_freight_number,
+            tri.seller_freight_company,
+            tri.return_after_sale_name,
+            tri.return_after_sale_mobile,
+            tri.return_after_sale_address,
+            tri.partner_check_user_name,
+            to_char(tri.partner_check_date,'yyyy-mm-dd hh24:mi:ss') partner_check_date,
+            tri.partner_cancel_reason,
+            tri.create_user_type,
+            tri.partner_user_name,
+            tri.return_source
+	</sql>
+	<!-- 获取私有平台退款单列表-->
+    <select id="queryRefundList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT  A.*,
+    			(SELECT TOI.PAYMENT_MONEY FROM TBL_ORDER_INFO TOI WHERE TOI.ORDER_NUMBER = A.ORDER_NUMBER ) AS PAYMENT_MONEY,
+    			(SELECT LOGIN_NAME FROM TBL_USER_INFO WHERE USER_NAME = A.USER_NAME) AS LOGIN_NAME,
+    			(CASE A.APPLY_TYPE WHEN '1' THEN (SELECT LOGIN_NAME FROM TBL_USER_INFO T WHERE T.ID=A.APPLY_USER_NAME)
+                                 WHEN '2' THEN APPLY_USER_NAME END) AS APPLY_USER_NAME_R,
+               (SELECT COMPANY_NAME FROM TBL_STATIONED_USER_INFO WHERE ID = A.STATIONED_USER_ID) STATIONED_USER_NAME,
+               (SELECT CONTACTS FROM TBL_STATIONED_USER_INFO TSUI WHERE TSUI.USER_NAME=(SELECT YWJL_USER_NAME FROM TBL_ORDER_INFO T WHERE T.ORDER_NUMBER=A.ORDER_NUMBER)) AS STATIONED_YWJL_USER_REALNAME,
+               (SELECT CONTACTS FROM TBL_STATIONED_USER_INFO TSUI WHERE TSUI.USER_NAME=(SELECT YWY_USER_NAME FROM TBL_ORDER_INFO T WHERE T.ORDER_NUMBER=A.ORDER_NUMBER)) AS STATIONED_YWY_USER_NAME,
+               (SELECT STORE_NAME FROM TBL_STORE_INFO TSI WHERE TSI.ID=(SELECT MD_ID FROM TBL_ORDER_INFO T WHERE T.ORDER_NUMBER=A.ORDER_NUMBER)) AS STATIONED_STORE_NAME
+    	  FROM (SELECT T.*,ROWNUM AS RN
+				  FROM (SELECT <include refid="all_column"/>
+				  		  FROM TBL_ORDER_RETURN_INFO TORI
+					    <where>
+							   TORI.ORDER_TYPE = 2
+							   AND EXISTS(
+							   	   SELECT 1 FROM TBL_ORDER_INFO TOI 
+							   	   <where>
+							   	  		    1=1
+							   	  		    AND TOI.ORDER_NUMBER = TORI.ORDER_NUMBER
+							   	  		<if test="ywjl_user_id != null and ywjl_user_id != '' ">
+							    			AND	EXISTS(SELECT 1 FROM TBL_STATIONED_USER_INFO TSUI WHERE TSUI.USER_NAME=TOI.YWJL_USER_NAME
+							    							AND TSUI.ID=#{ywjl_user_id,jdbcType=INTEGER})
+										</if>
+										<if test="md_id != null and md_id != 0 ">
+							    			AND	EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID=TOI.MD_ID
+							    							AND TSI.ID=#{md_id,jdbcType=INTEGER})
+										</if>
+										<if test="ywy_user_id != null and ywy_user_id != '' ">
+							    			AND	EXISTS(SELECT 1 FROM TBL_STATIONED_USER_INFO TSUI WHERE TSUI.USER_NAME=TOI.YWY_USER_NAME
+							    							AND TSUI.ID=#{ywy_user_id,jdbcType=INTEGER})
+										</if>
+							   	   </where>)
+							<if test="state != null">
+								AND TORI.STATE IN
+				                <foreach item="item" collection="state" open="(" separator="," close=")">
+									#{item}
+								</foreach>
+							</if>
+							<if test="order_number != null and order_number != '' ">
+							    AND	TORI.ORDER_NUMBER = #{order_number,jdbcType=VARCHAR}
+							</if>
+							<if test="return_number != null and return_number != '' ">
+							    AND	TORI.RETURN_NUMBER = #{return_number,jdbcType=VARCHAR}
+							</if>
+							<if test="apply_type != null and apply_type != '' ">
+							    AND	TORI.APPLY_TYPE = #{apply_type,jdbcType=CHAR}
+							</if>
+							<if test="start_date != null and start_date != '' ">
+							    AND	TORI.CREATE_DATE &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+							</if>
+							<if test="end_date != null and end_date != '' ">
+							    AND	TORI.CREATE_DATE &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+							</if>
+							<if test="login_name !=null and login_name !=''">
+								AND EXISTS(SELECT 1 FROM TBL_USER_INFO TUI WHERE TUI.USER_NAME = TORI.USER_NAME AND TUI.LOGIN_NAME = #{login_name,jdbcType=VARCHAR})
+							</if>
+							<if test="stationed_id != null and stationed_id != '' ">
+							    AND	TORI.STATIONED_USER_ID = #{stationed_id,jdbcType=INTEGER}
+							</if>
+					    </where>
+					    ORDER BY TORI.CREATE_DATE DESC) T
+		 		 WHERE ROWNUM &lt;= #{end_rownum,jdbcType=INTEGER}) A
+		 WHERE RN &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+
+	<!-- 获取私有平台退款单列表总数 -->
+    <select id="queryRefundCount" parameterType="java.util.HashMap" resultType="int">
+    	SELECT COUNT(1)
+		  FROM TBL_ORDER_RETURN_INFO TORI
+		<where>
+			   TORI.ORDER_TYPE = 2
+			   AND EXISTS(
+				   SELECT 1 FROM TBL_ORDER_INFO TOI 
+				   <where>
+						    1=1
+						    and TOI.ORDER_NUMBER = TORI.ORDER_NUMBER
+						<if test="ywjl_user_id != null and ywjl_user_id != '' ">
+			    			AND	EXISTS(SELECT 1 FROM TBL_STATIONED_USER_INFO TSUI WHERE TSUI.USER_NAME=TOI.YWJL_USER_NAME
+			    							AND TSUI.ID=#{ywjl_user_id,jdbcType=INTEGER})
+						</if>
+						<if test="md_id != null and md_id != 0 ">
+			    			AND	EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID=TOI.MD_ID
+			    							AND TSI.ID=#{md_id,jdbcType=INTEGER})
+						</if>
+						<if test="ywy_user_id != null and ywy_user_id != '' ">
+			    			AND	EXISTS(SELECT 1 FROM TBL_STATIONED_USER_INFO TSUI WHERE TSUI.USER_NAME=TOI.YWY_USER_NAME
+			    							AND TSUI.ID=#{ywy_user_id,jdbcType=INTEGER})
+						</if>
+				   </where>)
+			<if test="state != null">
+			   AND TORI.STATE IN
+			   <foreach item="item" collection="state" open="(" separator="," close=")">
+					#{item}
+			   </foreach>
+		    </if>
+			<if test="order_number != null and order_number != '' ">
+				 AND TORI.ORDER_NUMBER = #{order_number,jdbcType=VARCHAR}
+			</if>
+			<if test="return_number != null and return_number != '' ">
+				 AND TORI.RETURN_NUMBER = #{return_number,jdbcType=VARCHAR}
+			</if>
+			<if test="apply_type != null and apply_type != '' ">
+			    AND	TORI.APPLY_TYPE = #{apply_type,jdbcType=CHAR}
+			</if>
+			<if test="start_date != null and start_date != '' ">
+			     AND TORI.CREATE_DATE &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+			<if test="end_date != null and end_date != '' ">
+			     AND TORI.CREATE_DATE &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+			<if test="login_name !=null and login_name !=''">
+				AND EXISTS(SELECT 1 FROM TBL_USER_INFO TUI WHERE TUI.USER_NAME = TORI.USER_NAME AND TUI.LOGIN_NAME = #{login_name,jdbcType=VARCHAR})
+			</if>
+			<if test="stationed_id != null and stationed_id != '' ">
+			    AND	TORI.STATIONED_USER_ID = #{stationed_id,jdbcType=INTEGER}
+			</if>
+		</where>
+	</select>
+	<!-- 获取私有平台退货退款列表 -->
+	<select id="queryReturnInfoList" parameterType="java.util.Map" resultType="java.util.Map">
+		select  a.*,
+    			(select user_realname from tbl_sys_user_info where user_name = a.check_user_name) check_user_realname,
+	            (select login_name from tbl_user_info where user_name = a.create_user_name) login_name,
+	            (select user_manage_name from tbl_user_info where user_name = a.create_user_name) user_manage_name,
+	            nvl((select sum(count) from tbl_return_product where return_number = a.return_number and type='2'),0) actual_return_product_count,
+	            (select user_realname from tbl_sys_user_info where user_name = a.partner_user_name) partner_user_realname,
+	            (select user_realname from tbl_sys_user_info where user_name = a.partner_check_user_name) partner_check_user_realname,
+	            (select user_control_store_name from tbl_user_info where user_name = a.create_user_name) user_store_name
+    	  from (select t.*,rownum as rn
+				  from (select <include refid="returnInfo_column"/>
+				  		  from tbl_return_info tri
+					    <where>
+					    	  1=1
+					    	  and tri.create_user_type = 2
+							   and exists(
+							   	   select 1 from tbl_user_info tui 
+							   	   <where>
+							   	  		    1=1
+							   	  		    and tui.user_name = tri.create_user_name
+							   	  		<if test="login_name != null and login_name != '' ">
+							    			and	tui.login_name = #{login_name,jdbcType=VARCHAR}
+										</if>
+										<if test="ywjl_user_name != null and ywjl_user_name != '' ">
+							    			and	tui.market_supervision_user_id = #{ywjl_user_name,jdbcType=VARCHAR}
+										</if>
+										<if test="md_id != null and md_id != 0 ">
+							    			and	tui.store_id = #{md_id,jdbcType=INTEGER}
+										</if>
+										<if test="ywy_user_name != null and ywy_user_name != '' ">
+							    			and	tui.referee_user_id = #{ywy_user_name,jdbcType=VARCHAR}
+										</if>
+							   	   </where>)
+							<if test="apply_state != null">
+								and tri.apply_state in
+				                <foreach item="item" collection="apply_state" open="(" separator="," close=")">
+									#{item}
+								</foreach>
+							</if>
+							<if test="return_number != null and return_number != '' ">
+							    and	tri.return_number = #{return_number,jdbcType=VARCHAR}
+							</if>
+							<if test="return_type != null and return_type != '' ">
+							    and	tri.return_type = #{return_type,jdbcType=VARCHAR}
+							</if>
+							<if test="return_source != null and return_source != '' ">
+							    and	tri.return_source = #{return_source,jdbcType=INTEGER}
+							</if>
+							<if test="start_date != null and start_date != '' ">
+							    and	tri.create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+							</if>
+							<if test="end_date != null and end_date != '' ">
+							    and	tri.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+							</if>
+							<if test="user_store_name !=null and user_store_name !=''">
+								and exists(select 1 from tbl_user_info tui where tui.user_name = tri.create_user_name and tui.user_control_store_name like '%'||#{user_store_name,jdbcType=VARCHAR}||'%')
+							</if>
+					    </where>
+					    order by tri.create_date desc) t
+		 		 where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) A
+		 where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 获取私有平台退货退款数量 -->
+	<select id="queryReturnInfoCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+	  		  from tbl_return_info tri
+		    <where>
+				   1=1
+				   and tri.create_user_type = 2
+				   and exists(
+				   	   select 1 from tbl_user_info tui 
+				   	   <where>
+			   	  		    1=1
+			   	  		    and tui.user_name = tri.create_user_name
+			   	  		<if test="login_name != null and login_name != '' ">
+			    			and	tui.login_name = #{login_name,jdbcType=VARCHAR}
+						</if>
+			   	  		<if test="ywjl_user_name != null and ywjl_user_name != '' ">
+			    			and	tui.market_supervision_user_id = #{ywjl_user_name,jdbcType=VARCHAR}
+						</if>
+						<if test="md_id != null and md_id != 0 ">
+			    			and	tui.store_id = #{md_id,jdbcType=INTEGER}
+						</if>
+						<if test="ywy_user_name != null and ywy_user_name != '' ">
+			    			and	tui.referee_user_id = #{ywy_user_name,jdbcType=VARCHAR}
+						</if>
+			   	   </where>)
+				<if test="apply_state != null">
+					and tri.apply_state in
+	                <foreach item="item" collection="apply_state" open="(" separator="," close=")">
+						#{item}
+					</foreach>
+				</if>
+				<if test="return_number != null and return_number != '' ">
+				    and	tri.return_number = #{return_number,jdbcType=VARCHAR}
+				</if>
+				<if test="return_type != null and return_type != '' ">
+				    and	tri.return_type = #{return_type,jdbcType=VARCHAR}
+				</if>
+				<if test="return_source != null and return_source != '' ">
+				    and	tri.return_source = #{return_source,jdbcType=INTEGER}
+				</if>
+				<if test="start_date != null and start_date != '' ">
+				    and	tri.create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+				</if>
+				<if test="end_date != null and end_date != '' ">
+				    and	tri.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+				</if>
+				<if test="user_store_name !=null and user_store_name !=''">
+					and exists(select 1 from tbl_user_info tui where tui.user_name = tri.create_user_name and tui.user_control_store_name like '%'||#{user_store_name,jdbcType=VARCHAR}||'%')
+				</if>
+		    </where>
+	</select>
+	
+	
+</mapper>

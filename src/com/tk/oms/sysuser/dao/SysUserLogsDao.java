@@ -1,0 +1,46 @@
+package com.tk.oms.sysuser.dao;
+
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.stereotype.Repository;
+
+import com.tk.oms.sysuser.entity.SysUserLogs;
+/**
+* Copyright (c), 2016, Tongku
+* FileName : SysUserLogsDao.java
+* 系统用户日志数据库访问层
+* @author  wangpeng
+* @date 2016-06-20
+* @version1.00
+*/
+@Repository
+public interface SysUserLogsDao {
+    /**
+     * 新增系统用户日志信息
+     */
+    public void addSysUserLogs(SysUserLogs sysUserLogs);
+
+    /**
+     * 查询用户操作日志列表
+     * @param request
+     * @return
+     */
+    public List<Map<String, Object>> queryUserLogsForPage(Map<String,Object> params);
+
+    /**
+     * 查询实体总数，用于分页
+     * @param id
+     * @return
+     */
+    public int queryUserLogsCount(Map<String,Object> params);
+
+
+    /**
+     * 新增详情
+     * @param params
+     * @return
+     */
+    int insertDetail(Map<String,Object> params);
+
+}

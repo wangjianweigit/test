@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.finance.dao.UserChargeRecordDao">
+	<sql id="all_colum">
+		ucr.ID,
+		ucr.RECORD_NUMBER,
+		ucr.RECORD_ITEM_NUMBER,
+		ucr.RECORD_CHANNEL,
+		ucr.REMARK,
+		ucr.COLLECT_USER_NAME,
+		ucr.COLLECT_USER_MANAGER_NAME,
+		ucr.ACCOUNTANTS_SUBJECT_ID,
+		ucr.ACCOUNTANTS_SUBJECT_NAME,
+		ucr.PARENT_ACC_SUBJECT_ID,
+		ucr.PARENT_ACC_SUBJECT_NAME,
+		ucr.MONEY,
+		ucr.STATE,
+		ucr.CHECK_USER_NAME,
+		ucr.CHECK_USER_BUSINESS_NAME,
+		to_char(ucr.CHECK_DATE,'yyyy-mm-dd hh24:mi:ss') CHECK_DATE,
+		ucr.CHECK_REJECT_REASON,
+		ucr.TURNOVER_NUMBER,
+		ucr.THIRD_NUMBER,
+		ucr.VOUCHER_IMG_URL,
+		to_char(ucr.LAST_UPDATE_TIME,'yyyy-mm-dd hh24:mi:ss') LAST_UPDATE_TIME,
+		ucr.YWJL_USER_NAME,
+		ucr.YWY_USER_NAME,
+		ucr.MD_ID,
+		to_char(ucr.CREATE_DATE,'yyyy-mm-dd hh24:mi:ss') CREATE_DATE,
+		ucr.AGENCY_USER_ID,
+		ucr.AGENCY_USER_TYPE,
+		ucr.charge_type as chargetype,
+		decode(ucr.charge_type,1,'正常充值',2,'预付充值') charge_type
+	</sql>
+    <!--分页获取会员充值记录列表-->
+    <select id="queryListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select a.*,rownum rn from (
+            	   SELECT 
+            	   <include refid="all_colum"></include>,
+             	   sui1.USER_REALNAME YWJL_USER_REALNAME,
+                   sui2.USER_REALNAME YWY_USER_REALNAME,
+                   sui3.USER_REALNAME AGENCY_USER_REALNAME,
+                   si.STORE_NAME,
+                   ui.LOGIN_NAME  COLLECT_LOGIN_NAME
+                FROM
+                    TBL_USER_CHARGE_RECORD ucr
+                    LEFT JOIN TBL_SYS_USER_INFO sui1 ON ucr.YWJL_USER_NAME = sui1.USER_NAME
+                    LEFT JOIN TBL_SYS_USER_INFO sui2 ON ucr.YWY_USER_NAME = sui2.USER_NAME                    
+                    LEFT JOIN TBL_STORE_INFO si ON ucr.MD_ID = si.id
+                    LEFT JOIN TBL_SYS_USER_INFO sui3 ON ucr.AGENCY_USER_ID = sui3.id
+                    LEFT JOIN TBL_USER_INFO ui on ui.USER_NAME = ucr.COLLECT_USER_NAME
+                    <where>
+						 ucr.RECORD_CHANNEL in ('POS刷卡', '现金转账', '现金充值')
+                    	 <if test="state!=null and state.size()>0">
+					    	 and ucr.state in 
+					    	 <foreach item="s" collection="state" open="(" separator="," close=")">
+					    	 		#{s,jdbcType=VARCHAR}
+					    	 </foreach>
+					     </if>
+					      <if test="record_number!=null and record_number!=''">
+						    	 and ucr.RECORD_NUMBER like concat(concat('%', #{record_number,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="collect_user_name!=null and collect_user_name!=''">
+						    	 and ui.LOGIN_NAME like concat(concat('%', #{collect_user_name,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="collect_user_manager_name!=null and collect_user_manager_name!=''">
+						    	 and ucr.collect_user_manager_name like concat(concat('%', #{collect_user_manager_name,jdbcType=VARCHAR}),'%')
+						  </if>
+						  <if test="charge_type !=null and charge_type !=''">
+						  		and ucr.charge_type = #{charge_type,jdbcType=INTEGER}
+						  </if>
+                    </where> 
+                    ORDER BY CREATE_DATE DESC
+            ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--获取会员充值记录总数-->
+    <select id="queryListForCount" parameterType="java.util.Map" resultType="int">
+         SELECT COUNT(1)          	   
+                FROM
+                    TBL_USER_CHARGE_RECORD ucr
+                    LEFT JOIN TBL_USER_INFO ui on ui.USER_NAME = ucr.COLLECT_USER_NAME
+					<where>
+						 ucr.RECORD_CHANNEL in ('POS刷卡', '现金转账', '现金充值')
+                    	 <if test="state!=null and state.size()>0">
+					    	 and ucr.state in 
+					    	 <foreach item="s" collection="state" open="(" separator="," close=")">
+					    	 		#{s,jdbcType=VARCHAR}
+					    	 </foreach>
+					     </if>
+					      <if test="record_number!=null and record_number!=''">
+						    	 and ucr.RECORD_NUMBER like concat(concat('%', #{record_number,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="collect_user_name!=null and collect_user_name!=''">
+						    	 and ui.LOGIN_NAME like concat(concat('%', #{collect_user_name,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="collect_user_manager_name!=null and collect_user_manager_name!=''">
+						    	 and ucr.collect_user_manager_name like concat(concat('%', #{collect_user_manager_name,jdbcType=VARCHAR}),'%')
+						  </if>
+						  <if test="charge_type !=null and charge_type !=''">
+						  		and ucr.charge_type = #{charge_type,jdbcType=INTEGER}
+						  </if>
+                    </where> 
+    </select>
+    <!-- 根据ID查询充值记录 -->
+    <select id="queryById" parameterType="long" resultType="java.util.Map">
+          	   SELECT 
+          	   <include refid="all_colum"></include>,
+           	     sui1.USER_REALNAME YWJL_USER_REALNAME,
+                 sui2.USER_REALNAME YWY_USER_REALNAME,
+                 sui3.USER_REALNAME AGENCY_USER_REALNAME,
+                 SI.STORE_NAME,
+                 ui.LOGIN_NAME  COLLECT_LOGIN_NAME
+              FROM
+                  TBL_USER_CHARGE_RECORD ucr
+                  LEFT JOIN TBL_SYS_USER_INFO sui1 ON ucr.YWJL_USER_NAME = sui1.USER_NAME
+                  LEFT JOIN TBL_SYS_USER_INFO sui2 ON ucr.YWY_USER_NAME = sui2.USER_NAME                    
+                  LEFT JOIN TBL_STORE_INFO si ON ucr.MD_ID = si.id
+                  LEFT JOIN TBL_SYS_USER_INFO sui3 ON ucr.AGENCY_USER_ID = sui3.id
+                  LEFT JOIN TBL_USER_INFO ui on ui.USER_NAME = ucr.COLLECT_USER_NAME
+                  WHERE ucr.id = #{id,jdbcType=INTEGER}
+    </select>
+    <!-- 根据ID更新 -->
+    <update id="update" parameterType="java.util.Map">
+    	UPDATE TBL_USER_CHARGE_RECORD SET
+    	STATE = #{state,jdbcType=VARCHAR},
+    	CHECK_USER_NAME =  #{public_user_name,jdbcType=VARCHAR},
+    	CHECK_USER_BUSINESS_NAME =  #{public_user_realname,jdbcType=VARCHAR},
+    	CHECK_REJECT_REASON =  #{check_reject_reason,jdbcType=VARCHAR},
+    	CHECK_DATE =  sysdate
+    	WHERE id = #{id,jdbcType=INTEGER}
+    </update>
+    
+    <!--修改用户帐户余额，入驻商或者平台会员通用 -->
+	<select id="updateUserAccountBalance" statementType="CALLABLE" parameterType="java.util.Map">
+		<![CDATA[
+			call UPDATE_USER_ACCOUNT_BALANCE(
+			#{user_id,jdbcType=INTEGER},
+			#{user_type,jdbcType=VARCHAR},
+			#{money,jdbcType=FLOAT},
+			#{output_status,mode=OUT,jdbcType=VARCHAR},
+			#{output_msg,mode=OUT,jdbcType=VARCHAR})
+			]]>	
+	</select>
+	
+	<!--修改用户帐户余额和冻结余额【预付充值】 -->
+	<select id="updateAccountAndFrozenBalance" statementType="CALLABLE" parameterType="java.util.Map">
+		<![CDATA[
+			call UPDATE_ACCOUNT_FROZEN_BALANCE(
+			#{user_id,jdbcType=INTEGER},
+			#{user_type,jdbcType=VARCHAR},
+			#{money,jdbcType=FLOAT},
+			#{output_status,mode=OUT,jdbcType=VARCHAR},
+			#{output_msg,mode=OUT,jdbcType=VARCHAR})
+			]]>	
+	</select>
+	
+	<!--修改用户帐户余额【联营】 -->
+	<select id="updateStoreAccountBalance" statementType="CALLABLE" parameterType="java.util.Map">
+		<![CDATA[
+			call UPDATE_STORE_ACCOUNT_BALANCE(
+			#{user_id,jdbcType=INTEGER},
+			#{user_type,jdbcType=VARCHAR},
+			#{money,jdbcType=FLOAT},
+			#{output_status,mode=OUT,jdbcType=VARCHAR},
+			#{output_msg,mode=OUT,jdbcType=VARCHAR})
+			]]>	
+	</select>
+	
+</mapper>

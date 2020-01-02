@@ -1,0 +1,415 @@
+package com.tk.oms.marketing.control;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import com.tk.oms.marketing.service.ActivityService;
+import com.tk.sys.util.Packet;
+import com.tk.sys.util.ProcessResult;
+import com.tk.sys.util.Transform;
+
+/**
+ * 
+ * Copyright (c), 2017, Tongku
+ * FileName : ActivityControl
+ * 促销活动管理
+ * 
+ * @author shifan
+ * @version 1.00
+ * @date 2017-4-13
+ */
+@Controller
+@RequestMapping("/activity")
+public class ActivityControl {
+
+	@Resource
+	private ActivityService activityService;
+	
+	/**
+    *
+    * @api {post} /{project_name}/activity/add 促销活动
+    * @apiGroup activity
+    * @apiDescription  促销活动的创建
+    * @apiVersion 0.0.1
+	* @apiParam {string} activity_name 活动名称				 
+	* @apiParam {string} activity_type 活动类型；
+	* @apiParam {string} activity_remark	活动说明
+	* @apiParam {string} activity_qualification	活动资质
+	* @apiParam {string} activity_regulation	活动规则
+	* @apiParam {string} activity_image	活动图片
+	* @apiParam {string} state	是否启用1（停用）2（启用） 
+	* @apiParam {string} apply_begin_date	活动报名开始时间
+	* @apiParam {string} apply_end_date	活动报名结束时间
+	* @apiParam {string} begin_date	活动开始时间
+	* @apiParam {string} end_date	活动结束时间
+	* @apiParam {string} product_type	允许参加活动的商品类型 1.普通商品、  2:预售商品
+	* @apiParam {string} custom_discount_flag 是否可自定义折扣 1:固定折扣，不允许修改 ；  2：可变折扣，入驻商可自定义
+	* @apiParam {number} activity_max_discount	最高可自定义折扣率 ，可变折扣时必填（数字越小，折扣越高）
+	* @apiParam {number} activity_min_discount	最低可自定义折扣率 ，可变折扣时必填（数字越小，折扣越高）
+	* @apiParam {number} activity_discount	折扣率 ，固定折扣时必填（1为没有折扣，0.9为9折）
+	* @apiParam {string} is_add	最终售价是否享受其他优惠的基础上再享受活动优惠  1.不叠加，仅享受活动优惠；2：叠加，享受多重优惠
+	* @apiParam {string} locked_stock	是否锁定库存  1.共享库存；2.锁定库存 
+	* @apiParam {string} activity_quit_flag	是否允许退出活动  1.不允许退出  2.允许退出		
+	* @apiParam {string} tag_color	标签颜色	
+	* @apiParam {string} tag_name	列表页活动标签文字		   
+
+    * @apiSuccess {boolean} state 接口获取数据是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    * @apiSuccess {object} obj	   
+    */
+	@RequestMapping(value = "/add", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet addActivity(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try{
+			pr=activityService.addActivity(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+	}
+	
+
+	/**
+    *
+    * @api {post} /{project_name}/activity/list 促销活动列表
+    * @apiGroup activity
+    * @apiDescription  已发布的促销活动列表
+    * @apiVersion 0.0.1
+
+	* @apiParam {number} pageIndex				页码 （第几页） 
+	* @apiParam {number} pageSize				每页多少条   
+
+    * @apiSuccess {boolean} state 接口获取数据是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    * @apiSuccess {object[]} obj 促销活动列表
+    * @apiSuccess {number} obj.ID    主键ID
+    * @apiSuccess {string} obj.ACTIVITY_NAME    活动名称
+    * @apiSuccess {string} obj.ACTIVITY_TYPE    活动类型；
+    * @apiSuccess {string} obj.ACTIVITY_REMARK    活动说明
+    * @apiSuccess {string} obj.ACTIVITY_QUALIFICATION    活动说明
+    * @apiSuccess {string} obj.ACTIVITY_REGULATION    活动说明
+    * @apiSuccess {string} obj.ACTIVITY_IMAGE    活动图片
+    * @apiSuccess {string} obj.STATE    是否启用1（停用）2（启用）    
+    * @apiSuccess {string} obj.APPLY_BEGIN_DATE    活动报名开始时间
+    * @apiSuccess {string} obj.APPLY_END_DATE    活动报名结束时间
+    * @apiSuccess {string} obj.BEGIN_DATE    活动开始时间
+    * @apiSuccess {string} obj.END_DATE    活动结束时间
+    * @apiSuccess {string} obj.CREATE_DATE    创建时间
+    * @apiSuccess {number} obj.CREATE_USER_ID    创建人
+    * @apiSuccess {string} obj.ACTIVITY_STATE    活动审批状态,1（草稿）     2（待审批）    3（已审核通过）    4（已驳回）
+    * @apiSuccess {number} obj.APPROVAL_USER_ID    审批人
+    * @apiSuccess {string} obj.APPROVAL_DATE    审批时间
+    * @apiSuccess {string} obj.REJECT_RESAON    驳回原因
+    */
+	@RequestMapping(value = "/list", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet queryActivityList(HttpServletRequest request) {
+		return Transform.GetResult(activityService.queryActivityList(request));
+	}
+	
+	/**
+    *
+    * @api {post} /{project_name}/activity/detail 促销活动详情
+    * @apiGroup product
+    * @apiDescription  促销活动的详细信息
+    * @apiVersion 0.0.1
+
+	* @apiParam {number} id				活动ID 
+
+    * @apiSuccess {boolean} state 接口获取数据是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    * @apiSuccess {object} obj 促销活动详情
+    * @apiSuccess {object} obj.base_info 促销活动基本信息
+    * @apiSuccess {nubase_info.ID    主键ID
+    * @apiSuccess {string} obj.base_info.ACTIVITY_NAME    活动名称
+    * @apiSuccess {string} obj.base_info.ACTIVITY_TYPE    活动类型；
+    * @apiSuccess {string} obj.base_info.ACTIVITY_REMARK    活动说明
+    * @apiSuccess {string} obj.base_info.ACTIVITY_IMAGE    活动图片
+    * @apiSuccess {string} obj.base_info.STATE    是否启用1（停用）2（启用）    
+    * @apiSuccess {string} obj.base_info.APPLY_BEGIN_DATE    活动报名开始时间
+    * @apiSuccess {string} obj.base_info.APPLY_END_DATE    活动报名结束时间
+    * @apiSuccess {string} obj.base_info.BEGIN_DATE    活动开始时间
+    * @apiSuccess {string} obj.base_info.END_DATE    活动结束时间
+    * @apiSuccess {string} obj.base_info.CREATE_DATE    创建时间
+    * @apiSuccess {number} obj.base_info.CREATE_USER_ID    创建人
+    * @apiSuccess {string} obj.base_info.ACTIVITY_STATE    活动审批状态,1（草稿）     2（待审批）    3（已审核通过）    4（已驳回）
+    * @apiSuccess {number} obj.base_info.APPROVAL_USER_ID    审批人
+    * @apiSuccess {string} obj.base_info.APPROVAL_DATE    审批时间
+    * @apiSuccess {string} obj.base_info.REJECT_RESAON    驳回原因
+    * @apiSuccess {object} obj.sale_info 促销活动--限时折扣活动信息
+    * @apiSuccess {number} obj.sale_info.ACTIVITY_ID    关联数据表TBL_ACTIVITY_INFO
+    * @apiSuccess {string} obj.sale_info.PRODUCT_TYPE    允许参加活动的商品类型 1.普通商品、  2:预售商品
+    * @apiSuccess {string} obj.sale_info.CUSTOM_DISCOUNT_FLAG    是否可自定义折扣 1:固定折扣，不允许修改 ；  2：可变折扣，入驻商可自定义
+    * @apiSuccess {number} obj.sale_info.ACTIVITY_MAX_DISCOUNT    最高可自定义折扣率 ，可变折扣时必填（数字越小，折扣越高）
+    * @apiSuccess {number} obj.sale_info.ACTIVITY_MIN_DISCOUNT    最低可自定义折扣率 ，可变折扣时必填（数字越小，折扣越高）
+    * @apiSuccess {number} obj.sale_info.ACTIVITY_DISCOUNT    折扣率 ，固定折扣时必填（1为没有折扣，0.9为9折）
+    * @apiSuccess {string} obj.sale_info.IS_ADD    最终售价是否享受其他优惠的基础上再享受活动优惠  1.不叠加，仅享受活动优惠；2：叠加，享受多重优惠
+    * @apiSuccess {string} obj.sale_info.LOCKED_STOCK    是否锁定库存  1.共享库存；2.锁定库存 
+    * @apiSuccess {string} obj.sale_info.ACTIVITY_QUIT_FLAG    是否允许退出活动  1.不允许退出  2.允许退出
+    * @apiSuccess {string} obj.sale_info.TAG_COLOR    标签颜色
+    * @apiSuccess {string} obj.sale_info.TAG_NAME    列表页活动标签文字
+    */
+	@RequestMapping(value = "/detail", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet queryActivityDetail(HttpServletRequest request) {
+		return Transform.GetResult(activityService.queryActivityDetail(request));
+	}
+
+
+	/** 
+	* @api {post} /{project_name}/activity/approved 待审批促销活动审批通过
+    * @apiGroup activity
+    * @apiDescription  待审批促销活动审批通过
+    * @apiVersion 0.0.1
+    * 
+	* @apiParam {number} id				待审批ID 
+	* 
+    * @apiSuccess {boolean} state 接口审核是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    */
+	@RequestMapping(value = "/approve", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet activityApproved(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try{
+			pr=activityService.activityApproved(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+	}
+	
+	/** 
+	* @api {post} /{project_name}/activity/reject 待审批促销活动审批驳回
+    * @apiGroup activity
+    * @apiDescription  待审批促销活动审批驳回
+    * @apiVersion 0.0.1
+    * 
+	* @apiParam {number} id				待审批ID 
+    * @apiSuccess {boolean} state 接口审核驳回是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    */
+	@RequestMapping(value = "/reject", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet activityRejected(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try{
+			pr=activityService.activityRejected(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+	}
+	
+	/** 
+	* @api {post} /{project_name}/activity/submit 促销活动提交审批
+    * @apiGroup activity
+    * @apiDescription  促销活动提交审批
+    * @apiVersion 0.0.1
+    * 
+	* @apiParam {number} id				促销活动ID 
+    * @apiSuccess {boolean} state 接口是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    */
+	@RequestMapping(value = "/submit", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet activitySubmitted(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try{
+			pr=activityService.activitySubmitted(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+	}
+	
+	
+	/** 
+	* @api {post} /{project_name}/activity/delete 促销活动逻辑删除
+    * @apiGroup activity
+    * @apiDescription  促销活动逻辑删除
+    * @apiVersion 0.0.1
+    * 
+	* @apiParam {number} id				促销活动ID 
+    * @apiSuccess {boolean} state 接口是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    */
+	@RequestMapping(value = "/remove", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet removeActivity(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try{
+			pr=activityService.activityRemove(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+	}
+	
+	/** 
+	* @api {post} /{project_name}/activity/delete 促销活动删除
+    * @apiGroup activity
+    * @apiDescription  促销活动删除
+    * @apiVersion 0.0.1
+    * 
+	* @apiParam {number} id				促销活动ID 
+    * @apiSuccess {boolean} state 接口是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    */
+	@RequestMapping(value = "/update_state", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet activityUpdateState(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try{
+			pr=activityService.activityUpdateState(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+	}
+	
+	/**
+    *
+    * @api {post} /{project_name}/activity/edit 促销活动编辑
+    * @apiGroup activity
+    * @apiDescription  促销活动的编辑
+    * @apiVersion 0.0.1
+    * @apiParam {number} id 活动id	
+	* @apiParam {string} activity_name 活动名称				 
+	* @apiParam {string} activity_type 活动类型；
+	* @apiParam {string} activity_remark	活动说明
+	* @apiParam {string} activity_qualification	活动资质
+	* @apiParam {string} activity_regulation	活动规则
+	* @apiParam {string} activity_image	活动图片
+	* @apiParam {string} state	是否启用1（停用）2（启用） 
+	* @apiParam {string} apply_begin_date	活动报名开始时间
+	* @apiParam {string} apply_end_date	活动报名结束时间
+	* @apiParam {string} begin_date	活动开始时间
+	* @apiParam {string} end_date	活动结束时间
+	* @apiParam {string} product_type	允许参加活动的商品类型 1.普通商品、  2:预售商品
+	* @apiParam {string} custom_discount_flag 是否可自定义折扣 1:固定折扣，不允许修改 ；  2：可变折扣，入驻商可自定义
+	* @apiParam {number} activity_max_discount	最高可自定义折扣率 ，可变折扣时必填（数字越小，折扣越高）
+	* @apiParam {number} activity_min_discount	最低可自定义折扣率 ，可变折扣时必填（数字越小，折扣越高）
+	* @apiParam {number} activity_discount	折扣率 ，固定折扣时必填（1为没有折扣，0.9为9折）
+	* @apiParam {string} is_add	最终售价是否享受其他优惠的基础上再享受活动优惠  1.不叠加，仅享受活动优惠；2：叠加，享受多重优惠
+	* @apiParam {string} locked_stock	是否锁定库存  1.共享库存；2.锁定库存 
+	* @apiParam {string} activity_quit_flag	是否允许退出活动  1.不允许退出  2.允许退出		
+	* @apiParam {string} tag_color	标签颜色	
+	* @apiParam {string} tag_name	列表页活动标签文字	   
+
+    * @apiSuccess {boolean} state 接口获取数据是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    * @apiSuccess {object} obj	   
+    */
+	@RequestMapping(value = "/edit", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet editActivity(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try{
+			pr=activityService.editActivity(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+	}
+	
+	
+	/**
+    *
+    * @api {post} /{project_name}/activity/edit_decorate 促销活动编辑
+    * @apiGroup activity
+    * @apiDescription  促销活动的编辑
+    * @apiVersion 0.0.1
+    * @apiParam {number} id 活动id	
+	* @apiParam {string} activity_name 活动名称				 
+	* @apiParam {string} activity_type 活动类型；
+	* @apiParam {string} activity_remark	活动说明
+	* @apiParam {string} activity_qualification	活动资质
+	* @apiParam {string} activity_regulation	活动规则
+	* @apiParam {string} activity_image	活动图片
+	* @apiParam {string} state	是否启用1（停用）2（启用） 
+	* @apiParam {string} apply_begin_date	活动报名开始时间
+	* @apiParam {string} apply_end_date	活动报名结束时间
+	* @apiParam {string} begin_date	活动开始时间
+	* @apiParam {string} end_date	活动结束时间
+	* @apiParam {string} product_type	允许参加活动的商品类型 1.普通商品、  2:预售商品
+	* @apiParam {string} custom_discount_flag 是否可自定义折扣 1:固定折扣，不允许修改 ；  2：可变折扣，入驻商可自定义
+	* @apiParam {number} activity_max_discount	最高可自定义折扣率 ，可变折扣时必填（数字越小，折扣越高）
+	* @apiParam {number} activity_min_discount	最低可自定义折扣率 ，可变折扣时必填（数字越小，折扣越高）
+	* @apiParam {number} activity_discount	折扣率 ，固定折扣时必填（1为没有折扣，0.9为9折）
+	* @apiParam {string} is_add	最终售价是否享受其他优惠的基础上再享受活动优惠  1.不叠加，仅享受活动优惠；2：叠加，享受多重优惠
+	* @apiParam {string} locked_stock	是否锁定库存  1.共享库存；2.锁定库存 
+	* @apiParam {string} activity_quit_flag	是否允许退出活动  1.不允许退出  2.允许退出		
+	* @apiParam {string} tag_color	标签颜色	
+	* @apiParam {string} tag_name	列表页活动标签文字	   
+
+    * @apiSuccess {boolean} state 接口获取数据是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    * @apiSuccess {object} obj	   
+    */
+	@RequestMapping(value = "/edit_decorate", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet edit_decorate(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try{
+			pr=activityService.editDecorate(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+	}
+	
+	/**
+    *
+    * @api {post} /{project_name}/activity/sites 促销活动支持站点列表【用户站点列表及当前活动是否支持】
+    * @apiGroup product
+    * @apiDescription  促销活动的详细信息
+    * @apiVersion 0.0.1
+
+	* @apiParam {number} id				活动ID 
+
+    * @apiSuccess {boolean} state 接口获取数据是否成功.true:成功  false:失败
+    * @apiSuccess {string} message 接口返回信息说明
+    * @apiSuccess {object} obj 促销活动站点列表
+    * @apiSuccess {string} obj.SITE_ID   站点id 
+    * @apiSuccess {string} obj.SITE_NAME 站点名称  
+    * @apiSuccess {string} obj.ACTIVITY_SUPPORT_FLAG    活动站点标识  
+    */
+	@RequestMapping(value = "/sites", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet queryActivitySites(HttpServletRequest request) {
+		return Transform.GetResult(activityService.queryActivitySites(request));
+	}
+
+	/**
+	 * 编辑限时折扣活动是否推荐至首页
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/recommend", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet editRecommendHomeState(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try {
+			pr = activityService.editRecommendHomeState(request);
+		} catch (Exception e) {
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr);
+	}
+}

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 商品相关查询，以及文件夹管理相关查询 -->
+<mapper namespace="com.tk.oms.oss.dao.FileDirectoryInfoDao">
+   <sql id="all_dir">
+   	   di.id,
+       di.directory_name,
+       di.remark,
+       di.file_content_type,
+       di.file_type_ids,
+       di.picture_file_formats,
+       di.video_file_formats,
+       di.picture_size_limit,
+       di.picture_height,
+       di.picture_width,
+       di.video_size_limit,
+       di.file_quantity_limit,
+       di.is_share,
+       di.parent_id,
+       di.create_date,
+       di.ctrate_user_id
+   </sql>
+	<!-- 查询一个父ID下属的所有子目录列表-->
+	<select id="queryFileDirectoryInfoList" resultType="com.tk.oms.oss.entity.FileDirectoryInfo" parameterType="long">
+		select 
+		<include refid="all_dir"></include>,
+		(select count(1) from TBL_FILE_DIRECTORY_INFO od where od.parent_id = di.id) isParent
+		from TBL_FILE_DIRECTORY_INFO di
+    	WHERE di.parent_id = #{parent_id,jdbcType=INTEGER} 
+	</select>
+	<!-- 查询商品货号信息 -->
+	<select id="queryProductItemNumberList"  resultType="java.lang.String" parameterType="long">
+		SELECT pi.ITEMNUMBER
+  		FROM  TBL_PRODUCT_INFO pi
+  		<where>
+	  		<if test="stationed_user_id!=null and stationed_user_id!=0">
+	  			pi.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER} 
+	  		</if>
+	  		<if test="search_itemnumber!=null and search_itemnumber!=''">
+		 		AND ITEMNUMBER LIKE CONCAT(CONCAT('%', #{search_itemnumber,jdbcType=VARCHAR}),'%')
+	  		</if>
+  		</where>
+	</select>
+	<!-- 查询该货号是否存在或者当前用户是否可以查看该货号-->
+	<select id="checkProductItemNumber"  resultType="int" parameterType="java.util.Map">
+		SELECT count(1)
+  		FROM  TBL_PRODUCT_INFO pi
+  		<where>
+	  		<if test="stationed_user_id!=null and stationed_user_id!=0">
+	  			pi.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER} 
+	  		</if>
+	  		<if test="product_itemnumber!=null and product_itemnumber!=''">
+		 		AND ITEMNUMBER = #{product_itemnumber,jdbcType=INTEGER} 
+	  		</if>
+  		</where>
+	</select>
+</mapper>

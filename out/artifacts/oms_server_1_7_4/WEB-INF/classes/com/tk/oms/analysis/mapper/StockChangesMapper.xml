@@ -1,0 +1,450 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.analysis.dao.StockChangesDao">
+
+    <!--分页查询商品sku列表-->
+    <select id="queryProductSkuList" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select a.*, rownum num from(
+                select
+                    t1.product_itemnumber,
+                    t1.product_color,
+                    t1.product_specs,
+                    pi.product_img_url,
+                    sm.remark,
+                    (select mark_img_url from tbl_dic_user_mark where id = sm.mark_id) mark_img_url,
+                    t1.purchase_num
+                from(
+                    select
+                        c1.product_itemnumber,
+                        c1.product_color,
+                        c1.product_specs,
+                        nvl(sum(c2.purchase_num),0) purchase_num
+                    from
+                        tbl_product_sku c1
+                    left join (
+                        select
+                            tpd.product_sku,
+                            sum (case when tpo.special_balance_state = '1' then purchase_num - instorage_num else 0 end) purchase_num
+                        from
+                            ${jdbc_user}.tbl_purchase_detail tpd
+                        left join
+                            ${jdbc_user}.tbl_purchase_order tpo on tpd.purchase_number = tpo.purchase_number
+                        group by product_sku
+                    ) c2 on c1.id = c2.product_sku
+                    where c1.product_group = '尺码'
+                    group by c1.product_itemnumber,c1.product_color,c1.product_specs
+                    order by c1.product_itemnumber desc
+                ) t1 left join tbl_product_info pi on t1.product_itemnumber = pi.itemnumber
+                left join tbl_stock_mark sm on t1.product_itemnumber = sm.product_itemnumber
+            <where>
+           		1=1
+			 		<choose>
+				          <when test="product_type !=null and product_type !='' and product_type==3">
+				          	and pi.PRODUCT_TYPE = 3
+				          </when > 
+				          <otherwise>
+				          	and pi.PRODUCT_TYPE = 0
+				          </otherwise> 
+				    </choose>
+                <if test="product_itemnumber != null and product_itemnumber != ''">
+                    and t1.product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+                </if>
+                <if test="season_id != null and season_id != 0">
+                    and pi.season_id = #{season_id,jdbcType=INTEGER}
+                </if>
+                <if test="year != null and year != 0">
+                    and pi.year = #{year,jdbcType=INTEGER}
+                </if>
+                <if test="brand_id != null and brand_id != 0">
+                    and pi.brand_id = #{brand_id,jdbcType=INTEGER}
+                </if>
+                <if test="mark_id != null and mark_id != 0">
+                    and sm.mark_id = #{mark_id,jdbcType=INTEGER}
+                </if>
+                <if test="site_id != null and site_id != 0">
+                    and t1.product_itemnumber in (
+                        select
+                            tap.product_itemnumber
+                        from
+                            tbl_activity_product tap
+                        left join
+                            tbl_activity_info tai on tap.activity_id = tai.id
+                        where
+                            tai.state = '2' and tai.activity_state = '3'
+                            and tai.end_date >= sysdate
+                            and exists(select 1 from tbl_activity_site tas where tas.activity_id=tai.id and tas.site_id = #{site_id,jdbcType=VARCHAR})
+                        <if test="activity_id != null and activity_id != 0">
+                            and tai.id = #{activity_id,jdbcType=VARCHAR}
+                        </if>
+                    )
+                </if>
+                <if test="is_repair != null and is_repair != 0">
+                    <if test="is_repair == 1">
+                        and t1.purchase_num &gt; 0
+                    </if>
+                    <if test="is_repair == 2">
+                        and t1.purchase_num = 0
+                    </if>
+                </if>
+                <if test="time_count != null and time_count != 0">
+                    and exists (
+                        select 1 from(
+                            select
+                                min(iso.create_date) create_date,
+                                ps.product_itemnumber,
+                                ps.parent_id,
+                                ps.product_specs,
+                                ps.product_color
+                            from
+                                ${jdbc_user}.tbl_in_storage_detail isd
+                            left join
+                                ${jdbc_user}.tbl_in_storage_order iso on isd.in_storage_number = iso.in_storage_number
+                            left join
+                                tbl_product_sku ps on isd.product_sku_id = ps.id
+                            where
+                                iso.state = '2'
+                            <if test="end_date != null and end_date != ''">
+                                and iso.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+                            </if>
+                            group by ps.parent_id,ps.product_itemnumber,ps.product_specs,ps.product_color
+                        ) temp
+                        where
+                            temp.product_itemnumber = t1.product_itemnumber
+                            and temp.product_color = t1.product_color
+                            and temp.product_specs = t1.product_specs
+                        <if test="start_date != null and start_date != ''">
+                            and temp.create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+                        </if>
+                        <if test="end_date != null and end_date != ''">
+                            and temp.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+                        </if>
+                    )
+                </if>
+            </where>
+                order by product_itemnumber,t1.product_color,t1.product_specs
+            ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+        where num &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--通过sku查询商品库存数量-->
+    <select id="queryProductStockListBySku" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            product_group_member sku,
+            nvl(warehouse_total_count,0) stock_num,
+            nvl(sum(warehouse_total_count) over(),0) total_stock_num
+        from(
+            select
+                product_group_member,
+                sum(warehouse_total_count) warehouse_total_count
+            from (
+                select
+                    t4.warehouse_id,
+                    t4.product_sku,
+                    t4.warehouse_total_count
+                from (
+                    select
+                        t1.warehouse_id,
+                        t1.product_sku,
+                        count (1) as warehouse_total_count
+                    from (
+                        select
+                            t.*,
+                            (select warehouse_id from ${jdbc_user}.tbl_warehouse_storage t3 where t3.storage_number = t.storage_number) as warehouse_id
+                        from
+                            ${jdbc_user}.tbl_warehouse_product t) t1
+                        where
+                            exists(
+                                select 1 from ${jdbc_user}.tbl_product_unique_info t2 where t2.product_unique_code = t1.product_unique_code and t2.state = '1'
+                            )
+                        <if test="warehouse_id != null and warehouse_id != 0">
+                            and t1.warehouse_id in (select id from tbl_warehouse_info where parent_id = #{warehouse_id,jdbcType=INTEGER})
+                        </if>
+                    group by warehouse_id, t1.product_sku
+                ) t4
+                where
+                    exists (
+                        select 1 from ${jdbc_user}.tbl_platform_warehouse t5 where t5.warehouse_id = t4.warehouse_id
+                    )
+            ) a left join tbl_product_sku ps on a.product_sku = ps.id
+            where
+                ps.product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+                and ps.product_color = #{product_color,jdbcType=VARCHAR}
+                and ps.product_specs = #{product_specs,jdbcType=VARCHAR}
+            group by product_group_member order by product_group_member
+        )
+    </select>
+
+    <!--通过货号查询活动数量-->
+    <select id="queryActivityNumByItemnumber" parameterType="java.util.Map" resultType="int">
+        select
+            count (1) as activity_count
+        from
+            tbl_activity_product tap
+        left join
+            tbl_activity_info tai on tap.activity_id = tai.id
+        where
+            tap.product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+            and tai.state = '2' and tai.activity_state = '3'
+            and tai.end_date >= sysdate
+        <if test="site_id != null and site_id != 0">
+            and tai.site_id = #{site_id,jdbcType=VARCHAR}
+        </if>
+        <if test="activity_id != null and activity_id != 0">
+            and tai.id = #{activity_id,jdbcType=VARCHAR}
+        </if>
+    </select>
+
+    <!--查询库存异动参考总数量-->
+    <select id="queryStockChangesCount" parameterType="java.util.Map" resultType="int">
+        select count(1) from (
+            select
+                t1.product_itemnumber,
+                t1.product_color,
+                t1.product_specs,
+                pi.product_img_url,
+                (select mark_img_url from tbl_dic_user_mark where id = sm.mark_id) mark_img_url,
+                t1.purchase_num
+            from(
+                select
+                    c1.product_itemnumber,
+                    c1.product_color,
+                    c1.product_specs,
+                    nvl(sum(c2.purchase_num),0) purchase_num
+                from
+                    tbl_product_sku c1
+                left join (
+                    select
+                        tpd.product_sku,
+                        sum (case when tpo.special_balance_state = '1' then purchase_num - instorage_num else 0 end) purchase_num
+                    from
+                        ${jdbc_user}.tbl_purchase_detail tpd
+                    left join
+                        ${jdbc_user}.tbl_purchase_order tpo on tpd.purchase_number = tpo.purchase_number
+                    group by product_sku
+                ) c2 on c1.id = c2.product_sku
+                where c1.product_group = '尺码'
+                group by c1.product_itemnumber,c1.product_color,c1.product_specs
+                order by c1.product_itemnumber desc
+            ) t1 left join tbl_product_info pi on t1.product_itemnumber = pi.itemnumber
+            left join tbl_stock_mark sm on t1.product_itemnumber = sm.product_itemnumber and t1.product_color = sm.product_color and t1.product_specs = sm.product_specs
+        <where>
+        	1=1
+	 		<choose>
+		          <when test="product_type !=null and product_type !='' and product_type==3">
+		          	and pi.PRODUCT_TYPE = 3
+		          </when > 
+		          <otherwise>
+		          	and pi.PRODUCT_TYPE = 0
+		          </otherwise> 
+		    </choose>
+            <if test="product_itemnumber != null and product_itemnumber != ''">
+                and t1.product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+            </if>
+            <if test="season_id != null and season_id != 0">
+                and pi.season_id = #{season_id,jdbcType=INTEGER}
+            </if>
+            <if test="year != null and year != 0">
+                and pi.year = #{year,jdbcType=INTEGER}
+            </if>
+            <if test="brand_id != null and brand_id != 0">
+                and pi.brand_id = #{brand_id,jdbcType=INTEGER}
+            </if>
+            <if test="mark_id != null and mark_id != 0">
+                and sm.mark_id = #{mark_id,jdbcType=INTEGER}
+            </if>
+            <if test="site_id != null and site_id != 0">
+                and t1.product_itemnumber in (
+                    select
+                        tap.product_itemnumber
+                    from
+                        tbl_activity_product tap
+                    left join
+                        tbl_activity_info tai on tap.activity_id = tai.id
+                    where
+                        tai.state = '2' and tai.activity_state = '3'
+                        and tai.end_date >= sysdate
+                        and exists(select 1 from tbl_activity_site tas where tas.activity_id=tai.id and tas.site_id = #{site_id,jdbcType=VARCHAR})
+                    <if test="activity_id != null and activity_id != 0">
+                        and tai.id = #{activity_id,jdbcType=VARCHAR}
+                    </if>
+                )
+            </if>
+            <if test="is_repair != null and is_repair != 0">
+                <if test="is_repair == 1">
+                    and t1.purchase_num &gt; 0
+                </if>
+                <if test="is_repair == 2">
+                    and t1.purchase_num = 0
+                </if>
+            </if>
+            <if test="time_count != null and time_count != 0">
+                and exists (
+                select 1 from(
+                select
+                min(iso.create_date) create_date,
+                ps.product_itemnumber,
+                ps.parent_id,
+                ps.product_specs,
+                ps.product_color
+                from
+                ${jdbc_user}.tbl_in_storage_detail isd
+                left join
+                ${jdbc_user}.tbl_in_storage_order iso on isd.in_storage_number = iso.in_storage_number
+                left join
+                tbl_product_sku ps on isd.product_sku_id = ps.id
+                where
+                iso.state = '2'
+                <if test="end_date != null and end_date != ''">
+                    and iso.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+                </if>
+                group by ps.parent_id,ps.product_itemnumber,ps.product_specs,ps.product_color
+                ) temp
+                where
+                temp.product_itemnumber = t1.product_itemnumber
+                and temp.product_color = t1.product_color
+                and temp.product_specs = t1.product_specs
+                <if test="start_date != null and start_date != ''">
+                    and temp.create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+                </if>
+                <if test="end_date != null and end_date != ''">
+                    and temp.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+                </if>
+                )
+            </if>
+        </where>
+        )
+    </select>
+
+    <!--通过货号查询活动列表-->
+    <select id="queryActivityListByNumber" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            tai.activity_name,
+            (select name from tbl_site_info tsi where tsi.id = tai.site_id) site_name,
+            to_char(tai.begin_date,'yyyy-mm-dd') begin_date,
+            to_char(tai.end_date,'yyyy-mm-dd') end_date
+        from
+            tbl_activity_product tap
+        left join
+            tbl_activity_info tai on tap.activity_id = tai.id
+        where
+            tai.state = '2' and tai.activity_state = '3' and tai.end_date >= sysdate
+            and tap.product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+    </select>
+
+    <!--通过站点ID查询活动列表-->
+    <select id="queryActivityListBySite" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            tai.id,
+            tai.activity_name
+        from
+            tbl_activity_info tai
+        where
+            tai.state = '2' and tai.activity_state = '3' and tai.end_date >= sysdate
+            and exists(select 1 from tbl_activity_site tas where tas.activity_id=tai.id and tas.site_id = #{site_id,jdbcType=VARCHAR})
+    </select>
+
+    <!--查询仓库列表（大仓）-->
+    <resultMap id="allDrumbeatingMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="name" property="option"/>
+    </resultMap>
+    <select id="queryWarehouseList" resultMap="allDrumbeatingMap">
+        select twi.id,twi.name from tbl_warehouse_info twi where twi.parent_id = 0
+    </select>
+
+    <!--查询库存异动参考详情-->
+    <select id="queryStockChangesDetailList" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            product_group_member,
+            warehouse_total_count stock_num,
+            (select parent_id from tbl_warehouse_info where id = warehouse_id) warehouse_id
+        from (
+            select
+                t4.warehouse_id,
+                t4.product_sku,
+                t4.warehouse_total_count
+            from (
+                select
+                    t1.warehouse_id,
+                    t1.product_sku,
+                    count (1) as warehouse_total_count
+                from (
+                    select
+                        t.*,
+                        (select warehouse_id from ${jdbc_user}.tbl_warehouse_storage t3 where t3.storage_number = t.storage_number) as warehouse_id
+                    from
+                        ${jdbc_user}.tbl_warehouse_product t) t1
+                    where
+                        exists(
+                            select 1 from ${jdbc_user}.tbl_product_unique_info t2 where t2.product_unique_code = t1.product_unique_code and t2.state = '1'
+                        )
+                group by warehouse_id, t1.product_sku
+            ) t4
+            where
+                exists (
+                    select 1 from ${jdbc_user}.tbl_platform_warehouse t5 where t5.warehouse_id = t4.warehouse_id
+                )
+        ) a left join tbl_product_sku ps on a.product_sku = ps.id
+        where
+            ps.product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+            and ps.product_color = #{product_color,jdbcType=VARCHAR}
+            and ps.product_specs = #{product_specs,jdbcType=VARCHAR}
+        order by product_group_member
+    </select>
+
+    <!--查询库存异动标记数量-->
+    <select id="queryStockChangesMarkCount" parameterType="java.util.Map" resultType="int">
+        select
+            count(1)
+        from
+            tbl_stock_mark
+        where
+            product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+    </select>
+
+    <!--新增库存异动标记-->
+    <insert id="insertStockChangesMark" parameterType="java.util.Map">
+        insert into tbl_stock_mark(
+        	id,
+            product_itemnumber,
+            product_color,
+            product_specs,
+            mark_id,
+            remark,
+            mark_date
+        ) values (
+        	seq_stock_mark.nextVal,
+            #{product_itemnumber,jdbcType=VARCHAR},
+            #{product_color,jdbcType=VARCHAR},
+            #{product_specs,jdbcType=VARCHAR},
+            #{mark_id,jdbcType=INTEGER},
+            #{remark,jdbcType=VARCHAR},
+            sysdate
+        )
+    </insert>
+
+    <!--修改库存异动标记-->
+    <update id="updateStockChangesMark" parameterType="java.util.Map">
+        update
+            tbl_stock_mark
+        <set>
+            <if test="mark_id != null and mark_id != ''">
+                mark_id = #{mark_id,jdbcType=INTEGER},
+            </if>
+            <if test="remark != null and remark != ''">
+                remark = #{remark,jdbcType=VARCHAR}
+            </if>
+        </set>
+        where
+            product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+    </update>
+
+    <!--删除库存异动标记-->
+    <delete id="deleteStockChangesMark" parameterType="java.util.Map">
+        delete from tbl_stock_mark where product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+    </delete>
+
+</mapper>

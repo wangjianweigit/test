@@ -1,0 +1,787 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.marketing.dao.CustomMessageDao">
+	<sql id="all_column">
+	   tcm.id,
+       tcm.task_title,
+       tcm.task_state,
+       tcm.msg_title,
+       tcm.msg_content,
+       tcm.msg_user_type,
+       tcm.push_type,
+       tcm.push_cache_hours,
+       tcm.msg_open_action_type,
+       tcm.msg_open_action,
+       tcm.create_user_id,
+       tcm.audit_user_id
+	</sql>
+
+	<!-- 获取自定义消息列表 -->
+    <select id="queryCustomMessageList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	select a.*,
+    		   (select tsui.user_realname from tbl_sys_user_info tsui where tsui.id = a.create_user_id) as create_user_rname,
+    		   (select tsui.user_realname from tbl_sys_user_info tsui where tsui.id = a.audit_user_id) as audit_user_rname,
+    		   (select count(1) from tbl_custom_message_user tcmu where tcmu.task_id = a.id) as push_user_count,
+    		   (select count(1) 
+    		   	  from tbl_custom_message_user tcmu 
+    		   	 where tcmu.task_id = a.id 
+    		   	 	   and exists(
+    		   	 	   	   select 1 
+    		   	 	   	     from tbl_user_device_record tudr 
+    		   	 	   	    where tudr.user_id = tcmu.user_id
+    		   	 	   	          and tudr.delete_flag = 0
+    		   	 	   	          and (tudr.aliyun_deviceid is not null and tudr.device_type is not null) 
+    		   	 	   	   )
+    		    ) as push_user_device_count,
+    		   nvl((select sum(sent_count) from tbl_custom_message_count tcmc where tcmc.task_id = a.id),0) as push_sent_count,
+    		   nvl((select sum(received_count) from tbl_custom_message_count tcmc where tcmc.task_id = a.id),0) as push_received_count,
+    		   nvl((select sum(opened_count) from tbl_custom_message_count tcmc where tcmc.task_id = a.id),0) as push_opened_count,
+    		   case when exists(select 1
+		                        from tbl_custom_message t1 
+		                       where t1.id= a.id  
+		                             and (task_state = 2 or task_state = 3)
+		                             and push_type = 2
+		                             and nvl(push_start_date,sysdate) &gt;= sysdate )
+                    then '1' else '0' end as  can_stop_flag
+    	  from (select t.*,rownum as rn
+				  from (select <include refid="all_column"/>,
+				  			   to_char(tcm.push_start_date,'yyyy-mm-dd hh24:mi:ss') as push_start_date,
+				  			   to_char(tcm.create_date,'yyyy-mm-dd hh24:mi:ss') as create_date,
+				  			   to_char(tcm.audit_date,'yyyy-mm-dd hh24:mi:ss') as audit_date
+				  		  from tbl_custom_message tcm
+					    <where>
+							    1 = 1
+							<if test="task_state != null">
+								and tcm.task_state in
+				                <foreach item="item" collection="task_state" open="(" separator="," close=")">
+									#{item}
+								</foreach>
+							</if>
+							<if test="start_date != null and start_date != '' ">
+							    and	tcm.create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+							</if>
+							<if test="end_date != null and end_date != '' ">
+							    and	tcm.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+							</if>
+							<if test="task_title != null and task_title != '' ">
+							    and	tcm.task_title like '%'||#{task_title,jdbcType=VARCHAR}||'%'
+							</if>
+					    </where>
+					    order by tcm.create_date desc
+			           ) t 
+			     where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) a
+		 where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+
+	<!-- 获取自定义消息总数 -->
+    <select id="queryCustomMessageCount" parameterType="java.util.HashMap" resultType="int">
+    	 select count(1)
+		   from tbl_custom_message tcm
+		<where>
+			    1 = 1
+			<if test="task_state != null">
+				and tcm.task_state in
+	            <foreach item="item" collection="task_state" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+			</if>
+			<if test="start_date != null and start_date != '' ">
+			    and	tcm.create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+			</if>
+			<if test="end_date != null and end_date != '' ">
+			    and	tcm.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+			</if>
+			<if test="task_title != null and task_title != '' ">
+			    and	tcm.task_title like '%'||#{task_title,jdbcType=VARCHAR}||'%'
+			</if>
+	    </where>
+	</select>
+
+	<!-- 获取自定义消息详情 -->
+    <select id="queryCustomMessageDetail" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	 select <include refid="all_column"/>,
+    		    (select tsui.user_realname from tbl_sys_user_info tsui where tsui.id = tcm.create_user_id) as create_user_rname,
+    		    (select tsui.user_realname from tbl_sys_user_info tsui where tsui.id = tcm.audit_user_id) as audit_user_rname,
+    		    (select count(1) from tbl_custom_message_user tcmu where tcmu.task_id = tcm.id) as push_user_count,
+    		    (select count(1) 
+    		   	   from tbl_custom_message_user tcmu ,tbl_user_device_record tudr 
+    		   	  where tcmu.task_id = tcm.id 
+    		   	  	    and tcmu.user_id = tudr.user_id
+    		   	  	    and delete_flag = 0) as push_user_device_count,
+    		    nvl((select sum(sent_count) from tbl_custom_message_count tcmc where tcmc.task_id = tcm.id),0) as push_sent_count,
+    		    nvl((select sum(received_count) from tbl_custom_message_count tcmc where tcmc.task_id = tcm.id),0) as push_received_count,
+    		    nvl((select sum(opened_count) from tbl_custom_message_count tcmc where tcmc.task_id = tcm.id),0) as push_opened_count,
+    		    to_char(tcm.push_start_date,'yyyy-mm-dd hh24:mi:ss') as push_start_date,
+  			    to_char(tcm.create_date,'yyyy-mm-dd hh24:mi:ss') as create_date,
+  			    to_char(tcm.audit_date,'yyyy-mm-dd hh24:mi:ss') as audit_date,
+  			    case when tcm.msg_open_action_type = 3 then
+  			    		  msg_open_action 
+  			    	else ''
+  			    	end as itemnumber,
+  			    case when tcm.msg_open_action_type = 3 then
+  			    		  (select product_img_url from tbl_product_info tpi where tpi.itemnumber = tcm.msg_open_action) 
+  			    	else ''
+  			    	end as product_img_url,
+  			    case when tcm.msg_open_action_type = 3 then
+  			    		   (select product_name from tbl_product_info tpi where tpi.itemnumber = tcm.msg_open_action) 
+  			    	else ''
+  			    	end as product_name,
+  			    case when exists(select 1
+		                        from tbl_custom_message t1 
+		                       where t1.id= tcm.id  
+		                             and (task_state = 2 or task_state = 3)
+		                             and push_type = 2
+		                             and nvl(push_start_date,sysdate) &gt;= sysdate )
+                    then '1' else '0' end as  can_stop_flag
+		   from tbl_custom_message tcm
+		<where>
+				1=1
+			<if test="task_id != null and task_id != 0 ">
+				and	tcm.id = #{task_id,jdbcType=INTEGER}
+			</if>
+		</where>
+	</select>
+
+
+	<!-- 更新自定义消息推送信息 -->
+    <update id="updateCustomMessage" parameterType="java.util.HashMap">
+    	update tbl_custom_message tcm
+    	 <set>
+    	    <if test="task_title != null and task_title != '' ">
+			    tcm.task_title = #{task_title,jdbcType=VARCHAR},
+			</if>
+			<if test="task_state != null and task_state != '' ">
+			    tcm.task_state = #{task_state,jdbcType=INTEGER},
+			</if>
+			<if test="msg_title != null and msg_title != '' ">
+			    tcm.msg_title = #{msg_title,jdbcType=VARCHAR},
+			</if>
+			<if test="msg_content != null and msg_content != '' ">
+			    tcm.msg_content = #{msg_content,jdbcType=VARCHAR},
+			</if>
+			<if test="msg_user_type != null and msg_user_type != '' ">
+			    tcm.msg_user_type = #{msg_user_type,jdbcType=INTEGER},
+			</if>
+			<if test="push_type != null and push_type != '' ">
+			    tcm.push_type = #{push_type,jdbcType=INTEGER},
+			</if>
+			<if test="push_state_date != null and push_state_date != '' ">
+			    tcm.push_state_date = to_date(#{push_state_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+			</if>
+			<if test="push_cache_hours != null and push_cache_hours != '' ">
+			    tcm.push_cache_hours = #{push_cache_hours,jdbcType=INTEGER},
+			</if>
+			<if test="msg_open_action_type != null and msg_open_action_type != '' ">
+			    tcm.msg_open_action_type = #{msg_open_action_type,jdbcType=INTEGER},
+			</if>
+			<if test="msg_open_action != null and msg_open_action != '' ">
+			    tcm.msg_open_action = #{msg_open_action,jdbcType=VARCHAR},
+			</if>
+				tcm.edit_user_id = #{public_user_id,jdbcType=INTEGER},
+				tcm.edit_date = sysdate
+    	</set>  
+    	 where	tcm.id = #{task_id,jdbcType=INTEGER}
+	</update>
+	
+	<!-- 更新自定义消息审批状态 -->
+    <update id="updateCustomMessageAuditInfo" parameterType="java.util.HashMap">
+    	 update tbl_custom_message tcm
+    	  <set> 
+    	  		<if test="reject_reason != null and reject_reason != '' ">
+			    	tcm.reject_reason = #{reject_reason,jdbcType=VARCHAR},
+				</if>
+				tcm.task_state = #{task_state,jdbcType=INTEGER},
+				tcm.audit_user_id = #{public_user_id,jdbcType=INTEGER},
+				tcm.audit_date = sysdate
+    	 </set>  
+    	  where	tcm.id = #{task_id,jdbcType=INTEGER}
+	</update>
+
+	<!-- 获取获取活动ID（通过序列生成） -->
+    <select id="queryCustomMessageId" parameterType="java.util.HashMap" resultType="int">
+    	select seq_custom_message.nextval from dual
+	</select>
+
+	<!-- 插入活动基本信息 -->
+    <insert id="insertCustomMessage" parameterType="java.util.HashMap">
+    	insert into tbl_custom_message(
+			   id,
+		       task_title,
+		       task_state,
+		       msg_title,
+		       msg_content,
+		       msg_user_type,
+		       push_type,
+		       push_start_date,
+		       push_cache_hours,
+		       msg_open_action_type,
+		       msg_open_action,
+		       create_user_id,
+		       create_date,
+		       edit_user_id,
+		       edit_date
+    	) values(
+	    		#{task_id,jdbcType=INTEGER},
+	    		#{task_title,jdbcType=VARCHAR},
+				#{task_state,jdbcType=INTEGER},
+				#{msg_title,jdbcType=VARCHAR},
+				#{msg_content,jdbcType=VARCHAR},
+				#{msg_user_type,jdbcType=INTEGER},
+				#{push_type,jdbcType=INTEGER},
+				to_date(#{push_start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss'),
+				#{push_cache_hours,jdbcType=DOUBLE},
+				#{msg_open_action_type,jdbcType=INTEGER},
+				#{msg_open_action,jdbcType=VARCHAR},
+				#{public_user_id,jdbcType=INTEGER},
+				sysdate,
+				#{public_user_id,jdbcType=INTEGER},
+				sysdate
+    	)
+	</insert>
+	
+	<!-- 获取自定义消息用户配置 -->
+    <select id="queryCustomMessageUserConfig" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	 select id, 
+    	 		task_id, 
+    	 		user_config_type, 
+    	 		user_config_content
+		   from tbl_custom_msg_user_config tcmuc
+		<where>
+				1=1
+			<if test="task_id != null and task_id != 0 ">
+				and	tcmuc.task_id = #{task_id,jdbcType=INTEGER}
+			</if>
+		</where>
+	</select>
+	
+	<!-- 获取自定义消息用户列表 -->
+    <select id="queryCustomMessageUserList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	 select tcmc.task_id, 
+    	 		tcmc.user_id as id, 
+    	 		tcmc.send_state,
+    	 		to_char(tcmc.create_date,'yyyy-mm-dd hh24:mi:ss') create_date, 
+    	 		to_char(tcmc.send_date,'yyyy-mm-dd hh24:mi:ss') send_date,
+    	 		tui.login_name,
+    	 		tui.user_manage_name,
+    	 		tui.site_id,
+    	 		(select name from tbl_site_info tsi where tsi.id = tui.site_id) as site_name
+		   from tbl_custom_message_user tcmc, tbl_user_info tui
+		<where>
+				1=1
+				and tcmc.user_id = tui.id
+			<if test="task_id != null and task_id != 0 ">
+				and	tcmc.task_id = #{task_id,jdbcType=INTEGER}
+			</if>
+		</where>
+	</select>
+	
+	<!-- 获取自定义消息用户数量 -->
+    <select id="queryCustomMessageUserCount" parameterType="java.util.HashMap" resultType="int">
+    	 select count(1)
+		   from tbl_custom_message_user tcmc, tbl_user_info tui
+		<where>
+				1=1
+				and tcmc.user_id = tui.id
+			<if test="task_id != null and task_id != 0 ">
+				and	tcmc.task_id = #{task_id,jdbcType=INTEGER}
+			</if>
+		</where>
+	</select>
+	
+	<!-- 插入自定义消息推送配置信息 -->
+    <insert id="insertCustomMessageUserConfig" parameterType="java.util.HashMap">
+    	insert into tbl_custom_msg_user_config(
+			   id,
+		       task_id,
+		       user_config_type,
+		       user_config_content
+    	) 
+    	select seq_custom_msg_user_config.nextval,
+    		   task_id,
+		       user_config_type,
+		       user_config_content
+		  from (select #{task_id,jdbcType=INTEGER} as task_id,
+		    		   1 as user_config_type,
+		    		   #{site_id,jdbcType=VARCHAR} as user_config_content
+		    	  from dual
+		        <if test="market_supervision_user_id != null and market_supervision_user_id != '' ">
+		        union all
+		        select #{task_id,jdbcType=INTEGER} as task_id,
+		    		   2 as user_config_type,
+		    		   #{market_supervision_user_id,jdbcType=VARCHAR} as user_config_content
+		    	  from dual
+		        </if>
+		        <if test="user_group != null and user_group != '' ">
+		        union all
+		        select #{task_id,jdbcType=INTEGER} as task_id,
+		    		   3 as user_config_type,
+		    		   #{user_group,jdbcType=VARCHAR} as user_config_content
+		    	  from dual
+		        </if>
+		       )
+	</insert>
+	
+	<!-- 插入自定义消息推送配置信息 -->
+    <insert id="insertCustomMessageUser" parameterType="java.util.HashMap">
+    	insert into tbl_custom_message_user(
+		       id, 
+		       task_id, 
+		       user_id, 
+		       send_state,
+		       create_date 
+    	)
+    	select seq_custom_message_user.nextval,
+		       #{task_id,jdbcType=INTEGER}, 
+		       id, 
+		       0, 
+		       sysdate
+    	  from tbl_user_info
+    	 where id in
+   	 			<foreach item="item" collection="user_id" open="(" separator="," close=")">
+					#{item}
+				</foreach>  
+	</insert>
+	
+	<resultMap id="channelPageMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="page_name" property="option"/>
+    </resultMap>
+	<!-- 获取自定义消息频道页列表 -->
+    <select id="queryCustomMessageChannelPageList" parameterType="java.util.HashMap" resultMap="channelPageMap">
+    	 select id,
+    	 		page_name
+		   from tbl_decorate_page tdp
+		<where> 
+		 		site_id = #{site_id,jdbcType=INTEGER}
+		 		and page_type in(3,4,5,6,7,8)
+				and exists (
+					select 1 
+                      from (select ddt.id,
+                                 case
+                                    when ddt.effective_start_date =
+                                            (select max (effective_start_date)
+                                               from tbl_decorate_template
+                                              where     support_flag = '2'
+                                                    and site_id = #{site_id,jdbcType=INTEGER}
+                                                    and effective_start_date  &lt;= sysdate)
+                                    then
+                                       '0'
+                                    when ddt.effective_start_date >
+                                            (select max (effective_start_date)
+                                               from tbl_decorate_template
+                                              where     support_flag = '2'
+                                                    and site_id = #{site_id,jdbcType=INTEGER}
+                                                    and effective_start_date &lt;= sysdate)
+                                    then
+                                       '1'
+                                    else
+                                       '2'
+                                 end
+                                    state
+                            from tbl_decorate_template ddt
+                           where ddt.support_flag = '2'
+                                 and ddt.site_id = #{site_id,jdbcType=INTEGER}) 
+                           where state = 0 
+                                 and id  = tdp.template_id
+				  )
+		</where>
+	</select>
+	
+	<!-- 清除自定义消息用户配置 -->
+    <delete id="deleteCustomMessageUserConfig" parameterType="java.util.HashMap">
+    	delete from tbl_custom_msg_user_config tcmu
+    	  where	tcmu.task_id = #{task_id,jdbcType=INTEGER}
+	</delete>
+	
+	<!-- 清除自定义消息用户 -->
+    <delete id="deleteCustomMessageUser" parameterType="java.util.HashMap">
+    	delete from tbl_custom_message_user tcmu
+    	 where	tcmu.task_id = #{task_id,jdbcType=INTEGER}
+	</delete>
+	
+	<!-- 清除自定义消息 -->
+    <delete id="deleteCustomMessage" parameterType="java.util.HashMap">
+    	delete from tbl_custom_message tcm
+    	 where	tcm.id = #{task_id,jdbcType=INTEGER}
+	</delete>
+	
+	<!-- 获取自定义消息列表 -->
+    <select id="queryCustomMessageCalUserList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	select a.*
+    	  from (select t.*,rownum as rn
+				  from (select id,
+				  			   login_name,
+				  			   user_manage_name,
+				  			   tui.site_id,
+    	 					   (select name from tbl_site_info tsi where tsi.id = tui.site_id) as site_name
+				  		  from tbl_user_info tui
+					    <where>
+							    1 = 1
+							    and user_state in (1)
+							    and user_type in (1,2)
+							<if test="site_id_arr != null">
+								and tui.site_id in
+					            <foreach item="item" collection="site_id_arr" open="(" separator="," close=")">
+									#{item}
+								</foreach>
+							</if>
+							<if test="market_supervision_user_id_arr != null">
+								and tui.market_supervision_user_id in
+					            <foreach item="item" collection="market_supervision_user_id_arr" open="(" separator="," close=")">
+									#{item}
+								</foreach>
+							</if>
+							<if test="user_group_arr != null">
+								and exists(
+									select 1 
+									  from tbl_user_group_detail tugd
+									 where tugd.user_id = tui.id
+									       and tugd.group_id in 
+									       <foreach item="item" collection="user_group_arr" open="(" separator="," close=")">
+												#{item}
+										   </foreach>
+								)
+							</if>
+							<if test="user_id_arr != null">
+								and tui.id in
+					            <foreach item="item" collection="user_id_arr" open="(" separator="," close=")">
+									#{item}
+								</foreach>
+							</if>
+					    </where>
+			           ) t 
+			     where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) a
+		 where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	
+	<!-- 获取自定义消息总数 -->
+    <select id="queryCustomMessageCalUserCount" parameterType="java.util.HashMap" resultType="int">
+    	 select count(1)
+		   from tbl_user_info tui
+		<where>
+			    1 = 1
+			    and user_state in (1)
+			    and user_type in (1,2)
+			<if test="site_id_arr != null">
+				and tui.site_id in
+	            <foreach item="item" collection="site_id_arr" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+			</if>
+			<if test="market_supervision_user_id_arr != null">
+				and tui.market_supervision_user_id in
+	            <foreach item="item" collection="market_supervision_user_id_arr" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+			</if>
+			<if test="user_group_arr != null">
+				and exists(
+					select 1 
+					  from tbl_user_group_detail tugd
+					 where tugd.user_id = tui.id
+					       and tugd.group_id in 
+					       <foreach item="item" collection="user_group_arr" open="(" separator="," close=")">
+								#{item}
+						   </foreach>
+				)
+			</if>
+			<if test="user_id_arr != null">
+				and tui.id in
+	            <foreach item="item" collection="user_id_arr" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+			</if>
+	    </where>
+	</select>
+	
+	<!-- 自定义消息推送站点名称 -->
+    <select id="querySiteNames" parameterType="java.util.HashMap" resultType="java.lang.String">
+    	 select to_char(wm_concat(tsi.name))
+		   from tbl_site_info tsi
+		<where>
+			    tsi.id in
+	            <foreach item="item" collection="site_id_arr" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+	    </where>
+	</select>
+	
+	<!-- 自定义消息推送区域经理名称 -->
+    <select id="queryMarketUserNames" parameterType="java.util.HashMap" resultType="java.lang.String">
+    	 select to_char(wm_concat(tsui.user_realname))
+		   from tbl_sys_user_info tsui
+		<where>
+			     tsui.id in
+	            <foreach item="item" collection="market_supervision_user_id_arr" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+	    </where>
+	</select>
+	
+	<!-- 自定义消息推送用户组名称 -->
+    <select id="queryUserGroupNames" parameterType="java.util.HashMap" resultType="java.lang.String">
+    	 select to_char(wm_concat(tug.name))
+		   from tbl_user_group tug
+		<where> 
+		 		tug.id in 
+		       <foreach item="item" collection="user_group_id_arr" open="(" separator="," close=")">
+					#{item}
+			   </foreach>
+	    </where>
+	</select>
+	
+	<!-- 获取自定义消息列表 -->
+    <insert id="batchInsertCustomMessageUser" parameterType="java.util.HashMap">
+       insert into tbl_custom_message_user(
+       			   id,
+			       task_id,
+			       user_id,
+			       create_date,
+			       send_state
+       			   )
+    		select seq_custom_message_user.nextval,
+    			   #{task_id,jdbcType=INTEGER},
+    			   id,
+    			   sysdate,
+    			   0
+	  		  from tbl_user_info tui
+		    <where> 
+		    		user_state in (1)
+				    and user_type in (1,2)
+				<if test="site_id_arr != null">
+					and tui.site_id in
+		            <foreach item="item" collection="site_id_arr" open="(" separator="," close=")">
+						#{item}
+					</foreach>
+				</if>
+				<if test="market_supervision_user_id_arr != null">
+					and tui.market_supervision_user_id in
+		            <foreach item="item" collection="market_supervision_user_id_arr" open="(" separator="," close=")">
+						#{item}
+					</foreach>
+				</if>
+				<if test="user_group_arr != null">
+					and exists(
+						select 1 
+						  from tbl_user_group_detail tugd
+						 where tugd.user_id = tui.id
+						       and tugd.group_id in 
+						       <foreach item="item" collection="user_group_arr" open="(" separator="," close=")">
+									#{item}
+							   </foreach>
+					)
+				</if>
+				<if test="user_id_arr != null">
+					and tui.id in
+		            <foreach item="item" collection="user_id_arr" open="(" separator="," close=")">
+						#{item}
+					</foreach>
+				</if>
+		    </where>
+	</insert>
+	
+	<!-- 分页查询会员列表 -->
+    <select id="queryMemberList" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select a.*, rownum num from (
+                select
+                    a.id,
+                    a.user_name,
+                    a.login_name,
+                    a.user_state,
+                    a.user_manage_mobilephone,
+                    a.user_manage_current_address,
+                    case a.user_resource when '1' then '自行注册' when '2' then '后台注册'  when '3' then '分享注册' end user_resource,
+                    e.store_name,
+                    a.user_manage_name,
+                    c.user_name referee_user_name,
+                    a.market_supervision_user_realna,
+                    a.user_company_address_deails,
+                    (select name from tbl_site_info tsi where tsi.id = a.site_id) as site_name,
+                    (case ba.score when null then ' ' else (select grade_name from tbl_user_grade_info sg where min_score &lt;= ba.score and max_score &gt; ba.score and rownum &lt; = 1) end) score_grade
+                from
+                    tbl_user_info a
+                    left join tbl_sys_user_info c on a.referee_user_id = c.id
+                    left join tbl_store_info e on a.store_id = e.id
+                    left join tbl_bank_account ba on a.id = ba.user_id
+                <where>
+                    	a.user_state in (1)
+			    		and a.user_type in (1,2)
+                    <if test="user_name != null and user_name != ''">
+                        and a.user_name = #{user_name,jdbcType=VARCHAR}
+                    </if>
+                    <if test="user_manage_name != null and user_manage_name != ''">
+                        and a.user_manage_name = #{user_manage_name,jdbcType=VARCHAR}
+                    </if>
+                    <if test="referee_user_id != null and referee_user_id !=0">
+                        and c.id = #{referee_user_id,jdbcType=INTEGER}
+                    </if>
+                    <if test="login_name != null and login_name !=''">
+                        and a.login_name = #{login_name,jdbcType=VARCHAR}
+                    </if>
+                    <if test="store_id != null and store_id !=0">
+                        and e.id = #{store_id,jdbcType=INTEGER}
+                    </if>
+                    <if test="market_supervision_user_id != null and market_supervision_user_id !=0">
+                        and a.market_supervision_user_id = #{market_supervision_user_id,jdbcType=INTEGER}
+                    </if>
+                    <if test="mobilephone != null and mobilephone !=''">
+                        and a.user_manage_mobilephone = #{mobilephone,jdbcType=VARCHAR}
+                    </if>
+                    <if test="user_state != null and user_state != ''">
+                        and a.user_state IN
+                        <foreach item="item" collection="user_state" open="(" separator="," close=")">
+                            #{item}
+                        </foreach>
+                    </if>
+                    <if test="search_type == 'active_notice' and public_user_site_id !=null and public_user_site_id != ''">
+                         and a.site_id = #{public_user_site_id,jdbcType=INTEGER}
+                    </if>
+                    <if test="site_id !=null and site_id != 0">
+                        and a.site_id = #{site_id,jdbcType=INTEGER}
+                    </if>
+                    <if test="distribution_state != null and distribution_state == 0">
+                        and (a.distribution_state != 1 or a.distribution_state is null)
+                    </if>
+                    <if test="decoration_state != null and decoration_state == 0">
+                        and (a.decoration_state != 1 or a.decoration_state is null)
+                    </if>
+                    <if test="group_id != null and group_id != 0">
+                        and not exists(select 1 from tbl_user_group_detail where a.id = user_id and group_id = #{group_id,jdbcType=INTEGER})
+                    </if>
+                    <if test="review_user_group_id != null and review_user_group_id !='' and review_user_group_id != 0">
+                        and not exists(select 1 from tbl_review_user_group_detail where a.id = user_id and user_group_id = #{review_user_group_id,jdbcType=INTEGER})
+                    </if>
+                    <if test="user_list != null and user_list != ''">
+                        and a.id not in
+                            <foreach item="item" collection="user_list" open="(" separator="," close=")">
+                                #{item,jdbcType=INTEGER}
+                            </foreach>
+                    </if>
+                    <if test="user_type != null">
+						and a.user_type in
+			                <foreach item="item" collection="user_type" open="(" separator="," close=")">
+								#{item}
+							</foreach>
+					</if>
+					<if test="user_company_type != null and user_company_type != ''">
+						and a.user_company_type = #{user_company_type,jdbcType=INTEGER}
+					</if>
+					<if test="check_site_id_arr != null">
+						and a.site_id in
+			                <foreach item="item" collection="check_site_id_arr" open="(" separator="," close=")">
+								#{item}
+							</foreach>
+					</if>
+					<if test="filter_user_id_arr != null">
+						and a.id not in
+			                <foreach item="item" collection="filter_user_id_arr" open="(" separator="," close=")">
+								#{item}
+							</foreach>
+					</if>
+                </where>
+            ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+         where num &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!-- 分页查询会员列表记录数 -->
+    <select id="queryMemberListCount" parameterType="java.util.Map" resultType="int">
+        select count (1) 
+          from tbl_user_info a
+        left join tbl_sys_user_info c on a.referee_user_id = c.id
+        left join tbl_store_info e on a.store_id = e.id
+        <where>
+           		a.user_state in (1)
+			    and a.user_type in (1,2)
+            <if test="user_name != null and user_name != ''">
+                and a.user_name = #{user_name,jdbcType=VARCHAR}
+            </if>
+            <if test="user_manage_name != null and user_manage_name != ''">
+                and a.user_manage_name = #{user_manage_name,jdbcType=VARCHAR}
+            </if>
+            <if test="referee_user_id != null and referee_user_id !=0">
+                and c.id = #{referee_user_id,jdbcType=INTEGER}
+            </if>
+            <if test="login_name != null and login_name !=''">
+                and a.login_name = #{login_name,jdbcType=VARCHAR}
+            </if>
+            <if test="store_id != null and store_id !=0">
+                and e.id = #{store_id,jdbcType=INTEGER}
+            </if>
+            <if test="market_supervision_user_id != null and market_supervision_user_id !=0">
+                and a.market_supervision_user_id = #{market_supervision_user_id,jdbcType=INTEGER}
+            </if>
+            <if test="mobilephone != null and mobilephone !=''">
+                and a.user_manage_mobilephone = #{mobilephone,jdbcType=VARCHAR}
+            </if>
+            <if test="user_state != null and user_state != ''">
+                and a.user_state IN
+                <foreach item="item" collection="user_state" open="(" separator="," close=")">
+                    #{item}
+                </foreach>
+            </if>
+            <if test="search_type == 'active_notice' and public_user_site_id !=null and public_user_site_id != ''">
+                and a.site_id = #{public_user_site_id,jdbcType=INTEGER}
+            </if>
+            <if test="site_id !=null and site_id != 0">
+                and a.site_id = #{site_id,jdbcType=INTEGER}
+            </if>
+            <if test="distribution_state != null and distribution_state == 0">
+                and (a.distribution_state != 1 or a.distribution_state is null)
+            </if>
+            <if test="decoration_state != null and decoration_state == 0">
+                and (a.decoration_state != 1 or a.decoration_state is null)
+            </if>
+            <if test="group_id != null and group_id != 0">
+                and not exists(select 1 from tbl_user_group_detail where a.id = user_id and group_id = #{group_id,jdbcType=INTEGER})
+            </if>
+            <if test="review_user_group_id != null and review_user_group_id !='' and review_user_group_id != 0">
+                and not exists(select 1 from tbl_review_user_group_detail where a.id = user_id and user_group_id = #{review_user_group_id,jdbcType=INTEGER})
+            </if>
+            <if test="user_list != null and user_list != ''">
+                and a.id not IN
+                <foreach item="item" collection="user_list" open="(" separator="," close=")">
+                    #{item,jdbcType=INTEGER}
+                </foreach>
+            </if>
+            <if test="user_type != null">
+				and a.user_type IN
+	                <foreach item="item" collection="user_type" open="(" separator="," close=")">
+						#{item}
+					</foreach>
+			</if>
+			<if test="user_company_type != null and user_company_type != ''">
+				and a.user_company_type = #{user_company_type,jdbcType=INTEGER}
+			</if>
+			<if test="check_site_id_arr != null">
+				and a.site_id in
+	                <foreach item="item" collection="check_site_id_arr" open="(" separator="," close=")">
+						#{item}
+					</foreach>
+			</if>
+			<if test="filter_user_id_arr != null">
+				and a.id not in
+	                <foreach item="item" collection="filter_user_id_arr" open="(" separator="," close=")">
+						#{item}
+					</foreach>
+			</if>
+        </where>
+    </select>
+    <resultMap type="java.util.Map" id="customPageMap">
+    	<result column="id" property="id" />
+    	<result column="page_name" property="option" />
+    </resultMap>
+    <!-- 查询自定义页(微信) -->
+    <select id="queryCustomPageList" parameterType="java.util.Map" resultMap="customPageMap">
+    	SELECT  TDP.ID,
+				TDP.PAGE_NAME
+          FROM  TBL_DECORATE_PAGE TDP
+         INNER JOIN TBL_DECORATE_TEMPLATE DT on DT.ID = TDP.TEMPLATE_ID 
+ 		WHERE TDP.IS_DELETE = '1'
+ 		  AND TDP.SITE_ID = #{site_id,jdbcType=INTEGER}
+ 		  AND DT.SUPPORT_FLAG = 2
+ 		  AND TDP.PAGE_TYPE = 1
+    </select>
+</mapper>

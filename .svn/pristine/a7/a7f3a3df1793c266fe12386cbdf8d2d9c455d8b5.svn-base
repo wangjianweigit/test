@@ -1,0 +1,11 @@
+#（内网测试）
+jdbc.driverClassName=oracle.jdbc.driver.OracleDriver
+jdbc.url=jdbc:oracle:thin:@16.16.16.188:1521:orcl
+jdbc.username=tkvip_new
+jdbc.password=tkvip_new888123
+
+#（外网测试）
+#jdbc.driverClassName=oracle.jdbc.driver.OracleDriver
+#jdbc.url=jdbc:oracle:thin:@61.153.10.234:1521:testdb
+#jdbc.username=tkvip_new
+#jdbc.password=tkvip_new888123456

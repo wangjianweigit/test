@@ -1,0 +1,1586 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tk.analysis.transaction.dao.TransactionAnalysisDao">
+	<!-- DW:平台+商品+业务的权限条件 -->
+	<sql id="dw_public_psy_where">
+	   	and t1.product_key = dp.product_key
+	   	and t1.member_key = dm.member_key
+	   <!-- 童库平台 -->
+	   <if test="public_user_platform_type ==1">
+	   		and dp.product_type in (0,1)
+	   		and dm.stationed_user_id = 1
+	   		<if test="public_user_type != null and public_user_type == 2"><!-- 管理员 -->
+	   			<!-- 业务权限 -->
+	   			and dm.store_id in 
+	   			<foreach collection="ids" item="item" open="(" close=")" separator=",">
+				 	#{item,jdbcType=INTEGER}
+				 </foreach>
+	   	   		<!-- 商品分类 -->
+	   	   		and dp.product_first_classify in 
+	   	   		<foreach collection="typeIds" item="item" open="(" close=")" separator=",">
+				 	#{item,jdbcType=INTEGER}
+				</foreach>
+       		</if>
+       		<if test="public_user_type != null and public_user_type == 3"><!-- 业务员 -->
+			    and dm.ywy_user_id = #{public_user_id,jdbcType=INTEGER}
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 4"><!-- 业务经理 -->
+			    and dm.ywjl_user_id = #{public_user_id,jdbcType=INTEGER}
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 5"><!-- 店长 -->
+			    and dm.dz_user_id = #{public_user_id,jdbcType=INTEGER}
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 6"><!-- 营业员 -->
+	        	and dm.store_id in 
+	        	<foreach collection="ids" item="item" open="(" close=")" separator=",">
+				 	#{item,jdbcType=INTEGER}
+				 </foreach>
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 9"><!-- 销售管理 -->
+	        	and dm.ywjl_user_id in 
+	        	<foreach collection="ids" item="item" open="(" close=")" separator=",">
+				 	#{item,jdbcType=INTEGER}
+				 </foreach>
+	        </if>
+	   </if>
+	   <!-- 私有平台 -->
+	   <if test="public_user_platform_type ==2">
+	   		and dp.product_type = 3
+	   		and dp.stationed_user_id = #{public_user_stationed_user_id,jdbcType=INTEGER}
+			and dm.stationed_user_id = #{public_user_stationed_user_id,jdbcType=INTEGER}
+	   </if>
+	   <!-- 全部 -->
+	   <if test="public_user_platform_type ==9">
+	   		and dm.member_key > 0
+	   		<if test="public_user_type != null and public_user_type == 2"><!-- 管理员 -->
+	   			<!-- 业务权限 -->
+	   			and dm.store_id in 
+	   			<foreach collection="ids" item="item" open="(" close=")" separator=",">
+				 	#{item,jdbcType=INTEGER}
+				 </foreach>
+	   	   		<!-- 商品分类 -->
+	   	   		and dp.product_first_classify in 
+	   	   		<foreach collection="typeIds" item="item" open="(" close=")" separator=",">
+				 	#{item,jdbcType=INTEGER}
+				</foreach>
+       		</if>
+	   </if>
+	</sql>
+	<!-- DW:平台+业务的权限条件 -->
+	<sql id="dw_public_py_where">
+	   	and t1.member_key = dm.member_key
+	   <!-- 童库平台 -->
+	   <if test="public_user_platform_type ==1">
+	   		and dm.stationed_user_id = 1
+	   		<if test="public_user_type != null and public_user_type == 2"><!-- 管理员 -->
+	   			<!-- 业务权限 -->
+	   			and dm.store_id in 
+	   			<foreach collection="ids" item="item" open="(" close=")" separator=",">
+				 	#{item,jdbcType=INTEGER}
+				 </foreach>
+       		</if>
+       		<if test="public_user_type != null and public_user_type == 3"><!-- 业务员 -->
+			    and dm.ywy_user_id = #{public_user_id,jdbcType=INTEGER}
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 4"><!-- 业务经理 -->
+			    and dm.ywjl_user_id = #{public_user_id,jdbcType=INTEGER}
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 5"><!-- 店长 -->
+			    and dm.dz_user_id = #{public_user_id,jdbcType=INTEGER}
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 6"><!-- 营业员 -->
+	        	and dm.store_id in 
+	        	<foreach collection="ids" item="item" open="(" close=")" separator=",">
+				 	#{item,jdbcType=INTEGER}
+				 </foreach>
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 9"><!-- 销售管理 -->
+	        	and dm.ywjl_user_id in 
+	        	<foreach collection="ids" item="item" open="(" close=")" separator=",">
+				 	#{item,jdbcType=INTEGER}
+				 </foreach>
+	        </if>
+	   </if>
+	   <!-- 私有平台 -->
+	   <if test="public_user_platform_type ==2">
+			and dm.stationed_user_id = #{public_user_stationed_user_id,jdbcType=INTEGER}
+	   </if>
+	   <!-- 全部 -->
+	   <if test="public_user_platform_type ==9">
+	   		and dm.member_key > 0
+	   		<if test="public_user_type != null and public_user_type == 2"><!-- 管理员 -->
+	   			<!-- 业务权限 -->
+	   			and dm.store_id in 
+	   			<foreach collection="ids" item="item" open="(" close=")" separator=",">
+				 	#{item,jdbcType=INTEGER}
+				 </foreach>
+       		</if>
+	   </if>
+	</sql>
+	<!-- DW:平台+商品的权限条件 -->
+	<sql id="dw_public_ps_where">
+	   <!-- 童库平台 -->
+	   <if test="public_user_platform_type ==1">
+	   		and t.product_type in (0,1)
+	   		<if test="public_user_type != null and public_user_type == 2"><!-- 管理员 -->
+	   	   		<!-- 商品分类 -->
+	   	   		and t.product_first_classify in 
+	   	   		<foreach collection="typeIds" item="item" open="(" close=")" separator=",">
+				 	#{item,jdbcType=INTEGER}
+				</foreach>
+       		</if>
+	   </if>
+	   <!-- 私有平台 -->
+	   <if test="public_user_platform_type ==2">
+	   		and t.product_type = 3
+	   		and t.stationed_user_id = #{public_user_stationed_user_id,jdbcType=INTEGER}
+	   </if>
+	   <!-- 全部 -->
+	   <if test="public_user_platform_type ==9">
+	   		and t.product_key > 0
+	   		<if test="public_user_type != null and public_user_type == 2"><!-- 管理员 -->
+	   	   		<!-- 商品分类 -->
+	   	   		and t.product_first_classify in 
+	   	   		<foreach collection="typeIds" item="item" open="(" close=")" separator=",">
+				 	#{item,jdbcType=INTEGER}
+				</foreach>
+       		</if>
+	   </if>
+	</sql>
+	<!-- 折线图 商品访客数 -->
+	<select id="r_queryProductVisitorCount_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		<choose>
+			<when test="query_type == 'other'">
+				select create_date,nvl(sum(visitor_count),0) visitor_count
+				  from
+				(select dt.date_values as create_date,t1.access_terminal_key,count(distinct t1.member_key) visitor_count
+				  from fact_user_log_product_pv_d t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.log_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.access_terminal_key > 0
+				   <if test="access_terminal_id != null and access_terminal_id != ''">
+				   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t1.access_terminal_key)
+				   </if>
+				   <if test="brand_id !=null and brand_id !=0">
+				   	and dp.brand_id = #{brand_id,jdbcType=INTEGER}
+				   </if>
+				   <include refid="dw_public_psy_where"/>
+		           group by dt.date_values,t1.access_terminal_key)
+		           group by create_date
+			</when>
+			<otherwise>
+				select create_date,nvl(sum(visitor_count),0) visitor_count
+				  from
+				(select dt.date_values as create_date,t1.access_terminal_key,count(distinct t1.member_key) visitor_count
+				  from fact_user_log_product t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.log_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.access_terminal_key > 0
+				   <if test="access_terminal_id != null and access_terminal_id != ''">
+				   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t1.access_terminal_key)
+				   </if>
+				   <if test="brand_id !=null and brand_id !=0">
+				   	and dp.brand_id = #{brand_id,jdbcType=INTEGER}
+				   </if>
+				   <include refid="dw_public_psy_where"/>
+		           group by dt.date_values,t1.access_terminal_key)
+		           group by create_date
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 折线图 商品访客数<天> -->
+	<select id="r_queryProductVisitorCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select create_date,nvl(sum(visitor_count),0) visitor_count,nvl(sum(pv_count),0) pv_count
+		  from
+		(select dt.hours24_value create_date,count(distinct a.member_key) visitor_count,count(*) pv_count
+		  from
+		(select t1.log_time_key,t1.access_terminal_key,t1.member_key
+		  from fact_user_log_product t1,dim_date dt,dim_product dp,dim_member dm
+		 where t1.log_date_key = dt.date_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and t1.access_terminal_key > 0
+		   <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t1.access_terminal_key)
+		   </if>
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and dp.brand_id = #{brand_id,jdbcType=INTEGER}
+		   </if>
+		   <include refid="dw_public_psy_where"/>) a, dim_time dt
+           where a.log_time_key = dt.time_key
+           group by dt.hours24_value,a.access_terminal_key)
+           group by create_date
+           order by create_date
+	</select>
+	<!-- 交易趋势-商品访客数 折线图 -->
+	<select id="r_queryTrend_ProductVisitorCount_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		<choose>
+			<when test="query_type == 'other'">
+				select dt.date_values as create_date,count(distinct t1.member_key) visitor_count
+				  from fact_user_log_product_pv_d t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.log_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <if test="brand_id !=null and brand_id !=0">
+				   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+				   </if>
+				   <include refid="dw_public_psy_where"/>
+				   group by dt.date_values
+			</when>
+			<otherwise>
+				select dt.date_values as create_date,count(distinct t1.member_key) visitor_count
+				  from fact_user_log_product t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.log_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <if test="brand_id !=null and brand_id !=0">
+				   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+				   </if>
+				   <include refid="dw_public_psy_where"/>
+				   group by dt.date_values
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 交易趋势-商品访客数 折线图<天> -->
+	<select id="r_queryTrend_ProductVisitorCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_value as create_date,count(distinct a.member_key) visitor_count
+		  from
+		(select t1.log_time_key,t1.member_key
+		  from fact_user_log_product t1,dim_date dt,dim_product dp,dim_member dm
+		 where t1.log_date_key = dt.date_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+		   </if>
+		   <include refid="dw_public_psy_where"/>) a,dim_time dt
+		   where a.log_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+	</select>
+							<!-- #################        交易概况         ################ -->
+	<!-- 交易总览-全站访客数 -->
+	<select id="r_queryVisitorCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		<choose>
+			<when test="query_type == 'other'">
+				select nvl(sum(visitor_count),0)
+				  from
+				(select count(distinct t1.member_key) visitor_count
+				  from fact_user_log_pv_d t1,dim_date dt,dim_member dm
+				 where t1.log_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.access_terminal_key > 0
+				   <if test="access_terminal_id != null and access_terminal_id != ''">
+				   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t1.access_terminal_key)
+				   </if>
+				   <include refid="dw_public_py_where"/>
+				   group by t1.access_terminal_key)
+			</when>
+			<otherwise>
+				select nvl(sum(visitor_count),0)
+				  from
+				(select count(distinct t1.member_key) visitor_count
+				  from fact_user_log t1,dim_date dt,dim_member dm
+				 where t1.log_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.access_terminal_key > 0
+				   <if test="access_terminal_id != null and access_terminal_id != ''">
+				   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t1.access_terminal_key)
+				   </if>
+				   <include refid="dw_public_py_where"/>
+				   group by t1.access_terminal_key)
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 交易总览-商品访客数 -->
+	<select id="r_queryProductVisitorCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		<choose>
+			<when test="query_type == 'other'">
+				select nvl(sum(product_visitor_count),0)
+				  from
+				(select count(distinct t1.member_key) product_visitor_count
+				  from fact_user_log_product_pv_d t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.log_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.access_terminal_key > 0
+				   <if test="access_terminal_id != null and access_terminal_id != ''">
+				   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t1.access_terminal_key)
+				   </if>
+				   <include refid="dw_public_psy_where"/>
+				   group by t1.access_terminal_key)
+			</when>
+			<otherwise>
+				select nvl(sum(product_visitor_count),0)
+				  from
+				(select count(distinct t1.member_key) product_visitor_count
+				  from fact_user_log_product t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.log_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.access_terminal_key > 0
+				   <if test="access_terminal_id != null and access_terminal_id != ''">
+				   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t1.access_terminal_key)
+				   </if>
+				   <include refid="dw_public_psy_where"/>
+				   group by t1.access_terminal_key)
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 交易总览-下单买家数 -->
+	<select id="r_queryPurchaseNumber" parameterType="java.util.Map" resultType="java.lang.Float">
+		<choose>
+			<when test="query_type == 'other'">
+				select nvl(sum(purchase_number),0)
+				  from (
+				select count(distinct t1.member_key) purchase_number
+				  from fact_product_sale_d t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.access_terminal_key > 0
+				   and t1.order_count > 0
+				   <if test="access_terminal_id != null and access_terminal_id != ''">
+				   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t1.access_terminal_key)
+				   </if>
+				   <include refid="dw_public_psy_where"/>
+				   group by t1.access_terminal_key)
+			</when>
+			<otherwise>
+				select nvl(sum(purchase_number),0)
+				  from (
+				select count(distinct member_key) purchase_number
+				  from (
+				select (select decode(order_source,1,2,2,1,3,1,4,4,5,3,6,5) from dim_order where order_key = t1.order_key) access_terminal_key,t1.member_key
+				  from fact_order_product_sku t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.create_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <if test="access_terminal_id == 1">
+				   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t1.order_key)
+				   </if>
+				   <if test="access_terminal_id == 2">
+				   and exists (select 1 from dim_order where order_source = 1 and order_key = t1.order_key)
+				   </if>
+				   <if test="access_terminal_id == 4">
+				   and exists (select 1 from dim_order where order_source = 6 and order_key = t1.order_key)
+				   </if>
+				   <if test="access_terminal_id == 31">
+				   and exists (select 1 from dim_order where order_source = 5 and order_key = t1.order_key)
+				   </if>
+				   <if test="access_terminal_id == 32">
+				   and exists (select 1 from dim_order where order_source = 4 and order_key = t1.order_key)
+				   </if>
+				   <include refid="dw_public_psy_where"/>)
+				   group by access_terminal_key)
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 交易总览-订单商品总额 -->
+	<select id="r_queryOrderMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+		<choose>
+			<when test="query_type == 'other'">
+				select nvl(sum(t1.order_money),0) 
+				  from fact_product_sale_d t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.access_terminal_key > 0
+				   and t1.order_count > 0
+				   <include refid="dw_public_psy_where"/>
+				   <if test="access_terminal_id != null and access_terminal_id != ''">
+				   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t1.access_terminal_key)
+				   </if>
+			</when>
+			<otherwise>
+				select nvl(sum(t1.product_money),0) 
+				  from fact_order_product_sku t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.create_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <if test="access_terminal_id == 1">
+				   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t1.order_key)
+				   </if>
+				   <if test="access_terminal_id == 2">
+				   and exists (select 1 from dim_order where order_source = 1 and order_key = t1.order_key)
+				   </if>
+				   <if test="access_terminal_id == 4">
+				   and exists (select 1 from dim_order where order_source = 6 and order_key = t1.order_key)
+				   </if>
+				   <if test="access_terminal_id == 31">
+				   and exists (select 1 from dim_order where order_source = 5 and order_key = t1.order_key)
+				   </if>
+				   <if test="access_terminal_id == 32">
+				   and exists (select 1 from dim_order where order_source = 4 and order_key = t1.order_key)
+				   </if>
+				   <include refid="dw_public_psy_where"/>
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 交易总览-支付买家数 -->
+	<select id="r_queryPayPurchaseNumber" parameterType="java.util.Map" resultType="java.lang.Float">
+		<choose>
+			<when test="query_type == 'other'">
+				select nvl(sum(purchase_number),0)
+				  from (
+				select count(distinct t1.member_key) purchase_number
+				  from fact_product_sale_d t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.access_terminal_key > 0
+				   and t1.pay_money > 0
+				   <if test="access_terminal_id != null and access_terminal_id != ''">
+				   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t1.access_terminal_key)
+				   </if>
+				   <include refid="dw_public_psy_where"/>
+				   group by t1.access_terminal_key)
+			</when>
+			<otherwise>
+				select nvl(sum(purchase_number),0)
+				  from (
+				select count(distinct member_key) purchase_number
+				  from (
+				select (select decode(order_source,1,2,2,1,3,1,4,4,5,3,6,5) from dim_order where order_key = t1.order_key) access_terminal_key,t1.member_key
+				  from fact_order_product_sku t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.payment_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <if test="access_terminal_id == 1">
+				   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t1.order_key)
+				   </if>
+				   <if test="access_terminal_id == 2">
+				   and exists (select 1 from dim_order where order_source = 1 and order_key = t1.order_key)
+				   </if>
+				   <if test="access_terminal_id == 4">
+				   and exists (select 1 from dim_order where order_source = 6 and order_key = t1.order_key)
+				   </if>
+				   <if test="access_terminal_id == 31">
+				   and exists (select 1 from dim_order where order_source = 5 and order_key = t1.order_key)
+				   </if>
+				   <if test="access_terminal_id == 32">
+				   and exists (select 1 from dim_order where order_source = 4 and order_key = t1.order_key)
+				   </if>
+				   <include refid="dw_public_psy_where"/>)
+				   group by access_terminal_key)
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 交易总览-销售总额 -->
+	<select id="r_queryPayMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+		<choose>
+			<when test="query_type == 'other'">
+				select nvl(sum(t1.pay_money),0) 
+				  from fact_product_sale_d t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.access_terminal_key > 0
+				   and t1.pay_money > 0
+				   <if test="access_terminal_id != null and access_terminal_id != ''">
+				   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t1.access_terminal_key)
+				   </if>
+				   <if test="brand_id !=null and brand_id !=0">
+				   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+				   </if>
+				   <include refid="dw_public_psy_where"/>
+			</when>
+			<otherwise>
+				select nvl(sum(t1.pay_money),0) 
+				  from fact_order_product_sku t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.payment_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <if test="access_terminal_id == 1">
+				   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t1.order_key)
+				   </if>
+				   <if test="access_terminal_id == 2">
+				   and exists (select 1 from dim_order where order_source = 1 and order_key = t1.order_key)
+				   </if>
+				   <if test="access_terminal_id == 4">
+				   and exists (select 1 from dim_order where order_source = 6 and order_key = t1.order_key)
+				   </if>
+				   <if test="access_terminal_id == 31">
+				   and exists (select 1 from dim_order where order_source = 5 and order_key = t1.order_key)
+				   </if>
+				   <if test="access_terminal_id == 32">
+				   and exists (select 1 from dim_order where order_source = 4 and order_key = t1.order_key)
+				   </if>
+				   <if test="brand_id !=null and brand_id !=0">
+				   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+				   </if>
+				   <include refid="dw_public_psy_where"/>
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 交易总览-预定订单的定金 -->
+	<select id="r_queryPreFirstMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t1.product_money*(t2.earnest_money/t2.product_money)),0) 
+		  from fact_pre_order_product t1 ,fact_pre_order t2,dim_date dt,dim_product dp,dim_member dm
+		 where t1.order_key = t2.order_key
+		   and t1.payment_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_pre_order where order_source in (2,3) and order_key = t1.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_pre_order where order_source = 1 and order_key = t1.order_key)
+		   </if>
+		   <if test="access_terminal_id == 4">
+		   and 1=2
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_pre_order where order_source = 5 and order_key = t1.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_pre_order where order_source = 4 and order_key = t1.order_key)
+		   </if>
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+		   </if>
+		   <include refid="dw_public_psy_where"/>
+	</select>
+	<!-- 交易趋势-商品访客数 -->
+	<select id="r_queryTrend_ProductVisitorCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		<choose>
+			<when test="query_type == 'other'">
+				select count(distinct t1.member_key) 
+				  from fact_user_log_product_pv_d t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.log_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <if test="brand_id !=null and brand_id !=0">
+				   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+				   </if>
+				   <include refid="dw_public_psy_where"/>
+			</when>
+			<otherwise>
+				select count(distinct t1.member_key) product_visitor_count
+				  from fact_user_log_product t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.log_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <if test="brand_id !=null and brand_id !=0">
+				   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+				   </if>
+				   <include refid="dw_public_psy_where"/>
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 交易趋势-支付买家数 -->
+	<select id="r_queryTrend_PayPurchaseNumber" parameterType="java.util.Map" resultType="java.lang.Float">
+		<choose>
+			<when test="query_type == 'other'">
+				select count(distinct t1.member_key)
+				  from fact_product_sale_d t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.pay_money > 0
+				   <if test="brand_id !=null and brand_id !=0">
+				   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+				   </if>
+				   <include refid="dw_public_psy_where"/>
+			</when>
+			<otherwise>
+				select count(distinct t1.member_key)
+				  from fact_order_product_sku t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.payment_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <if test="brand_id !=null and brand_id !=0">
+				   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+				   </if>
+				   <include refid="dw_public_psy_where"/>
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 交易趋势-下单买家数 -->
+	<select id="r_queryTrend_PurchaseNumber" parameterType="java.util.Map" resultType="java.lang.Float">
+		<choose>
+			<when test="query_type == 'other'">
+				select count(distinct t1.member_key)
+				  from fact_product_sale_d t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.order_count > 0
+				   <if test="brand_id !=null and brand_id !=0">
+				   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+				   </if>
+				   <include refid="dw_public_psy_where"/>
+			</when>
+			<otherwise>
+				select count(distinct t1.member_key)
+				  from fact_order_product_sku t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.create_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <if test="brand_id !=null and brand_id !=0">
+				   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+				   </if>
+				   <include refid="dw_public_psy_where"/>
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 交易趋势-订单笔数 -->
+	<select id="r_queryTrend_OrderNum" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(distinct t1.order_key)
+		  from fact_order_product_sku t1,dim_date dt,dim_product dp,dim_member dm
+		 where t1.create_date_key = dt.date_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+		   </if>
+		   <include refid="dw_public_psy_where"/>
+	</select>
+	<!-- 交易趋势-订单商品数 -->
+	<select id="r_queryTrend_OrderCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		<choose>
+			<when test="query_type == 'other'">
+				select nvl(sum(t1.order_count),0)
+				  from fact_product_sale_d t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.order_count > 0
+				   <if test="brand_id !=null and brand_id !=0">
+				   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+				   </if>
+				   <include refid="dw_public_psy_where"/>
+			</when>
+			<otherwise>
+				select nvl(sum(t1.product_count),0)
+				  from fact_order_product_sku t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.create_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <if test="brand_id !=null and brand_id !=0">
+				   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+				   </if>
+				   <include refid="dw_public_psy_where"/>
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 交易趋势-成功退款金额 -->
+	<select id="r_queryTrend_ReturnMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t1.product_money),0)
+		  from fact_aso_refund_product t1,dim_date dt,dim_product dp,dim_member dm
+		 where t1.aso_refund_date_key = dt.date_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+  		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+		   </if>
+		   <include refid="dw_public_psy_where"/>
+	</select>
+	<!-- 交易趋势-下单买家数、订单商品数 折线图<天> -->
+	<select id="r_queryTrend_PurchaseNumberCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_value as create_date,count(distinct a.member_key) purchase_number,nvl(sum(a.product_count),0) order_count
+		  from
+		(select t1.create_date_time_key,t1.member_key,t1.order_key,t1.product_count
+		  from fact_order_product_sku t1,dim_date dt,dim_product dp,dim_member dm
+		 where t1.create_date_key = dt.date_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+		   </if>
+		   <include refid="dw_public_psy_where"/>) a,dim_time dt
+		   where a.create_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+	</select>
+	<!-- 交易趋势-订单笔数 -->
+	<select id="r_queryTrend_OrderNumD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_value as create_date,count(distinct a.order_key) order_num
+		  from
+		(select t1.create_date_time_key,t1.member_key,t1.order_key,t1.product_count
+		  from fact_order_product_sku t1,dim_date dt,dim_product dp,dim_member dm
+		 where t1.create_date_key = dt.date_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+		   </if>
+		   <include refid="dw_public_psy_where"/>) a,dim_time dt
+		   where a.create_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+	</select>
+	<!-- 交易趋势-支付买家数、销售总额 折线图<天> -->
+	<select id="r_queryTrend_PayPurchaseNumberMoneyD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_value as create_date,count(distinct a.member_key) purchase_number,nvl(sum(a.pay_money),0) pay_money
+		  from
+		(select t1.payment_date_time_key,t1.member_key,t1.pay_money
+		  from fact_order_product_sku t1,dim_date dt,dim_product dp,dim_member dm
+		 where t1.payment_date_key = dt.date_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+		   </if>
+		   <include refid="dw_public_psy_where"/>) a,dim_time dt
+		   where a.payment_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+	</select>
+	<!-- 交易趋势-预定订单的定金 折线图<天> -->
+	<select id="r_queryTrend_PreFirstMoneyD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_value as create_date,nvl(sum(a.pre_first_money),0) pre_first_money
+		  from
+		(select t1.payment_date_time_key,nvl(t1.product_money*(t2.earnest_money/t2.product_money),0) pre_first_money
+		  from fact_pre_order_product t1,fact_pre_order t2,dim_date dt,dim_product dp,dim_member dm
+		 where t1.order_key = t2.order_key
+		   and t1.payment_date_key = dt.date_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+		   </if>
+		   <include refid="dw_public_psy_where"/>) a,dim_time dt
+           where a.payment_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+	</select>
+	<!-- 交易趋势-成功退款金额 折线图<天> -->
+	<select id="r_queryTrend_ReturnMoneyD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_value create_date,nvl(sum(a.product_money),0) return_money
+		  from
+		(select t1.aso_refund_date_time_key,t1.product_money
+		  from fact_aso_refund_product t1,dim_date dt,dim_product dp,dim_member dm
+		 where t1.aso_refund_date_key = dt.date_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+		   </if>
+		   <include refid="dw_public_psy_where"/>) a,dim_time dt
+		   where a.aso_refund_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+	</select>
+	<!-- 交易趋势-订单笔数 折线图 -->
+	<select id="r_queryTrend_OrderNum_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.date_values as create_date,count(distinct t1.order_key) order_num
+		  from fact_order_product_sku t1,dim_date dt,dim_product dp,dim_member dm
+		 where t1.create_date_key = dt.date_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+		   </if>
+		   <include refid="dw_public_psy_where"/>
+		   group by dt.date_values
+	</select>
+	<!-- 交易趋势-下单买家数、订单商品数 折线图 -->
+	<select id="r_queryTrend_PurchaseNumberCount_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		<choose>
+			<when test="query_type == 'other'">
+				select dt.date_values as create_date,count(distinct t1.member_key) purchase_number,nvl(sum(t1.order_count),0) order_count
+				  from fact_product_sale_d t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.order_count > 0
+				   <if test="brand_id !=null and brand_id !=0">
+				   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+				   </if>
+				   <include refid="dw_public_psy_where"/>
+				   group by dt.date_values
+			</when>
+			<otherwise>
+				select dt.date_values as create_date,count(distinct t1.member_key) purchase_number,nvl(sum(t1.product_count),0) order_count
+				  from fact_order_product_sku t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.create_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <if test="brand_id !=null and brand_id !=0">
+				   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+				   </if>
+				   <include refid="dw_public_psy_where"/>
+				   group by dt.date_values
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 交易趋势-支付买家数、销售总额 折线图 -->
+	<select id="r_queryTrend_PayPurchaseNumberMoney_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		<choose>
+			<when test="query_type == 'other'">
+				select dt.date_values as create_date,count(distinct t1.member_key) purchase_number,nvl(sum(t1.pay_money),0) pay_money
+				  from fact_product_sale_d t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.pay_money > 0
+				   <if test="brand_id !=null and brand_id !=0">
+				   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+				   </if>
+				   <include refid="dw_public_psy_where"/>
+				   group by dt.date_values
+			</when>
+			<otherwise>
+				select dt.date_values as create_date,count(distinct t1.member_key) purchase_number,nvl(sum(t1.pay_money),0) pay_money
+				  from fact_order_product_sku t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.payment_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <if test="brand_id !=null and brand_id !=0">
+				   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+				   </if>
+				   <include refid="dw_public_psy_where"/>
+				   group by dt.date_values
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 交易趋势-预定订单的定金 折线图 -->
+	<select id="r_queryTrend_PreFirstMoney_Chart"  parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.date_values as create_date,nvl(sum(t1.product_money*(t2.earnest_money/t2.product_money)),0) pre_first_money
+		  from fact_pre_order_product t1,fact_pre_order t2,dim_date dt,dim_product dp,dim_member dm
+		 where t1.order_key = t2.order_key
+		   and t1.payment_date_key = dt.date_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+		   </if>
+		   <include refid="dw_public_psy_where"/>
+		   group by dt.date_values
+	</select>
+	<!-- 交易趋势-成功退款金额 折线图 -->
+	<select id="r_queryTrend_ReturnMoney_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		<choose>
+			<when test="query_type == 'other'">
+				select dt.date_values as create_date, nvl(sum(t1.product_money),0) return_money
+				  from fact_returns_product_sku_d t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.refund_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <if test="brand_id !=null and brand_id !=0">
+				   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+				   </if>
+				   <include refid="dw_public_psy_where"/>
+		           group by dt.date_values
+			</when>
+			<otherwise>
+				select dt.date_values as create_date,nvl(sum(t1.product_money),0) return_money
+				  from fact_aso_refund_product t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.aso_refund_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <if test="brand_id !=null and brand_id !=0">
+				   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+				   </if>
+				   <include refid="dw_public_psy_where"/>
+				   group by dt.date_values
+			</otherwise>
+		</choose>
+	</select>
+							<!-- #################        交易构成         ################ -->
+	<!-- 终端列表 -->
+	<select id="r_queryTerminalList" parameterType="java.util.Map" resultType="java.util.Map">
+		select access_terminal_id,
+				case when access_terminal_os is null then access_terminal_name
+				else access_terminal_name||'('||access_terminal_os||')' end access_terminal_name
+		  from dim_access_terminal
+		 order by access_terminal_id
+	</select>
+	<!-- 终端构成-商品访客数 -->
+	<select id="r_queryTerminal_ProductVisitorCount" parameterType="java.util.Map" resultType="java.util.Map">
+		<choose>
+			<when test="query_type == 'other'">
+				select (select access_terminal_id from dim_access_terminal where access_terminal_key = a.access_terminal_key) access_terminal_id,
+				  	   visitor_count
+	              from (select t1.access_terminal_key,count(distinct t1.member_key) visitor_count
+				  from fact_user_log_product_pv_d t1, dim_date dt,dim_product dp,dim_member dm
+				 where t1.log_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+			   	   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+			   	   and t1.access_terminal_key > 0
+				   <include refid="dw_public_psy_where"/>
+				   group by t1.access_terminal_key) a 
+			</when>
+			<otherwise>
+				select (select access_terminal_id from dim_access_terminal where access_terminal_key = a.access_terminal_key) access_terminal_id,
+				  	   visitor_count
+	              from (select t1.access_terminal_key,count(distinct t1.member_key) visitor_count
+				  from fact_user_log_product t1, dim_date dt,dim_product dp,dim_member dm
+				 where t1.log_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+			   	   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+			   	   and t1.access_terminal_key > 0
+				   <include refid="dw_public_psy_where"/>
+				   group by t1.access_terminal_key) a 
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 终端构成-支付买家数、销售总额、支付商品数 -->
+	<select id="r_queryTerminal_PayPurchaseNumberMoneyCount" parameterType="java.util.Map" resultType="java.util.Map">
+		<choose>
+			<when test="query_type == 'other'">
+				select (select access_terminal_id from dim_access_terminal where access_terminal_key = a.access_terminal_key) access_terminal_id,
+               			purchase_number,pay_count,pay_money
+				  from
+					(select t1.access_terminal_key,count(distinct t1.member_key) purchase_number,nvl(sum(t1.pay_count),0) pay_count,nvl(sum(t1.pay_money),0) pay_money
+					  from fact_product_sale_d t1,dim_date dt,dim_product dp,dim_member dm
+					 where t1.date_key = dt.date_key
+			           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   	   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   	   and t1.pay_money > 0
+					   <include refid="dw_public_psy_where"/>
+					   group by t1.access_terminal_key) a
+			</when>
+			<otherwise>
+				select a.access_terminal_id,count(distinct a.member_key) purchase_number,nvl(sum(a.product_count),0) pay_count,nvl(sum(a.pay_money),0) pay_money
+				  from
+					(select (select decode(order_source,1,2,2,1,3,1,4,32,5,31,6,4) from dim_order where order_key = t1.order_key) access_terminal_id,t1.member_key,t1.product_count,t1.pay_money
+					  from fact_order_product_sku t1,dim_date dt,dim_product dp,dim_member dm
+					 where t1.payment_date_key = dt.date_key
+			           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   	   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+					   <include refid="dw_public_psy_where"/>
+					   ) a
+					   group by a.access_terminal_id
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 终端构成-预定订单的定金 -->
+	<select id="r_queryTerminal_PreFirstMoney" parameterType="java.util.Map" resultType="java.util.Map">
+		select a.access_terminal_id,nvl(sum(a.pre_first_money),0) pre_first_money
+		  from
+			(select (select decode(order_source,1,2,2,1,3,1,4,32,5,31) from dim_pre_order where order_key = t1.order_key) access_terminal_id,t1.member_key,nvl(t1.product_money*(t2.earnest_money/t2.product_money),0) pre_first_money
+			  from fact_pre_order_product t1,fact_pre_order t2,dim_date dt,dim_product dp,dim_member dm
+			 where t1.order_key = t2.order_key
+		   	   and t1.payment_date_key = dt.date_key
+	           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   	   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+			   <include refid="dw_public_psy_where"/>) a
+			   group by a.access_terminal_id
+	</select>
+	<!-- 商品分类列表 -->
+	<select id="queryProductTypeList" parameterType="java.util.Map" resultType="java.util.Map">
+		select id,
+			   type_name
+		  from tbl_dic_product_type
+		 where parent_id = 0
+		 order by sortid desc
+	</select>
+	<!-- 商品类目构成 -->
+	<select id="r_queryProductClassifyFrom" parameterType="java.util.Map" resultType="java.util.Map">
+		select t.id,
+			   t.type_name,
+			   nvl(t1.visitor_count,0) visitor_count,
+			   nvl(t2.purchase_number,0) purchase_number,
+			   nvl(t2.sale_count,0) sale_count,
+			   nvl(t2.payment_money,0) payment_money
+		  from (<foreach collection="list" item="item" separator="union all">
+			  		select #{item.ID} id,
+			  			   #{item.TYPE_NAME} type_name
+			  		  from dual
+			  	</foreach>) t
+		  left join (select t1.product_first_classify,count(distinct t.member_key) visitor_count
+			  from fact_user_log_product t,dim_product t1,dim_date dt
+			 where t.product_key = t1.product_key
+			   and t.log_date_key = dt.date_key
+	           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   	   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+			   group by t1.product_first_classify) t1 on t1.product_first_classify = t.id
+		  left join (select t1.product_first_classify,count(distinct t.member_key) purchase_number,nvl(sum(t.product_count),0) sale_count,nvl(sum(t.pay_money),0) payment_money
+			  from fact_order_product_sku t,dim_product t1,dim_date dt
+			 where t.product_key = t1.product_key
+			   and t.payment_date_key = dt.date_key
+	           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+			   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+			   group by t1.product_first_classify) t2 on t2.product_first_classify = t.id
+	</select>
+	<!-- 品牌列表 -->
+	<select id="r_queryBrandList" parameterType="java.util.Map" resultType="java.util.Map">
+		select id,
+			   brand_name,
+			   logo
+		  from qx_dic_product_brand	t
+		 where t.id in 
+		 <foreach collection="brandList" item="item" open="(" close=")" separator=",">
+            #{item,jdbcType=INTEGER}
+         </foreach>
+		 order by
+			decode(t.id
+				<foreach collection="brandList" item="item" index="_index" open="," close="" separator=",">
+		            #{item},${_index}
+		        </foreach>)
+	</select>
+	<!-- 品牌构成-商品访客数 -->
+	<select id="r_queryBrand_ProductVisitorCount" parameterType="java.util.Map" resultType="java.util.Map">
+		<choose>
+			<when test="query_type == 'other'">
+				select dp.brand_id,count(distinct t1.member_key) visitor_count
+				  from fact_user_log_product_pv_d t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.log_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and dp.brand_id in 
+				   <foreach collection="brandList" item="item" open="(" close=")" separator=",">
+		              #{item,jdbcType=INTEGER}
+		           </foreach>
+				   <include refid="dw_public_psy_where"/>
+				   group by dp.brand_id
+			</when>
+			<otherwise>
+				select dp.brand_id,count(distinct t1.member_key) visitor_count
+				  from fact_user_log_product t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.log_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and dp.brand_id in 
+				   <foreach collection="brandList" item="item" open="(" close=")" separator=",">
+		              #{item,jdbcType=INTEGER}
+		           </foreach>
+				   <include refid="dw_public_psy_where"/>
+				   group by dp.brand_id
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 品牌构成-支付买家数、销售总额、支付商品数 -->
+	<select id="r_queryBrand_PayPurchaseNumberMoneyCount" parameterType="java.util.Map" resultType="java.util.Map">
+		<choose>
+			<when test="query_type == 'other'">
+				select dp.brand_id,count(distinct t1.member_key) purchase_number,nvl(sum(t1.pay_money),0) pay_money,nvl(sum(t1.pay_count),0) pay_count
+				  from fact_product_sale_d t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.pay_money > 0
+				   and dp.brand_id in 
+				   <foreach collection="brandList" item="item" open="(" close=")" separator=",">
+		              #{item,jdbcType=INTEGER}
+		           </foreach>
+				   <include refid="dw_public_psy_where"/>
+				   group by dp.brand_id
+			</when>
+			<otherwise>
+				select dp.brand_id,count(distinct t1.member_key) purchase_number,nvl(sum(t1.pay_money),0) pay_money,nvl(sum(t1.product_count),0) pay_count
+				  from fact_order_product_sku t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.payment_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and dp.brand_id in 
+				   <foreach collection="brandList" item="item" open="(" close=")" separator=",">
+		              #{item,jdbcType=INTEGER}
+		           </foreach>
+				   <include refid="dw_public_psy_where"/>
+				   group by dp.brand_id
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 品牌构成-预定订单的定金 -->
+	<select id="r_queryBrand_PreFirstMoney" parameterType="java.util.Map" resultType="java.util.Map">
+		select dp.brand_id,nvl(sum(t1.product_money*(t2.earnest_money/t2.product_money)),0) pre_first_money
+		  from fact_pre_order_product t1 ,fact_pre_order t2,dim_date dt,dim_product dp,dim_member dm
+		 where t1.order_key = t2.order_key
+		   and t1.payment_date_key = dt.date_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.brand_id in 
+		   <foreach collection="brandList" item="item" open="(" close=")" separator=",">
+              #{item,jdbcType=INTEGER}
+           </foreach>
+		   <include refid="dw_public_psy_where"/>
+		   group by dp.brand_id
+	</select>
+	<!-- 品牌构成-所有品牌的支付总金额 -->
+	<select id="r_queryBrand_AllPayMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+		<choose>
+			<when test="query_type == 'other'">
+				select nvl(sum(t1.pay_money),0) 
+				  from fact_product_sale_d t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.pay_money > 0
+				   and exists (select 1 from dim_product dp where product_key = t1.product_key and exists (select 1 from qx_dic_product_brand where id = dp.brand_id and state = 2))
+				   <include refid="dw_public_psy_where"/>
+			</when>
+			<otherwise>
+				select nvl(sum(t1.pay_money),0) 
+				  from fact_order_product_sku t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.payment_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and exists (select 1 from dim_product dp where product_key = t1.product_key and exists (select 1 from qx_dic_product_brand where id = dp.brand_id and state = 2))
+				   <include refid="dw_public_psy_where"/>
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 品牌构成-所有品牌的预定订单的定金 -->
+	<select id="r_queryBrand_AllPreFirstMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t1.product_money*(t2.earnest_money/t2.product_money)),0) 
+		  from fact_pre_order_product t1 ,fact_pre_order t2,dim_date dt,dim_product dp,dim_member dm
+		 where t1.order_key = t2.order_key
+		   and t1.payment_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and exists (select 1 from dim_product dp where product_key = t1.product_key and exists (select 1 from qx_dic_product_brand where id = dp.brand_id and state = 2))
+		   <include refid="dw_public_psy_where"/>
+	</select>
+	<!-- 数据趋势-支付买家数、销售总额、支付商品数和支付订单数 折线图 -->
+	<select id="r_queryDataTrend_PayPurchaseNumberMoneyCount_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.date_values as create_date,count(distinct t1.member_key) purchase_number,nvl(sum(t1.pay_money),0) pay_money,nvl(sum(t1.product_count),0) pay_count,
+		  	   count(distinct t1.order_key) order_num
+		  from fact_order_product_sku t1,dim_date dt,dim_product dp,dim_member dm
+		 where t1.payment_date_key = dt.date_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <if test="access_terminal_id == 1">
+		    and exists (select 1 from dim_order where order_source in (2,3) and order_key = t1.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		    and exists (select 1 from dim_order where order_source = 1 and order_key = t1.order_key)
+		   </if>
+		   <if test="access_terminal_id == 4">
+		    and exists (select 1 from dim_order where order_source = 6 and order_key = t1.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		    and exists (select 1 from dim_order where order_source = 5 and order_key = t1.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		    and exists (select 1 from dim_order where order_source = 4 and order_key = t1.order_key)
+		   </if>
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+		   </if>
+		   <include refid="dw_public_psy_where"/>
+		   group by dt.date_values
+	</select>
+	<!-- 数据趋势-预定订单的定金 折线图 -->
+	<select id="r_queryDataTrend_PreFirstMoney_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.date_values as create_date,nvl(sum(t1.product_money*(t2.earnest_money/t2.product_money)),0) pre_first_money
+		  from fact_pre_order_product t1 ,fact_pre_order t2,dim_date dt,dim_product dp,dim_member dm
+		 where t1.order_key = t2.order_key
+		   and t1.payment_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <if test="access_terminal_id == 1">
+		    and exists (select 1 from dim_pre_order where payment_state = 2 and order_source in (2,3) and order_key = t1.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		    and exists (select 1 from dim_pre_order where payment_state = 2 and order_source = 1 and order_key = t1.order_key)
+		   </if>
+		   <if test="access_terminal_id == 4">
+		    and 1=2
+		   </if>
+		   <if test="access_terminal_id == 31">
+		    and exists (select 1 from dim_pre_order where order_source = 5 and order_key = t1.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		    and exists (select 1 from dim_pre_order where payment_state = 2 and order_source = 4 and order_key = t1.order_key)
+		   </if>
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+		   </if>
+		   <include refid="dw_public_psy_where"/>
+		   group by dt.date_values
+	</select>
+	<!-- 数据趋势-支付买家数、销售总额、支付商品数和支付订单数 折线图<天> -->
+	<select id="r_queryDataTrend_PayPurchaseNumberMoneyCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_value create_date,count(distinct a.member_key) purchase_number,nvl(sum(a.pay_money),0) pay_money,nvl(sum(a.product_count),0) pay_count,
+		  	   count(distinct a.order_key) order_num
+		  from
+		(select t1.payment_date_time_key,t1.member_key,t1.pay_money,t1.product_count,t1.order_key
+		  from fact_order_product_sku t1,dim_date dt,dim_product dp,dim_member dm
+		 where t1.payment_date_key = dt.date_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <if test="access_terminal_id == 1">
+		    and exists (select 1 from dim_order where payment_state = 2 and order_source in (2,3) and order_key = t1.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		    and exists (select 1 from dim_order where payment_state = 2 and order_source = 1 and order_key = t1.order_key)
+		   </if>
+		   <if test="access_terminal_id == 4">
+		    and exists (select 1 from dim_order where order_source = 6 and order_key = t1.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		    and exists (select 1 from dim_order where order_source = 5 and order_key = t1.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		    and exists (select 1 from dim_order where order_source = 4 and order_key = t1.order_key)
+		   </if>
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+		   </if>
+		   <include refid="dw_public_psy_where"/>) a,dim_time dt
+		   where a.payment_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+	</select>
+	<!-- 数据趋势-预定订单的定金 折线图<天> -->
+	<select id="r_queryDataTrend_PreFirstMoneyD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_value as create_date,nvl(sum(a.pre_first_money),0) pre_first_money
+		  from
+		(select t1.payment_date_time_key,nvl(t1.product_money*(t2.earnest_money/t2.product_money),0) pre_first_money
+		  from fact_pre_order_product t1 ,fact_pre_order t2,dim_date dt,dim_product dp,dim_member dm
+		 where t1.order_key = t2.order_key
+		   and t1.payment_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <if test="access_terminal_id == 1">
+		    and exists (select 1 from dim_pre_order where payment_state = 2 and order_source in (2,3) and order_key = t1.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		    and exists (select 1 from dim_pre_order where payment_state = 2 and order_source = 1 and order_key = t1.order_key)
+		   </if>
+		   <if test="access_terminal_id == 4">
+		    and 1=2
+		   </if>
+		   <if test="access_terminal_id == 31">
+		    and exists (select 1 from dim_pre_order where order_source = 5 and order_key = t1.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		    and exists (select 1 from dim_pre_order where payment_state = 2 and order_source = 4 and order_key = t1.order_key)
+		   </if>
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t1.product_key)
+		   </if>
+		   <include refid="dw_public_psy_where"/>) a,dim_time dt
+		   where a.payment_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+	</select>
+	<!-- 终端下拉框 -->
+	<resultMap type="java.util.Map" id="terminalSelectMap">
+		<result column="access_terminal_id" property="id"/>
+        <result column="access_terminal_name" property="name"/>
+	</resultMap>
+	<select id="r_queryTerminalSelect" parameterType="java.util.Map" resultMap="terminalSelectMap">
+		select access_terminal_id,
+				case when access_terminal_os is null then access_terminal_name
+				else access_terminal_name||'('||access_terminal_os||')' end access_terminal_name
+		  from dim_access_terminal	
+		 order by access_terminal_id
+	</select>
+	<!-- 品牌下拉框 -->
+	<resultMap type="java.util.Map" id="brandSelectMap">
+		<result column="id" property="id"/>
+        <result column="brand_name" property="name"/>
+	</resultMap>
+	<select id="r_queryBrandSelect" parameterType="java.util.Map" resultMap="brandSelectMap">
+		select id,
+			   brand_name
+		  from qx_dic_product_brand
+		 where state = 2
+		 order by sortid desc
+	</select>
+	<!-- 查询默认排序的品牌列表 -->
+	<select id="r_queryBrandListBy_Default" parameterType="java.util.Map" resultType="string">
+		select id
+		  from qx_dic_product_brand	
+		 where state = 2
+		 order by sortid desc
+	</select>
+	<!-- 排序获取某一页的品牌列表-商品访客数 -->
+	<select id="r_queryProductVisitorCount_Brand" parameterType="java.util.Map" resultType="string">
+		<choose>
+			<when test="query_type == 'other'">
+				select id
+				  from (
+				select t.id,nvl(t1.p_visitor_count,0) p_visitor_count
+				  from qx_dic_product_brand t,(
+				select dp.brand_id,count(distinct t1.member_key) p_visitor_count
+				  from fact_user_log_product_pv_d t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.log_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and dp.brand_id is not null
+				   <include refid="dw_public_psy_where"/>
+				   group by dp.brand_id) t1
+				   where t.id = t1.brand_id(+)
+				     and t.state = 2
+				   order by ${sort} ${sort_by})
+			</when>
+			<otherwise>
+				select id
+				  from (
+				select t.id,nvl(t1.p_visitor_count,0) p_visitor_count
+				  from qx_dic_product_brand t,(
+				select dp.brand_id,count(distinct t1.member_key) p_visitor_count
+				  from fact_user_log_product t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.log_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and dp.brand_id is not null
+				   <include refid="dw_public_psy_where"/>
+				   group by dp.brand_id) t1
+				   where t.id = t1.brand_id(+)
+				     and t.state = 2
+				   order by ${sort} ${sort_by})
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 排序获取某一页的品牌列表-销售总额 -->
+	<select id="r_queryPayMoney_Brand" parameterType="java.util.Map" resultType="string">
+		<choose>
+			<when test="query_type == 'other'">
+				select id
+				  from (
+				select t.id,nvl(t1.product_money,0)+nvl(t2.pre_first_money,0) p_money
+				  from qx_dic_product_brand t,(
+				select dp.brand_id,nvl(sum(t1.pay_money),0) product_money
+				  from fact_product_sale_d t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.pay_money > 0
+				   and dp.brand_id is not null
+				   <include refid="dw_public_psy_where"/>
+				   group by dp.brand_id) t1,
+				   (select dp.brand_id,nvl(sum(t1.product_money*(t2.earnest_money/t2.product_money)),0) pre_first_money
+					  from fact_pre_order_product t1 ,fact_pre_order t2,dim_date dt,dim_product dp,dim_member dm
+					 where t1.order_key = t2.order_key
+					   and t1.payment_date_key = dt.date_key
+					   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+					   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+					   and dp.brand_id is not null
+					   <include refid="dw_public_psy_where"/>
+					   group by dp.brand_id) t2
+				   where t.id = t1.brand_id(+)
+				     and t.id = t2.brand_id(+)
+				     and t.state = 2
+				   order by ${sort} ${sort_by})
+			</when>
+			<otherwise>
+				select id
+				  from (
+				select t.id,nvl(t1.product_money,0)+nvl(t2.pre_first_money,0) p_money
+				  from qx_dic_product_brand t,(
+				select dp.brand_id,nvl(sum(t1.pay_money),0) product_money
+				  from fact_order_product_sku t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.payment_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and dp.brand_id is not null
+				   <include refid="dw_public_psy_where"/>
+				   group by dp.brand_id) t1,
+				   (select dp.brand_id,nvl(sum(t1.product_money*(t2.earnest_money/t2.product_money)),0) pre_first_money
+					  from fact_pre_order_product t1 ,fact_pre_order t2,dim_date dt,dim_product dp,dim_member dm
+					 where t1.order_key = t2.order_key
+					   and t1.payment_date_key = dt.date_key
+					   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+					   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+					   and dp.brand_id is not null
+					   <include refid="dw_public_psy_where"/>
+					   group by dp.brand_id) t2
+				   where t.id = t1.brand_id(+)
+				     and t.id = t2.brand_id(+)
+				     and t.state = 2
+				   order by ${sort} ${sort_by})
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 排序获取某一页的品牌列表-销售总额占比 -->
+	<select id="r_queryMoneyRatio_Brand" parameterType="java.util.Map" resultType="string">
+		<choose>
+			<when test="query_type == 'other'">
+				select id
+				  from (
+				select t.id,(nvl(t1.product_money,0)+nvl(t2.pre_first_money,0))/#{allPayMoney,jdbcType=INTEGER} as money_ratio
+				  from qx_dic_product_brand t,(
+				select dp.brand_id,nvl(sum(t1.pay_money),0) product_money
+				  from fact_product_sale_d t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.pay_money > 0
+				   and dp.brand_id is not null
+				   <include refid="dw_public_psy_where"/>
+				   group by dp.brand_id) t1,
+				   (select dp.brand_id,nvl(sum(t1.product_money*(t2.earnest_money/t2.product_money)),0) pre_first_money
+					  from fact_pre_order_product t1 ,fact_pre_order t2,dim_date dt,dim_product dp,dim_member dm
+					 where t1.order_key = t2.order_key
+					   and t1.payment_date_key = dt.date_key
+					   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+					   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+					   and dp.brand_id is not null
+					   <include refid="dw_public_psy_where"/>
+					   group by dp.brand_id) t2
+				   where t.id = t1.brand_id(+)
+				     and t.id = t2.brand_id(+)
+				     and t.state = 2
+				   order by ${sort} ${sort_by})
+			</when>
+			<otherwise>
+				select id
+				  from (
+				select t.id,(nvl(t1.product_money,0)+nvl(t2.pre_first_money,0))/#{allPayMoney,jdbcType=INTEGER} as money_ratio
+				  from qx_dic_product_brand t,(
+				select dp.brand_id,nvl(sum(t1.pay_money),0) product_money
+				  from fact_order_product_sku t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.payment_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and dp.brand_id is not null
+				   <include refid="dw_public_psy_where"/>
+				   group by dp.brand_id) t1,
+				   (select dp.brand_id,nvl(sum(t1.product_money*(t2.earnest_money/t2.product_money)),0) pre_first_money
+					  from fact_pre_order_product t1 ,fact_pre_order t2,dim_date dt,dim_product dp,dim_member dm
+					 where t1.order_key = t2.order_key
+					   and t1.payment_date_key = dt.date_key
+					   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+					   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+					   and dp.brand_id is not null
+					   <include refid="dw_public_psy_where"/>
+					   group by dp.brand_id) t2
+				   where t.id = t1.brand_id(+)
+				     and t.id = t2.brand_id(+)
+				     and t.state = 2
+				   order by ${sort} ${sort_by})
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 排序获取某一页的品牌列表-支付商品数 -->
+	<select id="r_queryPayCount_Brand" parameterType="java.util.Map" resultType="string">
+		<choose>
+			<when test="query_type == 'other'">
+				select id
+				  from (
+				select t.id,nvl(t1.p_count,0) p_count
+				  from qx_dic_product_brand t,(
+				select dp.brand_id,nvl(sum(t1.pay_count),0) p_count
+				  from fact_product_sale_d t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.pay_money > 0
+				   and dp.brand_id is not null
+				   <include refid="dw_public_psy_where"/>
+				   group by dp.brand_id) t1
+				   where t.id = t1.brand_id(+)
+				     and t.state = 2
+				   order by ${sort} ${sort_by})
+			</when>
+			<otherwise>
+				select id
+				  from (
+				select t.id,nvl(t1.p_count,0) p_count
+				  from qx_dic_product_brand t,(
+				select dp.brand_id,nvl(sum(t1.product_count),0) p_count
+				  from fact_order_product_sku t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.payment_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and dp.brand_id is not null
+				   <include refid="dw_public_psy_where"/>
+				   group by dp.brand_id) t1
+				   where t.id = t1.brand_id(+)
+				     and t.state = 2
+				   order by ${sort} ${sort_by})
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 排序获取某一页的品牌列表-支付买家数 -->
+	<select id="r_queryPayPurchaseNumber_Brand" parameterType="java.util.Map" resultType="string">
+		<choose>
+			<when test="query_type == 'other'">
+				select id
+				  from (
+				select t.id,nvl(t1.p_purchase_number,0) p_purchase_number
+				  from qx_dic_product_brand t,(
+				select dp.brand_id,count(distinct t1.member_key) p_purchase_number
+				  from fact_product_sale_d t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.pay_money > 0
+				   and dp.brand_id is not null
+				   <include refid="dw_public_psy_where"/>
+				   group by dp.brand_id) t1
+				   where t.id = t1.brand_id(+)
+				     and t.state = 2
+				   order by ${sort} ${sort_by})
+			</when>
+			<otherwise>
+				select id
+				  from (
+				select t.id,nvl(t1.p_purchase_number,0) p_purchase_number
+				  from qx_dic_product_brand t,(
+				select dp.brand_id,count(distinct t1.member_key) p_purchase_number
+				  from fact_order_product_sku t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.payment_date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and dp.brand_id is not null
+				   <include refid="dw_public_psy_where"/>
+				   group by dp.brand_id) t1
+				   where t.id = t1.brand_id(+)
+				     and t.state = 2
+				   order by ${sort} ${sort_by})
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 排序获取某一页的品牌列表-支付转化率 -->
+	<select id="r_queryPayZhl_Brand" parameterType="java.util.Map" resultType="string">
+		<choose>
+			<when test="query_type == 'other'">
+				select id
+				  from (
+				select t.id,case when nvl(t2.purchase_number,0) = 0 or nvl(t1.visitor_count,0) = 0  then 0
+							else nvl(t2.purchase_number,0)/nvl(t1.visitor_count,0) end p_zhl
+				  from qx_dic_product_brand t,
+				  	   (select dp.brand_id,count(distinct t1.member_key) visitor_count
+						  from fact_user_log_product_pv_d t1,dim_date dt,dim_product dp,dim_member dm
+						 where t1.log_date_key = dt.date_key
+				           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+						   and dp.brand_id is not null
+						   <include refid="dw_public_psy_where"/>
+						   group by dp.brand_id) t1,
+					   (select dp.brand_id,count(distinct t1.member_key) purchase_number
+						  from fact_product_sale_d t1,dim_date dt,dim_product dp,dim_member dm
+						 where t1.date_key = dt.date_key
+				           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   		   and t1.pay_money > 0
+						   and dp.brand_id is not null
+						   <include refid="dw_public_psy_where"/>
+						   group by dp.brand_id) t2
+				 where t.id = t1.brand_id(+)
+				   and t.id = t2.brand_id(+)
+				   and t.state = 2
+				 order by ${sort} ${sort_by})
+			</when>
+			<otherwise>
+				select id
+				  from (
+				select t.id,case when nvl(t2.purchase_number,0) = 0 or nvl(t1.visitor_count,0) = 0  then 0
+							else nvl(t2.purchase_number,0)/nvl(t1.visitor_count,0) end p_zhl
+				  from qx_dic_product_brand t,
+				  	   (select dp.brand_id,count(distinct t1.member_key) visitor_count
+						  from fact_user_log_product t1,dim_date dt,dim_product dp,dim_member dm
+						 where t1.log_date_key = dt.date_key
+				           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+						   and dp.brand_id is not null
+						   <include refid="dw_public_psy_where"/>
+						   group by dp.brand_id) t1,
+					   (select dp.brand_id,count(distinct t1.member_key) purchase_number
+						  from fact_order_product_sku t1,dim_date dt,dim_product dp,dim_member dm
+						 where t1.payment_date_key = dt.date_key
+				           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+						   and dp.brand_id is not null
+						   <include refid="dw_public_psy_where"/>
+						   group by dp.brand_id) t2
+				 where t.id = t1.brand_id(+)
+				   and t.id = t2.brand_id(+)
+				   and t.state = 2
+				 order by ${sort} ${sort_by})
+			</otherwise>
+		</choose>
+	</select>
+</mapper>

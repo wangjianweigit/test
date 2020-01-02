@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.product.dao.ProductBrandDao">
+    <!-- 商品品牌查询字段 -->
+	<sql id="product_brand_all_column">
+		id,
+		brand_name,
+		state,
+        logo,
+		member_service_rate,
+		to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+		sortid,
+		trade_mark_license_img,
+		code,
+		custom_deposit_rate,
+		insole_logo,
+		product_prize_tag_ratio,
+		watermark_img_url,
+		is_watermark,
+		shop_id
+	</sql>
+	<!-- 商品品牌通用查询条件 -->
+    <sql id="product_brand_where_record">
+        <where>
+            <if test="brand_name != null and brand_name != ''">
+	            brand_name = #{brand_name}
+	        </if>
+            <if test="states != null and states != ''">
+	            and state in
+				<foreach item="item" index="index" collection="states" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+	        </if>
+	        <if test="id != null and id != ''">
+	            and id = #{id}
+	        </if>
+	        <if test="code != null and code != ''">
+	            and code = #{code}
+	        </if>
+        </where>
+    </sql>
+   <!-- 查询商品品牌列表 -->
+	<select id="queryProductBrandList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+			select t.*,rownum as rn from (
+				select
+					id,brand_name,code,logo,trade_mark_license_img,
+					state,remark,sortid,member_service_rate,create_date,show,
+					(select ty.type_name from (
+						select bcr.brand_id,to_char(wm_concat(dpy.type_name)) type_name from tbl_brand_classify_rel bcr
+						left join tbl_dic_product_type dpy on bcr.classify_id = dpy.id group by bcr.brand_id
+						) ty where ty.brand_id = id) type_name,
+						CUSTOM_DEPOSIT_RATE,
+						product_prize_tag_ratio
+				from tbl_dic_product_brand <include refid="product_brand_where_record" /> order by sortid desc) t
+				where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn&gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 查询商品品牌列表(下拉框专用) -->
+	<select id="queryProductBrandAllList"  resultType="java.util.Map" resultMap="BrandList">
+		select id,brand_name
+			from  tbl_dic_product_brand where state='2' order by sortid desc
+	</select>
+	<resultMap id="BrandList" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="brand_name" property="option"/>
+    </resultMap>
+	<!-- 查询商品品牌数量 -->
+	<select id="queryProductBrandCount" parameterType="java.util.Map" resultType="int">
+		select count(1) from (select
+			<include refid="product_brand_all_column" />
+		from tbl_dic_product_brand <include refid="product_brand_where_record" />) 
+	</select>
+
+	<!--通过ID获取品牌名称-->
+	<select id="queryById" parameterType="long" resultType="java.util.Map">
+		select <include refid="product_brand_all_column" /> from tbl_dic_product_brand where id = #{id,jdbcType=INTEGER}
+	</select>
+
+	<!--查询品牌分类列表-->
+	<select id="queryBrandClassifyById" parameterType="java.util.Map" resultType="java.util.Map">
+		select
+			bcr.classify_id,
+			dpy.type_name
+		from
+			tbl_brand_classify_rel bcr
+		left join tbl_dic_product_type dpy on bcr.classify_id = dpy.id
+		where bcr.brand_id = #{id,jdbcType=INTEGER}
+	</select>
+
+	<!--通过商品品牌名称获取品牌数量-->
+	<select id="queryBrandCountByNameOrCode" parameterType="java.util.Map" resultType="int">
+		select
+		    count(1)
+		from
+		    tbl_dic_product_brand
+		where
+		    (brand_name = #{brand_name,jdbcType=VARCHAR} or code = #{code,jdbcType=CHAR})
+		<if test="id != null and id != 0">
+			and id != #{id,jdbcType=INTEGER}
+		</if>
+	</select>
+	<!--商品品牌新增-->
+	<insert id="insertProductBrand" parameterType="java.util.Map" >
+		<selectKey keyProperty="id" resultType="int" order="BEFORE">
+			select SEQ_PRODUCT_BRAND.nextval from dual
+		</selectKey>
+		insert into tbl_dic_product_brand
+			(id,
+			brand_name,
+			code,
+			state,
+			remark,
+			create_date,
+			create_user_id,
+			trade_mark_license_img,
+			sortid,
+			logo,
+			member_service_rate,
+			custom_deposit_rate,
+			insole_logo,
+			product_prize_tag_ratio,
+			watermark_img_url,
+			watermark_suffix,
+			is_watermark,
+			shop_id
+			) 
+		values(
+			#{id,jdbcType=INTEGER},
+			#{brand_name,jdbcType=VARCHAR},
+			#{code,jdbcType=VARCHAR},
+			#{state,jdbcType=VARCHAR},
+			#{remark,jdbcType=VARCHAR},
+			sysdate,
+			#{create_user_id,jdbcType=INTEGER},
+			#{trade_mark_license_img,jdbcType=VARCHAR},
+			(select nvl(max(sortid),0)+1 from tbl_dic_product_brand),
+			#{logo,jdbcType=VARCHAR},
+			#{member_service_rate,jdbcType=FLOAT},
+			#{custom_deposit_rate,jdbcType=FLOAT},
+			#{insole_logo,jdbcType=VARCHAR},
+			#{product_prize_tag_ratio,jdbcType=FLOAT},
+			#{watermark_img_url,jdbcType=VARCHAR},
+			#{watermark_suffix,jdbcType=VARCHAR},
+			#{is_watermark,jdbcType=INTEGER},
+			#{shop_id,jdbcType=INTEGER}
+		)
+	</insert>
+
+	<!--批量插入商品品牌的分类-->
+	<insert id ="batchInsertBrandClassify" parameterType ="java.util.List">
+		insert into tbl_brand_classify_rel (brand_id,classify_id)
+		select #{brand_id,jdbcType=INTEGER} as brand_id,classify_id from(
+		<foreach collection="classify_list" item="item" index="index" separator="UNION">
+			select
+				#{item,jdbcType=INTEGER} as classify_id
+			from dual
+		</foreach>
+		) A
+	</insert>
+
+	<!--删除商品品牌的分类-->
+	<delete id="deleteBrandClassify" parameterType="java.util.Map">
+		delete from tbl_brand_classify_rel where brand_id = #{brand_id,jdbcType=INTEGER}
+	</delete>
+	
+	<!--商品品牌编辑更新-->
+	<update  id="updateProductBrand" parameterType="java.util.Map" >
+		update tbl_dic_product_brand
+		<set>
+			<if test="brand_name!=null and brand_name!=''">
+				brand_name = #{brand_name,jdbcType=VARCHAR},
+			</if>
+			<!-- 添加商品是否展示的判断 -->
+			<if test="show!=null and show!=''">
+				show = #{show,jdbcType=VARCHAR},
+			</if>
+			<if test="state!=null and state!=''">
+				state = #{state,jdbcType=VARCHAR},
+			</if>
+			<if test="sortid!=null and sortid!=''">
+				sortid= #{sortid,jdbcType=INTEGER},
+			</if>
+			<if test="code != null and code != ''">
+				code = #{code,jdbcType=CHAR},
+			</if>
+            <if test="logo != null and logo != ''">
+                logo = #{logo,jdbcType=VARCHAR},
+            </if>
+            <if test="insole_logo != null and insole_logo != ''">
+                insole_logo = #{insole_logo,jdbcType=VARCHAR},
+            </if>
+			<if test="trade_mark_license_img != null and trade_mark_license_img != ''">
+				trade_mark_license_img = #{trade_mark_license_img,jdbcType=VARCHAR},
+			</if>
+			<if test="member_service_rate != null">
+				member_service_rate = #{member_service_rate,jdbcType=FLOAT},
+			</if>
+			<if test="custom_deposit_rate != null">
+				custom_deposit_rate = #{custom_deposit_rate,jdbcType=FLOAT},
+			</if>
+			<if test="product_prize_tag_ratio != null">
+				product_prize_tag_ratio = #{product_prize_tag_ratio,jdbcType=FLOAT},
+			</if>
+
+			<if test="watermark_img_url != null and watermark_img_url != ''">
+				watermark_img_url = #{watermark_img_url,jdbcType=VARCHAR},
+			</if>
+			<if test="watermark_suffix != null and watermark_suffix != ''">
+				watermark_suffix = #{watermark_suffix,jdbcType=VARCHAR},
+			</if>
+			<if test="is_watermark != null and is_watermark != 0">
+				is_watermark = #{is_watermark,jdbcType=VARCHAR},
+			</if>
+			<if test="is_watermark != null">
+				shop_id = #{shop_id,jdbcType=INTEGER}
+			</if>
+		</set> 	
+		where id = #{id,jdbcType=INTEGER}
+	</update>
+	
+	<!--商品品牌删除-->
+	<delete id="deleteProductBrand" parameterType="java.util.Map" >
+		delete from tbl_dic_product_brand
+		where id=#{id,jdbcType=INTEGER}
+	</delete>  
+	<!-- 查询品牌信息列表 -->
+	<select id="queryProductBrandInfoList"  resultType="java.util.Map">
+		select id,brand_name,logo
+		  from tbl_dic_product_brand where state='2' order by sortid desc
+	</select>
+
+	<!--通过商品品牌查询商品数量-->
+	<select id="queryProductCountByBrand" parameterType="java.util.Map" resultType="int">
+			select count(1) from tbl_product_info_apply
+            where
+            product_type_id in (
+                    select g.id from tbl_dic_product_type g start with g.id  = #{classify_id,jdbcType=INTEGER}
+                    connect by prior g.id =g.parent_id
+            )
+            and brand_id = #{brand_id,jdbcType=INTEGER}
+	</select>
+
+	<!--查询已开通店铺的入驻商列表-->
+	<resultMap id="openShopStationedMap" type="java.util.Map">
+		<result column="id" property="id"/>
+		<result column="shop_name" property="option"/>
+	</resultMap>
+	<select id="listOpenShopStationed" parameterType="java.util.Map" resultMap="openShopStationedMap">
+		select
+			ui.shop_id as id,
+			si.shop_name
+		from tbl_sta_shop_info si,tbl_stationed_user_info ui
+		where ui.id = si.stationed_user_id and state = 2 and is_open_shop = 2 and si.is_delete = 1
+	</select>
+</mapper>

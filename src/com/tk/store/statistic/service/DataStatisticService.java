@@ -1,0 +1,314 @@
+package com.tk.store.statistic.service;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
+import com.tk.store.member.dao.StoreMemberDao;
+import com.tk.store.statistic.dao.DataStatisticDao;
+import com.tk.sys.config.EsbConfig;
+import com.tk.sys.util.GridResult;
+import com.tk.sys.util.HttpClientUtil;
+import com.tk.sys.util.HttpUtil;
+import com.tk.sys.util.Jackson;
+import com.tk.sys.util.Packet;
+import com.tk.sys.util.PageUtil;
+import com.tk.sys.util.ProcessResult;
+import com.tk.sys.util.Transform;
+/**
+ * 
+ * Copyright (c), 2017, Tongku
+ * FileName : DataStatisticService
+ * 数据统计service层
+ *
+ * @author yejingquan
+ * @version 1.00
+ * @date 2018-3-14
+ */
+@Service("DataStatisticService")
+public class DataStatisticService {
+	
+	@Value("${store_service_url}")
+	private String store_service_url;// 联营门店服务地址
+	@Value("${goods_gather_list}")
+	private String goods_gather_list;//销售动态
+	@Value("${goods_sales}")
+	private String goods_sales;//商品销售排行榜
+	@Value("${psi_list}")
+	private String psi_list;//进销存列表查询
+	
+	@Resource
+	private DataStatisticDao dataStatisticDao;
+	@Resource
+	private StoreMemberDao storeMemberDao;
+	
+	/**
+	 * 交易概况
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryTradingOutlook(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		Map<String, Object> param = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+			}
+			
+			if(StringUtils.isEmpty(paramMap.get("user_id"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数，user_id");
+				return pr;
+			}
+			
+			param.put("AGENT_ID", paramMap.get("user_id"));
+			param.put("ORDER_TYPE", 1);
+			param.put("SHORTCUT_DATE", 0);// 0=今天 1=7天 2=15天 3=30天
+			
+			//调用远程接口
+			Map<String, Object> retMap = (Map<String, Object>) queryForPost(param,store_service_url+goods_gather_list);
+			
+			Map<String, Object> map = (Map<String, Object>) retMap.get("data");
+			if(!StringUtils.isEmpty(map.get("AMOUNT"))){
+				pr.setState(true);
+				pr.setMessage("获取交易概况成功");
+				pr.setObj(map.get("AMOUNT"));
+			}else{
+				pr.setState(true);
+				pr.setMessage("无数据");
+			}
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+		}
+		return pr;
+	}
+	/**
+	 * 销售动态
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult querySale(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		Map<String, Object> param = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+			}
+			
+			if(StringUtils.isEmpty(paramMap.get("user_id"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数，user_id");
+				return pr;
+			}
+			if(StringUtils.isEmpty(paramMap.get("shortcut_date"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数，shortcut_date");
+				return pr;
+			}
+			
+			param.put("AGENT_ID", paramMap.get("user_id"));
+			param.put("ORDER_TYPE", 1);
+			param.put("SHORTCUT_DATE", paramMap.get("shortcut_date"));// 0=今天 1=7天 2=15天 3=30天
+			
+			//调用远程接口
+			Map<String, Object> retMap = (Map<String, Object>) queryForPost(param,store_service_url+goods_gather_list);
+			pr.setState(true);
+			pr.setMessage("获取销售动态数据成功");
+			pr.setObj(retMap.get("data"));
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+		}
+		return pr;
+	}
+	/**
+	 * 商品销售排行
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult querySaleRank(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		Map<String, Object> param = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+			}
+			
+			if(StringUtils.isEmpty(paramMap.get("user_id"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数，user_id");
+				return pr;
+			}
+			if(StringUtils.isEmpty(paramMap.get("shortcut_date"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数，shortcut_date");
+				return pr;
+			}
+			param.put("AGENT_ID", paramMap.get("user_id"));
+			param.put("ORDER_TYPE", 1);
+			param.put("SHORTCUT_DATE", paramMap.get("shortcut_date"));// 0=今天 1=7天 2=15天 3=30天
+			
+			//调用远程接口
+			Map<String, Object> retMap = (Map<String, Object>) queryForPost(param,store_service_url+goods_sales);
+			Map<String, Object> resultMap = new HashMap<String, Object>();
+			Map<String, Object> map = (Map<String, Object>) retMap.get("data");
+			resultMap.put("dataList", (List<Map<String, Object>>) map.get("data"));
+			pr.setState(true);
+			pr.setMessage("获取商品销售排行数据成功");
+			pr.setObj(resultMap);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+		}
+		return pr;
+	}
+	/**
+	 * 门店进销存报表
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryPsiListForPage(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		Map<String, Object> param = new HashMap<String, Object>();
+		List<String> temList=new ArrayList<String>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+			}
+			if(Integer.parseInt(paramMap.get("public_user_type")+"")==1||Integer.parseInt(paramMap.get("public_user_type")+"")==2){
+				if(StringUtils.isEmpty(paramMap.get("region_id"))){
+					//查询所有区域数据
+					List<Map<String, Object>> regionList = storeMemberDao.userSelect(paramMap);
+					for (int i = 0; i < regionList.size(); i++) {
+						temList.add(regionList.get(i).get("id")+"");
+			        }
+					paramMap.put("region_id",temList);
+				}else{
+					 paramMap.put("region_id", (paramMap.get("region_id")+"").split(","));
+				}
+			}else if(Integer.parseInt(paramMap.get("public_user_type")+"")==9){
+				//查询当前区域数据
+				paramMap.put("region_id", (paramMap.get("public_user_id")+"").split(","));
+			}else{
+				gr.setState(true);
+				gr.setMessage("无数据");
+				gr.setTotal(0);
+				return gr;
+			}
+			param.put("index", paramMap.get("pageIndex"));
+			param.put("pageSize", paramMap.get("pageSize"));
+			if(!StringUtils.isEmpty(paramMap.get("region_id"))){
+				param.put("AGENT_ID", dataStatisticDao.queryAgentId(paramMap));
+				if(!StringUtils.isEmpty(paramMap.get("store_id"))) {
+					param.put("STORE_ID", dataStatisticDao.queryStoreId(paramMap));
+				}
+			}
+			
+			if(!StringUtils.isEmpty(paramMap.get("start_date"))){param.put("TIME_START", paramMap.get("start_date"));}
+			if(!StringUtils.isEmpty(paramMap.get("end_date"))){param.put("TIME_END", paramMap.get("end_date"));}
+			
+			Map<String, Object> retMap= (Map<String, Object>) queryForPost(param,store_service_url+psi_list);
+			if(retMap.get("data") instanceof List<?>){
+				gr.setState(true);
+				gr.setMessage("无数据");
+				gr.setTotal(0);
+			}else{
+				if(StringUtils.isEmpty(retMap.get("data"))){
+					gr.setState(false);
+					gr.setMessage(retMap.get("msg").toString());
+					gr.setTotal(0);
+					return gr;
+				}
+				Map<String, Object> map = (Map<String, Object>) retMap.get("data");
+				List<Map<String, Object>> list = (List<Map<String, Object>>) map.get("data");
+				
+				if (list != null && list.size() > 0) {
+					gr.setMessage("获取数据成功");
+					gr.setObj(dataStatisticDao.queryPsiList(list));
+				} else {
+					gr.setMessage("无数据");
+				}
+				if(!StringUtils.isEmpty(map.get("total"))){
+					gr.setTotal(Integer.valueOf(map.get("total").toString()));
+				}else{
+					gr.setTotal(0);
+				}
+				gr.setState(true);
+			}
+		} catch (Exception e) {
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+		}
+		return gr;
+	}
+	
+	/**
+	 * 门店在线支付分析表
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryPayOnlineListForPage(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+			}
+			GridResult pageParamResult = PageUtil.handlePageParams(paramMap);
+			if(pageParamResult!=null){
+				return pageParamResult;
+			}
+			//数量
+			int count = dataStatisticDao.queryPayOnlineCount(paramMap);
+			//列表
+			List<Map<String, Object>> list = dataStatisticDao.queryPayOnlineListForPage(paramMap);
+			if (list != null && list.size() > 0) {
+				gr.setMessage("获取门店在线支付数据成功");
+				gr.setObj(list);
+			} else {
+				gr.setMessage("无数据");
+			}
+			gr.setState(true);
+			gr.setTotal(count);
+		} catch (Exception e) {
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+		}
+		return gr;
+	}
+	
+	public Object queryForPost(Map<String,Object> obj,String url) throws Exception{
+        String params = "";
+        if(obj != null){
+            Packet packet = Transform.GetResult(obj, EsbConfig.ERP_FORWARD_KEY_NAME);//加密数据
+            params = Jackson.writeObject2Json(packet);//对象转json、字符串
+        }
+        //发送至服务端
+        String json = HttpClientUtil.post(url, params,30000);
+        return Transform.GetPacketJzb(json,Map.class);
+    }
+
+}

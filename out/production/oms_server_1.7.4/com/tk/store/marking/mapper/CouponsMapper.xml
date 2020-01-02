@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.store.marking.dao.CouponsDao">
+	<sql id="all_column">
+		temp.id,
+		temp.activity_name,
+		temp.begin_date,
+		temp.end_date,
+		temp.discount,
+		temp.fixed_price,
+		temp.purchase_restriction,
+		temp.state,
+		temp.start_state,
+		temp.reject_reason,
+		temp.activity_type,
+		temp.type,
+		temp.create_date
+	</sql>
+	<sql id="data_access">
+        <if test="partner_user_id != null and partner_user_id !=''">
+            and tui.partner_user_id = #{partner_user_id,jdbcType=INTEGER}
+        </if>
+	</sql>
+    
+    <!-- 商品库数量 -->
+	<select id="queryProductLibraryCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_product_info tpi
+		 where 
+		  <choose>
+		  	<when test="store_ids != null and store_ids != ''">
+				exists (select 1 from tbl_product_store tps where product_itemnumber = tpi.itemnumber
+			   					 and tps.user_id in
+			   					 (select user_id from tbl_store_user_manage where id in
+			   					  <foreach collection="store_ids" item="item" open="(" separator="," close=")">
+						 	  	  	#{item}
+						 	  	  </foreach>))
+			</when>
+		  	<otherwise>
+		  		exists (select 1 from tbl_product_region tpr where product_itemnumber = tpi.itemnumber
+				 				 and tpr.user_id=#{partner_user_id,jdbcType=INTEGER})
+		  	</otherwise>
+		  </choose>
+		  <if test="itemnumber != null and itemnumber !=''">
+	 		  and tpi.itemnumber = #{itemnumber,jdbcType=VARCHAR}
+	 	  </if>
+	 	  <if test="product_type_id != null and product_type_id !=''">
+	 		  and tpi.product_type_id = #{product_type_id,jdbcType=INTEGER}
+	 	  </if>
+	 	  <if test="season_id != null and season_id !=''">
+	 		  and tpi.season_id = #{season_id,jdbcType=INTEGER}
+	 	  </if>
+	 	  <if test="brand_id != null and brand_id !=''">
+	 		  and tpi.brand_id = #{brand_id,jdbcType=INTEGER}
+	 	  </if>
+	 	  <if test="year != null and year !=''">
+	 		  and tpi.year = #{year,jdbcType=INTEGER}
+	 	  </if>
+	 	  <if test="product_itemnumbers != null and product_itemnumbers != ''">
+	 	  	  and tpi.itemnumber not in
+	 	  	  <foreach collection="product_itemnumbers" item="item" open="(" separator="," close=")">
+	 	  	  	#{item}
+	 	  	  </foreach>
+	 	  </if>
+	</select>
+	<!-- 商品库列表 -->
+    <select id="queryProductLibraryListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+    	select * from (
+			select a.*,rownum rn from (
+				select tpi.itemnumber,
+				       tpi.product_name,
+				       tpi.year,
+				       (select brand_name from tbl_dic_product_brand tdpb where tdpb.id = tpi.brand_id)  as brand,
+				       (select type_name from tbl_dic_product_type tdpt where tdpt.id = tpi.product_type_id)  as product_type,
+				       (select name from tbl_dic_product_season tdps where tdps.id = tpi.season_id)  as season,
+				       tpi.product_img_url
+				  from tbl_product_info tpi
+				 where 
+				  <choose>
+				  	<when test="store_ids != null and store_ids != ''">
+						exists (select 1 from tbl_product_store tps where product_itemnumber = tpi.itemnumber
+			   					 and tps.user_id in
+			   					 (select user_id from tbl_store_user_manage where id in
+			   					  <foreach collection="store_ids" item="item" open="(" separator="," close=")">
+						 	  	  	#{item}
+						 	  	  </foreach>))
+					</when>
+				  	<otherwise>
+				  		exists (select 1 from tbl_product_region tpr where product_itemnumber = tpi.itemnumber
+						 				 and tpr.user_id=#{partner_user_id,jdbcType=INTEGER})
+				  	</otherwise>
+				  </choose>
+				  <if test="itemnumber != null and itemnumber !=''">
+			 		  and tpi.itemnumber = #{itemnumber,jdbcType=VARCHAR}
+			 	  </if>
+			 	  <if test="product_type_id != null and product_type_id !=''">
+			 		  and tpi.product_type_id = #{product_type_id,jdbcType=INTEGER}
+			 	  </if>
+			 	  <if test="season_id != null and season_id !=''">
+			 		  and tpi.season_id = #{season_id,jdbcType=INTEGER}
+			 	  </if>
+			 	  <if test="brand_id != null and brand_id !=''">
+			 		  and tpi.brand_id = #{brand_id,jdbcType=INTEGER}
+			 	  </if>
+			 	  <if test="year != null and year !=''">
+			 		  and tpi.year = #{year,jdbcType=INTEGER}
+			 	  </if>
+			 	  <if test="product_itemnumbers != null and product_itemnumbers != ''">
+			 	  	  and tpi.itemnumber not in
+			 	  	  <foreach collection="product_itemnumbers" item="item" open="(" separator="," close=")">
+			 	  	  	#{item}
+			 	  	  </foreach>
+			 	  </if>) a
+		 	where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+    
+    <!-- 门店库 -->
+    <select id="queryStoreLibraryCount" parameterType="java.util.Map" resultType="int">
+    	select count(1)
+    	  from tbl_store_user_manage t
+    	 where t.approval_state=1
+    	 and exists (
+    	 	select 1 from tbl_user_info tui
+    	 	 where id = t.user_id
+    	 	 <include refid="data_access"/>)
+    	 	<if test="store_name != null and store_name != ''">
+	   	    	and t.store_name like '%'||#{store_name,jdbcType=VARCHAR}||'%'
+	   	    </if>
+	   	    <if test="store_mobilephone != null and store_mobilephone != ''">
+	   	    	and t.store_mobilephone like '%'||#{store_mobilephone,jdbcType=VARCHAR}||'%'
+	   	    </if>
+	   	    <if test="user_manage_name != null and user_manage_name != ''">
+	   	    	and exists (select 1 from tbl_user_info where id = t.user_id and user_manage_name like '%'||#{user_manage_name,jdbcType=VARCHAR}||'%')
+	   	    </if>
+	   	    <if test="user_realname != null and user_realname != ''">
+	   	    	and exists (select 1 from tbl_sys_user_info where id = t.create_user_id and user_realname like '%'||#{user_realname,jdbcType=VARCHAR}||'%')
+	   	    </if>
+	   	    <if test="store_ids != null and store_ids != ''">
+	 	  	  and t.id not in
+	 	  	  <foreach collection="store_ids" item="item" open="(" separator="," close=")">
+	 	  	  	#{item}
+	 	  	  </foreach>
+	 	    </if>
+    </select>
+    
+    <!-- 门店库列表 -->
+    <select id="queryStoreLibraryListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+    	select temp.*,
+    		(select user_realname from tbl_sys_user_info where id = temp.create_user_id) user_realname,
+    		(select user_manage_name from tbl_user_info where id = temp.user_id) user_manage_name,
+    		(select name from tbl_dic_region where id =temp.province)||
+    		(select name from tbl_dic_region where id =temp.city)||
+    		(select name from tbl_dic_region where id =temp.county)||temp.store_detail_address as store_address
+    	 from (
+	    	select a.*,rownum rn from (
+				   select t.id,
+				   		  t.store_name,
+				   		  t.user_id,
+				   		  t.store_mobilephone,
+				   		  t.province,
+				   		  t.city,
+				   		  t.county,
+				   		  t.store_detail_address,
+				   		  to_char(t.create_date,'YYYY-MM-DD HH24:MI:SS') create_date,
+				   		  t.create_user_id
+				     from tbl_store_user_manage t
+				     where t.approval_state=1
+		    	     and exists (
+		    	 	   select 1 from tbl_user_info tui
+		    	 	    where id = t.user_id
+		    	 	    <include refid="data_access"/>)
+			    	    <if test="store_name != null and store_name != ''">
+			    	    	and t.store_name like '%'||#{store_name,jdbcType=VARCHAR}||'%'
+			    	    </if>
+			    	    <if test="store_mobilephone != null and store_mobilephone != ''">
+			    	    	and t.store_mobilephone like '%'||#{store_mobilephone,jdbcType=VARCHAR}||'%'
+			    	    </if>
+			    	    <if test="user_manage_name != null and user_manage_name != ''">
+			    	    	and exists (select 1 from tbl_user_info where id = t.user_id and user_manage_name like '%'||#{user_manage_name,jdbcType=VARCHAR}||'%')
+			    	    </if>
+			    	    <if test="user_realname != null and user_realname != ''">
+			    	    	and exists (select 1 from tbl_sys_user_info where id = t.create_user_id and user_realname like '%'||#{user_realname,jdbcType=VARCHAR}||'%')
+			    	    </if>
+			    	    <if test="store_ids != null and store_ids != ''">
+				 	  	  and t.id not in
+				 	  	  <foreach collection="store_ids" item="item" open="(" separator="," close=")">
+				 	  	  	#{item}
+				 	  	  </foreach>
+				 	    </if>
+					   order by t.create_date desc) a
+		 		where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) temp
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+    
+    <!--获取门店所属商家列表-->
+    <select id="queryUserList" parameterType="java.util.Map" resultType="string">
+    	select user_id from tbl_store_user_manage
+    	where id in
+    	 <foreach item="item" collection="store_ids" open="(" separator="," close=")">
+			#{item}
+		</foreach>
+		group by user_id
+    </select>
+    
+    <!--获取商家下的所有门店-->
+    <select id="queryUserStoreList" parameterType="java.util.Map" resultType="string">
+    	select id from tbl_store_user_manage
+    	where id in
+    	 <foreach item="item" collection="store_ids" open="(" separator="," close=")">
+			#{item}
+		</foreach>
+		and user_id=#{user_id,jdbcType=INTEGER}
+    </select>
+    
+    <!--查询门店信息-->
+    <select id="queryStoreList" parameterType="java.util.Map" resultType="java.util.Map">
+    	select id,
+    		   1 as check_type,
+    		   store_name,
+    		   (select name from tbl_dic_region where id =t.province)||
+    		   (select name from tbl_dic_region where id =t.city)||
+    		   (select name from tbl_dic_region where id =t.county)||t.store_detail_address as store_address,
+    		   store_mobilephone,
+    		   (select login_name from tbl_user_info where id = t.user_id) login_name,
+    		   (select user_realname from tbl_sys_user_info where id = t.create_user_id) user_realname,
+    		   to_char(t.create_date,'YYYY-MM-DD HH24:MI:SS') create_date
+    	 from tbl_store_user_manage t
+    	where id in
+    	<foreach item="item" collection="store_ids" open="(" separator="," close=")">
+			#{item}
+		</foreach>
+    </select>
+    
+    <!--查询商品信息-->
+    <select id="queryProductList" parameterType="java.util.Map" resultType="java.util.Map">
+    	select tpi.itemnumber,
+    			1 as check_type,
+		       tpi.product_name,
+		       tpi.year,
+		       (select brand_name from tbl_dic_product_brand tdpb where tdpb.id = tpi.brand_id)  as brand,
+		       (select type_name from tbl_dic_product_type tdpt where tdpt.id = tpi.product_type_id)  as product_type,
+		       (select name from tbl_dic_product_season tdps where tdps.id = tpi.season_id)  as season,
+		       tpi.product_img_url
+		  from tbl_product_info tpi
+    	where itemnumber in
+    	<foreach item="item" collection="product_ids" open="(" separator="," close=")">
+			#{item}
+		</foreach>
+    </select>
+    
+     <!--查询合作商下的门店列表-->
+    <select id="queryStoreByPartner" parameterType="java.util.Map" resultType="string">
+    	SELECT id
+		  FROM tbl_store_user_manage tsum
+		 WHERE EXISTS
+		          (SELECT 1
+		             FROM tbl_user_info tui
+		            WHERE tsum.user_id = tui.id AND PARTNER_USER_ID = #{partner_user_id,jdbcType=INTEGER})
+    	
+    </select>
+    
+</mapper>

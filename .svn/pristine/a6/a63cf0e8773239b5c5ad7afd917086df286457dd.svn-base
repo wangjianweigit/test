@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:rabbit="http://www.springframework.org/schema/rabbit"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/rabbit
+        http://www.springframework.org/schema/rabbit/spring-rabbit.xsd">
+
+	<!--定义queue -->
+	<rabbit:queue name="esb.product.prize.tag.update" durable="true" auto-delete="false" exclusive="false" declared-by="connectAdmin" />
+
+	<!--定义direct exchange, 绑定queue -->
+	<rabbit:direct-exchange name="esb.product.exchange" durable="true" auto-delete="false" declared-by="connectAdmin">
+		<rabbit:bindings>
+			<rabbit:binding queue="esb.product.prize.tag.update" key="esb.product.prize.tag.update"></rabbit:binding>
+		</rabbit:bindings>
+	</rabbit:direct-exchange>
+
+	<!--配置RabbitTemplate -->
+	<rabbit:template id="rabbitTemplate" connection-factory="connectionFactory" exchange="esb.product.exchange" channel-transacted="true" />
+
+</beans>

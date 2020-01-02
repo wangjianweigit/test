@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 新零售商家申请提现操作DAO -->
+<mapper namespace="com.tk.oms.finance.dao.RetailExtractDao">
+	<sql id="all_colum">
+		nwa.id,
+		nwa.withdrawal_number,
+		nwa.new_retail_apply_number,
+		nwa.user_id,
+		nwa.withdrawal_amount,
+		nwa.approval_user_id,
+		to_char(nwa.approval_date,'yyyy-mm-dd hh24:mi:ss') approval_date,
+		nwa.reject_reason,
+		nwa.remit_user_id,
+		to_char(nwa.remit_date,'yyyy-mm-dd hh24:mi:ss') remit_date,
+		nwa.state,
+		nwa.remark,
+		to_char(nwa.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+		nwa.bank_card,
+		nwa.bank_name,
+		nwa.playmoney_voucher_url,
+		nwa.bank_code,
+		nwa.account_name,
+		nwa.withdrawal_type
+	</sql>
+    <!--分页获取新零售商家提现申请单列表-->
+    <select id="queryListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select a.*,rownum rn from (
+            	   select <include refid="all_colum"></include>,
+		                  tui.login_name,
+		                  tui.user_manage_name,
+		                  tui.user_manage_mobilephone,
+		                  (select user_realname from tbl_sys_user_info sui where sui.id = nwa.approval_user_id) approval_user_realname,
+						  (select user_realname from tbl_sys_user_info sui where sui.id = nwa.remit_user_id) remit_user_realname            
+                     from tbl_nr_withdrawal_apply nwa
+                     left join tbl_user_info tui on nwa.user_id = tui.id
+                    where nwa.is_delete = '1'
+                   		  and tui.user_type &lt;&gt;5
+                    	  <if test="state != null and state.size() > 0">
+					        and nwa.state in 
+					    	 <foreach item="s" collection="state" open="(" separator="," close=")">
+					    	 	#{s,jdbcType=INTEGER}
+					    	 </foreach>
+					      </if>
+					      <if test="withdrawal_number != null and withdrawal_number != ''">
+						    and nwa.withdrawal_number like concat(concat('%', #{withdrawal_number,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="new_retail_apply_number != null and new_retail_apply_number !=''">
+						    and nwa.new_retail_apply_number like concat(concat('%', #{new_retail_apply_number,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="login_name!=null and login_name!=''">
+						    and tui.login_name like concat(concat('%', #{login_name,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="user_manage_name != null and user_manage_name != ''">
+						    and tui.user_manage_name like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="phone!=null and phone!=''">
+						    and tui.user_manage_mobilephone like concat(concat('%', #{phone,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="bank_card!=null and bank_card!=''">
+						    and nwa.bank_card like concat(concat('%', #{bank_card,jdbcType=VARCHAR}),'%')
+						  </if>
+			      order by nwa.create_date desc
+            ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--获取新零售商家提现申请总数-->
+    <select id="queryListForCount" parameterType="java.util.Map" resultType="int">
+         		   select count(1)
+                     from tbl_nr_withdrawal_apply nwa
+                     left join tbl_user_info tui 
+                     	  on nwa.user_id = tui.id 
+                    where nwa.is_delete = '1'
+                          and tui.user_type &lt;&gt;5
+                    	  <if test="state != null and state.size() > 0">
+					        and nwa.state in 
+					    	 <foreach item="s" collection="state" open="(" separator="," close=")">
+					    	 	#{s,jdbcType=INTEGER}
+					    	 </foreach>
+					      </if>
+					      <if test="withdrawal_number != null and withdrawal_number != ''">
+						    and nwa.withdrawal_number like concat(concat('%', #{withdrawal_number,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="new_retail_apply_number != null and new_retail_apply_number !=''">
+						    and nwa.new_retail_apply_number like concat(concat('%', #{new_retail_apply_number,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="login_name!=null and login_name!=''">
+						    and tui.login_name like concat(concat('%', #{login_name,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="user_manage_name != null and user_manage_name != ''">
+						    and tui.user_manage_name like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="phone != null and phone !=''">
+						    and tui.user_manage_mobilephone like concat(concat('%', #{phone,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="bank_card!=null and bank_card!=''">
+						    and nwa.bank_card like concat(concat('%', #{bank_card,jdbcType=VARCHAR}),'%')
+						  </if>
+    </select>
+    
+    <!-- 根据ID查询会员提现申请记录 -->
+    <select id="queryById" parameterType="long" resultType="java.util.Map">
+      	   	select <include refid="all_colum"></include>,
+                   tui.login_name,
+                   tui.user_manage_name,
+                   tui.user_manage_mobilephone,
+                   (select user_realname from tbl_sys_user_info sui where sui.id = nwa.approval_user_id) approval_user_realname,
+				   (select user_realname from tbl_sys_user_info sui where sui.id = nwa.remit_user_id) remit_user_realname         
+              from tbl_nr_withdrawal_apply nwa
+              left join tbl_user_info tui 
+              	   on nwa.user_id = tui.id
+             where nwa.is_delete = '1' 
+                   and nwa.id = #{id,jdbcType=INTEGER}
+    </select>
+    
+    <!-- 对用户提现操作记录进行审批 -->
+    <update id="approval" parameterType="java.util.Map">
+    	 update tbl_nr_withdrawal_apply nwa 
+    	    set nwa.state = #{state,jdbcType=VARCHAR},
+		    	nwa.approval_user_id =  #{public_user_id,jdbcType=INTEGER},
+		    	nwa.approval_date =   sysdate,
+		    	nwa.reject_reason =  #{reject_reason,jdbcType=VARCHAR}
+          where nwa.is_delete = '1' 
+          		and nwa.id = #{id,jdbcType=INTEGER}
+    </update>
+    
+    <!-- 对用户提现操作记录进行打款 -->
+    <update id="pay" parameterType="java.util.Map">
+    	 update tbl_nr_withdrawal_apply nwa 
+    	    set nwa.state = #{state,jdbcType=VARCHAR},
+    			nwa.remit_user_id = #{public_user_id,jdbcType=INTEGER},
+    			nwa.remit_date = sysdate,
+    			nwa.playmoney_voucher_url = #{voucher_img_url,jdbcType=VARCHAR}
+          where nwa.is_delete = '1' 
+          	    and nwa.id = #{id,jdbcType=INTEGER}
+    </update>
+</mapper>

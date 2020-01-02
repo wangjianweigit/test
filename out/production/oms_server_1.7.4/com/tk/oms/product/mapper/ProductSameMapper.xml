@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.product.dao.ProductSameDao">
+	<!-- 新增 -->
+	<insert id="insertProductSame" parameterType="java.util.Map">
+		<selectKey keyProperty="id" resultType="int" order="BEFORE">
+			select seq_same_product.nextval from dual
+		</selectKey>
+		insert into tbl_same_product(
+			id,
+			itemnumber,
+			parent_itemnumber
+		) values
+		(
+			#{id,jdbcType=INTEGER},
+			#{itemnumber,jdbcType=VARCHAR},
+			#{parent_itemnumber,jdbcType=VARCHAR}
+		)
+	</insert>
+	
+	<!-- 查询同款商品列表 -->
+    <select id="queryProductSameList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT  A.*,
+    		   (SELECT BRAND_NAME FROM TBL_DIC_PRODUCT_BRAND TDPB WHERE TDPB.ID = A.BRAND_ID)  AS BRAND,
+    		   (SELECT TYPE_NAME FROM TBL_DIC_PRODUCT_TYPE TDPT WHERE TDPT.ID = A.PRODUCT_TYPE_ID)  AS PRODUCT_TYPE,
+    		   (SELECT NAME FROM TBL_DIC_PRODUCT_SEASON TDPS WHERE TDPS.ID = A.SEASON_ID)  AS SEASON
+    	  FROM (SELECT T.*,ROWNUM AS RN
+				  FROM (SELECT TSP.ITEMNUMBER cid,TSP.ITEMNUMBER,TPI.PRODUCT_IMG_URL,TPI.PRODUCT_NAME,TPI.BRAND_ID,
+				  TPI.PRODUCT_TYPE_ID,TPI.SEASON_ID,TPI.YEAR
+				  		  FROM TBL_SAME_PRODUCT TSP,TBL_PRODUCT_INFO TPI
+					    WHERE TSP.ITEMNUMBER=TPI.ITEMNUMBER AND PARENT_ITEMNUMBER='0'
+					    <if test="itemnumber != null and itemnumber != '' ">
+						   AND	TPI.ITEMNUMBER = #{itemnumber,jdbcType=VARCHAR}
+						</if>
+						<if test="year != null and year != '' ">
+							AND	TPI.YEAR = #{year,jdbcType=INTEGER}
+						</if>
+						<if test="product_type_id != null and product_type_id != '' ">
+							AND	TPI.PRODUCT_TYPE_ID = #{product_type_id,jdbcType=INTEGER}
+						</if>
+						<if test="brand_id != null and brand_id != '' ">
+							AND	TPI.BRAND_ID = #{brand_id,jdbcType=INTEGER}
+						</if>
+						<if test="season_id != null and season_id != '' ">
+							AND	TPI.SEASON_ID = #{season_id,jdbcType=INTEGER}
+						</if>
+					    ) T
+		 		 WHERE ROWNUM &lt;= #{end_rownum,jdbcType=INTEGER}) A
+		 WHERE RN &gt; #{start_rownum,jdbcType=INTEGER} 
+	</select>
+	
+	<!-- 查询出满足条件的父级商品以及满足条件的子级商品的父级商品 -->
+    <select id="queryProductSameListByCondition" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT  A.*,
+    		   (SELECT BRAND_NAME FROM TBL_DIC_PRODUCT_BRAND TDPB WHERE TDPB.ID = A.BRAND_ID)  AS BRAND,
+    		   (SELECT TYPE_NAME FROM TBL_DIC_PRODUCT_TYPE TDPT WHERE TDPT.ID = A.PRODUCT_TYPE_ID)  AS PRODUCT_TYPE,
+    		   (SELECT NAME FROM TBL_DIC_PRODUCT_SEASON TDPS WHERE TDPS.ID = A.SEASON_ID)  AS SEASON
+    	  FROM (SELECT T.*,
+               ROWNUM AS RN,
+               TPI.ID,
+               TPI.PRODUCT_IMG_URL,
+               TPI.PRODUCT_NAME,
+               TPI.BRAND_ID,
+               TPI.PRODUCT_TYPE_ID,
+               TPI.SEASON_ID,
+               TPI.YEAR
+          FROM (SELECT TSP.ITEMNUMBER CID, TSP.ITEMNUMBER
+                  FROM TBL_SAME_PRODUCT TSP,TBL_PRODUCT_INFO TPI
+                 WHERE TSP.ITEMNUMBER=TPI.ITEMNUMBER AND PARENT_ITEMNUMBER = '0'
+                 <if test="itemnumber != null and itemnumber != '' ">
+				   AND (TPI.ITEMNUMBER = #{itemnumber,jdbcType=VARCHAR} or exists(select 1 from TBL_SAME_PRODUCT t where t.parent_itemnumber=tsp.itemnumber and t.itemnumber= #{itemnumber,jdbcType=VARCHAR}))
+				</if>
+				<if test="year != null and year != '' ">
+					AND	TPI.YEAR = #{year,jdbcType=INTEGER}
+				</if>
+				<if test="product_type_id != null and product_type_id != '' ">
+					AND	TPI.PRODUCT_TYPE_ID = #{product_type_id,jdbcType=INTEGER}
+				</if>
+				<if test="brand_id != null and brand_id != '' ">
+					AND	TPI.BRAND_ID = #{brand_id,jdbcType=INTEGER}
+				</if>
+				<if test="season_id != null and season_id != '' ">
+					AND	TPI.SEASON_ID = #{season_id,jdbcType=INTEGER}
+				</if>) T,
+               	TBL_PRODUCT_INFO TPI
+         		WHERE T.ITEMNUMBER=TPI.ITEMNUMBER
+		 		 AND ROWNUM &lt;= #{end_rownum,jdbcType=INTEGER}) A
+		 WHERE RN &gt; #{start_rownum,jdbcType=INTEGER}  
+	</select>
+	
+	<!-- 查询出满足条件的父级商品以及满足条件的子级商品的父级商品总数 -->
+    <select id="queryProductSameCountByCondition" parameterType="java.util.HashMap" resultType="int">
+    	     SELECT count(1)
+          FROM (SELECT TSP.ITEMNUMBER cid, TSP.ITEMNUMBER
+                  FROM TBL_SAME_PRODUCT TSP,tbl_product_info TPI
+                 WHERE TSP.ITEMNUMBER=TPI.ITEMNUMBER and PARENT_ITEMNUMBER = '0'
+                 <if test="itemnumber != null and itemnumber != '' ">
+				   AND (TPI.ITEMNUMBER = #{itemnumber,jdbcType=VARCHAR} or exists(select 1 from TBL_SAME_PRODUCT t where t.parent_itemnumber=tsp.itemnumber and t.itemnumber= #{itemnumber,jdbcType=VARCHAR}))
+				</if>
+				<if test="year != null and year != '' ">
+					AND	TPI.YEAR = #{year,jdbcType=INTEGER}
+				</if>
+				<if test="product_type_id != null and product_type_id != '' ">
+					AND	TPI.PRODUCT_TYPE_ID = #{product_type_id,jdbcType=INTEGER}
+				</if>
+				<if test="brand_id != null and brand_id != '' ">
+					AND	TPI.BRAND_ID = #{brand_id,jdbcType=INTEGER}
+				</if>
+				<if test="season_id != null and season_id != '' ">
+					AND	TPI.SEASON_ID = #{season_id,jdbcType=INTEGER}
+				</if>) T,
+               tbl_product_info TPI
+         WHERE t.ITEMNUMBER=TPI.ITEMNUMBER 
+	</select>
+	
+	<!-- 查询指定父级货号同款商品 -->
+    <select id="queryProductSameByParentItemnumber" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT TPI.ID,TSP.PARENT_ITEMNUMBER cid,TSP.ITEMNUMBER,TPI.PRODUCT_IMG_URL,TPI.PRODUCT_NAME,TPI.BRAND_ID,
+			   TPI.PRODUCT_TYPE_ID,TPI.SEASON_ID,TPI.YEAR,
+			   (SELECT BRAND_NAME FROM TBL_DIC_PRODUCT_BRAND TDPB WHERE TDPB.ID = TPI.BRAND_ID)  AS BRAND,
+    		   (SELECT TYPE_NAME FROM TBL_DIC_PRODUCT_TYPE TDPT WHERE TDPT.ID = TPI.PRODUCT_TYPE_ID)  AS PRODUCT_TYPE,
+    		   (SELECT NAME FROM TBL_DIC_PRODUCT_SEASON TDPS WHERE TDPS.ID = TPI.SEASON_ID)  AS SEASON
+				  		  FROM TBL_SAME_PRODUCT TSP,TBL_PRODUCT_INFO TPI
+					    WHERE TSP.ITEMNUMBER=TPI.ITEMNUMBER AND TSP.PARENT_ITEMNUMBER= #{parent_itemnumber,jdbcType=VARCHAR}
+					    ORDER BY TSP.ID desc
+	</select>
+	
+	<!-- 查询同款商品总数 -->
+    <select id="queryProductSameCount" parameterType="java.util.HashMap" resultType="int">
+    	SELECT count(1) FROM TBL_SAME_PRODUCT TSP,TBL_PRODUCT_INFO TPI
+					    WHERE TSP.ITEMNUMBER=TPI.ITEMNUMBER
+							 AND PARENT_ITEMNUMBER= '0'
+	</select>
+	
+	<!-- 删除 -->
+	<delete id="removeProductSame" parameterType="java.util.Map">
+		delete from  tbl_same_product where itemnumber=#{itemnumber,jdbcType=VARCHAR} or parent_itemnumber=#{itemnumber,jdbcType=VARCHAR}
+	</delete>
+	
+	<!-- 查询同款商品详情 -->
+    <select id="queryProductSameDetail" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT TSP.ITEMNUMBER,TSP.PARENT_ITEMNUMBER,TPI.PRODUCT_IMG_URL FROM TBL_SAME_PRODUCT TSP,TBL_PRODUCT_INFO TPI
+					    WHERE TSP.ITEMNUMBER=TPI.ITEMNUMBER
+							 AND (TSP.ITEMNUMBER=#{itemnumber,jdbcType=VARCHAR} or TSP.PARENT_ITEMNUMBER=#{itemnumber,jdbcType=VARCHAR})
+							 ORDER BY TSP.ID
+	</select>
+	
+	
+	<!--判断是否有重复的颜色-->
+	<select id="queryCountByProductSize" parameterType="java.util.Map" resultType="int">
+		 SELECT COUNT (1)
+			  FROM (SELECT product_group_member, product_color
+			          FROM tbl_product_sku
+			         WHERE product_itemnumber = #{parentItemnumber,jdbcType=VARCHAR} AND product_group = '尺码') T1,
+			       (SELECT product_group_member, product_color
+			          FROM tbl_product_sku
+			         WHERE product_itemnumber = #{itemnumber,jdbcType=VARCHAR} AND product_group = '尺码') T2
+			 WHERE     T1.product_group_member = T2.product_group_member
+			       AND T1.product_color = T2.product_color
+	</select>
+
+	<!--查询参加活动商品数量-->
+	<select id="countJoinActivityProduct" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		from tbl_activity_product ap,tbl_activity_info ai
+		where ap.activity_id = ai.id and ai.activity_type in (2,5)
+		and ap.activity_end_date &gt;= sysdate
+		and (ap.product_itemnumber = #{itemnumber,jdbcType=VARCHAR} or ap.product_itemnumber = #{parentItemnumber,jdbcType=VARCHAR})
+	</select>
+	
+</mapper>

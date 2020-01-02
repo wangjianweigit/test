@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.analysis.dao.ProductAnalysisDao">
+
+	<!--获取商品动态总数 -->
+	<select id="queryProductAnalysisCount" parameterType="java.util.Map" resultType="int">
+			select count(1) from tbl_product_info t
+				 where t.PRODUCT_TYPE = 0
+				 <if test="brand_id != null and brand_id != ''">
+                    and t.brand_id=#{brand_id,jdbcType=INTEGER}
+                 </if>
+                 <if test="year != null and year != ''">
+                    and t.year=#{year,jdbcType=INTEGER}
+                 </if>
+                 <if test="season_id != null and season_id != ''">
+                    and t.season_id=#{season_id,jdbcType=INTEGER}
+                 </if>
+                 <if test="itemnumber != null and itemnumber != ''">
+                    and t.itemnumber like '%'||#{itemnumber}||'%'
+                 </if>
+	</select>
+	
+	<!--获取商品动态列表 -->
+	<select id="queryProductAnalysisList" parameterType="java.util.Map" resultType="java.util.Map">
+	select * from (
+					select b.*, rownum rn from (
+			select 
+				  t.itemnumber,t.PRODUCT_IMG_URL,t.BRAND_ID,t.YEAR,to_char(FIRST_SELL_STATE_DATE,'yyyy-mm-dd hh24:mi:ss')  as  FIRST_SELL_STATE_DATE,
+				  nvl(t1.count,0)count,
+				  nvl(t2.lastcount,0)lastcount,
+				  nvl(t3.PRODUCT_TOTAL_MONEY,0)PRODUCT_TOTAL_MONEY,
+				  nvl(t4.last_PRODUCT_TOTAL_MONEY,0)last_PRODUCT_TOTAL_MONEY,
+				  trunc(nvl(t5.return_rate,0)*100,2)  return_rate,
+				  trunc(nvl(t6.last_return_rate,0)*100,2)  last_return_rate,
+				  nvl(t0.cart_count,0)cart_count,
+				  nvl(t3.product_count,0)product_count,
+				  nvl(t4.last_product_count,0)last_product_count,
+				  nvl(t5.return_num,0)return_num,
+				  nvl(t6.last_return_num,0)last_return_num
+				 from  tbl_product_info  t
+				 left join
+				 (  SELECT tps.product_itemnumber,SUM (COUNT) cart_count
+                      FROM tbl_product_sku tps,TBL_USER_CART tuc
+                     WHERE tps.id = tuc.product_sku_id
+                  GROUP BY tps.product_itemnumber)t0 on t.itemnumber = t0.product_itemnumber
+                left join
+				(select a.itemnumber,
+				       b.count
+				  from tbl_product_info a,
+				       (select page_name, count(1) count
+				          from tbl_user_log_info
+				         where page_type = '商品详情'
+				         <if test="start_date != null and start_date != '' and end_date != null and end_date != ''">
+				      		AND create_date BETWEEN to_date(#{start_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS') AND to_date(#{end_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS')
+	                    </if>
+				         group by page_name) b
+				 where a.itemnumber = b.page_name) t1 on t.itemnumber = t1.itemnumber
+				left join (select a.itemnumber,
+				       c.lastcount
+				  from tbl_product_info a,
+				       (select page_name, count(1) lastcount
+				          from tbl_user_log_info
+				         where page_type = '商品详情'
+				           <if test="last_start_date != null and last_start_date != '' and last_end_date != null and last_end_date != ''">
+		                      AND create_date BETWEEN to_date(#{last_start_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS') AND to_date(#{last_end_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS')
+		                   </if>
+				         group by page_name) c
+				 where a.itemnumber = c.page_name) t2 on t.itemnumber = t2.itemnumber
+				 left join (
+				 select a.itemnumber,
+				       b.PRODUCT_TOTAL_MONEY,
+				       b.product_count
+				  from tbl_product_info a,
+				       (select b.PRODUCT_ITEMNUMBER,
+				               sum(b.PRODUCT_TOTAL_MONEY) PRODUCT_TOTAL_MONEY,
+				               sum(b.count)product_count
+				          from TBL_ORDER_PRODUCT_SKU b, tbl_order_info c
+				         where b.ORDER_NUMBER = c.ORDER_NUMBER
+				         <if test="start_date != null and start_date != '' and end_date != null and end_date != ''">
+				         	AND PAYMENT_DATE BETWEEN to_date(#{start_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS') AND to_date(#{end_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS')
+	                    </if>
+				         group by b.PRODUCT_ITEMNUMBER) b
+				 where itemnumber = b.PRODUCT_ITEMNUMBER
+				 )t3 on t.itemnumber = t3.itemnumber
+				 left join (
+				 select a.itemnumber,
+				       b.last_PRODUCT_TOTAL_MONEY,
+				       b.last_product_count
+				  from tbl_product_info a,
+				       (select b.PRODUCT_ITEMNUMBER,
+				               sum(PRODUCT_TOTAL_MONEY) last_PRODUCT_TOTAL_MONEY,
+				               sum(b.count)last_product_count
+				          from TBL_ORDER_PRODUCT_SKU b, tbl_order_info c
+				         where b.ORDER_NUMBER = c.ORDER_NUMBER
+				         <if test="last_start_date != null and last_start_date != '' and last_end_date != null and last_end_date != ''">
+				           AND PAYMENT_DATE BETWEEN to_date(#{last_start_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS') AND to_date(#{last_end_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS')
+	                    </if>
+				         group by b.PRODUCT_ITEMNUMBER) b
+				 where itemnumber = b.PRODUCT_ITEMNUMBER
+				 )t4 on t.itemnumber = t4.itemnumber
+				 left join (
+				 select t3.*,case when nvl(t3.sale_num,0)=0 then 0 else (t3.RETURN_NUM/t3.sale_num) end return_rate from (     
+				    select 
+				         pi.ITEMNUMBER,
+				         NVL(t1.RETURN_NUM,0) RETURN_NUM,
+				         NVL(t2.sale_num,0) sale_num
+				          from
+				          TBL_PRODUCT_info pi left join 
+				         (select PRODUCT_ITEMNUMBER,sum(RETURN_NUM) RETURN_NUM from
+				         (SELECT PS.PRODUCT_ITEMNUMBER,a.PRODUCT_SKU,count(A.PRODUCT_UNIQUE_CODE) RETURN_NUM
+				                   FROM ${jdbc_user}.TBL_NEW_RETURN_CONFIRM a 
+				                   left join ${jdbc_user}.TBL_NEW_RETURN_ORDER b on a.RETURN_NUMBER = b.RETURN_NUMBER
+				                   left join TBL_PRODUCT_SKU ps on ps.ID = a.PRODUCT_SKU
+				                   WHERE a.return_flag = 1 
+				                   <if test="start_date != null and start_date != '' and end_date != null and end_date != ''">
+				                   	  AND REFUND_DATE BETWEEN to_date(#{start_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS') AND to_date(#{end_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS')
+				                    </if>
+				                   GROUP BY PS.PRODUCT_ITEMNUMBER,a.PRODUCT_SKU) temp 
+				                   group by PRODUCT_ITEMNUMBER
+				                   ) t1 on PI.ITEMNUMBER = t1.PRODUCT_ITEMNUMBER
+				                    left join
+				    (select ITEMNUMBER,sum(PRODUCT_COUNT) sale_num from tbl_order_product 
+				    group by ITEMNUMBER) t2 on PI.ITEMNUMBER = t2.ITEMNUMBER)t3
+				    where t3.RETURN_NUM !=0 or t3.sale_num!=0
+				 )t5 on t.itemnumber = t5.itemnumber
+				 left join (
+				 select t3.*,case when nvl(t3.sale_num,0)=0 then 0 else (t3.LAST_RETURN_NUM/t3.sale_num) end last_return_rate from (     
+				    select 
+				         pi.ITEMNUMBER,
+				         NVL(t1.RETURN_NUM,0) LAST_RETURN_NUM,
+				         NVL(t2.sale_num,0) sale_num
+				          from
+				          TBL_PRODUCT_info pi left join 
+				         (select PRODUCT_ITEMNUMBER,sum(RETURN_NUM) RETURN_NUM from
+				         (SELECT PS.PRODUCT_ITEMNUMBER,a.PRODUCT_SKU,count(A.PRODUCT_UNIQUE_CODE) RETURN_NUM
+				                   FROM ${jdbc_user}.TBL_NEW_RETURN_CONFIRM a 
+				                   left join ${jdbc_user}.TBL_NEW_RETURN_ORDER b on a.RETURN_NUMBER = b.RETURN_NUMBER
+				                   left join TBL_PRODUCT_SKU ps on ps.ID = a.PRODUCT_SKU
+				                   WHERE a.return_flag = 1 
+				                   <if test="last_start_date != null and last_start_date != '' and last_end_date != null and last_end_date != ''">
+				                   	  AND REFUND_DATE BETWEEN to_date(#{last_start_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS') AND to_date(#{last_end_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS')
+				                    </if>
+				                   GROUP BY PS.PRODUCT_ITEMNUMBER,a.PRODUCT_SKU) temp 
+				                   group by PRODUCT_ITEMNUMBER
+				                   ) t1 on PI.ITEMNUMBER = t1.PRODUCT_ITEMNUMBER
+				                    left join
+				    (select ITEMNUMBER,sum(PRODUCT_COUNT) sale_num from tbl_order_product 
+				    group by ITEMNUMBER) t2 on PI.ITEMNUMBER = t2.ITEMNUMBER)t3
+				    where t3.LAST_RETURN_NUM !=0 or t3.sale_num!=0
+				 )t6 on t.itemnumber = t6.itemnumber
+				 where t.PRODUCT_TYPE = 0
+						 <if test="brand_id != null and brand_id != ''">
+		                    and t.brand_id=#{brand_id,jdbcType=INTEGER}
+		                 </if>
+		                 <if test="year != null and year != ''">
+		                    and t.year=#{year,jdbcType=INTEGER}
+		                 </if>
+		                 <if test="season_id != null and season_id != ''">
+		                    and t.season_id=#{season_id,jdbcType=INTEGER}
+		                 </if>
+		                 <if test="itemnumber != null and itemnumber != ''">
+		                    and t.itemnumber like '%'||#{itemnumber}||'%'
+		                 </if>
+		                 <if test="sort != null and sort != ''">
+			                    order by ${sort} ${sort_by} ,itemnumber
+			                  </if>
+					) b where
+					rownum &lt;= #{end_rownum})
+					where rn &gt; #{start_rownum}
+	</select>
+	
+	
+	
+	
+	<!--获取商品动态列表 -->
+	<select id="queryProductChartList" parameterType="java.util.Map" resultType="java.util.Map">
+		select '浏览量' type_name,count(1) cnt,TO_CHAR (a.CREATE_DATE, 'YYYY-MM-DD') create_date from TBL_USER_LOG_INFO a,tbl_product_info t
+                <where>
+                    t.itemnumber = a.page_name
+                    and a.page_type = '商品详情'
+                    and t.itemnumber=#{itemnumber,jdbcType=VARCHAR}
+                    <if test="start_time != null and start_time != ''">
+                         and a.CREATE_DATE &gt;= TO_DATE(#{start_time,jdbcType=VARCHAR},'YYYY-MM-DD')
+                     </if>
+                     <if test="end_time != null and end_time != ''">
+                         and a.CREATE_DATE &lt;= TO_DATE(#{end_time,jdbcType=VARCHAR},'YYYY-MM-DD')
+                     </if>
+                </where>
+                group by TO_CHAR (a.CREATE_DATE, 'YYYY-MM-DD')
+                UNION ALL
+                select '已售商品数' type_name ,b.PRODUCT_COUNT cnt,PAYMENT_DATE create_date 
+                  from tbl_product_info a,
+                       (select b.PRODUCT_ITEMNUMBER,
+                               TO_CHAR (PAYMENT_DATE, 'YYYY-MM-DD')PAYMENT_DATE,
+                               sum(b.count)product_count
+                          from TBL_ORDER_PRODUCT_SKU b, tbl_order_info c
+                         where b.ORDER_NUMBER = c.ORDER_NUMBER
+                         <if test="start_time != null and start_time != '' and end_time != null and end_time != ''">
+                             AND PAYMENT_DATE BETWEEN to_date(#{start_time,jdbcType=VARCHAR}, 'YYYY-MM-DD') AND to_date(#{end_time,jdbcType=VARCHAR}, 'YYYY-MM-DD')
+                        </if>
+                         group by b.PRODUCT_ITEMNUMBER,TO_CHAR (c.PAYMENT_DATE, 'YYYY-MM-DD')) b
+                 where itemnumber = b.PRODUCT_ITEMNUMBER
+                 and a.ITEMNUMBER=#{itemnumber,jdbcType=VARCHAR}
+	</select>
+	
+		
+</mapper>

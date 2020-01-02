@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.decoration.dao.DirectoryDao">
+	<sql id="all_column">
+		   id,
+		   directory_name,
+		   remark,
+		   file_content_type,
+		   file_type_ids,
+		   picture_file_formats,
+		   video_file_formats,
+		   picture_size_limit,
+		   picture_height,
+		   picture_width,
+		   video_size_limit,
+		   file_quantity_limit,
+		   is_share,
+		   parent_id,
+		   ctrate_user_id,
+		   to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date
+	</sql>
+	<resultMap type="java.util.Map" id="resultDetaiMap">
+		<result column="id" property="id"/>
+		<result column="directory_name" property="name"/>
+		<result column="parent_id" property="pId"/>
+		<result column="file_content_type" property="type"/>
+		<result column="file_type_ids" property="file_type_ids"/>
+		<result column="picture_file_formats" property="picture_file_formats"/>
+		<result column="video_file_formats" property="video_file_formats"/>
+		<result column="picture_size_limit" property="picture_size_limit"/>
+		<result column="picture_height" property="picture_height"/>
+		<result column="picture_width" property="picture_width"/>
+		<result column="video_size_limit" property="video_size_limit"/>
+		<result column="file_quantity_limit" property="file_quantity_limit"/>
+		<result column="is_share" property="is_share"/>
+		<result column="child" property="child"/>
+		<result column="directory_type" property="directory_type"/>
+		<result column="fileType" property="fileType"/>
+		<result column="directory_name" property="filename"/>
+		<result column="id" property="directory_id"/>
+	</resultMap>
+	<!-- 查询目录结构层级 -->
+	<select id="queryDirectoryAll" parameterType="java.util.Map" resultType="java.util.Map" resultMap="resultDetaiMap">
+		select
+        <include refid="all_column"/>
+        ,(select count(1) from tbl_file_directory_info b where b.parent_id = a.id) child
+        ,level from tbl_file_directory_info a
+        start with parent_id = 0
+        connect by prior id = parent_id
+	</select>
+	<!-- 新增节点信息(文件夹及文件) -->
+	<insert id="insert" parameterType="java.util.Map">
+			<selectKey keyProperty="id" resultType="int" order="BEFORE">
+                select seq_file_directory_info.nextval from dual
+            </selectKey>
+		insert into tbl_file_directory_info
+			  (
+			   id,
+			   directory_name,
+			   remark,
+			   file_content_type,
+			   file_type_ids,
+			   picture_file_formats,
+			   video_file_formats,
+			   picture_size_limit,
+			   picture_height,
+			   picture_width,
+			   video_size_limit,
+			   file_quantity_limit,
+			   is_share,
+			   parent_id,
+			   ctrate_user_id,
+			   create_date)
+			values
+			  (
+			   #{id,jdbcType=INTEGER},
+			   #{name,jdbcType=VARCHAR},
+			   #{remark,jdbcType=VARCHAR},
+			   #{type,jdbcType=CHAR},
+			   #{file_type_ids,jdbcType=VARCHAR},
+			   #{picture_file_formats,jdbcType=VARCHAR},
+			   #{video_file_formats,jdbcType=VARCHAR},
+			   #{picture_size_limit,jdbcType=INTEGER},
+			   #{picture_height,jdbcType=INTEGER},
+			   #{picture_width,jdbcType=INTEGER},
+			   #{video_size_limit,jdbcType=INTEGER},
+			   #{file_quantity_limit,jdbcType=INTEGER},
+			   #{is_share,jdbcType=CHAR},
+			   #{parent_id,jdbcType=INTEGER},
+			   #{public_user_id,jdbcType=INTEGER},
+			   sysdate)
+	</insert>
+	<!-- 新增节点 -->
+	<insert id="insertByType" parameterType="java.util.Map">
+			<selectKey keyProperty="id" resultType="int" order="BEFORE">
+                select seq_file_directory_info.nextval from dual
+            </selectKey>
+		insert into tbl_file_directory_info
+			  (
+			   id,
+			   directory_name,
+			   file_content_type,
+			   parent_id,
+			   ctrate_user_id,
+			   create_date)
+			values
+			  (
+			   #{id,jdbcType=INTEGER},
+			   #{name,jdbcType=VARCHAR},
+			   #{type,jdbcType=CHAR},
+			   #{parent_id,jdbcType=INTEGER},
+			   #{public_user_id,jdbcType=INTEGER},
+			   sysdate)
+	</insert>
+	<!-- 更新节点信息 -->
+	<update id="update" parameterType="java.util.Map">
+		update tbl_file_directory_info
+		   <set>
+		   		<if test="remark !=null and remark !=''">
+		   			remark = #{remark,jdbcType=VARCHAR},
+		   		</if>
+		   		directory_name = #{name,jdbcType=VARCHAR},
+	   			file_content_type = #{type,jdbcType=CHAR},
+	   			file_type_ids = #{file_type_ids,jdbcType=VARCHAR},
+	   			file_quantity_limit = #{file_quantity_limit,jdbcType=INTEGER},
+		    	is_share = #{is_share,jdbcType=CHAR},
+	   			picture_file_formats = #{picture_file_formats,jdbcType=VARCHAR},
+	   			picture_size_limit = #{picture_size_limit,jdbcType=INTEGER},
+	   			picture_height = #{picture_height,jdbcType=INTEGER},
+		    	picture_width = #{picture_width,jdbcType=INTEGER},
+	   			video_file_formats = #{video_file_formats,jdbcType=VARCHAR},
+	   			video_size_limit = #{video_size_limit,jdbcType=INTEGER}
+		   </set>
+		 where id = #{id,jdbcType=INTEGER}
+	</update>
+	<!-- 更新节点 -->
+	<update id="updateByType" parameterType="java.util.Map">
+		update tbl_file_directory_info
+		   set  directory_name = #{name,jdbcType=VARCHAR},
+	   			file_content_type = #{type,jdbcType=CHAR},
+	   			file_type_ids = '',
+	   			picture_file_formats = '',
+	   			video_file_formats = '',
+	   			file_quantity_limit = '',
+	   			picture_size_limit = '',
+	   			picture_height = '',
+		    	picture_width = '',
+	   			video_size_limit = '',
+		    	is_share =''
+		 where id = #{id,jdbcType=INTEGER}
+	</update>
+	<!-- 删除节点信息 -->
+	<delete id="delete" parameterType="java.util.Map">
+		delete from tbl_file_directory_info where id = #{id,jdbcType=INTEGER}
+	</delete>
+	<!-- 根据节点ID查询是否存在子节点 -->
+	<select id="queryDirectoryByParentId" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_file_directory_info
+		 where parent_id = #{id,jdbcType=INTEGER}
+	</select>
+	<!-- 查询节点信息 -->
+	<select id="queryDirectoryDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select <include refid="all_column"/>
+		  from tbl_file_directory_info
+		 where id = #{id,jdbcType=INTEGER}
+	</select>
+	<!-- 根据节点名称查询是否存在 -->
+	<select id="queryDirectoryByDirectoryName" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_file_directory_info
+		 where directory_name = #{name,jdbcType=VARCHAR}
+		   <if test="id!=null and id!=0">
+			   and id != #{id,jdbcType=INTEGER}
+		   </if>
+	</select>
+	<!-- 文件类型和扩展名信息 -->
+	<select id="queryFileTypeList" resultType="java.util.Map">
+		select * from tbl_dic_file_type
+	</select>
+	<!-- 查询商品主图目录的ID，默认其父节点为1 -->
+	<select id="queryProductMainImgDir" resultType="long">
+		select NVL(min(id),0) from TBL_FILE_DIRECTORY_INFO where PARENT_ID = 1 and DIRECTORY_NAME = '商品主图'
+	</select>
+	<!--获取素材目录管理中，商品图片的所有子目录 -->
+	<select id="queryProductImgChild" resultType="java.util.Map" resultMap="resultDetaiMap">
+        select
+        <include refid="all_column"/>,
+        1 directory_type,
+        3 fileType
+        from tbl_file_directory_info a
+        where parent_id = 1
+        <if test="is_share!=null and is_share!=''">
+	        and is_share = #{is_share,jdbcType=VARCHAR}
+        </if>
+	</select>
+</mapper>

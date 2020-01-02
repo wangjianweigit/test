@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.analysis.dao.ProductOperationLogDao">
+    <!--新增商品操作日志-->
+    <insert id="insertProductOperationLog" parameterType="com.tk.oms.product.entity.ProductOperationLog">
+        insert into TBL_PRODUCT_OPERATION_LOG(
+            id,
+            product_itemnumber,
+            operation_type,
+            operation_name,
+            keyword_type,
+            keyword_name,
+            business_id,
+            business_name,
+            remark,
+            create_user_id,
+            create_date,
+            operator_platform
+        ) values (
+            seq_product_operation_log.nextval,
+            #{productItemnumber,jdbcType=VARCHAR},
+            #{operationType,jdbcType=INTEGER},
+            #{operationName,jdbcType=VARCHAR},
+            #{keywordType,jdbcType=INTEGER},
+            #{keywordName,jdbcType=VARCHAR},
+            #{businessId,jdbcType=INTEGER},
+            #{businessName,jdbcType=VARCHAR},
+            #{remark,jdbcType=VARCHAR},
+            #{createUserId,jdbcType=INTEGER},
+            sysdate,
+            #{operatorPlatform,jdbcType=INTEGER}
+        )
+    </insert>
+
+    <!--分页查询商品操作日志列表-->
+    <select id="listProductOperationLogForPage" parameterType="java.util.Map" resultType="java.util.Map">
+        select  a.* from (
+        select t.*,rownum as rn from (
+        select
+        pol.product_itemnumber,
+        pi.product_img_url,
+        pol.operation_type,
+        pol.operation_name,
+        pol.keyword_type,
+        pol.keyword_name,
+        pol.remark,
+        pol.operator_platform,
+        to_char(pol.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+        case when pol.operator_platform=1 then(select user_realname from tbl_sys_user_info where id=pol.create_user_id)
+        when pol.operator_platform=2 then (select contacts from tbl_stationed_user_info where id=pol.create_user_id) end create_user_name,
+        (select company_name from tbl_stationed_user_info where id = pi.stationed_user_id) stationed_user_name
+        from tbl_product_operation_log pol
+        left join tbl_product_info_apply pi on pol.product_itemnumber = pi.itemnumber
+        <where>
+        	<if test="product_itemnumber != null and product_itemnumber != ''">
+               and pol.product_itemnumber=#{product_itemnumber,jdbcType=VARCHAR}
+            </if>
+            <if test="stationed_id != null and stationed_id != ''">
+               and pi.stationed_user_id=#{stationed_id,jdbcType=INTEGER}
+            </if>
+            <if test="operator_platform != null and operator_platform != ''">
+               and pol.operator_platform=#{operator_platform,jdbcType=INTEGER}
+            </if>
+            <if test="operation_type != null and operation_type != ''">
+               and pol.operation_type=#{operation_type,jdbcType=INTEGER}
+            </if>
+            <if test="create_user_name != null and create_user_name != ''">
+               and (exists(select 1 from tbl_sys_user_info tsui where  tsui.id=pol.create_user_id and tsui.user_realname like concat(concat('%',#{create_user_name,jdbcType=VARCHAR}),'%'))
+               			or exists(select 1 from tbl_stationed_user_info sui where sui.id = pol.create_user_id and sui.contacts like concat(concat('%',#{create_user_name,jdbcType=VARCHAR}),'%') ))
+            </if>
+            <if test="operate_start_date != null and operate_start_date != ''">
+                and pol.create_date &gt;= to_date(#{operate_start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+            </if>
+            <if test="operate_end_date != null and operate_end_date != ''">
+                and pol.create_date &lt;= to_date(#{operate_end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+            </if>
+        </where>
+        order by pol.create_date desc,pol.id desc
+        ) t where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) a where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--查询商品操作日志列表总数量-->
+    <select id="countProductOperationLogForPage" parameterType="java.util.Map" resultType="java.lang.Integer">
+        select count(1) from tbl_product_operation_log pol
+        left join tbl_product_info_apply pi on pol.product_itemnumber = pi.itemnumber
+        <where>
+        	<if test="product_itemnumber != null and product_itemnumber != ''">
+               and pol.product_itemnumber=#{product_itemnumber,jdbcType=VARCHAR}
+            </if>
+            <if test="stationed_id != null and stationed_id != ''">
+               and pi.stationed_user_id=#{stationed_id,jdbcType=INTEGER}
+            </if>
+            <if test="operator_platform != null and operator_platform != ''">
+               and pol.operator_platform=#{operator_platform,jdbcType=INTEGER}
+            </if>
+            <if test="operation_type != null and operation_type != ''">
+               and pol.operation_type=#{operation_type,jdbcType=INTEGER}
+            </if>
+            <if test="create_user_name != null and create_user_name != ''">
+               and (exists(select 1 from tbl_sys_user_info tsui where  tsui.id=pol.create_user_id and tsui.user_realname like concat(concat('%',#{create_user_name,jdbcType=VARCHAR}),'%'))
+               			or exists(select 1 from tbl_stationed_user_info sui where sui.id = pol.create_user_id and sui.contacts like concat(concat('%',#{create_user_name,jdbcType=VARCHAR}),'%') ))
+            </if>
+            <if test="operate_start_date != null and operate_start_date != ''">
+                and pol.create_date &gt;= to_date(#{operate_start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+            </if>
+            <if test="operate_end_date != null and operate_end_date != ''">
+                and pol.create_date &lt;= to_date(#{operate_end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+            </if>
+        </where>
+    </select>
+
+</mapper>

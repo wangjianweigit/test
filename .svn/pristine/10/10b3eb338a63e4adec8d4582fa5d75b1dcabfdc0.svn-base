@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.finance.dao.SalesmanCreditLineDao">
+
+    <!-- 查询业务员授信额度管理列表记录数 -->
+	<select id="querySalesmanCreditLineCount" resultType="int">
+        SELECT
+          count(1)
+        from TBL_SYS_USER_INFO
+        <where>
+            user_name !='admin' and user_type in('3','4') and state='2'
+            <if test="user_type!=null and user_type!='' ">
+                and user_type = #{user_type}
+            </if>
+            <if test="user_name!=null and user_name!='' ">
+                and user_name = #{user_name}
+            </if>
+            <if test="user_realname!=null and user_realname!='' ">
+                and user_realname =#{user_realname}
+            </if>
+            <if test="user_company_address_province!=null and user_company_address_province!=0 ">
+                and user_company_address_province = #{user_company_address_province}
+            </if>
+            <if test="user_company_address_city!=null and user_company_address_city!=0 ">
+                and user_company_address_city = #{user_company_address_city}
+            </if>
+            <if test="user_company_address_county!=null and user_company_address_county!=0 ">
+                and user_company_address_county = #{user_company_address_county}
+            </if>
+        </where>
+    </select>
+
+    <!-- 查询业务员授信额度管理列表 -->
+    <select id="querySalesmanCreditLineList" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT tt.*,
+                CASE
+                WHEN (
+                      (SELECT NAME
+                        FROM TBL_DIC_REGION
+                        WHERE ID = USER_COMPANY_ADDRESS_MAX)
+                      || ','
+                      || (SELECT TO_CHAR(WM_CONCAT (NAME)) NAME
+                      FROM (select id,name from TBL_DIC_REGION order by id asc)
+                      WHERE ID IN
+                      (USER_COMPANY_ADDRESS_PROVINCE,
+                      USER_COMPANY_ADDRESS_CITY,
+                      USER_COMPANY_ADDRESS_COUNTY)) =',')
+                THEN
+                ''
+                ELSE
+                  (SELECT NAME  FROM TBL_DIC_REGION  WHERE ID = tt.USER_COMPANY_ADDRESS_MAX)|| ','|| (SELECT TO_CHAR(WM_CONCAT (NAME)) NAME FROM (select id,name from TBL_DIC_REGION order by id asc) WHERE ID IN (tt.USER_COMPANY_ADDRESS_PROVINCE,tt.USER_COMPANY_ADDRESS_CITY,tt.USER_COMPANY_ADDRESS_COUNTY))
+                END
+                AS ADRESS,
+                (CREDIT_MONEY
+                - (select nvl(sum(MONEY),0) from TBL_USER_CHARGE_RECORD where STATE = '1' and agency_user_id = tt.id)
+                - (SELECT NVL(SUM(LOGISTICS_MONEY+PRODUCT_MONEY+DF_MONEY),0) FROM TBL_ORDER_INFO WHERE PAYMENT_STATE = 3 AND SALE_USER_NAME =tt.USER_NAME )
+                - (SELECT NVL(SUM(CONTRIBUTION_MONEY),0) V_CREDIT_MONEY_WAIT FROM TBL_CONTRIBUTION_WAIT WHERE STATE!=3 AND SALE_USER_NAME =tt.USER_NAME)
+                ) WAIT_MONEY FROM (
+			          SELECT A.* from (
+			                SELECT A.*,ROWNUM RN
+			                FROM
+			                (SELECT * FROM TBL_SYS_USER_INFO
+			                    <where>
+			                        user_name !='admin' and user_type in('3','4') and state='2'
+			                        <if test="user_type!=null and user_type!='' ">
+			                            and user_type = #{user_type}
+			                        </if>
+			                        <if test="user_name!=null and user_name!='' ">
+			                            and user_name = #{user_name}
+			                        </if>
+			                        <if test="user_realname!=null and user_realname!='' ">
+			                            and user_realname =#{user_realname}
+			                        </if>
+			                        <if test="province!=null and province!=0 ">
+			                            and user_company_address_province = #{province}
+			                        </if>
+			                        <if test="city!=null and city!=0 ">
+			                            and user_company_address_city = #{city}
+			                        </if>
+			                        <if test="area!=null and area!=0 ">
+			                            and user_company_address_county = #{area}
+			                        </if>
+			                    </where>
+			                     order by user_type
+			                ) A WHERE
+			            ROWNUM &lt;= #{end_rownum}) A
+			        where RN &gt; #{start_rownum}
+        ) tt
+    </select>
+
+    <!-- 修改业务员授信额度 -->
+    <update id="updateCreditMoney" parameterType="java.util.Map">
+        update TBL_SYS_USER_INFO
+        <set>
+            credit_money = #{credit_money,jdbcType=INTEGER}
+        </set>
+        where user_name !='admin' and id = #{id,jdbcType=INTEGER}
+    </update>
+
+</mapper>

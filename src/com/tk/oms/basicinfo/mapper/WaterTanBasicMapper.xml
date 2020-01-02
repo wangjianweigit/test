@@ -1,0 +1,363 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.basicinfo.dao.WaterTanBasicDao">
+
+	<sql id="waterTanWhere">
+		<where>
+			<if test="name != '' and name != null">
+				and name = #{name, jdbcType=VARCHAR}
+			</if>
+			<if test="admin_name != '' and admin_name != null">
+				and admin_name = #{name, jdbcType=VARCHAR}
+			</if>
+			<if test="mobile != '' and mobile != null">
+				and mobile = #{mobile, jdbcType=VARCHAR}
+			</if>
+			<if test="start_date != '' and start_date != null">
+				and create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+			</if>
+			<if test="end_date != '' and end_date != null">
+				and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+			</if>
+			<if test="state != null">
+				and state IN
+				<foreach item="item" collection="state" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+			</if>
+		</where>
+	</sql>
+
+	<sql id="waterTanMemberStoreWhere">
+		<where>
+			<if test="type != '' and type != null">
+				and type = #{type, jdbcType=CHAR}
+			</if>
+			<if test="shop_id != '' and shop_id != null">
+				and shop_id = #{shop_id, jdbcType=CHAR}
+			</if>
+			<if test="shop_name != '' and shop_name != null">
+				and shop_name = #{shop_name, jdbcType=VARCHAR}
+			</if>
+			<if test="company_id != '' and company_id != null">
+				and company_id = #{company_id, jdbcType=INTEGER}
+			</if>
+			<if test="sync_type != '' and sync_type != null">
+				and sync_type = #{sync_type, jdbcType=CHAR}
+			</if>
+			<if test="start_date != '' and start_date != null">
+				and create_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+			</if>
+			<if test="end_date != '' and end_date != null">
+				and create_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+			</if>
+			<if test="state != null">
+				and state IN
+				<foreach item="item" collection="state" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+			</if>
+		</where>
+	</sql>
+
+	<sql id="waterTanCompanyStoreWhere">
+		<where>
+			cs.shop_id = ss.shop_id(+)
+			and cs.company_id = #{company_id, jdbcType=INTEGER}
+			<if test="shop_name !=null and shop_name != ''">
+				and cs.shop_name = #{shop_name, jdbcType=VARCHAR}
+			</if>
+			<if test="states != null">
+				<foreach item="item" collection="states" open="and (" separator="or" close=")">
+					<if test="item==1">
+						ss.state = 1 or ss.state is null
+					</if>
+					<if test="item==2">
+						ss.state = 2
+					</if>
+				</foreach>
+			</if>
+		</where>
+	</sql>
+
+	<!-- 获取聚水谭公司列表 -->
+    <select id="queryWaterTanList" resultType="java.util.Map" parameterType="java.util.Map">
+		select * from(
+          select
+				a.*,rownum num,
+				(select USER_REALNAME FROM TBL_SYS_USER_INFO WHERE a.CREATER_ID=id) created_user_name
+			from
+				( select ID,
+						NAME,
+						ADMIN_NAME,
+						MOBILE,
+						PARTNERID,
+						PATRNERKEY,
+						TOKEN,
+						TAOBAO_APPKEY,
+						TAOBAO_APPSECRET,
+						CREATER_ID,
+						to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+						STATE
+				  from TBL_SAAS_COMPANY <include refid="waterTanWhere" /> order by create_date desc
+				) a  where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+		) where num &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+	<!-- 查询聚水谭列表记录数 -->
+	<select id="queryWaterTanCount" resultType="int" parameterType="java.util.Map">
+		SELECT COUNT (1) FROM TBL_SAAS_COMPANY <include refid="waterTanWhere" />
+	</select>
+
+	<!-- 查询聚水谭公司明细 -->
+    <select id="queryWaterTanDetail"  resultType="java.util.Map" parameterType="java.util.Map">
+　　　　　 select ID,
+				NAME,
+				ADMIN_NAME,
+				MOBILE,
+				PARTNERID,
+				PATRNERKEY,
+				TOKEN,
+				TAOBAO_APPKEY,
+				TAOBAO_APPSECRET,
+				CREATER_ID,
+				to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+				STATE
+		  from TBL_SAAS_COMPANY　WHERE ID = #{id,jdbcType=INTEGER}
+    </select>
+
+	<!-- 新增聚水谭公司信息 -->
+	<insert id="insertWaterTanDetail" parameterType="java.util.Map">
+		insert into TBL_SAAS_COMPANY
+		(
+			ID,
+			NAME,
+			ADMIN_NAME,
+			MOBILE,
+			PARTNERID,
+			PATRNERKEY,
+			TOKEN,
+			TAOBAO_APPKEY,
+			TAOBAO_APPSECRET,
+			CREATER_ID,
+			CREATE_DATE,
+			STATE
+		)
+		VALUES
+		(
+			SEQ_SAAS_COMPANY.nextval,
+			#{NAME,jdbcType=VARCHAR},
+			#{ADMIN_NAME,jdbcType=VARCHAR},
+			#{MOBILE,jdbcType=VARCHAR},
+			#{PARTNERID,jdbcType=VARCHAR},
+			#{PATRNERKEY,jdbcType=INTEGER},
+			#{TOKEN,jdbcType=VARCHAR},
+			#{TAOBAO_APPKEY,jdbcType=VARCHAR},
+			#{TAOBAO_APPSECRET,jdbcType=VARCHAR},
+			#{public_user_id,jdbcType=INTEGER},
+			sysdate,
+			#{STATE,jdbcType=CHAR}
+		)
+	</insert>
+
+	<!-- 编辑聚水谭公司信息 -->
+    <update id="editWaterTanDetail" parameterType="java.util.Map" >
+         UPDATE TBL_SAAS_COMPANY
+			 <set>
+				 <if test="NAME != null and NAME != ''">
+					 NAME = #{NAME,jdbcType=VARCHAR},
+				</if>
+				<if test="ADMIN_NAME != null and ADMIN_NAME != ''">
+					ADMIN_NAME = #{ADMIN_NAME,jdbcType=VARCHAR},
+				</if>
+				<if test="MOBILE != null and MOBILE != ''">
+					MOBILE = #{MOBILE,jdbcType=VARCHAR},
+				</if>
+				<if test="PARTNERID != null and PARTNERID != ''">
+					PARTNERID = #{PARTNERID,jdbcType=VARCHAR},
+				</if>
+				 <if test="TOKEN != null and TOKEN != ''">
+					 TOKEN = #{TOKEN,jdbcType=VARCHAR},
+				 </if>
+				 <if test="TAOBAO_APPKEY != null and TAOBAO_APPKEY != ''">
+					 TAOBAO_APPKEY = #{TAOBAO_APPKEY,jdbcType=VARCHAR},
+				 </if>
+				 <if test="TAOBAO_APPSECRET != null and TAOBAO_APPSECRET != ''">
+					 TAOBAO_APPSECRET = #{TAOBAO_APPSECRET,jdbcType=VARCHAR},
+				 </if>
+				 <if test="STATE != null and STATE != ''">
+					 STATE = #{STATE,jdbcType=CHAR},
+				 </if>
+				 UPDATE_DATE = sysdate
+			</set>
+		　WHERE ID = #{id,jdbcType=INTEGER}
+    </update>
+
+
+	<!-- 获取聚水谭会员店铺列表 -->
+	<select id="queryWaterTanMemberStoreList" resultType="java.util.Map" parameterType="java.util.Map">
+		select
+			(select USER_REALNAME FROM TBL_SYS_USER_INFO WHERE t.CREATER_ID=id) created_user_name,
+			ui.user_manage_name as member_user_name,
+			ui.user_name,
+			(SELECT name FROM TBL_SAAS_COMPANY WHERE t.COMPANY_ID=id) company_name,
+			t.*
+		from (
+			select * from(
+				select
+					a.*,rownum num
+				from
+					( select ID,
+						SHOP_ID,
+						SHOP_NAME,
+						TYPE,
+						SYNC_TYPE,
+						STATE,
+						USER_ID,
+						COMPANY_ID,
+						CREATER_ID,
+						STOCK_SYNC_STATE,
+						to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date
+					from TBL_SAAS_SHOP <include refid="waterTanMemberStoreWhere" /> order by create_date desc
+					) a  where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+			) where num &gt; #{start_rownum,jdbcType=INTEGER}
+		) t
+		left join TBL_USER_INFO ui on t.USER_ID = ui.id
+	</select>
+
+	<!-- 查询聚水谭会员店铺列表记录数 -->
+	<select id="queryWaterTanMemberStoreCount" resultType="int" parameterType="java.util.Map">
+		SELECT COUNT (1) FROM TBL_SAAS_SHOP <include refid="waterTanMemberStoreWhere" />
+	</select>
+
+	<!-- 查询聚水谭会员店铺明细 -->
+	<select id="queryWaterTanMemberStoreDetail"  resultType="java.util.Map" parameterType="java.util.Map">
+		select ID,
+			SHOP_ID,
+			SHOP_NAME,
+			TYPE,
+			SYNC_TYPE,
+			STATE,
+			(select USER_MANAGE_NAME FROM TBL_USER_INFO WHERE a.USER_ID =id) as member_user_name,
+			USER_ID,
+			COMPANY_ID,
+			CREATER_ID,
+			to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date
+		from TBL_SAAS_SHOP a　WHERE ID = #{id,jdbcType=INTEGER}
+	</select>
+
+	<!-- 新增聚水谭会员店铺信息 -->
+	<insert id="insertWaterTanMemberStoreDetail" parameterType="java.util.Map">
+		insert into TBL_SAAS_SHOP
+		(
+			ID,
+			SHOP_ID,
+			SHOP_NAME,
+			TYPE,
+			SYNC_TYPE,
+			STATE,
+			USER_ID,
+			COMPANY_ID,
+			CREATER_ID,
+			CREATE_DATE
+		)
+		VALUES
+		(
+			SEQ_SAAS_SHOP.nextval,
+			#{SHOP_ID,jdbcType=INTEGER},
+			#{SHOP_NAME,jdbcType=VARCHAR},
+			#{TYPE,jdbcType=CHAR},
+			#{SYNC_TYPE,jdbcType=CHAR},
+			#{STATE,jdbcType=CHAR},
+			#{USER_ID,jdbcType=INTEGER},
+			#{COMPANY_ID,jdbcType=INTEGER},
+			#{public_user_id,jdbcType=INTEGER},
+			sysdate
+		)
+	</insert>
+
+	<!-- 编辑聚水谭会员店铺信息 -->
+	<update id="editWaterTanMemberStoreDetail" parameterType="java.util.Map" >
+		UPDATE TBL_SAAS_SHOP
+		<set>
+			<if test="SHOP_ID != null">
+				SHOP_ID = #{SHOP_ID,jdbcType=INTEGER},
+			</if>
+			<if test="SHOP_NAME != null">
+				SHOP_NAME = #{SHOP_NAME,jdbcType=VARCHAR},
+			</if>
+			<if test="TYPE != null and TYPE != ''">
+				TYPE = #{TYPE,jdbcType=CHAR},
+			</if>
+			<if test="SYNC_TYPE != null and SYNC_TYPE != ''">
+				SYNC_TYPE = #{SYNC_TYPE,jdbcType=CHAR},
+			</if>
+			<if test="STATE != null and STATE != ''">
+				STATE = #{STATE,jdbcType=CHAR},
+			</if>
+			<if test="USER_ID != null and USER_ID != ''">
+				USER_ID = #{USER_ID,jdbcType=INTEGER},
+			</if>
+			<if test="COMPANY_ID != null and COMPANY_ID != ''">
+				COMPANY_ID = #{COMPANY_ID,jdbcType=INTEGER},
+			</if>
+			<if test="STOCK_SYNC_STATE != null and STOCK_SYNC_STATE != ''">
+				STOCK_SYNC_STATE = #{STOCK_SYNC_STATE,jdbcType=CHAR},
+			</if>
+			UPDATE_DATE = sysdate
+		</set>
+		　WHERE ID = #{id,jdbcType=INTEGER}
+	</update>
+
+	<!-- 聚水谭会员店铺取消授权 -->
+	<delete id="deleteWaterTanMemberStore" parameterType="java.lang.Long">
+		DELETE tbl_saas_shop WHERE id = #{id, jdbcType=INTEGER}
+	</delete>
+
+	<!-- 查询聚水谭公司下拉框 -->
+	<select id="queryWaterTanCompanyOption" parameterType="java.util.Map" resultMap="waterTanCompanyListMap">
+		select ID,NAME from TBL_SAAS_COMPANY　WHERE state = '1'
+	</select>
+
+	<resultMap id="waterTanCompanyListMap" type="java.util.Map">
+		<result column="ID" property="id"/>
+		<result column="NAME" property="option"/>
+	</resultMap>
+
+	<!-- 查询聚水谭系统配置托管公司id -->
+	<select id="queryWaterTanHostCompany" resultType="java.lang.String">
+		select value from TBL_SYS_PARAM_CONFIG where key = 'self_saas_company'
+	</select>
+
+	<!-- 查询用户聚水谭店铺授权信息 -->
+	<select id="queryWaterTanUserShopInfo" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from tbl_saas_shop where shop_id = #{SHOP_ID, jdbcType=INTEGER} and state = '2'
+	</select>
+
+	<!-- 获取聚水谭公司店铺列表 -->
+	<select id="queryWaterTanCompanyStoreList" resultType="java.util.Map" parameterType="java.util.Map">
+		select * from(
+			select
+				a.*,rownum num,case when s_state is null then '1' else s_state end as state
+			from
+			  ( select cs.id,
+					(SELECT ss.state FROM TBL_SAAS_SHOP ss WHERE cs.SHOP_ID = ss.SHOP_ID) AS s_state,
+					cs.shop_id,
+					cs.shop_name,
+					cs.shop_site,
+					cs.nick,
+					to_char(cs.session_expired, 'yyyy-mm-dd hh24:mi:ss') as session_expired,
+					to_char(cs.created, 'yyyy-mm-dd hh24:mi:ss') as created,
+					to_char(cs.create_date, 'yyyy-mm-dd hh24:mi:ss') create_date
+				from tbl_saas_company_shop cs, TBL_SAAS_SHOP ss <include refid="waterTanCompanyStoreWhere" /> order by cs.create_date desc
+			) a  where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+		) where num &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+
+	<!-- 查询聚水谭公司店铺列表记录数 -->
+	<select id="queryWaterTanCompanyStoreCount" resultType="int" parameterType="java.util.Map">
+		SELECT COUNT (1) FROM tbl_saas_company_shop cs, TBL_SAAS_SHOP ss <include refid="waterTanCompanyStoreWhere" />
+	</select>
+</mapper>

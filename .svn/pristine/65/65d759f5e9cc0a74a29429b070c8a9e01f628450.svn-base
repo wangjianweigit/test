@@ -1,0 +1,841 @@
+package com.tk.oms.order.service;
+
+import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import com.tk.sys.util.*;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import com.tk.oms.basicinfo.dao.LogisticsCompanyDao;
+import com.tk.oms.order.dao.OrderDao;
+import com.tk.oms.order.entity.OrderSkuMap;
+import com.tk.oms.returns.dao.ReturnsDao;
+import com.tk.oms.returns.service.UserMbrCardInfoService;
+import com.tk.sys.config.EsbConfig;
+
+@Service("OrderService")
+public class OrderService {
+	private Log logger = LogFactory.getLog(this.getClass());
+	@Resource
+	private OrderDao orderDao;
+	@Resource
+	private ReturnsDao returnsDao;
+	@Resource
+	private LogisticsCompanyDao logisticsCompanyDao;
+	@Resource
+	private UserMbrCardInfoService userMbrCardInfoService;
+	@Value("${pay_service_url}")
+	private String pay_service_url;//远程调用见证宝接口
+	
+	@Value("${retail_service_new_url}")
+    private String retail_service_new_url;
+	
+	/**ERP服务地址*/
+    @Value("${erp_service_url}")
+    private String erp_service_url;
+    /**ERP订单发货排期信息*/
+    @Value("${order_deliver_schedule}")
+    private String order_deliver_schedule;
+    @Value("${order_sku_order_count}")
+    private String order_sku_order_count;//订单sku占用排名情况
+    @Value("${order_sku_purchase_count}")
+    private String order_sku_purchase_count;//订单sku生产计划情况
+	/**
+	 * 获取订单列表
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryOrderList(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			GridResult pageParamResult = PageUtil.handlePageParams(paramMap);
+			if(pageParamResult!=null){
+				return pageParamResult;
+			}
+			if((!StringUtils.isEmpty(paramMap.get("order_state")))&&paramMap.get("order_state") instanceof String){
+				paramMap.put("order_state",(paramMap.get("order_state")+"").split(","));
+			}
+			if((!StringUtils.isEmpty(paramMap.get("is_final_order")))&&paramMap.get("is_final_order") instanceof List<?>){
+				paramMap.put("is_final_order","");
+			}
+			List<Map<String, Object>> list = orderDao.queryOrderList(paramMap);
+			int count = orderDao.queryOrderCount(paramMap);
+			if (list != null && list.size() > 0) {
+				gr.setMessage("获取数据成功");
+				gr.setObj(list);
+			} else {
+				gr.setMessage("无数据");
+			}
+			gr.setState(true);
+			gr.setTotal(count);
+		} catch (Exception e) {
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+		}
+		return gr;
+	}
+	
+	/**
+	 * 获取订单详情
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryOrderDetail(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			Map<String,Object> resultMap = new HashMap<String,Object>();
+			//获取待订单详情基本信息
+			Map<String,Object> detail = orderDao.queryOrderDetail(paramMap);
+			if(detail!=null){
+				//获取订单商品详情信息
+				//List<Map<String,Object>> productList = orderDao.queryOrderProductList(paramMap);
+				//获取订单商品sku列表信息
+				List<Map<String,Object>> productSkuList = orderDao.queryOrderProductSkuList(paramMap);
+				if("3".equals(detail.get("ORDER_STATE")+"")||"5".equals(detail.get("ORDER_STATE")+"")){
+					List<Map<String,Object>> boxList = orderDao.queryOrderBoxList(paramMap);
+					resultMap.put("box_info", boxList);
+				}
+				resultMap.put("base_info", detail);
+				//获取物流公司列表
+				if(!StringUtils.isEmpty(paramMap.get("require_logistics_company"))&&"1".equals(paramMap.get("require_logistics_company"))){
+					Map<String, Object> map = new HashMap<String, Object>();
+					if("批发".equals(detail.get("ORDER_TYPE"))) {//订单类型
+						map.put("order_type", "1");
+					}else if("代发".equals(detail.get("ORDER_TYPE"))) {
+						map.put("order_type", "2");
+					}
+					map.put("shipping_method_id", detail.get("DELIVERY_TYPE"));//订单所属配送方式
+					List<Map<String,Object>> logisticsCompanyList=logisticsCompanyDao.queryLogisticsCompany(map);
+					resultMap.put("logistics_info", logisticsCompanyList);
+				}
+				//resultMap.put("product_info", productList);
+				resultMap.put("product_sku_info", productSkuList);
+				pr.setMessage("获取数据成功");
+				pr.setObj(resultMap);
+			} else {
+				pr.setMessage("无数据");
+			}
+			pr.setState(true);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+		}
+		return pr;
+	}
+
+	/**
+	 * 订单取消
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult orderCancel(HttpServletRequest request) throws Exception {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			if(StringUtils.isEmpty(paramMap.get("order_number"))||StringUtils.isEmpty(paramMap.get("public_user_name"))||StringUtils.isEmpty(paramMap.get("cancel_reason"))){
+				pr.setMessage("缺少参数");
+				pr.setState(false);
+				return pr;
+			}
+			paramMap.put("cancel_reason",paramMap.get("cancel_reason")+"（系统取消）");
+			orderDao.cancelOrder(paramMap);
+			String output_status = String.valueOf(paramMap.get("output_status"));//状态 0-失败 1-成功
+			String output_msg = String.valueOf(paramMap.get("output_msg"));//当成功时为：取消成功   当失败是：为错误消息内容
+			if(ResponseSateEnum.SUCCESS.getValue().equals(output_status)){//成功
+				/**
+				 * 订单取消，返还会员卡额度
+				 */
+				pr.setState(true);
+				Map<String,Object> detail = orderDao.queryOrderDetail(paramMap);
+				if(detail!=null
+						&&!detail.isEmpty()
+						&&"2".equals(detail.get("MBR_CARD").toString()) 
+						&& "0".equals(detail.get("PRE_ORDER_TYPE").toString())){
+					//获取用户会员卡记录信息
+					long userId = Long.parseLong(detail.get("USER_NAME").toString());
+					Map<String, Object> userMbrCard = this.returnsDao.getUserMbrCardByUserId(userId);
+					if (userMbrCard == null) {
+						pr.setState(false);
+						pr.setMessage("用户会员卡记录信息异常");
+						return pr;
+					}
+					int EXPIRATION_FLAG = Integer.parseInt(userMbrCard.get("EXPIRATION_FLAG").toString());//会员卡过期标志位 0.未过期   1.已过期
+					if (EXPIRATION_FLAG == 0) {//会员卡未过期才进行反充
+						//会员卡剩余余额
+						BigDecimal cardBalance = new BigDecimal(userMbrCard.get("CARD_BALANCE") + "");
+						//退货总金额
+						BigDecimal totalReturnPrice = new BigDecimal(detail.get("PRODUCT_MONEY") + "");
+						userMbrCard.put("CARD_BALANCE", cardBalance.add(totalReturnPrice));
+						
+						if(!userMbrCardInfoService.updateUserMbrCardInfo(userId, userMbrCard)){
+							throw new RuntimeException("更新会员卡信息失败");
+						}
+						/**
+						 * 封装增加会员卡使用记录参数
+						 * 增加会员卡使用记录
+						 */
+						Map<String, Object> userRecordMap = new HashMap<String, Object>(16);
+						userRecordMap.put("mbr_card_id", Long.parseLong(userMbrCard.get("ID") + ""));
+						userRecordMap.put("order_number", paramMap.get("order_number"));
+						userRecordMap.put("type", 4);
+						userRecordMap.put("used_amount", totalReturnPrice);
+						userRecordMap.put("remark", "普通订单关闭,会员卡额度返还。订单号："+paramMap.get("order_number"));
+						if (this.returnsDao.insertUserMbrCardUseRecord(userRecordMap) < 0) {
+							throw new RuntimeException("记录会员卡收支记录失败");
+						}
+					}
+				
+				}
+			}else{
+				pr.setState(false);
+			}
+			pr.setMessage(output_msg);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+	
+	/**
+	 * 订单调价
+	 */
+	@Transactional
+	public ProcessResult orderReadjust(HttpServletRequest request) throws Exception {
+		ProcessResult pr = new ProcessResult();
+		try {
+			OrderSkuMap orderSkuMap = null;
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				orderSkuMap = (OrderSkuMap) Transform.GetPacket(json, OrderSkuMap.class);
+			}
+			if(StringUtils.isEmpty(orderSkuMap.getOrder_number())){
+				pr.setMessage("缺少参数");
+				pr.setState(false);
+				return pr;
+			}
+			if(orderSkuMap.getSku_list() == null || orderSkuMap.getSku_list().size() == 0){
+				pr.setMessage("缺少参数sku列表");
+				pr.setState(false);
+				return pr;
+			}
+			orderDao.readjustOrder(orderSkuMap);
+			String output_status = String.valueOf(orderSkuMap.getOutput_status());//状态 0-失败 1-成功
+			String output_msg = String.valueOf(orderSkuMap.getOutput_msg());//当成功时为：取消成功   当失败是：为错误消息内容
+			if(ResponseSateEnum.SUCCESS.getValue().equals(output_status)){//成功
+				pr.setState(true);
+			}else{
+				pr.setState(false);
+			}
+			pr.setMessage(output_msg);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+	
+	/**
+	 * 订单运费计算
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult orderFreightMoney(HttpServletRequest request) throws Exception {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			if(StringUtils.isEmpty(paramMap.get("order_number"))||StringUtils.isEmpty(paramMap.get("logistics_company_id"))){
+				pr.setMessage("缺少参数");
+				pr.setState(false);
+				return pr;
+			}
+			Map<String,Object> freightMoneyMap=orderDao.queryOrderFeightMoney(paramMap);
+			if(freightMoneyMap!=null){
+				pr.setObj(freightMoneyMap);
+				pr.setMessage("操作成功");
+				pr.setState(true);
+			}else{
+				pr.setMessage("操作失败");
+				pr.setState(false);
+			}
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+	/**
+	 * 转账支付列表
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryTransferList(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        	PageUtil.handlePageParams(paramMap);
+	        }
+            if(paramMap.size() == 0) {
+            	gr.setState(false);
+            	gr.setMessage("参数缺失,请与管理员联系");
+                return gr;
+            }
+            if(paramMap.containsKey("payment_state") && !StringUtils.isEmpty(paramMap.get("payment_state"))) {
+                String[] payment_state = paramMap.get("payment_state").toString().split(",");
+                if (payment_state.length > 1) {
+                    paramMap.put("payment_state", paramMap.get("payment_state"));
+                } else {
+                    paramMap.put("payment_state", paramMap.get("payment_state").toString().split(","));
+                }
+            }
+            //查询转账支付数量
+			int total = orderDao.queryTransferCount(paramMap);
+            //查询转账支付列表
+			List<Map<String, Object>> dataList = orderDao.queryTransferList(paramMap);
+			if (dataList != null && dataList.size() > 0) {
+				gr.setState(true);
+				gr.setMessage("查询成功!");
+				gr.setObj(dataList);
+				gr.setTotal(total);
+			} else {
+				gr.setState(true);
+				gr.setMessage("无数据");
+			}
+        } catch (Exception e) {
+        	gr.setState(false);
+        	gr.setMessage(e.getMessage());
+        }
+
+        return gr;
+	}
+	/**
+	 * 转账支付详情
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryTransferDetail(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        }
+	        if(paramMap.size() == 0) {
+	        	pr.setState(false);
+	        	pr.setMessage("参数缺失,请与管理员联系");
+                return pr;
+            }
+            //转账支付
+	        Map<String, Object> retMap = orderDao.queryTransferDetail(paramMap);
+            pr.setState(true);
+            pr.setMessage("查询成功！");
+            pr.setObj(retMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage("查询失败！");
+        }
+
+        return pr;
+	}
+	/**
+	 * 确认转账支付
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult editPaymentState(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			// 前台用户数据
+			Map<String,Object> paramMap = (Map<String,Object>)Transform.GetPacket(json, HashMap.class);
+			Map<String, Object> retMap = orderDao.queryOrderUserInfo(paramMap);
+			orderDao.updatePaymentState(paramMap);
+			String output_status = String.valueOf(paramMap.get("output_status"));//状态 0-失败 1-成功
+			String output_msg = String.valueOf(paramMap.get("output_msg"));//当成功时为：取消成功   当失败是：为错误消息内容
+			
+			if(ResponseSateEnum.SUCCESS.getValue().equals(output_status)){//成功
+				Map<String, Object> param = new HashMap<String, Object>();
+				param.put("user_id", retMap.get("USER_NAME"));//用户ID
+				param.put("user_name", retMap.get("USER_MANAGE_NAME"));//用户姓名
+				param.put("bank_account", retMap.get("BANK_ACCOUNT"));//银行会员子账户
+				param.put("order_number", paramMap.get("order_number"));//订单号
+				param.put("tran_amount", retMap.get("ORDER_MONEY"));//订单金额
+				//远程调用见证宝接口 登记挂账
+				pr=HttpClientUtil.post(pay_service_url+"/tran/charge_account",param);
+				if(!pr.getState()){
+					throw new RuntimeException("登记挂账失败，失败原因："+pr.getMessage());
+				}
+				pr.setState(true);
+				pr.setMessage(output_msg);
+			}else{
+				pr.setState(false);
+				pr.setMessage(output_msg);
+			}
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			throw new RuntimeException("审批异常，异常原因："+e.getMessage());
+		}
+		return pr;
+	}
+	
+	
+	/**
+     * 经销商订单列表
+     * @param request
+     * @return
+     * @throws Exception
+     */
+    public GridResult distributorOrderList(HttpServletRequest request) throws Exception {
+        GridResult gr = new GridResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                gr.setState(false);
+                gr.setMessage("缺少参数");
+                return gr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            Map<String, Object> sendMap = new HashMap<String, Object>();
+            sendMap.put("PAGE_SIZE",params.get("pageSize"));
+            sendMap.put("INDEX",params.get("pageIndex"));
+            sendMap.put("ACCOUNT",params.get("ACCOUNT"));
+            if(params.containsKey("ORDER_ID") && !StringUtils.isEmpty(params.get("ORDER_ID"))){
+                sendMap.put("ORDER_ID",params.get("ORDER_ID"));//订单号
+            }
+            if(params.containsKey("USER_NAME")&& !StringUtils.isEmpty(params.get("USER_NAME"))){
+                sendMap.put("USER_NAME",params.get("USER_NAME"));//用户名
+            }
+            if(params.containsKey("USER_MOBILE")&& !StringUtils.isEmpty(params.get("USER_MOBILE"))){
+                sendMap.put("USER_MOBILE",params.get("USER_MOBILE"));//手机号
+            }
+            if(params.containsKey("RECEIVING_NAME")&& !StringUtils.isEmpty(params.get("RECEIVING_NAME"))){
+                sendMap.put("RECEIVING_NAME",params.get("RECEIVING_NAME"));//收货人
+            }
+            if(params.containsKey("RECEIVING_MOBILE")&& !StringUtils.isEmpty(params.get("RECEIVING_MOBILE"))){
+                sendMap.put("RECEIVING_MOBILE",params.get("RECEIVING_MOBILE"));//收货人电话
+            }
+            if(params.containsKey("MIN_DATE")&& !StringUtils.isEmpty(params.get("MIN_DATE"))){
+                sendMap.put("MIN_DATE",params.get("MIN_DATE"));//下单开始时间
+            }
+            if(params.containsKey("MAX_DATE")&& !StringUtils.isEmpty(params.get("MAX_DATE"))){
+                sendMap.put("MAX_DATE",params.get("MAX_DATE"));//下单结束时间
+            }
+            if(params.containsKey("PAY_TYPE")&& !StringUtils.isEmpty(params.get("PAY_TYPE"))){
+                sendMap.put("PAY_TYPE",params.get("PAY_TYPE"));
+            }
+            if(params.containsKey("DELIVER_TYPE")&& !StringUtils.isEmpty(params.get("DELIVER_TYPE"))){
+                sendMap.put("DELIVER_TYPE",params.get("DELIVER_TYPE"));
+            }
+            if(params.containsKey("STORE_SALES_ID")&& !StringUtils.isEmpty(params.get("STORE_SALES_ID"))){
+                sendMap.put("STORE_SALES_ID",params.get("STORE_SALES_ID"));//导购员
+            }
+            if(params.containsKey("STAFF_ID")&& !StringUtils.isEmpty(params.get("STAFF_ID"))){
+                sendMap.put("STAFF_ID",params.get("STAFF_ID"));//收银员
+            }
+            if(params.containsKey("STORE_ID")&& !StringUtils.isEmpty(params.get("STORE_ID"))){
+                sendMap.put("STORE_ID",params.get("STORE_ID"));//门店
+            }
+            if(params.containsKey("ORDER_STATE_NORMAL")&& !StringUtils.isEmpty(params.get("ORDER_STATE_NORMAL"))){
+                sendMap.put("ORDER_STATE_NORMAL",params.get("ORDER_STATE_NORMAL"));
+            }
+            Map<String, Object> resPr = (Map<String, Object>) this.queryForPost(sendMap, retail_service_new_url+"open/Order/orderList");
+            if (Integer.parseInt(resPr.get("state").toString()) == 1) {
+                gr.setState(true);
+                gr.setMessage("获取经销商订单列表成功");
+                Map<String, Object> data =  (Map<String, Object>)resPr.get("data");
+                List<Map<String, Object>> dataList=(List<Map<String, Object>>)data.get("LIST");
+                //int total=dataList.size();
+                int total=Integer.parseInt(data.get("TOTAL").toString());
+                gr.setTotal(total);
+                gr.setObj(dataList);
+            }else{
+            	gr.setState(true);
+                gr.setMessage("无数据");
+                gr.setObj("");
+            }
+        } catch (Exception e) {
+            gr.setState(false);
+            gr.setMessage(e.getMessage());
+        }
+        return gr;
+    }
+    public Object queryForPost(Map<String,Object> obj,String url) throws Exception{
+        String params = "";
+        if(obj != null){
+            Packet packet = Transform.GetResult(obj, EsbConfig.ERP_FORWARD_KEY_NAME);//加密数据
+            params = Jackson.writeObject2Json(packet);//对象转json、字符串
+        }
+        //发送至服务端
+        String json = HttpClientUtil.post(url, params);
+        return Transform.GetPacketJzb(json,Map.class);
+    }
+    
+    
+    /**
+     * 经销商订单详情
+     * @param request
+     * @return
+     * @throws Exception
+     */
+    public GridResult distributorOrderDetail(HttpServletRequest request) throws Exception {
+        GridResult gr = new GridResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                gr.setState(false);
+                gr.setMessage("缺少参数");
+                return gr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            if (StringUtils.isEmpty(params.get("AGENT_ID"))) {
+                gr.setState(false);
+                gr.setMessage("缺少参数AGENT_ID");
+                return gr;
+            }
+            if (StringUtils.isEmpty(params.get("ORDER_ID"))) {
+                gr.setState(false);
+                gr.setMessage("缺少参数ORDER_ID");
+                return gr;
+            }
+            Map<String, Object> sendMap = new HashMap<String, Object>();
+            sendMap.put("ACCOUNT",params.get("AGENT_ID"));
+            sendMap.put("ORDER_ID",params.get("ORDER_ID"));
+            Map<String, Object> resPr = (Map<String, Object>) this.queryForPost(sendMap, retail_service_new_url+"open/Order/orderDetail");
+            if (Integer.parseInt(resPr.get("state").toString()) == 1) {
+                Map<String, Object> data =  (Map<String, Object>)resPr.get("data");
+                gr.setState(true);
+                gr.setMessage("获取经销商订单详情成功");
+                gr.setObj(data);
+            }
+        } catch (Exception e) {
+            gr.setState(false);
+            gr.setMessage(e.getMessage());
+            logger.info(e.getMessage());
+        }
+        return gr;
+    }
+    
+    
+    /**
+     * 经销商订单获取物流信息
+     * @param request
+     * @return
+     * @throws Exception
+     */
+    public GridResult distributorOrLogisticsInfo(HttpServletRequest request) throws Exception {
+        GridResult gr = new GridResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                gr.setState(false);
+                gr.setMessage("缺少参数");
+                return gr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            if (StringUtils.isEmpty(params.get("ORDER"))) {
+                gr.setState(false);
+                gr.setMessage("缺少参数ORDER");
+                return gr;
+            }
+            Map<String, Object> sendMap = new HashMap<String, Object>();
+            sendMap.put("ORDER",params.get("ORDER"));
+            Map<String, Object> resPr = (Map<String, Object>) this.queryForPost(sendMap, retail_service_new_url+"Order/logisticsRecord");
+            if (Integer.parseInt(resPr.get("state").toString()) == 1) {
+                List<Map<String, Object>> data =  (List<Map<String, Object>>)resPr.get("data");
+                gr.setState(true);
+                gr.setMessage("获取经销商订单详情成功");
+                gr.setObj(data);
+            }
+        } catch (Exception e) {
+            gr.setState(false);
+            gr.setMessage(e.getMessage());
+            logger.info(e.getMessage());
+        }
+        return gr;
+    }
+
+	/**
+	 *
+	 * @param request
+	 * @return
+     */
+	public ProcessResult downloadSaleOrder(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if (StringUtils.isEmpty(json)) {
+				pr.setState(false);
+				pr.setMessage("缺少参数");
+				return pr;
+			}
+			// 前台用户数据
+			Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+			String orderNumber = "order_number";
+
+			if (paramMap.containsKey(orderNumber) && StringUtils.isEmpty(paramMap.get(orderNumber))) {
+				pr.setState(false);
+				pr.setMessage("缺少参数【ORDER_NUMBER】");
+				return pr;
+			}
+			Map<String, Object> order = this.orderDao.queryOrderDetail(paramMap);
+			if (order == null) {
+				pr.setState(false);
+				pr.setMessage("订单异常");
+				return pr;
+			}
+			Map<String, Object> resultMap = new HashMap<String, Object>(16);
+			resultMap.put("order",order);
+			resultMap.put("productList",this.orderDao.queryOrderProductSkuListForExport(paramMap));
+			pr.setState(true);
+			pr.setMessage("获取销售清单数据成功");
+			pr.setObj(resultMap);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			e.printStackTrace();
+		}
+		return pr;
+	}
+	
+	/**
+	 * 添加订单备注
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult addCustomerServiceRemark(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			// 前台用户数据
+			Map<String,Object> paramMap = (Map<String,Object>)Transform.GetPacket(json, HashMap.class);
+			if (StringUtils.isEmpty(paramMap.get("order_number_arr"))) {
+				pr.setState(false);
+				pr.setMessage("缺少参数");
+                return pr;
+            }
+			//如果存在之前备注 先设置为无效
+			orderDao.updateCustomerServiceRemarkState(paramMap);
+			int num=orderDao.addCustomerServiceRemark(paramMap);
+			if(num<=0){
+				throw new RuntimeException("修改订单备注异常");
+			}
+			pr.setState(true);
+			pr.setMessage("修改订单备注成功");
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			throw new RuntimeException("修改订单备注，异常原因："+e.getMessage());
+		}
+		return pr;
+	}
+	
+	/**
+	 * 查看当前订单备注记录
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryCustomerServiceRemarkList(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        }
+	        if (StringUtils.isEmpty(paramMap.get("order_number"))) {
+	        	gr.setState(false);
+	        	gr.setMessage("缺少参数");
+                return gr;
+            }
+	        List<Map<String, Object>> list=orderDao.queryCustomerServiceRemarkList(paramMap);
+	        gr.setState(true);
+	        gr.setMessage("查询成功");
+	        gr.setObj(list);
+        } catch (Exception e) {
+        	gr.setState(false);
+        	gr.setMessage(e.getMessage());
+        }
+
+        return gr;
+	}
+	
+	/**
+	 * 查看当前订单备注记录详情
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryCustomerServiceRemarkDetail(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        }
+	        if (StringUtils.isEmpty(paramMap.get("order_number"))) {
+	        	gr.setState(false);
+	        	gr.setMessage("缺少参数");
+                return gr;
+            }
+	        Map<String, Object> detail=orderDao.queryCustomerServiceRemarkDetail(paramMap);
+	        gr.setState(true);
+	        gr.setMessage("查询成功");
+	        gr.setObj(detail);
+        } catch (Exception e) {
+        	gr.setState(false);
+        	gr.setMessage(e.getMessage());
+        }
+
+        return gr;
+	}
+
+	/**
+	 * 查看当前订单发货排期信息
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryOrderDeliverScheduleList(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        }
+	        if (StringUtils.isEmpty(paramMap.get("order_number"))) {
+	        	gr.setState(false);
+	        	gr.setMessage("缺少参数");
+                return gr;
+            }
+	        PageUtil.handlePageParams(paramMap);
+	        Map<String,Object> orderInfo  = orderDao.queryOrderDetail(paramMap);
+	        if("6".equals(orderInfo.get("ORDER_STATE")+"")){
+	        	gr.setState(false);
+	        	gr.setMessage("当前订单已关闭");
+                return gr;
+	        }
+	        if("全部发货".equals(orderInfo.get("DELIVER_STATE")+"")){
+	        	gr.setState(false);
+	        	gr.setMessage("当前订单已全部发货");
+                return gr;
+	        }
+			//调用erp同步接口
+            gr = HttpClientUtil.postGrid(erp_service_url + order_deliver_schedule, paramMap);
+        } catch (Exception e) {
+        	gr.setState(false);
+        	gr.setMessage(e.getMessage());
+        }
+        return gr;
+	}
+	
+	/**
+	 * 查看当前订单sku订单占用排名情况
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult querySkuOrderCountList(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        }
+	        if (StringUtils.isEmpty(paramMap.get("product_sku"))) {
+	        	gr.setState(false);
+	        	gr.setMessage("缺少参数");
+                return gr;
+            }
+	        PageUtil.handlePageParams(paramMap);
+			//调用erp同步接口
+            gr = HttpClientUtil.postGrid(erp_service_url + order_sku_order_count, paramMap);
+        } catch (Exception e) {
+        	gr.setState(false);
+        	gr.setMessage(e.getMessage());
+        }
+        return gr;
+	}
+	
+	/**
+	 * 查看当前订单sku生产计划情况
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult querySkuPurchaseList(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        }
+	        if (StringUtils.isEmpty(paramMap.get("product_sku"))) {
+	        	gr.setState(false);
+	        	gr.setMessage("缺少参数");
+                return gr;
+            }
+	        PageUtil.handlePageParams(paramMap);
+			//调用erp同步接口
+            gr = HttpClientUtil.postGrid(erp_service_url + order_sku_purchase_count, paramMap);
+        } catch (Exception e) {
+        	gr.setState(false);
+        	gr.setMessage(e.getMessage());
+        }
+        return gr;
+	}
+
+}

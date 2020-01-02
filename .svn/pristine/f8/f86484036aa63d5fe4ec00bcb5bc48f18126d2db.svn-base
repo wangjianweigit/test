@@ -1,0 +1,335 @@
+package com.tk.oms.product.service;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import com.tk.oms.product.dao.ProductTypeDao;
+import com.tk.sys.util.HttpUtil;
+import com.tk.sys.util.ProcessResult;
+import com.tk.sys.util.Transform;
+
+
+@Service("ProductTypeService")
+public class ProductTypeService {
+	private Log logger = LogFactory.getLog(this.getClass());
+    @Resource
+    private ProductTypeDao productTypeDao;
+    /**
+     * 查询商品分类信息
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+	public ProcessResult queryProductTypeList(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        Map<String, Object> map = new HashMap<String, Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if(!StringUtils.isEmpty(json))
+                //参数实体
+            	map = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            // 数据库用户
+            List<Map<String, Object>> dataList = productTypeDao.queryProductTypeList(map);
+            if (dataList != null && dataList.size() > 0) {
+				pr.setState(true);
+				pr.setMessage("获取商品分类信息成功");
+				pr.setObj(dataList);
+			} else {
+				pr.setState(true);
+				pr.setMessage("无数据");
+			}
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+    }
+
+    /**
+     * 新增商品分类信息
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+    @Transactional
+	public ProcessResult addProductType(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        Map<String, Object> map = new HashMap<String, Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if(!StringUtils.isEmpty(json))
+                //参数实体
+                map = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            //判断名称不重复
+            Map<String, Object> param = new HashMap<String, Object>();
+            param.put("type_name",map.get("type_name"));
+            if(productTypeDao.isExist(param)>0){
+                pr.setState(false);
+                pr.setMessage("分类名称["+map.get("type_name")+"]已存在");
+                return pr;
+            }
+            if(productTypeDao.insert(map)>0){
+                pr.setState(true);
+                pr.setMessage("新增商品分类成功");
+                pr.setObj(map);
+            } else {
+                pr.setState(false);
+                pr.setMessage("新增商品分类失败");
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException("新增商品分类失败："+e.getMessage());
+        }
+        return pr;
+    }
+    /**
+     * 批量更新商品分类信息，存在则更新，不存在则新增
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+	@Transactional
+    public ProcessResult batchEditProductType(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        Map<String, Object> paramMap = new HashMap<String, Object>();
+        try {
+            //将数据拆分为待插入，待更新两部分
+            List<Map<String, Object>> insertList = new ArrayList<Map<String, Object>>();
+            List<Map<String, Object>> updateList =  new ArrayList<Map<String, Object>>();
+            List<Map<String, Object>> returlList =  new ArrayList<Map<String, Object>>();//返回值，用于更新界面上的ID
+
+            String json = HttpUtil.getRequestInputStream(request);
+            if(!StringUtils.isEmpty(json))
+            	paramMap = (Map<String, Object>)Transform.GetPacket(json, Map.class);
+            List<Map<String, Object>> list = (List<Map<String, Object>>) paramMap.get("dataList");
+            if(list!=null&&list.size()>0){
+                for(Map<String, Object> map:list){//重名判断
+                    if(productTypeDao.isExist(map)>0){
+                        pr.setState(false);
+                        pr.setMessage("分类名称["+map.get("type_name")+"]已存在");
+                        return pr;
+                    }
+                    if(StringUtils.isEmpty(map.get("id"))){
+                        insertList.add(map);
+                    }else{
+                        updateList.add(map);
+                    }
+                }
+            }
+            
+            if(insertList.size()>0){
+                for(Map<String, Object> map:insertList){
+                	map.put("create_user_id", paramMap.get("create_user_id"));
+                    if(productTypeDao.insert(map)>0){
+                    	returlList.add(map);
+                    }
+                }
+            }
+            if(updateList.size()>0)
+               productTypeDao.batchUpdate(updateList);
+            returlList.addAll(updateList);
+            pr.setState(true);
+            pr.setMessage("批量编辑商品分类成功");
+            pr.setObj(returlList);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage("批量编辑商品分类失败："+e.getMessage());
+            logger.error("批量编辑商品分类失败："+e.getMessage());
+            throw new RuntimeException(e.getMessage());
+        }
+        return pr;
+    }
+    /**
+     * 更新商品分类信息
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+	public ProcessResult editProductType(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        Map<String, Object> map = new HashMap<String, Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if(!StringUtils.isEmpty(json))
+                //参数实体
+            	map = ( Map<String, Object>) Transform.GetPacket(json, Map.class);
+            if(map.get("id").equals(0)){
+                pr.setState(false);
+                pr.setMessage("参数错误，商品分类Id不能为空");
+                return pr;
+            }
+            //判断名称不重复
+            Map<String, Object> param = new HashMap<String, Object>();
+            param.put("type_name",map.get("type_name"));
+            param.put("id",map.get("id"));
+            if(productTypeDao.isExist(param)>0){
+                pr.setState(false);
+                pr.setMessage("分类名称已存在");
+                return pr;
+            }
+            if(productTypeDao.update(map)>0){
+                pr.setState(true);
+                pr.setMessage("更新商品分类成功");
+                pr.setObj(null);
+            } else {
+                pr.setState(false);
+                pr.setMessage("更新商品分类失败");
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+    }
+    /**
+     * 删除商品分类信息
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+	public ProcessResult removeProductType(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        Map<String,Object> params = new HashMap<String,Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if(!StringUtils.isEmpty(json))
+                //参数实体
+                params = (Map<String,Object>) Transform.GetPacket(json, Map.class);
+            if(StringUtils.isEmpty(params.get("id"))){
+                pr.setState(false);
+                pr.setMessage("参数错误，商品类型Id不能为空");
+                return pr;
+            }
+            Map<String,Object> retMap = productTypeDao.queryChildrenByParentId(params);
+            	String type_name = retMap.get("TYPE_NAME").toString();
+            	int children = Integer.parseInt(retMap.get("CHILDREN").toString());
+            	if(children>0){
+            		 pr.setState(false);
+                     pr.setMessage("分类"+type_name+"存在子节点，不允许删除,请先删除子节点");
+                     return pr;
+            	}
+            if(productTypeDao.delete(params)>0){
+                pr.setState(true);
+                pr.setMessage("删除商品分类成功");
+                pr.setObj(null);
+            } else {
+                pr.setState(false);
+                pr.setMessage("删除商品分类失败");
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+    }
+    /**
+     * 商品分类排序
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+    @Transactional
+	public ProcessResult sortProductType(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        Map<String,Object> map = new HashMap<String,Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if(!StringUtils.isEmpty(json))
+                //参数实体
+            	map = (Map<String,Object>) Transform.GetPacket(json, Map.class);
+            if(StringUtils.isEmpty(map.get("type"))){
+            	if(StringUtils.isEmpty(map.get("id1"))||StringUtils.isEmpty(map.get("id2"))){
+                    pr.setState(false);
+                    pr.setMessage("参数错误，需要两个交换的id（id1、id2）");
+                    return pr;
+                }
+                Map<String,Object> t1 = productTypeDao.queryById(Long.parseLong(map.get("id1").toString()));
+                Map<String,Object> t2 = productTypeDao.queryById(Long.parseLong(map.get("id2").toString()));
+                t1.put("id", map.get("id1"));
+                t1.put("sortid",t2.get("SORTID"));
+                t2.put("id", map.get("id2"));
+                t2.put("sortid",t1.get("SORTID"));
+                if(productTypeDao.update(t1)>0&&productTypeDao.update(t2)>0){
+                    pr.setState(true);
+                    pr.setMessage("排序字段修改成功");
+                } else {
+                    pr.setState(false);
+                    pr.setMessage("排序字段修改失败");
+                }
+            }else{
+            	if(StringUtils.isEmpty(map.get("id"))){
+                    pr.setState(false);
+                    pr.setMessage("参数缺失，分类ID为空");
+                    return pr;
+                }
+            	if(StringUtils.isEmpty(map.get("parent_id"))){
+                    pr.setState(false);
+                    pr.setMessage("参数缺失，分类的父id为空");
+                    return pr;
+                }
+            	if(productTypeDao.update(map)>0){
+            		pr.setState(true);
+                    pr.setMessage("排序字段修改成功");
+            	}else{
+            		pr.setState(false);
+                    pr.setMessage("排序字段修改失败");
+            	}
+            }
+            
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error("排序字段修改失败："+e.getMessage());
+            throw new RuntimeException(e.getMessage());
+        }
+        return pr;
+    }
+    /**
+     * 分类下拉框列表
+     * @param request
+     * @return
+     */
+	public ProcessResult queryTypeList(HttpServletRequest request) {
+		 ProcessResult pr = new ProcessResult();
+		try{
+			
+		 List<Map<String, Object>> dataList = productTypeDao.queryTypeList();
+		 
+		 pr.setState(true);
+         pr.setMessage("查询成功");
+         pr.setObj(dataList);
+		} catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error("查询失败："+e.getMessage());
+        }
+        return pr;
+	}
+	/**
+	 * 查询大类
+	 * @param request
+	 * @return
+	 */
+	public ProcessResult queryMainTypeList(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try{
+			
+		 List<Map<String, Object>> dataList = productTypeDao.queryMainTypeList();
+		 
+		 pr.setState(true);
+         pr.setMessage("查询成功");
+         pr.setObj(dataList);
+		} catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error("查询失败："+e.getMessage());
+        }
+        return pr;
+	}
+}

@@ -1,0 +1,514 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.finance.dao.SettlementDao">
+
+    <!--分页获取入驻商结算列表-->
+    <select id="queryListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select a.*,rownum rn from (
+                select
+                    su.company_name,
+                    bs.settlement_number,
+                    bs.settlement_state,
+                    bs.settlement_type,
+                    bs.order_number,
+                    bs.product_num,
+                    bs.settlement_amount,
+                    bs.remark,
+                    to_char(bs.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+                    to_char(bs.liquidation_date,'yyyy-mm-dd hh24:mi:ss') settlement_date
+                from
+                    v_buss_settlement bs
+                left join tbl_stationed_user_info su on bs.stationed_user_id = su.id
+                <where>
+                    <if test="settlement_number != null and settlement_number != ''">
+                        bs.settlement_number like '%'||#{settlement_number,jdbcType=VARCHAR}||'%'
+                    </if>
+                    <if test="company_name != null and company_name != ''">
+                        and su.company_name = #{company_name,jdbcType=VARCHAR}
+                    </if>
+                    <if test="order_number != null and order_number != ''">
+                        and bs.order_number like '%'||#{order_number,jdbcType=VARCHAR}||'%'
+                    </if>
+                    <if test="start_time != null and start_time != ''">
+                        and bs.create_date &gt; to_date(#{start_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+                    </if>
+                    <if test="end_time != null and end_time != ''">
+                        and bs.create_date &lt; to_date(#{end_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+                    </if>
+                    <if test="settlement_type != null and settlement_type != ''">
+                        and bs.settlement_type = #{settlement_type,jdbcType=CHAR}
+                    </if>
+                    <if test="settlement_state != null and settlement_state != ''">
+                        and bs.settlement_state in
+                        <foreach item="item" index="index" collection="settlement_state" open="(" separator="," close=")">
+                            #{item}
+                        </foreach>
+                    </if>
+					<if test="remark != null and remark != ''">
+						and bs.remark = #{remark,jdbcType=CHAR}
+					</if>
+                </where>
+            ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--分页获取入驻商结算单数量-->
+    <select id="queryListForCount" parameterType="java.util.Map" resultType="int">
+        select
+            count(1)
+        from
+			v_buss_settlement bs
+        left join
+            tbl_stationed_user_info su on bs.stationed_user_id = su.id
+        <where>
+            <if test="settlement_number != null and settlement_number != ''">
+                bs.settlement_number like '%'||#{settlement_number,jdbcType=VARCHAR}||'%'
+            </if>
+            <if test="company_name != null and company_name != ''">
+                and su.company_name = #{company_name,jdbcType=VARCHAR}
+            </if>
+            <if test="order_number != null and order_number != ''">
+                and bs.order_number like '%'||#{order_number,jdbcType=VARCHAR}||'%'
+            </if>
+            <if test="start_time != null and start_time != ''">
+                and bs.create_date &gt; to_date(#{start_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+            </if>
+            <if test="end_time != null and end_time != ''">
+                and bs.create_date &lt; to_date(#{end_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+            </if>
+            <if test="settlement_type != null and settlement_type != ''">
+                and bs.settlement_type = #{settlement_type,jdbcType=CHAR}
+            </if>
+            <if test="settlement_state != null and settlement_state != ''">
+                and bs.settlement_state in
+                <foreach item="item" index="index" collection="settlement_state" open="(" separator="," close=")">
+                    #{item}
+                </foreach>
+            </if>
+			<if test="remark != null and remark != ''">
+				and bs.remark = #{remark,jdbcType=CHAR}
+			</if>
+        </where>
+    </select>
+
+    <!--获取入驻商结算单详情-->
+    <select id="queryById" parameterType="long" resultType="java.util.Map">
+        select
+            bs.id,
+            su.user_name,
+            bs.settlement_number,
+            bs.settlement_state,
+            bs.settlement_type,
+            bs.order_number,
+            bs.product_num,
+            bs.settlement_amount,
+            bs.remark,
+            to_char(bs.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+            to_char(bs.settlement_date,'yyyy-mm-dd hh24:mi:ss') settlement_date
+        from
+            tbl_buss_settlement_info bs
+        left join
+            tbl_stationed_user_info su on bs.stationed_user_id = su.id
+        where
+            bs.id = #{id,jdbcType=INTEGER}
+    </select>
+
+	<!--获取入驻商结算单详情-->
+	<select id="queryByNumber" parameterType="java.lang.String" resultType="java.util.Map">
+		select
+			su.user_name,
+			bs.settlement_number,
+			bs.settlement_state,
+			bs.settlement_type,
+			bs.order_number,
+			bs.product_num,
+			bs.settlement_amount,
+			bs.remark,
+			to_char(bs.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+			to_char(bs.settlement_date,'yyyy-mm-dd hh24:mi:ss') settlement_date
+		from
+			v_buss_settlement bs
+		left join
+			tbl_stationed_user_info su on bs.stationed_user_id = su.id
+		where
+		bs.settlement_number = #{settlement_number,jdbcType=VARCHAR}
+	</select>
+
+	<sql id="monthLiquidationDateSql">
+		select
+		case when charge_off_day &lt; settlement_day
+					and to_char(sysdate,'yyyymmdd') &lt; to_char(Trunc(SYSDATE, 'MONTH') + charge_off_day -1,'yyyymmdd')
+			 then Trunc(SYSDATE, 'MONTH') + settlement_day -1
+			 when charge_off_day &lt; settlement_day
+					and to_char(sysdate,'yyyymmdd') &gt;= to_char(Trunc(SYSDATE, 'MONTH') + charge_off_day -1,'yyyymmdd')
+			 then Trunc(add_months(SYSDATE,1), 'MONTH') + settlement_day -1
+			 when charge_off_day &gt;= settlement_day
+					and to_char(sysdate,'yyyymmdd') &lt; to_char(Trunc(SYSDATE, 'MONTH') + charge_off_day -1,'yyyymmdd')
+			 then Trunc(add_months(SYSDATE,1), 'MONTH') + settlement_day -1
+			 when charge_off_day &gt;= settlement_day
+					and to_char(sysdate,'yyyymmdd') &gt;= to_char(Trunc(SYSDATE, 'MONTH') + charge_off_day -1,'yyyymmdd')
+			 then Trunc(add_months(SYSDATE,2), 'MONTH') + settlement_day -1
+			 else sysdate end
+		from (
+			select
+				sum(decode(t.key, 'charge_off_day', t.value , 0)) charge_off_day,
+				sum(decode(t.key, 'settlement_day', t.value , 0)) settlement_day
+			from TBL_SYS_PARAM_CONFIG t
+		)
+	</sql>
+	
+	<!-- 添加入驻商待结算记录 -->
+	<insert id="insertSettlementForStationed" parameterType="java.util.Map">
+		insert into TBL_BUSS_SETTLEMENT_INFO(
+			id,
+			stationed_user_id,
+			settlement_number,
+			settlement_state,
+			settlement_type,
+			order_number,
+			product_num,
+			settlement_amount,
+			bank_account_type,
+			bank_account,
+			remark,
+			settlement_group,
+			pay_number,
+			settlement_user_id,
+			settlement_date
+		)
+		select seq_buss_settlement_info.nextval,
+			divide_user_id,
+			GETAUTONUMBERSHORT(13),
+			(case when instr(PAYMENT_TYPE, '授信') > 0 then '3' else '1' end),
+			'1',
+			oi.order_number,
+            s.product_count,
+			total_money,
+			'1',
+			(select BANK_ACCOUNT from TBL_BANK_ACCOUNT ba where ba.user_id = s.divide_user_id),
+			'入驻商货款',
+			(case when instr(PAYMENT_TYPE, '授信') > 0 then '2' else '1' end),
+			(case when instr(PAYMENT_TYPE, '授信') > 0 then oi.user_name else #{pay_trade_number,jdbcType=VARCHAR} end) pay_number,
+			divide_user_id,
+			(case when instr(PAYMENT_TYPE, '授信') > 0 then (<include refid="monthLiquidationDateSql"/>) else sysdate end)
+		from (
+			select order_number,divide_user_id,sum(total_money) total_money, sum(product_count) product_count from (
+				SELECT odr.order_number,odr.DIVIDE_USER_ID,odr.product_sku,odr.DIVIDE_MONEY*(ops.count) total_money,ops.count product_count
+				  FROM TBL_ORDER_DIVIDE_RECORD odr,
+					   (SELECT order_number, product_sku, COUNT
+						  FROM TBL_ORDER_PRODUCT_SKU
+						 WHERE order_number = #{order_number,jdbcType=VARCHAR}) ops
+				 WHERE     ODR.ORDER_NUMBER = ops.order_number
+					   AND odr.product_sku = ops.product_sku
+					   and ODR.DIVIDE_TYPE = '1'
+					   and odr.order_number = #{order_number,jdbcType=VARCHAR}
+			) group by order_number,divide_user_id
+		) s,TBL_ORDER_INFO oi
+		where s.order_number = oi.order_number
+	</insert>
+	<!-- 添加平台服务待结算记录 -->
+	<insert id="insertSettlementForPlatform" parameterType="java.util.Map">
+		insert into TBL_BUSS_SETTLEMENT_INFO(
+			id,
+			stationed_user_id,
+			settlement_number,
+			settlement_state,
+			settlement_type,
+			order_number,
+			product_num,
+			settlement_amount,
+			bank_account_type,
+			bank_account,
+			remark,
+			settlement_group,
+			pay_number,
+			settlement_user_id,
+			settlement_date
+		)
+		select seq_buss_settlement_info.nextval,
+			divide_user_id,
+			GETAUTONUMBERSHORT(13),
+			(case when instr(PAYMENT_TYPE, '授信') > 0 then '3' else '1' end),
+			'1',
+			oi.order_number,
+            s.product_count,
+			total_money,
+			'2',
+			(select value from TBL_SYS_PARAM_CONFIG where key = 'platform_bank_account'),
+			'会员服务费',
+			(case when instr(PAYMENT_TYPE, '授信') > 0 then '2' else '1' end),
+			(case when instr(PAYMENT_TYPE, '授信') > 0 then oi.user_name else #{pay_trade_number,jdbcType=VARCHAR} end) pay_number,
+			(select value from TBL_SYS_PARAM_CONFIG where key = 'platform_user_id'),
+			(case when instr(PAYMENT_TYPE, '授信') > 0 then (<include refid="monthLiquidationDateSql"/>) else sysdate end)
+		from (
+			select order_number,divide_user_id,round(sum(total_money),2) total_money, sum(product_count) product_count from (
+				SELECT odr.order_number,divide_user_id,odr.product_sku,(odr.divide_money-ops.product_discount_money)*(ops.count) total_money,ops.count product_count
+				  FROM TBL_ORDER_DIVIDE_RECORD odr,
+					   (SELECT order_number, product_sku, COUNT, case when #{is_store_order,jdbcType=INTEGER} = 2 then 0 else product_total_discount_money/count end product_discount_money
+						  FROM TBL_ORDER_PRODUCT_SKU
+						 WHERE order_number = #{order_number,jdbcType=VARCHAR}) ops
+				 WHERE     ODR.ORDER_NUMBER = ops.order_number
+					   AND odr.product_sku = ops.product_sku
+					   and ODR.DIVIDE_TYPE = '2'
+					   and odr.order_number = #{order_number,jdbcType=VARCHAR}
+			) group by order_number,divide_user_id
+		) s,TBL_ORDER_INFO oi
+		where s.order_number = oi.order_number
+	</insert>
+	<!-- 添加仓储服务待结算记录 -->
+	<insert id="insertSettlementForStorage" parameterType="java.util.Map">
+		insert into TBL_BUSS_SETTLEMENT_INFO(
+			id,
+			stationed_user_id,
+			settlement_number,
+			settlement_state,
+			settlement_type,
+			order_number,
+			product_num,
+			settlement_amount,
+			bank_account_type,
+			bank_account,
+			remark,
+			settlement_group,
+			pay_number,
+			settlement_user_id,
+			settlement_date
+		)
+		select seq_buss_settlement_info.nextval,
+			divide_user_id,
+			GETAUTONUMBERSHORT(13),
+			(case when instr(PAYMENT_TYPE, '授信') > 0 then '3' else '1' end),
+			'1',
+			oi.order_number,
+            s.product_count,
+			total_money,
+			'3',
+			(select value from TBL_SYS_PARAM_CONFIG where key = 'storage_bank_account'),
+			'仓储费',
+			(case when instr(PAYMENT_TYPE, '授信') > 0 then '2' else '1' end),
+			(case when instr(PAYMENT_TYPE, '授信') > 0 then oi.user_name else #{pay_trade_number,jdbcType=VARCHAR} end) pay_number,
+			(select value from TBL_SYS_PARAM_CONFIG where key = 'storage_user_id'),
+			(case when instr(PAYMENT_TYPE, '授信') > 0 then (<include refid="monthLiquidationDateSql"/>) else sysdate end)
+		from (
+			select order_number,divide_user_id,sum(total_money) total_money, sum(product_count) product_count from (
+				SELECT odr.order_number,divide_user_id,odr.product_sku,odr.DIVIDE_MONEY*(ops.count) total_money,ops.count product_count
+				  FROM TBL_ORDER_DIVIDE_RECORD odr,
+					   (SELECT order_number, product_sku, COUNT
+						  FROM TBL_ORDER_PRODUCT_SKU
+						 WHERE order_number = #{order_number,jdbcType=VARCHAR}) ops
+				 WHERE     ODR.ORDER_NUMBER = ops.order_number
+					   AND odr.product_sku = ops.product_sku
+					   and ODR.DIVIDE_TYPE = '3'
+					   and odr.order_number = #{order_number,jdbcType=VARCHAR}
+			) group by order_number,divide_user_id
+		) s,TBL_ORDER_INFO oi
+		where s.order_number = oi.order_number
+	</insert>
+	<!-- 添加入驻商服务待结算记录 -->
+	<insert id="insertSettlementForStationedServer" parameterType="java.util.Map">
+		insert into TBL_BUSS_SETTLEMENT_INFO(
+			id,
+			stationed_user_id,
+			settlement_number,
+			settlement_state,
+			settlement_type,
+			order_number,
+			product_num,
+			settlement_amount,
+			bank_account_type,
+			bank_account,
+			remark,
+			settlement_group,
+			pay_number,
+			settlement_user_id,
+			settlement_date
+		)
+		select seq_buss_settlement_info.nextval,
+			divide_user_id,
+			GETAUTONUMBERSHORT(13),
+			(case when instr(PAYMENT_TYPE, '授信') > 0 then '3' else '1' end),
+			'1',
+			oi.order_number,
+            s.product_count,
+			total_money,
+			'2',
+			(select value from TBL_SYS_PARAM_CONFIG where key = 'platform_bank_account'),
+			'入驻商服务费',
+			(case when instr(PAYMENT_TYPE, '授信') > 0 then '2' else '1' end),
+			(case when instr(PAYMENT_TYPE, '授信') > 0 then oi.user_name else #{pay_trade_number,jdbcType=VARCHAR} end) pay_number,
+			(select value from TBL_SYS_PARAM_CONFIG where key = 'platform_user_id'),
+			(case when instr(PAYMENT_TYPE, '授信') > 0 then (<include refid="monthLiquidationDateSql"/>) else sysdate end)
+		from (
+			select order_number,divide_user_id,sum(total_money) total_money, sum(product_count) product_count from (
+				SELECT odr.order_number,divide_user_id,odr.product_sku,odr.DIVIDE_MONEY*(ops.count) total_money,ops.count product_count
+				  FROM TBL_ORDER_DIVIDE_RECORD odr,
+					   (SELECT order_number, product_sku, COUNT
+						  FROM TBL_ORDER_PRODUCT_SKU
+						 WHERE order_number = #{order_number,jdbcType=VARCHAR}) ops
+				 WHERE     ODR.ORDER_NUMBER = ops.order_number
+					   AND odr.product_sku = ops.product_sku
+					   and ODR.DIVIDE_TYPE = '4'
+					   and odr.order_number = #{order_number,jdbcType=VARCHAR}
+			) group by order_number,divide_user_id
+		) s,TBL_ORDER_INFO oi
+		where s.order_number = oi.order_number
+	</insert>
+
+	<!-- 添加入驻商支付服务费待结算记录 -->
+	<insert id="insertSettlementForStationedPay" parameterType="java.util.Map">
+		insert into TBL_BUSS_SETTLEMENT_INFO(
+			id,
+			stationed_user_id,
+			settlement_number,
+			settlement_state,
+			settlement_type,
+			order_number,
+			product_num,
+			settlement_amount,
+			bank_account_type,
+			bank_account,
+			remark,
+			settlement_group,
+			pay_number,
+			settlement_user_id,
+			settlement_date
+		)
+		select seq_buss_settlement_info.nextval,
+		divide_user_id,
+		GETAUTONUMBERSHORT(13),
+		(case when instr(PAYMENT_TYPE, '授信') > 0 then '3' else '1' end),
+		'1',
+		oi.order_number,
+		s.product_count,
+		total_money,
+		'2',
+		(select value from TBL_SYS_PARAM_CONFIG where key = 'platform_bank_account'),
+		'入驻商支付服务费',
+		(case when instr(PAYMENT_TYPE, '授信') > 0 then '2' else '1' end),
+		(case when instr(PAYMENT_TYPE, '授信') > 0 then oi.user_name else #{pay_trade_number,jdbcType=VARCHAR} end) pay_number,
+		(select value from TBL_SYS_PARAM_CONFIG where key = 'platform_user_id'),
+		(case when instr(PAYMENT_TYPE, '授信') > 0 then (<include refid="monthLiquidationDateSql"/>) else sysdate end)
+		from (
+		select order_number,divide_user_id,sum(total_money) total_money, sum(product_count) product_count from (
+		SELECT odr.order_number,divide_user_id,odr.product_sku,odr.DIVIDE_MONEY*(ops.count) total_money,ops.count product_count
+		FROM TBL_ORDER_DIVIDE_RECORD odr,
+		(SELECT order_number, product_sku, COUNT
+		FROM TBL_ORDER_PRODUCT_SKU
+		WHERE order_number = #{order_number,jdbcType=VARCHAR}) ops
+		WHERE     ODR.ORDER_NUMBER = ops.order_number
+		AND odr.product_sku = ops.product_sku
+		and ODR.DIVIDE_TYPE = '5'
+		and odr.order_number = #{order_number,jdbcType=VARCHAR}
+		) group by order_number,divide_user_id
+		) s,TBL_ORDER_INFO oi
+		where s.order_number = oi.order_number
+	</insert>
+	<!-- 添加物流费待结算记录 -->
+	<insert id="insertSettlementForFreight" parameterType="java.util.Map">
+		insert into TBL_BUSS_SETTLEMENT_INFO(
+			id,
+			settlement_user_id,
+			settlement_number,
+			settlement_state,
+			settlement_type,
+			order_number,
+			product_num,
+			settlement_amount,
+			bank_account_type,
+			bank_account,
+			remark,
+			settlement_group,
+			pay_number,
+			settlement_date
+		)
+		select seq_buss_settlement_info.nextval,
+			(select value from TBL_SYS_PARAM_CONFIG where key = 'storage_user_id'),
+			GETAUTONUMBERSHORT(13),
+			(case when instr(PAYMENT_TYPE, '授信') > 0 then '3' else '1' end),
+			'1',
+			o.order_number,
+			o.product_count,
+			logistics_money,
+			'3',
+			(select value from TBL_SYS_PARAM_CONFIG where key = 'storage_bank_account'),
+			'物流费',
+			(case when instr(PAYMENT_TYPE, '授信') > 0 then '2' else '1' end),
+			(case when instr(PAYMENT_TYPE, '授信') > 0 then o.user_name else #{pay_trade_number,jdbcType=VARCHAR} end) pay_number,
+			(case when instr(PAYMENT_TYPE, '授信') > 0 then (<include refid="monthLiquidationDateSql"/>) else sysdate end)
+		from TBL_ORDER_INFO o
+		where o.order_number = #{order_number,jdbcType=VARCHAR}
+	</insert>
+	<!-- 添加代发费待结算记录 -->
+	<insert id="insertSettlementForConsignment" parameterType="java.util.Map">
+		insert into TBL_BUSS_SETTLEMENT_INFO(
+			id,
+			settlement_user_id,
+			settlement_number,
+			settlement_state,
+			settlement_type,
+			order_number,
+			product_num,
+			settlement_amount,
+			bank_account_type,
+			bank_account,
+			remark,
+			settlement_group,
+			pay_number,
+			settlement_date
+		)
+		select seq_buss_settlement_info.nextval,
+			(select value from TBL_SYS_PARAM_CONFIG where key = 'storage_user_id'),
+			GETAUTONUMBERSHORT(13),
+			(case when instr(PAYMENT_TYPE, '授信') > 0 then '3' else '1' end),
+			'1',
+			o.order_number,
+			o.product_count,
+			df_money,
+			'3',
+			(select value from TBL_SYS_PARAM_CONFIG where key = 'storage_bank_account'),
+			'代发费',
+			(case when instr(PAYMENT_TYPE, '授信') > 0 then '2' else '1' end),
+			(case when instr(PAYMENT_TYPE, '授信') > 0 then o.user_name else #{pay_trade_number,jdbcType=VARCHAR} end) pay_number,
+			(case when instr(PAYMENT_TYPE, '授信') > 0 then (<include refid="monthLiquidationDateSql"/>) else sysdate end)
+		from TBL_ORDER_INFO o
+		where o.order_number = #{order_number,jdbcType=VARCHAR}
+	</insert>
+	<!-- 增加入驻商资金流水 add wanghai -->
+	<insert id="insertStationedCapitalLogs" parameterType="java.lang.String">
+		insert into TBL_STATIONED_CAPITAL_LOGS(
+			id,
+			log_number,
+			turnover_number,
+			log_type,
+			tran_amount,
+			account_balance,
+			deposit_balance,
+			unliquidated_balance,
+			record_channel,
+			stationed_user_id
+		)
+		select SEQ_STATIONED_CAPITAL_LOGS.nextval,GETAUTONUMBERSHORT(15),order_number,'订单付款',tran_amount,
+			(select account_balance from tbl_bank_account where user_id = a.stationed_id),
+			(select DEPOSIT_money_BALANCE from tbl_bank_account where user_id = a.stationed_id),
+			(select sum(case when settlement_amount <![CDATA[ > ]]> settled_amount then settlement_amount - settled_amount else 0 end) from TBL_BUSS_SETTLEMENT_INFO where SETTLEMENT_USER_ID = a.stationed_id and SETTLEMENT_STATE != '2' and IS_DELETE = '0'),
+			'待结算',
+			stationed_id
+		from (
+			select d.order_number,d.divide_user_id stationed_id,sum(d.divide_money*s.count) tran_amount from TBL_ORDER_DIVIDE_RECORD d,TBL_ORDER_PRODUCT_SKU s
+			where d.order_number = s.order_number and d.product_sku = s.product_sku and divide_type = '1'
+				and d.order_number = #{order_number,jdbcType=VARCHAR}
+			group by d.order_number,d.divide_user_id
+		) a
+	</insert>
+	<!-- 锁表 add wanghai -->
+	<update id="lockTable"  parameterType="java.lang.String">
+		update TBL_STATIONED_USER_APPLY a set id = id where exists (select 1 from TBL_ORDER_DIVIDE_RECORD d,TBL_ORDER_PRODUCT_SKU s
+		where d.order_number = s.order_number and d.product_sku = s.product_sku and divide_type = '1'
+		and d.order_number in (select ORDER_NUMBER from TBL_ORDER_UNION_PAY_DETAIL where PAY_TRADE_NUMBER =  #{pay_trade_number,jdbcType=VARCHAR})
+		and d.divide_user_id = a.id
+		)
+	</update>
+</mapper>

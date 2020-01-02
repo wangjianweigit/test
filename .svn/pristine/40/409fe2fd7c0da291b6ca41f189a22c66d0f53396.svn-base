@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.order.dao.ExecOrderDao">
+
+    <sql id="execOrderMap">
+        <if test="mark_state != null and mark_state != ''">
+            and a.mark_state = #{mark_state, jdbcType=INTEGER}
+        </if>
+        <if test="exec_type != null and exec_type != ''">
+            and a.exec_type = #{exec_type, jdbcType=INTEGER}
+        </if>
+        <if test="order_number != null and order_number != ''">
+            and a.order_number like '%'||#{order_number, jdbcType=INTEGER}||'%'
+        </if>
+        <if test="user_manage_name != null and user_manage_name != ''">
+            and a.user_manage_name like '%'||#{user_manage_name, jdbcType=INTEGER}||'%'
+        </if>
+        <if test="start_date != null and start_date != ''">
+            and a.create_date &gt;= to_date(#{start_date},'YYYY-MM-DD HH24:MI:SS')
+        </if>
+        <if test="end_date != null and end_date != ''">
+            and a.create_date &lt;= to_date(#{end_date},'YYYY-MM-DD HH24:MI:SS')
+        </if>
+        <if test="platform_source != null and platform_source != ''">
+            and a.platform_source = #{platform_source, jdbcType=VARCHAR}
+        </if>
+    </sql>
+
+    <select id="listExecOrder" parameterType="java.util.Map" resultType="com.tk.oms.order.entity.ExecOrder">
+      select * from (
+            select rownum rn, a.* from (
+                SELECT
+                    a.id, a.order_number, a.exec_type,
+                       a.mark_state, a.user_name, a.user_type,
+                       a.user_manage_name, b.product_count, b.product_money,b.order_state,
+                       a.exce_reason, a.platform_source, a.order_source,
+                       a.remarks, to_char(a.create_date,'yyyy-mm-dd hh24:mi:ss') as create_date, to_char(a.update_date,'yyyy-mm-dd hh24:mi:ss') as update_date
+                  FROM TBL_EXEC_ORDER_RECORD a, TBL_ORDER_INFO b where a.order_number = b.order_number
+                    order by a.create_date desc
+                      <include refid="execOrderMap" />
+              )a
+            where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+        where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <select id="countExecOrder" parameterType="java.util.Map" resultType="int">
+        select count(1) from TBL_EXEC_ORDER_RECORD a <where><include refid="execOrderMap" /></where>
+    </select>
+
+    <update id="updateExecOrderRecord" parameterType="java.util.Map">
+        update TBL_EXEC_ORDER_RECORD set mark_state = #{markState, jdbcType=INTEGER},update_date = sysdate where id = #{id, jdbcType=INTEGER}
+    </update>
+
+    <insert id="insertExecOrderMarkRecord" parameterType="java.util.Map">
+        INSERT INTO TBL_EXEC_ORDER_MARK_RECORD (
+           ID, EXEC_ID, REMARKS,
+           MARK_STATE, CREATE_ID, CREATE_DATE)
+        VALUES (
+             SEQ_EXEC_ORDER_MARK_RECORD.nextval,
+             #{id, jdbcType=INTEGER},
+             #{remarks, jdbcType=VARCHAR},
+             #{markState, jdbcType=INTEGER},
+             #{public_user_id, jdbcType=INTEGER},
+             sysdate
+        )
+    </insert>
+
+    <resultMap id="execOrderWhiteListMap" type="java.util.Map">
+        <result column="user_manage_name" property="user_manage_name" />
+        <result column="user_id" property="user_id" />
+        <result column="login_name" property="login_name" />
+        <result column="user_manage_mobilephone" property="user_manage_mobilephone" />
+        <result column="create_date" property="create_date" />
+        <result column="operation_user" property="operation_user" />
+    </resultMap>
+    <select id="listExecOrderWhiteList" parameterType="java.util.Map" resultMap="execOrderWhiteListMap">
+        select * from (
+            select rownum rn, a.* from (
+                select a.user_id,b.login_name, b.user_manage_name,b.user_manage_mobilephone,to_char(a.create_date,'YYYY-MM-DD HH24:MI:SS') as create_date,
+                  (select user_realname from tbl_sys_user_info where id = a.creater_id) as operation_user
+                from TBL_EXEC_ORDER_WHITE_LIST a, TBL_USER_INFO b where a.user_id = b.id
+             )a
+          where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+        where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <select id="countExecOrderWhiteList" parameterType="java.util.Map" resultType="int">
+        select count(1) from TBL_EXEC_ORDER_WHITE_LIST
+    </select>
+
+    <delete id="deleteExecOrderWhiteList" parameterType="java.util.List">
+        delete TBL_EXEC_ORDER_WHITE_LIST where user_id in
+        <foreach collection="list" item="item" open="(" separator="," close=")">
+            #{item,jdbcType=INTEGER}
+        </foreach>
+    </delete>
+
+    <insert id="insertExecOrderWhiteList" parameterType="java.util.Map">
+        insert into TBL_EXEC_ORDER_WHITE_LIST (user_id, create_date,creater_id)
+        select user_id, sysdate as create_date,#{public_user_id, jdbcType=INTEGER} as creater_id from (
+            <foreach collection="ids" item="item" open="(" separator="union" close=")">
+               select #{item} as user_id from dual
+            </foreach>
+        ) a where not exists (select 1 from TBL_EXEC_ORDER_WHITE_LIST where a.user_id = user_id)
+    </insert>
+
+    <update id="updateExecOrderHandleStateByClose">
+        update TBL_EXEC_ORDER_RECORD set mark_state = 1,update_date = sysdate,remarks='订单已关闭，系统自动标记为已处理' where mark_state = 0 and order_number = #{orderNumber, jdbcType=VARCHAR}
+    </update>
+</mapper>

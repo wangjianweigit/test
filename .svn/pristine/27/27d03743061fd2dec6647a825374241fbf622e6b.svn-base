@@ -1,0 +1,343 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.marketing.dao.RefillCardDao">
+    <sql id="all_column">
+        ci.id,
+        ci.refill_card_name,
+        ci.refill_card_amount,
+        ci.refill_card_price,
+        ci.expiry_period,
+        ci.user_type,
+        TO_CHAR(ci.sell_start_date,'YYYY-MM-DD HH24:MI:SS') sell_start_date,
+        TO_CHAR(ci.sell_end_date,'YYYY-MM-DD HH24:MI:SS') sell_end_date,
+        ci.state,
+        ci.create_date
+	</sql>
+
+    <select id="queryById" resultType="java.util.Map">
+        select <include refid="all_column"/>
+        from TBL_MBR_REFILL_CARD_INFO ci
+        where
+            ci.id = #{id, jdbcType=INTEGER}
+    </select>
+
+    <!-- 查询充值卡列表 -->
+    <select id="queryList" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select a.*, rownum num from (
+                select <include refid="all_column"/>,
+                nvl((select sum(CARD_NUM) from TBL_REFILL_CARD_PUR_RECORD where REFILL_CARD_ID = ci.id), 0) count
+                from TBL_MBR_REFILL_CARD_INFO ci
+                <where>
+                    ci.is_delete = 1
+                    <if test="refill_card_name!=null and refill_card_name!=''">
+                        and ci.refill_card_name LIKE CONCAT(CONCAT('%', #{refill_card_name,jdbcType=VARCHAR}),'%')
+                    </if>
+                    <if test="user_type!=null and user_type!=''">
+                        and instr(ci.user_type,  #{user_type,jdbcType=VARCHAR}) > 0
+                    </if>
+                    <if test="state != null">
+                        and ci.state IN
+                        <foreach item="item" collection="state" open="(" separator="," close=")">
+                            #{item}
+                        </foreach>
+                    </if>
+                    order by ci.create_date desc
+                </where>
+            ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where num &gt;#{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!-- 查询充值卡总数 -->
+    <select id="queryCount" parameterType="java.util.Map" resultType="int">
+        select
+        COUNT(1)
+        from  TBL_MBR_REFILL_CARD_INFO ci
+        <where>
+            ci.is_delete = 1
+            <if test="refill_card_name!=null and refill_card_name!=''">
+                and ci.refill_card_name LIKE CONCAT(CONCAT('%', #{refill_card_name,jdbcType=VARCHAR}),'%')
+            </if>
+            <if test="user_type!=null and user_type!=''">
+                and instr(ci.user_type,  #{user_type,jdbcType=VARCHAR}) > 0
+            </if>
+            <if test="state != null">
+                and ci.state IN
+                <foreach item="item" collection="state" open="(" separator="," close=")">
+                    #{item}
+                </foreach>
+            </if>
+        </where>
+    </select>
+
+    <!-- 插入或更新 -->
+    <update id="insertOrUpdate" parameterType="java.util.Map">
+        merge into TBL_MBR_REFILL_CARD_INFO ci
+        using
+        (
+            select
+                #{ID, jdbcType=INTEGER} id,
+                #{REFILL_CARD_NAME, jdbcType=VARCHAR} refill_card_name,
+                #{REFILL_CARD_AMOUNT, jdbcType=INTEGER} refill_card_amount,
+                #{REFILL_CARD_PRICE, jdbcType=INTEGER} refill_card_price,
+                #{EXPIRY_PERIOD, jdbcType=INTEGER} expiry_period,
+                #{USER_TYPE, jdbcType=VARCHAR} user_type,
+                TO_DATE(#{SELL_START_DATE, jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS') sell_start_date,
+                TO_DATE(#{SELL_END_DATE, jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS') sell_end_date,
+                #{public_user_id,jdbcType=INTEGER} public_user_id
+            from dual
+        ) t1 on (ci.id = t1.id)
+        when matched then
+            update set
+            <if test="REFILL_CARD_NAME != null and REFILL_CARD_NAME !=''">ci.refill_card_name = t1.refill_card_name,</if>
+            <if test="REFILL_CARD_AMOUNT != null and REFILL_CARD_AMOUNT !=''">ci.refill_card_amount = t1.refill_card_amount,</if>
+            <if test="REFILL_CARD_PRICE != null and REFILL_CARD_PRICE !=''">ci.refill_card_price = t1.refill_card_price,</if>
+            <if test="EXPIRY_PERIOD != null and EXPIRY_PERIOD !=''">ci.expiry_period = t1.expiry_period,</if>
+            <if test="USER_TYPE != null and USER_TYPE !=''">ci.user_type = t1.user_type,</if>
+            ci.sell_start_date = t1.sell_start_date,
+            ci.sell_end_date = t1.sell_end_date,
+            ci.update_date = sysdate,
+            ci.update_id = t1.public_user_id
+        when not matched then
+            insert
+            (
+                id,
+                refill_card_name,
+                refill_card_amount,
+                refill_card_price,
+                expiry_period,
+                user_type,
+                sell_start_date,
+                sell_end_date,
+                creater_id
+            )
+            values
+            (
+                SEQ_MBR_REFILL_CARD_INFO.nextval,
+                t1.refill_card_name,
+                t1.refill_card_amount,
+                t1.refill_card_price,
+                t1.expiry_period,
+                t1.user_type,
+                t1.sell_start_date,
+                t1.sell_end_date,
+                t1.public_user_id
+            )
+    </update>
+
+    <update id="updateState" parameterType="java.util.Map">
+        update TBL_MBR_REFILL_CARD_INFO
+          set state = #{state, jdbcType=INTEGER}
+
+        where id = #{id, jdbcType=INTEGER}
+    </update>
+
+    <!--删除-->
+    <update id="deletedById" parameterType="long">
+		update TBL_MBR_REFILL_CARD_INFO set is_delete = 2 where id = #{id,jdbcType=INTEGER}
+	</update>
+
+    <!--更新会员卡销售时间-->
+    <update id="updateRefillCardDate" parameterType="java.util.Map">
+        update tbl_mbr_refill_card_info set
+            sell_start_date = to_date(#{SELL_START_DATE,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS'),
+            sell_end_date = to_date(#{SELL_END_DATE,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS'),
+            update_id = #{public_user_id,jdbcType=INTEGER},update_date = sysdate
+        where id = #{ID, jdbcType=INTEGER}
+    </update>
+
+    <select id="querySaleDetailByCard" resultType="java.util.Map" parameterType="java.util.Map">
+         select * from (
+            select a.*, rownum num from (
+                select
+                    login_name, real_name, card_num, to_char(create_date,'YYYY-MM-DD HH24:MI:SS') create_date
+                from TBL_REFILL_CARD_PUR_RECORD
+                where REFILL_CARD_ID = #{id, jdbcType=INTEGER}
+            ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where num &gt;#{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <select id="querySaleDetailCountByCard" resultType="int" parameterType="java.util.Map">
+        select count(1)
+        from TBL_REFILL_CARD_PUR_RECORD
+        where REFILL_CARD_ID = #{id, jdbcType=INTEGER}
+    </select>
+
+    <select id="queryBuyCardDetail" parameterType="java.util.Map" resultType="java.util.Map">
+        select B.*,
+            tumc.CARD_BALANCE,
+            to_char(tumc.expiration_date,'YYYY-MM-DD HH24:MI:SS') expiration_date,
+            ui.login_name,
+            ui.USER_MANAGE_NAME real_name
+         from (
+            select a.*,
+             rownum num from (
+                select  
+                	mbr_card_id, 
+    				sum (payment_money) payment_money,
+    				sum(card_num) card_num,
+    				sum(ci.refill_card_amount*card_num) refill_card_amount
+                from TBL_REFILL_CARD_PUR_RECORD pr
+                inner join TBL_USER_MBR_CARD mc on pr.MBR_CARD_ID = mc.id
+                inner join TBL_MBR_REFILL_CARD_INFO ci on pr.REFILL_CARD_ID = ci.id
+                <where>
+                    <if test="login_name!=null and login_name!=''">
+                        and pr.login_name LIKE CONCAT(CONCAT('%', #{login_name,jdbcType=VARCHAR}),'%')
+                    </if>
+                    <if test="real_name!=null and real_name!=''">
+                        and pr.real_name LIKE CONCAT(CONCAT('%', #{real_name,jdbcType=VARCHAR}),'%')
+                    </if>
+                    <if test="begin_time != null and begin_time != ''">
+                        and mc.EXPIRATION_DATE &gt;= TO_DATE(#{begin_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+                    </if>
+                    <if test="end_time != null and end_time != ''">
+                        and mc.EXPIRATION_DATE &lt;= TO_DATE(#{end_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+                    </if>
+                </where>
+                group by pr.MBR_CARD_ID, pr.login_name, pr.real_name
+            ) a 
+            where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) B 
+        LEFT JOIN TBL_USER_MBR_CARD tumc on B.MBR_CARD_ID = tumc.id
+        LEFT JOIN TBL_USER_INFO ui on ui.id = tumc.user_id
+        where  num &gt;#{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <select id="queryBuyCardDetailCount" parameterType="java.util.Map" resultType="int">
+        select count(1)
+        from (
+            select
+                mbr_card_id,
+                sum (payment_money) payment_money,
+                sum(card_num) card_num,
+                sum(ci.refill_card_amount*card_num) refill_card_amount
+            from TBL_REFILL_CARD_PUR_RECORD pr
+            inner join TBL_USER_MBR_CARD mc on pr.MBR_CARD_ID = mc.id
+            inner join TBL_MBR_REFILL_CARD_INFO ci on pr.REFILL_CARD_ID = ci.id
+            <where>
+                <if test="login_name!=null and login_name!=''">
+                    and pr.login_name LIKE CONCAT(CONCAT('%', #{login_name,jdbcType=VARCHAR}),'%')
+                </if>
+                <if test="real_name!=null and real_name!=''">
+                    and pr.real_name LIKE CONCAT(CONCAT('%', #{real_name,jdbcType=VARCHAR}),'%')
+                </if>
+                <if test="begin_time != null and begin_time != ''">
+                    and mc.EXPIRATION_DATE &gt;= TO_DATE(#{begin_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+                </if>
+                <if test="end_time != null and end_time != ''">
+                    and mc.EXPIRATION_DATE &lt;= TO_DATE(#{end_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+                </if>
+            </where>
+            group by pr.MBR_CARD_ID, pr.login_name, pr.real_name
+        )
+    </select>
+
+
+
+    <select id="queryBalanceDetail" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select a.*, rownum num from (
+                select type, used_amount, remark, to_char(create_date,'YYYY-MM-DD HH24:MI:SS') create_date
+                from TBL_USER_MBR_CARD_USE_RECORD
+                where mbr_card_id = #{mbr_card_id,jdbcType=VARCHAR}
+                order by create_date desc
+            ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where num &gt;#{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <select id="queryBalanceDetailCount" parameterType="java.util.Map" resultType="int">
+        select count(1)
+        from TBL_USER_MBR_CARD_USE_RECORD
+        where mbr_card_id = #{mbr_card_id,jdbcType=VARCHAR}
+        order by create_date desc
+    </select>
+
+
+    <select id="queryBuyDetail" resultType="java.util.Map">
+        select * from (
+            select a.*, rownum num from (
+                select
+                    pr.ORDER_NUMBER, pr.PAYMENT_MONEY, pr.PAYMENT_TYPE, pr.login_name, pr.real_name, pr.remark, pr.SALESMAN_NAME,
+                    ci.refill_card_name,  pr.card_num, to_char(pr.create_date,'YYYY-MM-DD HH24:MI:SS') create_date,
+                    pr.referee_user_id, pr.REFEREE_USER_REALNAME, pr.STORE_NAME, pr.STORE_ID, pr.MARKET_SUPERVISION_USER_REALNA, pr.market_supervision_user_id
+                from TBL_REFILL_CARD_PUR_RECORD pr
+                left join TBL_MBR_REFILL_CARD_INFO ci on ci.id = pr.REFILL_CARD_ID
+                <where>
+                    <if test="login_name!=null and login_name!=''">
+                        and pr.login_name LIKE CONCAT(CONCAT('%', #{login_name,jdbcType=VARCHAR}),'%')
+                    </if>
+                    <if test="real_name!=null and real_name!=''">
+                        and pr.real_name LIKE CONCAT(CONCAT('%', #{real_name,jdbcType=VARCHAR}),'%')
+                    </if>
+                    <if test="begin_time != null and begin_time != ''">
+                        and pr.create_date &gt;= TO_DATE(#{begin_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+                    </if>
+                    <if test="end_time != null and end_time != ''">
+                        and pr.create_date &lt;= TO_DATE(#{end_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+                    </if>
+                    <if test="order_number!=null and order_number!=''">
+                        and pr.order_number = #{order_number,jdbcType=VARCHAR}
+                    </if>
+                    <if test="ywy_user_id!=null and ywy_user_id!=''">
+                        and pr.referee_user_id = #{ywy_user_id,jdbcType=VARCHAR}
+                    </if>
+                    <if test="ywjl_user_id!=null and ywjl_user_id!=''">
+                        and pr.market_supervision_user_id = #{ywjl_user_id,jdbcType=VARCHAR}
+                    </if>
+                    <if test="md_id!=null and md_id!=''">
+                        and pr.store_id = #{md_id,jdbcType=VARCHAR}
+                    </if>
+                </where>
+                order by create_date desc
+            ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where num &gt;#{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <select id="queryBuyDetailCount" parameterType="java.util.Map" resultType="int">
+        select count(1)
+        from TBL_REFILL_CARD_PUR_RECORD pr
+        left join TBL_MBR_REFILL_CARD_INFO ci on ci.id = pr.REFILL_CARD_ID
+        <where>
+            <if test="login_name!=null and login_name!=''">
+                and pr.login_name LIKE CONCAT(CONCAT('%', #{login_name,jdbcType=VARCHAR}),'%')
+            </if>
+            <if test="real_name!=null and real_name!=''">
+                and pr.real_name LIKE CONCAT(CONCAT('%', #{real_name,jdbcType=VARCHAR}),'%')
+            </if>
+            <if test="begin_time != null and begin_time != ''">
+                and pr.create_date &gt;= TO_DATE(#{begin_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+            </if>
+            <if test="end_time != null and end_time != ''">
+                and pr.create_date &lt;= TO_DATE(#{end_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+            </if>
+            <if test="order_number!=null and order_number!=''">
+                and pr.order_number = #{order_number,jdbcType=VARCHAR}
+            </if>
+            <if test="ywy_user_id!=null and ywy_user_id!=''">
+                and pr.referee_user_id = #{ywy_user_id,jdbcType=VARCHAR}
+            </if>
+            <if test="ywjl_user_id!=null and ywjl_user_id!=''">
+                and pr.market_supervision_user_id = #{ywjl_user_id,jdbcType=VARCHAR}
+            </if>
+            <if test="md_id!=null and md_id!=''">
+                and pr.store_id = #{md_id,jdbcType=VARCHAR}
+            </if>
+        </where>
+    </select>
+
+    <select id="isExistByNameAndType" parameterType="java.util.Map" resultType="int">
+        select count(1)
+        from TBL_MBR_REFILL_CARD_INFO
+        where refill_card_name = #{refill_card_name, jdbcType=VARCHAR} and is_delete = 1
+        <if test="id != null and id != ''" >
+            and id != #{id, jdbcType=INTEGER}
+        </if>
+        and
+        <foreach collection="user_types" item="type" open="(" close=")" separator="or">
+            instr(user_type, trim(#{type}))>0
+        </foreach>
+    </select>
+
+</mapper>

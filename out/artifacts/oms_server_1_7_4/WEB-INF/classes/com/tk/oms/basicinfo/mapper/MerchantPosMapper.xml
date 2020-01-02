@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.basicinfo.dao.MerchantPosDao">
+
+    <!-- 商业Pos设备列表 -->
+    <select id="queryMerchantPosList" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT *
+        FROM (SELECT a.*, rownum num
+              FROM
+                (SELECT t1.* ,
+                        (SELECT user_name FROM tbl_sys_user_info WHERE t1.create_user_id = id) as create_user_name,
+                        (SELECT user_name FROM tbl_sys_user_info WHERE t1.update_user_id = id) as update_user_name
+                     FROM
+                        (SELECT id,
+                                to_char(create_date, 'YYYY-MM-DD HH24:MI:SS') as create_date,
+                                create_user_id,
+                                merchant_name,
+                                merchant_no,
+                                to_char(effective_date, 'YYYY-MM-DD HH24:MI:SS') as effective_date,
+                                state,
+                                terminal_model,
+                                terminal_no,
+                                to_char(last_use_date, 'YYYY-MM-DD HH24:MI:SS') as last_use_date,
+                                to_char(update_date, 'YYYY-MM-DD HH24:MI:SS') as update_date,
+                                update_user_id,
+                                appliance_sn
+                            FROM tbl_merchant_pos
+                            <where>
+                                1=1
+                                <if test="merchant_name != null and merchant_name !=''">
+                                    and merchant_name = #{merchant_name,jdbcType=INTEGER}
+                                </if>
+                                <if test="terminal_model != null and terminal_model != ''">
+                                    and terminal_model = #{terminal_model,jdbcType=VARCHAR}
+                                </if>
+                                <if test="terminal_no != null and terminal_no != ''">
+                                    and terminal_no = #{terminal_no,jdbcType=VARCHAR}
+                                </if>
+                                <if test="state != null and state != ''">
+                                    and state = #{state,jdbcType=VARCHAR}
+                                </if>
+                                <if test="create_start_time != null and create_start_time != ''">
+                                    and effective_date &gt;= to_date(#{create_start_time},'YYYY-MM-DD HH24:MI:SS')
+                                </if>
+                                <if test="create_end_time != null and create_end_time != ''">
+                                    and effective_date &lt;= to_date(#{create_end_time},'YYYY-MM-DD HH24:MI:SS')
+                                </if>
+                            </where>
+                          ORDER BY create_date desc
+                      ) t1
+              )a
+              where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+        where num &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!-- 商业Pos设备记录数 -->
+    <select id="queryMerchantPosCount" parameterType="java.util.Map" resultType="int">
+        select
+            count(1)
+        from TBL_MERCHANT_POS
+        <where>
+            1=1
+            <if test="merchant_name != null and merchant_name !=''">
+                and merchant_name = #{merchant_name,jdbcType=INTEGER}
+            </if>
+            <if test="terminal_model != null and terminal_model != ''">
+                and terminal_model = #{terminal_model,jdbcType=VARCHAR}
+            </if>
+            <if test="terminal_no != null and terminal_no != ''">
+                and terminal_no = #{terminal_no,jdbcType=VARCHAR}
+            </if>
+            <if test="state != null and state != ''">
+                and state = #{state,jdbcType=VARCHAR}
+            </if>
+            <if test="create_start_time != null and create_start_time != ''">
+                and effective_date &gt;= to_date(#{create_start_time},'YYYY-MM-DD HH24:MI:SS')
+            </if>
+            <if test="create_end_time != null and create_end_time != ''">
+                and effective_date &lt;= to_date(#{create_end_time},'YYYY-MM-DD HH24:MI:SS')
+            </if>
+        </where>
+    </select>
+
+    <!-- 根据id查询商业Pos设备 -->
+    <select id="queryMerchantPosById" parameterType="long" resultType="java.util.Map" >
+        SELECT  id,
+                to_char(create_date, 'YYYY-MM-DD HH24:MI:SS') as create_date,
+                create_user_id,
+                merchant_name,
+                merchant_no,
+                to_char(effective_date, 'YYYY-MM-DD HH24:MI:SS') as effective_date,
+                state,
+                terminal_model,
+                terminal_no,
+                to_char(last_use_date, 'YYYY-MM-DD HH24:MI:SS') as last_use_date,
+                to_char(update_date, 'YYYY-MM-DD HH24:MI:SS') as update_date,
+                appliance_sn
+        FROM TBL_MERCHANT_POS where id = #{id, jdbcType=INTEGER}
+    </select>
+
+    <!-- 根据终端号查询Pos设备数量 -->
+    <select id="queryMerchantPosCountByTerminalNo" parameterType="java.lang.String" resultType="int">
+        SELECT COUNT (1) FROM TBL_MERCHANT_POS where terminal_no = #{terminal_no, jdbcType=VARCHAR}
+    </select>
+
+    <!-- 新增商业Pos设备 -->
+    <insert id="insertMerchantPos" parameterType="java.util.Map" >
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+                SELECT SEQ_MERCHANT_POS.nextval FROM dual
+        </selectKey>
+       insert into TBL_MERCHANT_POS
+       (
+            id,
+            create_date,
+            create_user_id,
+            effective_date,
+            merchant_name,
+            merchant_no,
+            terminal_model,
+            terminal_no,
+            state,
+            appliance_sn
+       )
+       values
+       (
+            #{id, jdbcType=INTEGER},
+            sysdate,
+            #{public_user_id, jdbcType=INTEGER},
+            to_date(#{effective_date},'YYYY-MM-DD HH24:mi:ss'),
+            #{merchant_name, jdbcType=VARCHAR},
+            #{merchant_no, jdbcType=VARCHAR},
+            #{terminal_model, jdbcType=VARCHAR},
+            #{terminal_no, jdbcType=VARCHAR},
+            #{state, jdbcType=CHAR},
+            #{appliance_sn, jdbcType=VARCHAR}
+       )
+    </insert>
+
+    <!-- 修改商业Pos设备 -->
+    <update id="updateMerchantPos" parameterType="java.util.Map">
+        UPDATE TBL_MERCHANT_POS
+        <set>
+            <if test="effective_date != null and effective_date !=''">
+                effective_date = to_date(#{effective_date},'YYYY-MM-DD HH24:mi:ss'),
+            </if>
+            <if test="merchant_name != null and merchant_name != ''">
+                merchant_name = #{merchant_name, jdbcType=VARCHAR},
+            </if>
+            <if test="merchant_no != null and merchant_no != ''">
+                merchant_no = #{merchant_no, jdbcType=VARCHAR},
+            </if>
+            <if test="terminal_model != null and terminal_model != ''">
+                terminal_model = #{terminal_model, jdbcType=VARCHAR},
+            </if>
+            <if test="terminal_no != null and terminal_no != ''">
+                terminal_no = #{terminal_no, jdbcType=VARCHAR},
+            </if>
+            <if test="state != null and state != ''">
+                state = #{state, jdbcType=CHAR},
+            </if>
+            <if test="appliance_sn !=null and appliance_sn != ''">
+            	appliance_sn = #{appliance_sn, jdbcType=VARCHAR},
+            </if>
+            update_date = sysdate,
+            update_user_id = #{public_user_id, jdbcType=INTEGER}
+        </set>
+        WHERE id = #{id, jdbcType=INTEGER}
+    </update>
+
+    <!-- 根据id删除商业Pos设备 -->
+    <delete id="deleteMerchantPos" parameterType="long">
+        DELETE TBL_MERCHANT_POS WHERE ID = #{id, jdbcType=INTEGER}
+    </delete>
+</mapper>

@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 用户对账任务数据操作 -->
+<mapper namespace="com.tk.oms.finance.dao.UserAccountCheckDao">
+
+    <!-- 对账任务分页条件 -->
+    <sql id="queryListWhereByPage">
+        <where>
+            1=1
+            <if test="title != '' and title != null">
+                and t.title = #{title,jdbcType=VARCHAR}
+            </if>
+            <if test="start_date != '' and start_date != null">
+                and t.check_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+            </if>
+            <if test="end_date != '' and end_date != null">
+                and t.check_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+            </if>
+        </where>
+    </sql>
+
+    <!-- 对账任务明细分页条件 -->
+    <sql id="queryListDetailWhereByPage">
+        <where>
+            1=1
+            <if test="state != '' and state != null">
+                and t.state = #{state,jdbcType=CHAR}
+            </if>
+            <if test="task_id != '' and task_id != null">
+                and t.task_id = #{task_id,jdbcType=CHAR}
+            </if>
+        </where>
+    </sql>
+
+    <!-- 查询对账任务记录数 -->
+    <select id="queryListForCount" parameterType="java.util.Map" resultType="int">
+        SELECT count(1) FROM TBL_USER_ACCOUNT_CHECK_TASK t <include refid="queryListWhereByPage" />
+    </select>
+
+    <!-- 查询对账任务分页列表 -->
+    <select id="queryListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+      SELECT
+          t1.*,
+          (SELECT user_realname FROM TBL_SYS_USER_INFO WHERE t1.create_user_id = id ) as user_realname,
+          (SELECT count(1) FROM TBL_USER_ACCOUNT_CHECK_DETAIL WHERE t1.id = task_id and state = 1) as error_count,
+          (SELECT count(1) FROM TBL_USER_ACCOUNT_CHECK_DETAIL WHERE t1.id = task_id and state = 2) as success_count,
+          (SELECT count(1) FROM TBL_USER_ACCOUNT_CHECK_DETAIL WHERE t1.id = task_id) as total_count
+        FROM (
+            SELECT * FROM (
+              SELECT a.*,rownum rn FROM (
+                SELECT
+                    id,
+                    state,
+                    to_char(check_date,'YYYY-MM-DD HH24:MI:SS') check_date,
+                    title,
+                    remark,
+                    create_user_id
+                FROM TBL_USER_ACCOUNT_CHECK_TASK t <include refid="queryListWhereByPage" />
+              ) a WHERE rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+            ) WHERE rn &gt; #{start_rownum,jdbcType=INTEGER}
+        )t1
+    </select>
+
+    <!-- 查询对账明细任务记录数 -->
+    <select id="queryListDetailForCount" parameterType="java.util.Map" resultType="int">
+        SELECT count(1) FROM TBL_USER_ACCOUNT_CHECK_DETAIL t <include refid="queryListDetailWhereByPage" />
+    </select>
+
+    <!-- 查询对账任务明细分页列表 -->
+    <select id="queryListDetailForPage" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT
+            t1.*,
+            t2.user_manage_name,
+            t2.login_name
+        FROM (
+            SELECT * FROM (
+                SELECT a.*,rownum rn FROM (
+                    SELECT
+                        id,
+                        state,
+                        jzb_balance,
+                        local_balance,
+                        task_id,
+                        user_id,
+                        error_reason
+                    FROM TBL_USER_ACCOUNT_CHECK_DETAIL t <include refid="queryListDetailWhereByPage" />
+                ) a WHERE rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+            ) WHERE rn &gt; #{start_rownum,jdbcType=INTEGER}
+        ) t1,TBL_USER_INFO t2 WHERE t2.id = t1.user_id
+    </select>
+
+    <!-- 查询对账明细信息 -->
+    <select id="queryAccountCheckDetail" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT
+            id,
+            state,
+            jzb_balance,
+            local_balance,
+            task_id,
+            user_id,
+            (SELECT bank_account FROM TBL_BANK_ACCOUNT where t.user_id=user_id) as bank_account
+        FROM TBL_USER_ACCOUNT_CHECK_DETAIL t WHERE id = #{id,jdbcType=INTEGER} and task_id = #{task_id,jdbcType=INTEGER}
+    </select>
+
+    <!-- 新增对账任务 -->
+    <insert id="insert" parameterType="java.util.Map">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT SEQ_USER_ACCOUNT_CHECK_TASK.nextval FROM dual
+        </selectKey>
+        insert into TBL_USER_ACCOUNT_CHECK_TASK(
+            id,
+            create_user_id,
+            title,
+            remark,
+            create_date,
+            state
+        )
+        values (
+            #{id,jdbcType=INTEGER},
+            #{public_user_id,jdbcType=INTEGER},
+            #{title,jdbcType=VARCHAR},
+            #{remark,jdbcType=VARCHAR},
+            sysdate,
+            '1'
+        )
+    </insert>
+
+    <!-- 查询本地账户余额 -->
+    <select id="queryUserAccountBalance" parameterType="java.util.Map" resultType="java.lang.Float">
+        SELECT nvl(account_balance,0) as account_balance FROM tbl_bank_account where bank_account = #{bank_account, jdbcType=VARCHAR}
+    </select>
+
+    <!-- 修改对账信息 -->
+    <update id="update" parameterType="java.util.Map">
+        UPDATE TBL_USER_ACCOUNT_CHECK_DETAIL
+        <set>
+            <if test="state != '' and state != null">
+                state = #{state,jdbcType=CHAR},
+            </if>
+            <if test="jzb_balance != '' and jzb_balance != null">
+                jzb_balance = #{jzb_balance,jdbcType=FLOAT},
+            </if>
+            <if test="local_balance != '' and local_balance != null">
+                local_balance = #{local_balance,jdbcType=FLOAT}
+            </if>
+        </set>
+        WHERE id = #{id,jdbcType=INTEGER} and task_id = #{task_id,jdbcType=INTEGER}
+    </update>
+
+    <!-- 新增会员见证宝对账明细 -->
+    <insert id="insertUserAccountCheckingDetail" parameterType="java.util.Map">
+        insert into TBL_USER_ACCOUNT_CHECK_DETAIL(
+            id,
+            task_id,
+            user_id,
+            bank_account
+        )
+        SELECT
+            SEQ_USER_ACCOUNT_CHECK_DETAIL.nextval,
+            #{id,jdbcType=INTEGER} as task_id,
+            user_id,
+            bank_account
+        FROM tbl_bank_account where USER_TYPE = 1 and bank_account is not null
+    </insert>
+
+    <!-- 查询未处理完的对账任务记录数 -->
+    <select id="queryUserAccountCheckingTaskCount" resultType="int">
+        select count(1) from TBL_USER_ACCOUNT_CHECK_TASK WHERE state in (1,3)
+    </select>
+
+</mapper>

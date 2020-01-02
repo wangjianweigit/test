@@ -1,0 +1,721 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.finance.dao.AdvanceOrderDao">
+	<!-- 退定金审批数量 -->
+	<select id="queryDepositRefundCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_pre_order_return temp,tbl_pre_order_info temp2
+		 where temp.order_number = temp2.order_number
+		 <if test="return_number !=null and return_number !=''">
+		   and temp.return_number = #{return_number,jdbcType=VARCHAR}
+		 </if>
+		 <if test="order_number !=null and order_number !=''">
+		   and temp.order_number = #{order_number,jdbcType=VARCHAR}
+		 </if>
+		 <if test="login_name != null and login_name != ''">
+	 		and exists (select 1 from tbl_user_info where id = temp.user_id and login_name like concat(concat('%', #{login_name,jdbcType=VARCHAR}),'%')) 
+	 	 </if>
+	 	 <if test="user_manage_name != null and user_manage_name != ''">
+            and temp.user_manage_name like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%')
+         </if>
+         <if test="start_date!=null and start_date!=''">
+       		and temp.create_date &gt;= to_date(#{start_date},'yyyy-mm-dd hh24:mi:ss')
+         </if>
+         <if test="end_date!=null and end_date!=''">
+          	and temp.create_date &lt;= to_date(#{end_date},'yyyy-mm-dd hh24:mi:ss')
+         </if>
+         <if test="return_type !=null and return_type !=''">
+         	and temp.return_type = #{return_type,jdbcType=CHAR}
+         </if>
+	 	 <if test="state != null and state != ''">
+           	and temp.state in 
+	         <foreach item="item" collection="state" open="(" separator="," close=")">
+	   	 			#{item,jdbcType=CHAR}
+	   	 	 </foreach>
+         </if>
+	</select>
+	<!-- 退定金审批列表 -->
+	<select id="queryDepositRefundList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+		select a.*,rownum rn from (
+		select temp.return_number,
+		       temp.order_number,
+		       temp.user_manage_name,
+		       (select login_name from tbl_user_info where id = temp.user_id) login_name,
+		       nvl(temp.return_money,0) return_money,
+		       temp.apply_user_realname,
+		       to_char(temp.create_date, 'yyyy-mm-dd hh24:mi:ss') create_date,
+		       temp.check_user_realname,
+		       to_char(temp.check_date, 'yyyy-mm-dd hh24:mi:ss') check_date,
+		       temp.check_cancle_reason,
+		       temp.state,
+		       nvl(temp2.earnest_money,0) earnest_money,
+		       nvl(temp2.product_money,0) product_money,
+		       to_char(temp2.payment_date, 'yyyy-mm-dd hh24:mi:ss') payment_date,
+		       temp.return_type
+		  from tbl_pre_order_return temp,tbl_pre_order_info temp2
+		 where temp.order_number = temp2.order_number
+		 <if test="return_number !=null and return_number !=''">
+		   and temp.return_number = #{return_number,jdbcType=VARCHAR}
+		 </if>
+		 <if test="order_number !=null and order_number !=''">
+		   and temp.order_number = #{order_number,jdbcType=VARCHAR}
+		 </if>
+		 <if test="login_name != null and login_name != ''">
+	 		and exists (select 1 from tbl_user_info where id = temp.user_id and login_name like concat(concat('%', #{login_name,jdbcType=VARCHAR}),'%')) 
+	 	 </if>
+	 	 <if test="user_manage_name != null and user_manage_name != ''">
+            and temp.user_manage_name like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%')
+         </if>
+         <if test="start_date!=null and start_date!=''">
+       		and temp.create_date &gt;= to_date(#{start_date},'yyyy-mm-dd hh24:mi:ss')
+         </if>
+         <if test="end_date!=null and end_date!=''">
+          	and temp.create_date &lt;= to_date(#{end_date},'yyyy-mm-dd hh24:mi:ss')
+         </if>
+         <if test="return_type !=null and return_type !=''">
+         	and temp.return_type = #{return_type,jdbcType=CHAR}
+         </if>
+	 	 <if test="state != null and state != ''">
+           	and temp.state in 
+	         <foreach item="item" collection="state" open="(" separator="," close=")">
+	   	 			#{item,jdbcType=CHAR}
+	   	 	 </foreach>
+         </if>
+         order by temp.create_date desc
+         ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 退定金详情 -->
+	<select id="queryDepositRefundDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select temp.return_number,
+		       temp.order_number,
+		       temp.user_manage_name,
+		       (select login_name from tbl_user_info where id = temp.user_id) login_name,
+		       nvl(temp.return_money,0) return_money,
+		       temp.apply_user_realname,
+		       to_char(temp.create_date, 'yyyy-mm-dd hh24:mi:ss') create_date,
+		       temp.check_user_realname,
+		       to_char(temp.check_date, 'yyyy-mm-dd hh24:mi:ss') check_date,
+		       temp.state,
+		       nvl(temp2.earnest_money,0) earnest_money,
+		       nvl(temp2.product_money,0) product_money,
+		       to_char(temp2.create_date, 'yyyy-mm-dd hh24:mi:ss') order_date
+		  from tbl_pre_order_return temp,tbl_pre_order_info temp2
+		 where temp.order_number = temp2.order_number
+		   and temp.return_number = #{return_number,jdbcType=VARCHAR}
+	</select>
+	<!-- 预定订单数量 -->
+	<select id="queryAdvanceOrderCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_pre_order_info temp
+		  <where>
+		    <if test="order_number !=null and order_number !=''">
+		    	and temp.order_number = #{order_number,jdbcType=VARCHAR}
+		    </if>
+		    <if test="order_source !=null and order_source !=''">
+		    	and temp.order_source = #{order_source,jdbcType=VARCHAR}
+		    </if>
+		    <if test="start_date !=null and start_date !=''">
+	      		and temp.create_date &gt;= to_date(#{start_date},'yyyy-mm-dd hh24:mi:ss')
+	        </if>
+	        <if test="end_date !=null and end_date !=''">
+	         	and temp.create_date &lt;= to_date(#{end_date},'yyyy-mm-dd hh24:mi:ss')
+	        </if>
+	        <if test="warehouse_id !=null and warehouse_id !=''">
+	        	and temp.warehouse_id = #{order_source,jdbcType=INTEGER}
+	        </if>
+	        <if test="login_name !=null and login_name !=''">
+		    	and exists (select 1 from tbl_user_info where id = temp.user_id and login_name like concat(concat('%', #{login_name,jdbcType=VARCHAR}),'%'))
+		    </if>
+		    <if test="ywjl_user_name != null and ywjl_user_name != '' ">
+		    	and	temp.ywjl_user_name = #{ywjl_user_name,jdbcType=VARCHAR}
+			</if>
+			<if test="md_id != null and md_id != 0 ">
+			    and	temp.md_id = #{md_id,jdbcType=INTEGER}
+			</if>
+			<if test="ywy_user_name != null and ywy_user_name != '' ">
+			    and	temp.ywy_user_name = #{ywy_user_name,jdbcType=VARCHAR}
+			</if>
+			 <if test="public_user_type != null and public_user_type == 2">
+	            and exists (select 1 from tbl_sys_user_store tsus where tsus.store_id = temp.md_id and tsus.user_id = #{public_user_id,jdbcType=INTEGER})
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 3">
+	            and temp.ywy_user_name = #{public_user_name,jdbcType=INTEGER}
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 4">
+	            and temp.ywjl_user_name = #{public_user_name,jdbcType=INTEGER}
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 5">
+	            and exists(select 1 from tbl_store_info tsi where tsi.id = temp.md_id and tsi.shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER})
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 6">
+	            and exists(select 1 from tbl_store_user_rel tsui where tsui.store_id = temp.md_id and tsui.user_id = #{public_user_id,jdbcType=INTEGER})
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 9">
+	            and exists(select 1
+	                         from tbl_sys_user_info tsui
+	                        where tsui.user_type = 4
+	            				  and tsui.organization_id in (
+									  	select id from tbl_sys_organization_info where connect_by_isleaf=1
+									  	start with parent_id = #{public_user_organization_id,jdbcType=INTEGER} connect by prior id = parent_id
+						              )
+						          and tsui.user_name = temp.ywjl_user_name)
+	        </if>
+	        <if test="order_state != null and order_state != ''">
+           		and temp.order_state in
+	         <foreach item="item" collection="order_state" open="(" separator="," close=")">
+	   	 			#{item,jdbcType=CHAR}
+	   	 	 </foreach>
+         	</if>
+			<if test="pre_order_type != null and pre_order_type != ''">
+				and pre_order_type = #{pre_order_type, jdbcType=CHAR}
+			</if>
+			<if test="custom_product_itemnumber != null and custom_product_itemnumber != ''">
+				and exists(select 1 from tbl_pre_order_detail tpod where tpod.order_number=temp.order_number and tpod.product_itemnumber=#{custom_product_itemnumber,jdbcType=VARCHAR} and temp.PRE_ORDER_TYPE &lt;&gt;1)
+			</if>
+			<if test="original_product_itemnumber != null and original_product_itemnumber != ''">
+				and exists(select 1 from tbl_pre_order_detail tpod where tpod.order_number=temp.order_number
+									and exists(select 1 from tbl_custom_product_rel tcpr 
+													where tcpr.custom_product_itemnumber=TPOD.PRODUCT_ITEMNUMBER 
+												and tcpr.custom_user_id=tpod.USER_ID
+												and tcpr.original_product_itemnumber=#{original_product_itemnumber,jdbcType=VARCHAR}))
+			</if>
+        </where>
+	</select>
+	<!-- 预定订单列表 -->
+	<select id="queryAdvanceOrderList" parameterType="java.util.Map" resultType="java.util.Map">
+		select t.*,
+		       case when t.pre_order_type =2 and exists(select 1 from  ${jdbc_user}.TBL_PURCHASE_ORDER tpo where tpo.STATE in('2','3') and tpo.SPECIAL_BALANCE_STATE = '1' and tpo.ORDER_NUMBER_PLATFORM = t.order_number) 
+		            then 1 else 0 end as close_flag
+		 from (
+			select a.*,rownum rn from(
+			select temp.order_number,
+			       (select login_name from tbl_user_info where id = temp.user_id) login_name,
+			       temp.user_manage_name,
+			       to_char(temp.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+			       to_char(temp.payment_date,'yyyy-mm-dd hh24:mi:ss') payment_date,
+			       nvl(temp.product_money,0) product_money,
+			       nvl(temp.product_count,0) product_count,
+			       nvl(temp.earnest_money,0) earnest_money,
+			       temp.order_state,
+				   temp.payment_state,
+			       nvl(temp2.return_money,0) return_money,
+	               (select user_realname from tbl_sys_user_info where user_name = temp.ywjl_user_name) ywjl_user_realname,
+	               (select user_realname from tbl_sys_user_info where user_name = temp.ywy_user_name) ywy_user_realname,
+	               (select store_name from tbl_store_info where id = temp.md_id) store_name,
+	               NVL(temp.payment_use_money,0) payment_use_money,
+	               temp.warehouse_state,
+	               to_char(temp.warehouse_date,'yyyy-mm-dd hh24:mi:ss') warehouse_date,
+	               temp.warehouse_user_name,
+	               temp.warehouse_user_realname,
+	               temp.warehouse_id,
+				   temp.pre_order_type,
+				   temp.check_state,
+	               (select twi.name from tbl_warehouse_info twi where twi.id = (select twit.parent_id from tbl_warehouse_info twit where twit.id = temp.warehouse_id)) as warehouse_name,
+	               case when temp.pre_order_type=1 then ''
+	               else (select product_itemnumber from tbl_pre_order_detail tpod where tpod.order_number=temp.order_number and rownum = 1) end as custom_product_itemnumber,
+	               case when temp.pre_order_type=1 then '' else (select original_product_itemnumber from tbl_custom_product_rel tcpr
+						left join tbl_pre_order_detail tpod 
+							on tcpr.custom_product_itemnumber=tpod.product_itemnumber
+							and tcpr.custom_user_id=tpod.USER_ID
+						where tpod.order_number=temp.order_number 
+						and rownum=1) end as original_product_itemnumber
+			  from tbl_pre_order_info temp,
+			  	   (select order_number,return_money from tbl_pre_order_return where state = 2 and return_type = 2
+			  	   <if test="order_number !=null and order_number !=''">
+			  	   	and order_number = #{order_number,jdbcType=VARCHAR}
+			  	   </if>
+			  	   ) temp2
+			  where temp.order_number = temp2.order_number(+)
+			    <if test="order_number !=null and order_number !=''">
+			    	and temp.order_number = #{order_number,jdbcType=VARCHAR}
+			    </if>
+			    <if test="order_source !=null and order_source !=''">
+			    	and temp.order_source = #{order_source,jdbcType=VARCHAR}
+			    </if>
+			    <if test="start_date !=null and start_date !=''">
+		      		and temp.create_date &gt;= to_date(#{start_date},'yyyy-mm-dd hh24:mi:ss')
+		        </if>
+		        <if test="end_date !=null and end_date !=''">
+		         	and temp.create_date &lt;= to_date(#{end_date},'yyyy-mm-dd hh24:mi:ss')
+		        </if>
+		        <if test="warehouse_id !=null and warehouse_id !=''">
+		        	and temp.warehouse_id = #{order_source,jdbcType=INTEGER}
+		        </if>
+		        <if test="login_name !=null and login_name !=''">
+			    	and exists (select 1 from tbl_user_info where id = temp.user_id and login_name like concat(concat('%', #{login_name,jdbcType=VARCHAR}),'%'))
+			    </if>
+			    <if test="ywjl_user_name != null and ywjl_user_name != '' ">
+			    	and	temp.ywjl_user_name = #{ywjl_user_name,jdbcType=VARCHAR}
+				</if>
+				<if test="md_id != null and md_id != 0 ">
+				    and	temp.md_id = #{md_id,jdbcType=INTEGER}
+				</if>
+				<if test="ywy_user_name != null and ywy_user_name != '' ">
+				    and	temp.ywy_user_name = #{ywy_user_name,jdbcType=VARCHAR}
+				</if>
+				 <if test="public_user_type != null and public_user_type == 2">
+		            and exists (select 1 from tbl_sys_user_store tsus where tsus.store_id = temp.md_id and tsus.user_id = #{public_user_id,jdbcType=INTEGER})
+		        </if>
+		        <if test="public_user_type != null and public_user_type == 3">
+		            and temp.ywy_user_name = #{public_user_name,jdbcType=INTEGER}
+		        </if>
+		        <if test="public_user_type != null and public_user_type == 4">
+		            and temp.ywjl_user_name = #{public_user_name,jdbcType=INTEGER}
+		        </if>
+		        <if test="public_user_type != null and public_user_type == 5">
+		            and exists(select 1 from tbl_store_info tsi where tsi.id = temp.md_id and tsi.shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER})
+		        </if>
+		        <if test="public_user_type != null and public_user_type == 6">
+		            and exists(select 1 from tbl_store_user_rel tsui where tsui.store_id = temp.md_id and tsui.user_id = #{public_user_id,jdbcType=INTEGER})
+		        </if>
+		        <if test="public_user_type != null and public_user_type == 9">
+		            and exists(select 1
+		                         from tbl_sys_user_info tsui
+		                        where tsui.user_type = 4
+		            				  and tsui.organization_id in (
+										  	select id from tbl_sys_organization_info where connect_by_isleaf=1
+										  	start with parent_id = #{public_user_organization_id,jdbcType=INTEGER} connect by prior id = parent_id
+							              )
+							          and tsui.user_name = temp.ywjl_user_name)
+		        </if>
+		        <if test="order_state != null and order_state != ''">
+	           		and temp.order_state in
+		         <foreach item="item" collection="order_state" open="(" separator="," close=")">
+		   	 			#{item,jdbcType=CHAR}
+		   	 	 </foreach>
+	         	</if>
+				<if test="pre_order_type != null and pre_order_type != ''">
+					and pre_order_type = #{pre_order_type, jdbcType=CHAR}
+				</if>
+				<if test="custom_product_itemnumber != null and custom_product_itemnumber != ''">
+					and exists(select 1 from tbl_pre_order_detail tpod where tpod.order_number=temp.order_number and tpod.product_itemnumber=#{custom_product_itemnumber,jdbcType=VARCHAR} and temp.PRE_ORDER_TYPE &lt;&gt;1)
+				</if>
+				<if test="original_product_itemnumber != null and original_product_itemnumber != ''">
+					and exists(select 1 from tbl_pre_order_detail tpod where tpod.order_number=temp.order_number
+										and exists(select 1 from tbl_custom_product_rel tcpr 
+														where tcpr.custom_product_itemnumber=TPOD.PRODUCT_ITEMNUMBER 
+													and tcpr.custom_user_id=tpod.USER_ID
+													and tcpr.original_product_itemnumber=#{original_product_itemnumber,jdbcType=VARCHAR}))
+				</if>
+	         	order by temp.create_date desc
+	         	) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) t where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 预定订单详情 -->
+	<select id="queryAdvanceOrderDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select 
+		       temp.USER_ID,
+			   temp.order_number,
+		       (select login_name from tbl_user_info where id = temp.user_id) login_name,
+		       temp.user_manage_name,
+		       to_char(temp.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+		       to_char(temp.payment_date,'yyyy-mm-dd hh24:mi:ss') payment_date,
+		       nvl(to_char(temp.cancel_date,'yyyy-mm-dd hh24:mi:ss'),0) cancel_date,
+		       nvl(temp.product_money,0) product_money,
+		       nvl(temp.product_count,0) product_count,
+		       nvl(temp.earnest_money,0) earnest_money,
+		       temp.order_state,
+		       (select user_realname from tbl_sys_user_info where user_name = temp.ywjl_user_name) ywjl_user_realname,
+               (select user_realname from tbl_sys_user_info where user_name = temp.ywy_user_name) ywy_user_realname,
+               (select store_name from tbl_store_info where id = temp.md_id) store_name,
+		       to_char(temp.finish_date, 'yyyy-mm-dd hh24:mi:ss') finish_date,
+		       (select to_char(create_date, 'yyyy-mm-dd hh24:mi:ss') from tbl_pre_order_return where order_number = temp.order_number and state in ('1','2')) suspend_date,
+		       nvl((select to_char(check_date, 'yyyy-mm-dd hh24:mi:ss') from tbl_pre_order_return where order_number = temp.order_number and state='2'),0) check_date,
+		       NVL(temp.payment_use_money,0) payment_use_money,
+		       temp.mbr_card,
+		       temp.pre_order_type
+		  from tbl_pre_order_info temp
+		  where order_number = #{order_number,jdbcType=VARCHAR}
+	</select>
+	<!-- 预定商品清单 -->
+	<select id="queryPreUserCart" parameterType="java.util.Map" resultType="java.util.Map">
+		  select product_itemnumber,
+				 product_old_itemnumber,
+                 product_name,
+                 product_img_url,
+                 sum(product_count) product_count,
+                 nvl((
+                    select sum(count) from tbl_order_product_sku op
+                    where exists (
+                        select 1 from tbl_pre_order_relate por 
+                        where por.pre_order_number = #{order_number,jdbcType=VARCHAR}  and  por.order_number = op.order_number
+                    )
+                    and exists (
+                        select 1 from tbl_order_info oi where (
+                            oi.payment_state = '2' or order_state!=6
+                        )
+                        and oi.order_number = op.order_number
+                    )
+                    and op.product_itemnumber = ff.product_itemnumber
+        ),0) reserve_count
+            from
+          (select temp.product_itemnumber,
+                 nvl (temp.product_count, 0) product_count,
+                 pi.product_name,
+                 pi.product_img_url,
+                 <!-- 定制商品添加原货号查询 by wangjianwei 2017-12-28 -->
+                 (select original_product_itemnumber from TBL_CUSTOM_PRODUCT_REL cpr where cpr.custom_product_itemnumber = temp.product_itemnumber and cpr.custom_user_id =temp.user_id) as PRODUCT_OLD_ITEMNUMBER
+            from tbl_pre_order_detail temp,
+                 tbl_product_info pi
+           where     order_number = #{order_number,jdbcType=VARCHAR}
+                 and temp.product_itemnumber = pi.itemnumber) ff
+        group by product_itemnumber,product_old_itemnumber, product_name, product_img_url
+	</select>
+	<!-- 预定商品清单明细 -->
+	<select id="queryPreUserCartDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		  select temp.product_itemnumber,
+		         temp.product_color,
+		         temp.product_gbcode,
+		         temp.product_size,
+		         nvl (temp.product_count, 0) product_count,
+		         nvl (temp.product_unit_price, 0) product_unit_price,
+		         nvl (temp1.count, 0) reserve_count
+		    from tbl_pre_order_detail temp left join (select op.product_sku,sum(count) count from tbl_order_product_sku op
+                    where exists (
+                        select 1 from tbl_pre_order_relate por 
+                        where por.pre_order_number = #{order_number,jdbcType=VARCHAR} and por.order_number = op.order_number
+                    )
+                    and exists (
+                        select 1 from tbl_order_info oi where (
+                            oi.payment_state = '2' or order_state!=6
+                        )
+                        and oi.order_number = op.order_number
+                        )
+                        group by op.product_sku) temp1 on temp1.product_sku = temp.product_sku
+		   where     temp.order_number = #{order_number,jdbcType=VARCHAR}
+		         and temp.product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+		order by product_itemnumber,
+		         product_color,
+		         product_specs,
+		         product_size asc
+	</select>
+	<!-- 定制订单商品明细列表数据 -->
+	<select id="queryCustomOrderProductDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		  SELECT ORDER_NUMBER,
+			   BRAND_NAME,
+			   BRAND_LOGO,
+			   INSOLE_FLAG,
+			   TONGUE_FLAG,
+			   TONGUE_LOGO,
+			   INSOLE_LOGO,
+			   BOX_SUPPLY_FLAG,
+			   BOX_SUPPLY_CONTACT_NAME,
+			   BOX_SUPPLY_CONTACT_PHONENUMBER,
+			   BAG_SUPPLY_FLAG,
+			   BAG_SUPPLY_CONTACT_NAME,
+			   BAG_SUPPLY_CONTACT_PHONENUMBER,
+			   TAG_SUPPLY_FLAG,
+			   TAG_SUPPLY_CONTACT_NAME,
+			   TAG_SUPPLY_CONTACT_PHONENUMBER,
+			   CERTIFICATE,
+			   REGISTRATION
+		  FROM TBL_CUSTOM_PRODUCT_INFO WHERE order_number = #{order_number, jdbcType=VARCHAR}
+	</select>
+	<!-- 相关联的普通订单 -->
+	<select id="queryOrderList" parameterType="java.util.Map" resultType="java.util.Map">
+			select temp.order_number,
+				   temp2.order_state,
+				   nvl(temp2.product_count,0) product_count,
+				   nvl(temp2.payment_money,0) payment_money,
+				   to_char(temp2.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+				   temp2.product_money + temp2.logistics_money + temp2.df_money as order_money,
+				   temp.earnest_money
+			  from tbl_pre_order_relate temp, tbl_order_info temp2
+			 where temp.pre_order_number = #{order_number,jdbcType=VARCHAR}
+			   and temp.order_number = temp2.order_number(+)
+	</select>
+	<!-- 预定订单金额信息 -->
+	<select id="queryAdvanceOrderMoneyInfo" parameterType="java.util.Map" resultType="java.util.Map">
+		select nvl((select sum(count) from tbl_order_product_sku op
+                    where exists (
+                        select 1 from tbl_pre_order_relate por 
+                        where por.pre_order_number = #{order_number,jdbcType=VARCHAR}  and  por.order_number = op.order_number
+                    )
+                    and exists (
+                        select 1 from tbl_order_info oi where (
+                            oi.payment_state = '2' or order_state!=6
+                        )
+                        and oi.order_number = op.order_number
+                        )),0)
+		          reserve_count,
+		       nvl (temp.product_count, 0) product_count,
+		       case when temp.PAYMENT_STATE ='2' then nvl (temp.earnest_money, 0) else 0 end as earnest_money,
+		       nvl (temp.product_money, 0) product_money,
+		       nvl (temp2.return_money, 0) return_money,
+		       case when temp.PAYMENT_STATE ='2'  then (nvl (temp.earnest_money, 0) - nvl (temp.payment_use_money, 0)) else 0 end as  remaining_deposit,
+		       (
+					SELECT NVL (SUM (product_money), 0)
+			          FROM tbl_order_info t,tbl_pre_order_relate por
+			         WHERE     t.payment_state = '2'
+			               AND por.pre_order_number = temp.order_number
+			                              AND por.order_number = t.order_number
+				) + 
+          case when temp.PAYMENT_STATE ='2'  then (nvl (temp.earnest_money, 0) - nvl (temp.payment_use_money, 0)) else 0 end total_money
+		  from tbl_pre_order_info temp, (select order_number,return_money from tbl_pre_order_return where return_type = '2' and state = '2' and order_number = #{order_number,jdbcType=VARCHAR}) temp2
+		 where     temp.order_number = temp2.order_number(+)
+		       and temp.order_number = #{order_number,jdbcType=VARCHAR}
+	</select>
+	<!-- 查询待支付订单是否存在 -->
+	<select id="queryOrderUnpaid" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_pre_order_info
+		 where ORDER_STATE = '1'
+		   and order_number = #{order_number,jdbcType=VARCHAR}
+	</select>
+	<!-- 取消订单 -->
+	<update id="updateOrderCancel" parameterType="java.util.Map">
+		update tbl_pre_order_info
+		   set order_state = '6',
+		   	   cancel_reason = #{cancel_reason,jdbcType=VARCHAR},
+		   	   cancel_date = sysdate,
+		   	   finish_date = sysdate,
+		   	   cancel_user_name = #{public_user_name,jdbcType=VARCHAR},
+		   	   cancel_user_realname = #{public_user_realname,jdbcType=VARCHAR}
+		 where order_number = #{order_number,jdbcType=VARCHAR}
+	</update>
+	<resultMap id="depositReturnMap" type="java.util.Map">
+		<result column="id" property="id"/>
+		<result column="return_number" property="return_number"/>
+		<result column="order_number" property="order_number"/>
+		<result column="return_type" property="return_type"/>
+		<result column="user_id" property="user_id"/>
+		<result column="return_money" property="return_money"/>
+		<result column="state" property="state"/>
+		<result column="third_logno" property="third_logno"/>
+	</resultMap>
+	<!-- 获取预定订单中止申请信息 -->
+	<select id="queryDepositReturnForUpdate" parameterType="java.lang.String" resultMap="depositReturnMap">
+		select id,return_number,order_number,user_id,return_type,return_money,state,third_logno
+		from tbl_pre_order_return where return_number = #{return_number,jdbcType=VARCHAR} for update
+	</select>
+	<!-- 更新申请单状态 -->
+	<update id="updateDepositReturn" parameterType="java.util.Map">
+		update tbl_pre_order_return set STATE = #{state,jdbcType=CHAR}, CHECK_USER_NAME = #{approval_user_name,jdbcType=VARCHAR},
+			CHECK_USER_REALNAME = #{approval_user_realname,jdbcType=VARCHAR}, CHECK_DATE = sysdate,
+			CHECK_CANCLE_REASON = #{check_cancle_reason,jdbcType=VARCHAR}
+		where return_number = #{return_number,jdbcType=VARCHAR}
+	</update>
+	<!-- 更新预定订单状态 -->
+	<update id="updatePreOrderState" parameterType="java.util.Map">
+		update TBL_PRE_ORDER_INFO set order_state = #{order_state,jdbcType=CHAR},finish_date = sysdate where order_number = #{order_number,jdbcType=VARCHAR}
+	</update>
+	<!-- 更新预定订单完成时间 -->
+	<update id="updatePreOrderFinishDate" parameterType="java.lang.String">
+		update TBL_PRE_ORDER_INFO set finish_date = sysdate where order_number = #{order_number,jdbcType=VARCHAR}
+	</update>
+	<!-- 新增已经支付定金的预定订单退货申请 -->
+	<insert id="insertAdvanceOrderMoneyInfo" parameterType="java.util.Map">
+		INSERT INTO TBL_PRE_ORDER_RETURN (id,
+                                  return_number,
+                                  return_type,
+                                  order_number,
+                                  user_id,
+                                  user_manage_name,
+                                  return_money,
+                                  state,
+                                  return_remark,
+                                  apply_user_name,
+                                  apply_user_realname,
+                                  create_date,
+                                  third_logno)
+    	select 
+		SEQ_PRE_ORDER_RETURN.nextval,
+		getAutoNumber('23'),
+		#{return_type,jdbcType=VARCHAR} return_type,
+		poi.ORDER_NUMBER,
+		poi.user_id,
+		poi.user_manage_name,
+		(NVL(poi.earnest_money,0) - NVL(poi.payment_use_money,0)) return_money,
+		'1' state,
+		#{return_remark,jdbcType=VARCHAR} return_remark,
+		#{apply_user_name,jdbcType=VARCHAR} apply_user_name,
+		#{apply_user_realname,jdbcType=VARCHAR} apply_user_realname,
+		sysdate create_date,
+		GETTHIRDLOGNUMBER('0')
+	 	from TBL_PRE_ORDER_INFO poi 
+	 	where poi.ORDER_NUMBER= #{order_number,jdbcType=VARCHAR}
+	</insert>
+	<!-- 根据单号查询预定订单信息 -->
+	<select id="queryPreOrderByNumber" resultType="java.util.Map" parameterType="java.lang.String">
+			   SELECT 
+		        poi.id,
+				poi.order_number,
+				poi.create_date,
+				poi.user_id,
+				poi.user_manage_name,
+				poi.order_state,
+				poi.earnest_money,
+				poi.payment_state,
+				poi.payment_date,
+				poi.payment_type,
+				poi.payment_use_money,
+				poi.payment_number,
+				poi.product_money,
+				poi.product_count,
+				poi.order_source,
+				poi.cancel_reason,
+				poi.cancel_date,
+				poi.cancel_user_name,
+				poi.cancel_user_realname,
+				poi.ywjl_user_name,
+				poi.ywy_user_name,
+				poi.md_id,
+				poi.activity_id,
+				poi.activity_name,
+				case when poi.PRE_ORDER_TYPE =2 and exists(select 1 from  ${jdbc_user}.TBL_PURCHASE_ORDER tpo where tpo.STATE in('2','3') and tpo.SPECIAL_BALANCE_STATE = '1' and tpo.ORDER_NUMBER_PLATFORM = poi.order_number ) 
+		            then 1 else 0 end as close_flag,
+		        ui.login_name,
+		        ui.user_manage_name
+               FROM TBL_PRE_ORDER_INFO poi
+               left join TBL_USER_INFO ui on poi.user_id = ui.id
+		       WHERE poi.order_number = #{order_number,jdbcType=VARCHAR}
+		       AND rownum &lt;=1
+	</select>
+	
+	<!-- 检测当卡预定订单所关联的尾款订单是否存在  待支付 的情况  -->
+	<select id="checkRemainOrderStateByPreOrderNumber" parameterType="java.util.Map" resultType="int">
+		select count(1) from tbl_order_info oi where oi.order_state = '1'
+		and exists (
+		    select 1 from tbl_pre_order_relate por 
+		    where por.pre_order_number = #{order_number,jdbcType=VARCHAR}
+		    and por.order_number = oi.order_number
+		)
+	</select>
+	
+	<!-- 更新预定订单手工占用状态 -->
+	<update id="updatePreOrderWarehouseState" parameterType="java.util.Map">
+		update TBL_PRE_ORDER_INFO 
+		   set WAREHOUSE_STATE = '2',warehouse_date = sysdate,
+		   	   WAREHOUSE_USER_NAME = #{public_user_name,jdbcType=VARCHAR},WAREHOUSE_USER_REALNAME =#{public_user_realname,jdbcType=VARCHAR},
+		   	   WAREHOUSE_ID = #{warehouse_id,jdbcType=INTEGER}
+		 where order_number = #{order_number,jdbcType=VARCHAR}
+	</update>
+	
+	<!-- 预定订单手工占用数据插入 -->
+	<insert id="insertAdvanceOrderWarehouseCount" parameterType="java.util.Map">
+		insert into TBL_PRE_ORDER_WAREHOUSE_COUNT (id,PRE_ORDER_NUMBER,USER_NAME,WAREHOUSE_ID,PRODUCT_SKU,OCCUPY_COUNT,CREATE_DATE)
+		select SEQ_PRE_ORDER_WAREHOUSE_COUNT.nextval,
+			   ORDER_NUMBER,
+			   USER_ID||'',
+			   #{warehouse_id,jdbcType=INTEGER},
+			   PRODUCT_SKU, 
+			   PRODUCT_COUNT,
+			   sysdate
+		 from TBL_PRE_ORDER_DETAIL t1
+		where order_number = #{order_number,jdbcType=VARCHAR}
+			  and not exists(
+			  	select 1 
+			  	  from TBL_ORDER_PRODUCT_SKU t2 
+			  	 where t2.product_sku = t1.product_sku
+			  	 	   and exists(select 1 
+			  	 	                from TBL_PRE_ORDER_RELATE t3 
+			  	 	               where t3.PRE_ORDER_NUMBER = #{order_number,jdbcType=VARCHAR}
+			  	 	   					 and t3.ORDER_NUMBER = t2.order_number)	
+			  	 	   and exists(
+			  	 	   	   select 1 from tbl_order_info t4 where t4.order_number = t2.order_number and (t4.ORDER_STATE != 6 or (t4.ORDER_STATE = 6 and t4.PAYMENT_STATE = 2))
+			  	 	   )					 					      
+			  )
+	</insert>
+	
+	<!-- 预定订单手工占用数据清除 -->
+	<delete id="deletePreOrderWarehouseCount" parameterType="java.util.Map">
+		delete from TBL_PRE_ORDER_WAREHOUSE_COUNT where PRE_ORDER_NUMBER = #{order_number,jdbcType=VARCHAR}
+	</delete>
+	<!-- 实付金额 -->
+	<select id="queryActuallyMoney" parameterType="java.util.Map" resultType="int">
+		SELECT NVL (SUM (payment_money), 0) 
+                      FROM tbl_order_info t,tbl_pre_order_relate por
+                     WHERE     t.payment_state = '2'
+                           AND por.pre_order_number = #{order_number,jdbcType=VARCHAR}
+                                          AND por.order_number = t.order_number
+	</select>
+	<!-- 审批商品定制订单 -->
+	<update id="checkingCustomOrder" parameterType="java.util.Map">
+		UPDATE TBL_PRE_ORDER_INFO set
+			<if test="approval_remark !=null and approval_remark !=''">
+           		approval_remark=#{approval_remark, jdbcType=VARCHAR},
+            </if>
+			check_state = #{check_state, jdbcType=CHAR},
+			CHECK_DATE=sysdate,
+			CHECK_USER_NAME = #{check_user_name, jdbcType=CHAR},
+			CHECK_USER_REALNAME =  #{check_user_realname, jdbcType=CHAR}
+		WHERE ORDER_NUMBER = #{order_number, jdbcType=VARCHAR}
+	</update>
+	<!-- 根据定制订单单号，确认定制品牌信息是否已经存在，存在则返回已存在的定制品牌记录ID -->
+	<select id="queryCustomBrandByPreOrderNum" parameterType="java.util.Map" resultType="long">
+		select id from TBL_CUSTOM_PRODUCT_BRAND cpb where exists (
+                select 1 from TBL_PRE_ORDER_DETAIL prd where prd.ORDER_NUMBER = #{order_number, jdbcType=VARCHAR}
+                and prd.user_id = cpb.user_id
+        )
+        and  exists (
+             select 1
+             from TBL_CUSTOM_PRODUCT_INFO cpi where cpi.ORDER_NUMBER = #{order_number, jdbcType=VARCHAR}
+             and cpb.brand_name = cpi.brand_name
+        )
+        and  exists (
+                 select cpr.original_product_itemnumber 
+                 from TBL_CUSTOM_PRODUCT_REL cpr
+                 inner join TBL_PRE_ORDER_DETAIL prd on prd.product_itemnumber = cpr.custom_product_itemnumber
+                 where prd.ORDER_NUMBER = #{order_number, jdbcType=VARCHAR} and cpr.original_product_itemnumber= cpb.original_product_itemnumber
+        )
+	</select>
+	<!-- 审批商品定制订单 -->
+	<insert id="insertCustomBrand" parameterType="java.util.Map">
+		<selectKey keyProperty="id" resultType="int" order="BEFORE">
+			select SEQ_PRODUCT_BRAND.nextval from dual
+		</selectKey>
+		insert into TBL_CUSTOM_PRODUCT_BRAND
+		select 
+		#{id,jdbcType=INTEGER},
+		cpi.BRAND_NAME,
+		cpi.BRAND_LOGO,
+		sysdate CREATE_DATE,
+		#{check_user_id, jdbcType=INTEGER}  CREATE_USER_ID,
+		cpi.INSOLE_LOGO,
+		(
+		    select pi.brand_id from TBL_PRE_ORDER_DETAIL prd
+		    inner join TBL_CUSTOM_PRODUCT_REL cpr on cpr.custom_product_itemnumber = prd.PRODUCT_ITEMNUMBER
+		    inner join TBL_PRODUCT_INFO pi on cpr.original_product_itemnumber =  pi.itemnumber
+		    where prd.ORDER_NUMBER = cpi.ORDER_NUMBER and rownum &lt;=1
+		) brand_id,
+		(
+            select pi.stationed_user_id from TBL_PRE_ORDER_DETAIL prd
+            inner join TBL_CUSTOM_PRODUCT_REL cpr on cpr.custom_product_itemnumber = prd.PRODUCT_ITEMNUMBER
+            inner join TBL_PRODUCT_INFO pi on cpr.original_product_itemnumber =  pi.itemnumber
+            where prd.ORDER_NUMBER = cpi.ORDER_NUMBER and rownum &lt;=1
+        ) stationed_user_id,
+        (select user_id from TBL_PRE_ORDER_INFO poi where poi.ORDER_NUMBER = cpi.ORDER_NUMBER and rownum &lt;=1) user_id,
+        (
+                 select cpr.original_product_itemnumber 
+                 from TBL_CUSTOM_PRODUCT_REL cpr
+                 inner join TBL_PRE_ORDER_DETAIL prd on prd.product_itemnumber = cpr.custom_product_itemnumber
+                 where prd.ORDER_NUMBER = cpi.ORDER_NUMBER and rownum &lt;=1
+        ) original_product_itemnumber
+		 from TBL_CUSTOM_PRODUCT_INFO cpi where cpi.ORDER_NUMBER = #{order_number, jdbcType=VARCHAR}
+	</insert>
+	<!-- 更新定制商品的品牌信息 -->
+	<update id="updateProductBrandId" parameterType="java.util.Map">
+		update TBL_PRODUCT_INFO set brand_id = #{id, jdbcType=INTEGER}
+		where itemnumber = (
+			select prd.product_itemnumber from TBL_PRE_ORDER_DETAIL prd
+    		where prd.ORDER_NUMBER = #{order_number, jdbcType=VARCHAR} and rownum &lt;=1
+		) and PRODUCT_TYPE = 1
+	</update>
+	<!-- 查询没有生产尾款订单（尾款订单未关闭）的预付订单商品金额 -->
+	<select id="queryOrderedProducrMoneyBrPreOrderNumber" parameterType="java.util.Map" resultType="string">
+				SELECT         
+				nvl(sum(product_total_money),0)
+                from TBL_PRE_ORDER_RELATE por,
+                TBL_ORDER_PRODUCT_SKU ops,
+                TBL_ORDER_INFO oi
+                where 
+                por.order_number = ops.order_number
+                and ops.order_number = oi.order_number
+                and oi.order_state!=6
+                and por.pre_order_number = #{order_number, jdbcType=VARCHAR}
+	</select>
+</mapper>

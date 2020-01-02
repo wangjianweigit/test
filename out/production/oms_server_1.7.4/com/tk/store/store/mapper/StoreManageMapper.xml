@@ -1,0 +1,1243 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.store.store.dao.StoreManageDao">
+	<sql id="all_column">
+		id,
+		user_name,
+		login_name,
+		user_pwd,
+		user_state,
+		user_resource,
+		create_user_id,
+		to_char(create_date,'yyyy-mm-dd hh24:mi:ss')  as  create_date,
+		edit_user_id,
+		to_char(edit_date,'yyyy-mm-dd hh24:mi:ss')  as  edit_date,
+		approval_user_id,
+		to_char(approval_date,'yyyy-mm-dd hh24:mi:ss')  as  approval_date,
+		user_create_ip,
+		user_login_count,
+		to_char(user_last_login_date,'yyyy-mm-dd hh24:mi:ss')  as  user_last_login_date,
+		user_last_login_ip,
+		user_head_imgurl,
+		user_manage_name,
+		user_manage_sex,
+		user_manage_cardid,
+		user_manage_cardid_file1,
+		user_manage_cardid_file2,
+		user_manage_current_address,
+		user_manage_telephone,
+		user_manage_mobilephone,
+		user_manage_weixin,
+		user_manage_qq,
+		user_manage_email,
+		user_company_name,
+		user_company_corporation,
+		user_company_telephone,
+		user_company_type,
+		user_company_address_max,
+		user_company_address_province,
+		user_company_address_city,
+		user_company_address_county,
+		user_company_address_deails,
+		user_company_comment,
+		referee_user_id,
+		referee_user_realname,
+		market_supervision_user_id,
+		market_supervision_user_realna,
+		store_id,
+		store_name,
+		openid,
+		to_char(last_update_time,'yyyy-mm-dd hh24:mi:ss')  as  last_update_time,
+		distribution_state,
+		issuing_grade_id,
+		user_business_licence_imgurl,
+		shop_website,
+		shop_name,
+		platform,
+		main_category,
+		shop_photo,
+		to_char(unbunding_date,'yyyy-mm-dd hh24:mi:ss')  as  unbunding_date,
+		site_id,
+		business_license_number,
+		user_company_location_address,
+		user_control_store_name, 
+		user_store_address_province, 
+		user_store_address_city,
+		user_store_address_county, 
+		user_store_address_deails,
+		user_store_location_address,
+		user_policy_period,
+		user_type,
+		case when commission_rate is null then 0 else commission_rate*100 end commission_rate,
+		case when pay_service_rate is null then 0 else pay_service_rate*100 end pay_service_rate,
+		partner_user_id,
+		partner_user_realna,
+		supervisor_user_id,
+		supervisor_user_realna,
+		store_user_type,
+		user_logistics_template_id,
+		agent_id
+	</sql>
+
+	<!--分页查询店铺列表 -->
+	<select id="queryStoreListForPage" parameterType="java.util.Map"  resultType="java.util.Map">
+		select * from (
+			select a.*,rownum rn from (
+			   SELECT <include refid="all_column"/>,
+					(select user_realname from tbl_sys_user_info where id=a.create_user_id) as market_supervision_realname,
+					(select name from tbl_dic_region where id = a.user_store_address_province)
+		          		||(select name from tbl_dic_region where id = a.user_store_address_city )
+		           		||(select name from tbl_dic_region where id = a.user_store_address_county)
+		           		||a.user_store_address_deails as address,
+		           	(select to_char(wm_concat(t.store_name)) from tbl_store_user_manage t where t.user_id=a.id) as have_stores	
+				  FROM TBL_USER_INFO a
+				 WHERE USER_TYPE=2
+				 <if test="login_name != null and login_name != '' ">
+		 			and a.login_name like concat(concat('%', #{login_name,jdbcType=VARCHAR}),'%')
+				 </if>
+				 <if test="state != null">
+					and a.user_state IN
+		                <foreach item="item" collection="state" open="(" separator="," close=")">
+							#{item}
+						</foreach>
+				 </if>
+				 <if test="store_name != null and store_name != '' ">
+		 			and a.user_control_store_name like concat(concat('%', #{store_name,jdbcType=VARCHAR}),'%')
+				 </if>
+				 <if test="user_manage_mobilephone != null and user_manage_mobilephone != '' ">
+		 			and a.user_manage_mobilephone =#{user_manage_mobilephone,jdbcType=VARCHAR}
+				 </if>
+				 <if test="supervisor_user_id != null and supervisor_user_id != '' ">
+		 			and a.supervisor_user_id =#{supervisor_user_id,jdbcType=VARCHAR}
+				 </if>
+				 <if test="begin_date != null and begin_date != '' ">
+				    and	a.create_date &gt;= to_date(#{begin_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+				 </if>
+				 <if test="end_date != null and end_date != '' ">
+				    and	a.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+				 </if>
+		 		 <if test="ywjl_user_id !=null and ywjl_user_id !=''">
+					and a.market_supervision_user_id  = #{ywjl_user_id,jdbcType=INTEGER}
+				 </if>
+				 <if test="public_user_type != null and public_user_type == 3">
+		            and 1=2
+		         </if>
+		         <if test="public_user_type != null and public_user_type == 4">
+		            and a.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+		         </if>
+		         <if test="public_user_type != null and public_user_type == 5">
+		            and 1=2
+		         </if>
+		         <if test="public_user_type != null and public_user_type == 6">
+		            and 1=2
+		         </if>
+		         <if test="public_user_type != null and public_user_type == 7">
+					and a.supervisor_user_id = #{public_user_id,jdbcType=INTEGER}
+		         </if>
+		         <if test="public_user_type != null and public_user_type == 9">
+		            and a.partner_user_id = #{public_user_id,jdbcType=INTEGER}
+		         </if>
+		         <if test="store_user_type != null and store_user_type !=''">
+		            and a.store_user_type = #{store_user_type,jdbcType=INTEGER}
+		         </if>
+		          order by create_date desc ) a
+		 	where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	
+	<!--查询店铺总数 -->
+	<select id="queryStoreCount" parameterType="java.util.Map"  resultType="int">
+		SELECT count(1)
+		  FROM TBL_USER_INFO a
+		 WHERE USER_TYPE=2
+		 <if test="login_name != null and login_name != '' ">
+ 			and a.login_name like concat(concat('%', #{login_name,jdbcType=VARCHAR}),'%')
+		 </if>
+		 <if test="state != null">
+			and a.user_state IN
+                <foreach item="item" collection="state" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+		 </if>
+		 <if test="user_manage_mobilephone != null and user_manage_mobilephone != '' ">
+ 			and a.user_manage_mobilephone =#{user_manage_mobilephone,jdbcType=VARCHAR}
+		 </if>
+		 <if test="supervisor_user_id != null and supervisor_user_id != '' ">
+ 			and a.supervisor_user_id =#{supervisor_user_id,jdbcType=VARCHAR}
+		 </if>
+		 <if test="store_name != null and store_name != '' ">
+ 			and a.user_control_store_name like concat(concat('%', #{store_name,jdbcType=VARCHAR}),'%')
+		 </if>
+		 <if test="begin_date != null and begin_date != '' ">
+		    and	a.create_date &gt;= to_date(#{begin_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+		 </if>
+		 <if test="end_date != null and end_date != '' ">
+		    and	a.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+		 </if>
+		 <if test="ywjl_user_id !=null and ywjl_user_id !=''">
+			and a.market_supervision_user_id  = #{ywjl_user_id,jdbcType=INTEGER}
+		 </if>
+		 <if test="public_user_type != null and public_user_type == 3">
+            and 1=2
+         </if>
+         <if test="public_user_type != null and public_user_type == 4">
+            and a.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+         </if>
+         <if test="public_user_type != null and public_user_type == 5">
+            and 1=2
+         </if>
+         <if test="public_user_type != null and public_user_type == 6">
+            and 1=2
+         </if>
+         <if test="public_user_type != null and public_user_type == 7">
+			and a.supervisor_user_id = #{public_user_id,jdbcType=INTEGER}
+         </if>
+         <if test="public_user_type != null and public_user_type == 9">
+            and a.partner_user_id = #{public_user_id,jdbcType=INTEGER}
+         </if>
+         <if test="store_user_type != null and store_user_type !=''">
+            and a.store_user_type = #{store_user_type,jdbcType=INTEGER}
+         </if>
+	</select>
+	
+	<!--查询店铺详情 -->
+	<select id="queryStoreDetail" parameterType="java.util.Map"  resultType="java.util.Map">
+		SELECT <include refid="all_column"/>,
+			(select template_name from tbl_user_logistics_template where id=a.user_logistics_template_id) as template_name,
+			(select user_realname from tbl_sys_user_info where id=a.create_user_id) as market_supervision_realname,
+			(select name from TBL_SITE_INFO where id=a.site_id) as site_name,
+			(select name from tbl_dic_region where id = a.user_store_address_province)
+          		||(select name from tbl_dic_region where id = a.user_store_address_city )
+           		||(select name from tbl_dic_region where id = a.user_store_address_county)
+           		||a.user_store_address_deails as control_store_address,
+           	(select name from tbl_dic_region where id = a.user_company_address_province)
+          		||(select name from tbl_dic_region where id = a.user_company_address_city )
+           		||(select name from tbl_dic_region where id = a.user_company_address_county)
+           		||a.user_company_address_deails as company_address
+		  FROM TBL_USER_INFO a
+		 WHERE USER_TYPE=2
+		 and id=#{id,jdbcType=INTEGER}
+	</select>
+	
+	<!--店铺启用禁用-->
+	<update id="updateStoreState" parameterType="java.util.Map">
+		  update tbl_user_info 
+		  	set user_state=#{user_state,jdbcType=INTEGER}
+		  where id=#{id,jdbcType=INTEGER}
+	</update>
+	
+	<!--店铺佣金比例设置-->
+	<update id="storeCommissionRateSet" parameterType="java.util.Map">
+		  update tbl_user_info 
+		  	set commission_rate=#{commission_rate,jdbcType=INTEGER}
+		  where id=#{id,jdbcType=INTEGER}
+	</update>
+	
+	<!--支付服务费设置-->
+	<update id="storePayServiceRateSet" parameterType="java.util.Map">
+		  update tbl_user_info 
+		  	set pay_service_rate=#{pay_service_rate,jdbcType=INTEGER}
+		  where id=#{id,jdbcType=INTEGER}
+	</update>
+	
+	<!--店铺平台登入设置-->
+	<update id="storePlatformLoginSet" parameterType="java.util.Map">
+		  update tbl_user_info 
+		  	set platform_login_state=#{platform_login_state,jdbcType=INTEGER}
+		  where id=#{id,jdbcType=INTEGER}
+	</update>
+	
+	<!-- 更新店铺-->
+	<update id="editStore" parameterType="java.util.Map">
+		update tbl_user_info
+		<set>
+			<if test="USER_STATE !=null and USER_STATE !=''">
+				USER_STATE = #{USER_STATE,jdbcType=INTEGER},
+			</if>
+			<if test="USER_MANAGE_NAME!=null and USER_MANAGE_NAME!=''">
+				USER_MANAGE_NAME = #{USER_MANAGE_NAME,jdbcType=VARCHAR},
+			</if>
+			<if test="USER_MANAGE_SEX!=null and USER_MANAGE_SEX!=''">
+				USER_MANAGE_SEX = #{USER_MANAGE_SEX,jdbcType=VARCHAR},
+			</if>
+			<if test="USER_MANAGE_CARDID!=null and USER_MANAGE_CARDID!=''">
+				USER_MANAGE_CARDID = #{USER_MANAGE_CARDID,jdbcType=VARCHAR},
+			</if>
+			<if test="USER_MANAGE_CURRENT_ADDRESS!=null and USER_MANAGE_CURRENT_ADDRESS!=''">
+				USER_MANAGE_CURRENT_ADDRESS =#{USER_MANAGE_CURRENT_ADDRESS,jdbcType=VARCHAR},
+			</if>
+			<if test="USER_MANAGE_TELEPHONE!=null and USER_MANAGE_TELEPHONE!='' ">
+				USER_MANAGE_TELEPHONE =#{USER_MANAGE_TELEPHONE,jdbcType=VARCHAR},
+			</if>
+			<if test="USER_MANAGE_MOBILEPHONE!=null and USER_MANAGE_MOBILEPHONE!=''">
+				USER_MANAGE_MOBILEPHONE =#{USER_MANAGE_MOBILEPHONE,jdbcType=VARCHAR},
+			</if>
+			<if test="USER_MANAGE_WEIXIN!=null and USER_MANAGE_WEIXIN!=''">
+				USER_MANAGE_WEIXIN =#{USER_MANAGE_WEIXIN,jdbcType=VARCHAR},
+			</if>
+			<if test="USER_MANAGE_QQ!=null and USER_MANAGE_QQ!=''">
+				USER_MANAGE_QQ =#{USER_MANAGE_QQ,jdbcType=VARCHAR},
+			</if>
+			<if test="USER_MANAGE_EMAIL!=null and USER_MANAGE_EMAIL!=''">
+				USER_MANAGE_EMAIL =#{USER_MANAGE_EMAIL,jdbcType=VARCHAR},
+			</if>
+			<if test="USER_COMPANY_NAME!=null and USER_COMPANY_NAME!=''">
+				USER_COMPANY_NAME =#{USER_COMPANY_NAME,jdbcType=VARCHAR},
+			</if>
+			<if test="USER_COMPANY_CORPORATION!=null and USER_COMPANY_CORPORATION!=''">
+				USER_COMPANY_CORPORATION =#{USER_COMPANY_CORPORATION,jdbcType=VARCHAR},
+			</if>
+			<if test="USER_COMPANY_TELEPHONE!=null and USER_COMPANY_TELEPHONE!=''">
+				USER_COMPANY_TELEPHONE =#{USER_COMPANY_TELEPHONE,jdbcType=VARCHAR},
+			</if>
+			<if test="USER_COMPANY_TYPE!=null">
+				USER_COMPANY_TYPE =#{USER_COMPANY_TYPE,jdbcType=INTEGER},
+			</if>
+			<if test="USER_COMPANY_ADDRESS_MAX!=0 and USER_COMPANY_ADDRESS_MAX!=null">
+				USER_COMPANY_ADDRESS_MAX =#{USER_COMPANY_ADDRESS_MAX,jdbcType=INTEGER},
+			</if>
+			<if test="province!=0 and province!=null and province!='' ">
+				USER_COMPANY_ADDRESS_PROVINCE =#{province,jdbcType=INTEGER},
+			</if>
+			<if test="city!=0 and city!=null and city!=''">
+				USER_COMPANY_ADDRESS_CITY =#{city,jdbcType=INTEGER},
+			</if>
+			<if test="area!=0 and area!=null and area !=''">
+				USER_COMPANY_ADDRESS_COUNTY =#{area,jdbcType=INTEGER},
+			</if>
+			<if test="USER_COMPANY_ADDRESS_DEAILS!=null">
+				USER_COMPANY_ADDRESS_DEAILS =#{USER_COMPANY_ADDRESS_DEAILS,jdbcType=INTEGER},
+			</if>
+			<if test="USER_COMPANY_COMMENT!=null and USER_COMPANY_COMMENT!=''">
+				USER_COMPANY_COMMENT =#{USER_COMPANY_COMMENT,jdbcType=VARCHAR},
+			</if>
+			<if test="REFEREE_USER_ID!=null">
+				REFEREE_USER_ID =#{REFEREE_USER_ID,jdbcType=VARCHAR},
+			</if>
+			<if test="REFEREE_USER_REALNAME!=null">
+				REFEREE_USER_REALNAME =#{REFEREE_USER_REALNAME,jdbcType=VARCHAR},
+			</if>
+			<if test="MARKET_SUPERVISION_USER_ID!=null and MARKET_SUPERVISION_USER_ID!=''">
+				MARKET_SUPERVISION_USER_ID =#{MARKET_SUPERVISION_USER_ID,jdbcType=VARCHAR},
+			</if>
+			<if test="MARKET_SUPERVISION_USER_REALNA!=null and MARKET_SUPERVISION_USER_REALNA!=''">
+				MARKET_SUPERVISION_USER_REALNA =#{MARKET_SUPERVISION_USER_REALNA,jdbcType=VARCHAR},
+			</if>
+			<if test="edit_user_id!=null and edit_user_id!=''">
+				edit_user_id =#{edit_user_id,jdbcType=VARCHAR},
+				edit_date = sysdate,
+			</if>
+			<if test="STORE_ID!=null and STORE_ID!=0">
+				STORE_ID =#{STORE_ID,jdbcType=INTEGER},
+			</if>
+			<if test="STORE_NAME!=null and STORE_NAME!=''">
+				STORE_NAME =#{STORE_NAME,jdbcType=VARCHAR},
+			</if>
+			<if test="user_business_licence_imgurl!=null">
+				user_business_licence_imgurl =#{user_business_licence_imgurl,jdbcType=VARCHAR},
+			</if>
+			<if test="SHOP_WEBSITE!=null">
+				SHOP_WEBSITE =#{SHOP_WEBSITE,jdbcType=VARCHAR},
+			</if>
+			<if test="SHOP_NAME!=null">
+				SHOP_NAME =#{SHOP_NAME,jdbcType=VARCHAR},
+			</if>
+			<if test="PLATFORM!=null">
+				PLATFORM =#{PLATFORM,jdbcType=VARCHAR},
+			</if>
+			<if test="MAIN_CATEGORY!=null">
+				MAIN_CATEGORY =#{MAIN_CATEGORY,jdbcType=VARCHAR},
+			</if>
+			<if test="shop_photo!=null">
+				shop_photo =#{shop_photo,jdbcType=VARCHAR},
+			</if>
+			<if test="BUSINESS_LICENSE_NUMBER!=null">
+				BUSINESS_LICENSE_NUMBER =#{BUSINESS_LICENSE_NUMBER,jdbcType=VARCHAR},
+			</if>
+			<if test="SITE_ID != null">
+				SITE_ID = #{SITE_ID,jdbcType=INTEGER},
+			</if>
+			<if test="USER_COMPANY_LOCATION_ADDRESS != null">
+				USER_COMPANY_LOCATION_ADDRESS = #{USER_COMPANY_LOCATION_ADDRESS,jdbcType=INTEGER},
+			</if>
+			<if test="USER_CONTROL_STORE_NAME != null">
+				USER_CONTROL_STORE_NAME = #{USER_CONTROL_STORE_NAME,jdbcType=INTEGER},
+			</if>
+			<if test="USER_STORE_ADDRESS_DEAILS != null">
+				USER_STORE_ADDRESS_DEAILS = #{USER_STORE_ADDRESS_DEAILS,jdbcType=INTEGER},
+			</if>
+			<if test="USER_STORE_LOCATION_ADDRESS != null">
+				USER_STORE_LOCATION_ADDRESS = #{USER_STORE_LOCATION_ADDRESS,jdbcType=INTEGER},
+			</if>
+			<if test="store_province !=0 and store_province !=null and store_province!='' ">
+				USER_STORE_ADDRESS_PROVINCE =#{store_province,jdbcType=INTEGER},
+			</if>
+			<if test="store_city !=0 and store_city!=null and store_city!='' ">
+				USER_STORE_ADDRESS_CITY =#{store_city,jdbcType=INTEGER},
+			</if>
+			<if test="store_area !=0 and store_area!=null and store_area!='' ">
+				USER_STORE_ADDRESS_COUNTY =#{store_area,jdbcType=INTEGER},
+			</if>
+			<if test="STORE_USER_TYPE != null and STORE_USER_TYPE != ''">
+				store_user_type = #{STORE_USER_TYPE,jdbcType=INTEGER}
+			</if>
+		</set>
+		where id = #{id,jdbcType=INTEGER}
+	</update>
+	
+	<!--新增店铺-->
+	<insert id="addStore" parameterType="java.util.Map" >
+	    <selectKey keyProperty="id" resultType="int" order="BEFORE"> 
+        	SELECT seq_user_info_apply.nextval FROM DUAL
+    	</selectKey>
+		insert into tbl_user_info_apply
+		(
+		id,user_name,login_name,user_pwd,user_manage_name,user_manage_sex,
+		user_manage_cardid,user_manage_cardid_file1,user_manage_cardid_file2,
+		user_manage_current_address,user_manage_telephone,user_manage_mobilephone,
+		user_manage_weixin,user_manage_qq,user_manage_email,user_company_name,
+		user_company_corporation,user_company_telephone,user_company_type,user_company_address_max,
+		user_company_address_province,user_company_address_city,user_company_address_county,
+		user_company_address_deails,user_company_comment,create_date,user_create_ip,referee_user_id,
+		referee_user_realname,market_supervision_user_id,market_supervision_user_realna,user_resource,store_id,store_name,
+		shop_website,shop_name,platform,main_category,shop_photo,site_id,create_user_id,user_business_licence_imgurl,user_state,business_license_number,
+		user_company_location_address,user_control_store_name,user_store_address_province,user_store_address_city,
+		user_store_address_county,user_store_address_deails,user_store_location_address,user_longitude,user_latitude,distribution_state,user_type,
+		partner_user_id,partner_user_realna,supervisor_user_id,supervisor_user_realna,commission_rate,store_user_type,user_logistics_template_id
+		)
+		values
+		(
+		#{id,jdbcType=INTEGER},#{id,jdbcType=VARCHAR},#{login_name,jdbcType=VARCHAR},#{user_pwd,jdbcType=VARCHAR},#{user_manage_name,jdbcType=VARCHAR},#{user_manage_sex,jdbcType=VARCHAR},
+		#{user_manage_cardid,jdbcType=VARCHAR},#{user_manage_cardid_file1,jdbcType=VARCHAR},#{user_manage_cardid_file2,jdbcType=VARCHAR},
+		#{user_manage_current_address,jdbcType=VARCHAR},#{user_manage_telephone,jdbcType=VARCHAR},#{user_manage_mobilephone,jdbcType=VARCHAR},
+		#{user_manage_weixin,jdbcType=VARCHAR},#{user_manage_qq,jdbcType=VARCHAR},#{user_manage_email,jdbcType=VARCHAR},#{user_company_name,jdbcType=VARCHAR},
+		#{user_company_corporation,jdbcType=VARCHAR},#{user_company_telephone,jdbcType=VARCHAR},#{user_company_type,jdbcType=INTEGER},
+		#{user_company_address_max,jdbcType=INTEGER},#{province,jdbcType=INTEGER},#{city,jdbcType=INTEGER},
+		#{area,jdbcType=INTEGER},#{user_company_address_deails,jdbcType=VARCHAR},
+		#{user_company_comment,jdbcType=VARCHAR},sysdate,#{user_create_ip,jdbcType=VARCHAR},#{referee_user_id,jdbcType=VARCHAR},
+		#{referee_user_realname,jdbcType=VARCHAR},#{market_supervision_user_id,jdbcType=VARCHAR},#{market_supervision_user_realna,jdbcType=VARCHAR},
+		2,#{store_id,jdbcType=INTEGER},#{store_name,jdbcType=VARCHAR},
+		#{shop_website,jdbcType=VARCHAR},#{shop_name,jdbcType=VARCHAR},#{platform,jdbcType=VARCHAR},#{main_category,jdbcType=VARCHAR},#{shop_photo,jdbcType=VARCHAR}
+		,#{site_id,jdbcType=INTEGER},#{public_user_id,jdbcType=INTEGER},#{user_business_licence_imgurl,jdbcType=VARCHAR},0,#{business_license_number,jdbcType=VARCHAR},
+		#{user_company_location_address,jdbcType=VARCHAR},#{user_manage_name,jdbcType=VARCHAR},#{store_province,jdbcType=INTEGER},#{store_city,jdbcType=INTEGER},
+		#{store_area,jdbcType=INTEGER},#{user_store_address_deails,jdbcType=VARCHAR},#{user_store_location_address,jdbcType=VARCHAR},
+		#{user_longitude,jdbcType=INTEGER},#{user_latitude,jdbcType=INTEGER},0,2,
+		#{partner_user_id,jdbcType=INTEGER},#{partner_user_realna,jdbcType=VARCHAR},#{supervisor_user_id,jdbcType=INTEGER},#{supervisor_user_realna,jdbcType=VARCHAR},
+		#{commission_rate,jdbcType=INTEGER},#{store_user_type,jdbcType=INTEGER},#{user_logistics_template_id,jdbcType=INTEGER}
+		)
+	</insert>
+	
+	<!-- 分页获取审批列表 -->
+	<select id="queryStoreApprovalList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		select * from (
+		select b.*, rownum rn from (
+			select a.id,a.user_name,a.user_state,a.login_name,a.user_manage_name,a.user_manage_mobilephone,
+			a.user_manage_current_address,case a.user_resource when '1' then '自行注册' when '2' then '后台注册' end user_resource,
+			to_char(a.create_date,'yyyy-mm-dd hh24:mi:ss')create_date,to_char(a.edit_date,'yyyy-mm-dd hh24:mi:ss')edit_date,c.user_realname create_user_name,d.user_realname edit_name,
+			e.name||f.name||g.name||a.user_company_address_deails address,a.rejected_reason,
+			a.market_supervision_user_realna,a.supervisor_user_realna,a.store_user_type
+			from tbl_user_info_apply a
+			left join tbl_sys_user_info c on a.create_user_id=c.id
+			left join tbl_sys_user_info d on a.edit_user_id=d.id
+			left join tbl_dic_region e on a.user_company_address_province=e.id
+			left join tbl_dic_region f on a.user_company_address_city=f.id
+			left join tbl_dic_region g on a.user_company_address_county=g.id
+			where a.user_state in(0,3)
+			and a.user_type=2
+			    <if test="login_name!=null and login_name!=''">
+					and a.login_name =#{login_name,jdbcType=VARCHAR}
+				</if>
+				<if test="user_manage_name!=null and user_manage_name!=''">
+		 			and a.user_manage_name like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%')
+				 </if>
+				<if test="user_manage_mobilephone!=null and user_manage_mobilephone!=''">
+					and a.user_manage_mobilephone = #{user_manage_mobilephone, jdbcType=VARCHAR}
+				</if>
+				<if test="begin_date != null and begin_date != '' ">
+				    and	a.create_date &gt;= to_date(#{begin_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+				</if>
+				<if test="end_date != null and end_date != '' ">
+				    and	a.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+				</if>
+				<if test="ywjl_user_id != null and ywjl_user_id != '' ">
+				    and	a.market_supervision_user_id = #{ywjl_user_id,jdbcType=VARCHAR}
+				</if>
+				<if test="md_id != null and md_id != 0 ">
+				    and	a.store_id = #{md_id,jdbcType=INTEGER}
+				</if>
+				<if test="state != null">
+					and a.user_state IN
+		                <foreach item="item" collection="state" open="(" separator="," close=")">
+							#{item}
+						</foreach>
+				</if>
+				<if test="partner_user_id != null and partner_user_id != '' ">
+				    and	a.partner_user_id = #{partner_user_id,jdbcType=VARCHAR}
+				</if>
+				<if test="supervisor_user_id != null and supervisor_user_id != '' ">
+				    and	a.supervisor_user_id = #{supervisor_user_id,jdbcType=VARCHAR}
+				</if>
+				<if test="public_user_type != null and public_user_type == 3">
+		            and 1=2
+		         </if>
+		         <if test="public_user_type != null and public_user_type == 4">
+		            and a.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+		         </if>
+		         <if test="public_user_type != null and public_user_type == 5">
+		            and 1=2
+		         </if>
+		         <if test="public_user_type != null and public_user_type == 6">
+		            and 1=2
+		         </if>
+		         <if test="public_user_type != null and public_user_type == 7">
+					and a.supervisor_user_id = #{public_user_id,jdbcType=INTEGER}
+		         </if>
+		         <if test="public_user_type != null and public_user_type == 9">
+		            and a.partner_user_id = #{public_user_id,jdbcType=INTEGER}
+		         </if>
+		         <if test="store_user_type != null and store_user_type !=''">
+		            and a.store_user_type = #{store_user_type,jdbcType=INTEGER}
+		         </if>
+				order by a.user_state,a.create_date desc
+		) b where
+		rownum &lt;= #{end_rownum})
+		where rn &gt; #{start_rownum}
+	</select>
+	
+	<!--查询店铺审批列表数量 -->
+	<select id="queryStoreApprovalCount" parameterType="java.util.Map" resultType="int">
+		   select count(1) 
+		   		from tbl_user_info_apply a
+				<where>
+				     a.user_state in(0,3)
+				     and a.user_type=2
+					 <if test="login_name!=null and login_name!=''">
+						and a.login_name =#{login_name,jdbcType=VARCHAR}
+					</if>
+					<if test="user_manage_name!=null and user_manage_name!=''">
+			 			and a.user_manage_name like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%')
+					 </if>
+					<if test="user_manage_mobilephone!=null and user_manage_mobilephone!=''">
+						and a.user_manage_mobilephone = #{user_manage_mobilephone, jdbcType=VARCHAR}
+					</if>
+					<if test="begin_date != null and begin_date != '' ">
+					    and	a.create_date &gt;= to_date(#{begin_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+					</if>
+					<if test="end_date != null and end_date != '' ">
+					    and	a.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+					</if>
+					<if test="ywjl_user_id != null and ywjl_user_id != '' ">
+					    and	a.market_supervision_user_id = #{ywjl_user_id,jdbcType=VARCHAR}
+					</if>
+					<if test="md_id != null and md_id != 0 ">
+					    and	a.store_id = #{md_id,jdbcType=INTEGER}
+					</if>
+					<if test="state != null">
+						and a.user_state IN
+			                <foreach item="item" collection="state" open="(" separator="," close=")">
+								#{item}
+							</foreach>
+					</if>
+					<if test="partner_user_id != null and partner_user_id != '' ">
+					    and	a.partner_user_id = #{partner_user_id,jdbcType=VARCHAR}
+					</if>
+					<if test="supervisor_user_id != null and supervisor_user_id != '' ">
+					    and	a.supervisor_user_id = #{supervisor_user_id,jdbcType=VARCHAR}
+					</if>
+					<if test="public_user_type != null and public_user_type == 3">
+			            and 1=2
+			         </if>
+			         <if test="public_user_type != null and public_user_type == 4">
+			            and a.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+			         </if>
+			         <if test="public_user_type != null and public_user_type == 5">
+			            and 1=2
+			         </if>
+			         <if test="public_user_type != null and public_user_type == 6">
+			            and 1=2
+			         </if>
+			         <if test="public_user_type != null and public_user_type == 7">
+						and a.supervisor_user_id = #{public_user_id,jdbcType=INTEGER}
+			         </if>
+			         <if test="public_user_type != null and public_user_type == 9">
+			            and a.partner_user_id = #{public_user_id,jdbcType=INTEGER}
+			         </if>
+			         <if test="store_user_type != null and store_user_type !=''">
+			            and a.store_user_type = #{store_user_type,jdbcType=INTEGER}
+			         </if>
+			</where>
+	</select>
+	 <!-- 店铺会员认证审批列表 -->
+	 <select id="queryStoreMemberAuthApprovalList" parameterType="java.util.Map" resultType="java.util.Map">
+	    select a.*,
+	    	(select login_name from tbl_user_info T where t.id=a.user_id) as login_name,
+	    	(select user_manage_name from tbl_user_info T where t.id=a.user_id) as user_manage_name,
+	    	(select user_realname from tbl_sys_user_info T where t.id=a.approval_user_id) as approval_manage_name,
+	    	(select name from tbl_dic_region where id = a.user_company_address_province)
+          		||(select name from tbl_dic_region where id = a.user_company_address_city )
+           		||(select name from tbl_dic_region where id = a.user_company_address_county)
+           		||a.user_company_address_deails as address
+		     from (
+			    select t.*,
+			    rownum rn from (
+			        select 
+					t.id,
+					t.user_id,
+					t.user_real_name,
+					t.user_manage_cardid,
+					t.user_manage_cardid_img,
+					t.user_company_address_province,
+					t.user_company_address_city,
+					t.user_company_address_county,
+					t.user_company_address_deails,
+					t.state,
+					t.type,
+					t.rejected_reason,
+					to_char(t.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+					t.user_company_img,
+					t.approval_user_id,
+					to_char(t.approval_date,'yyyy-mm-dd hh24:mi:ss') approval_date
+					from tbl_bank_card_user_info t
+					left join tbl_user_info a on t.user_id=a.id
+					<where>
+						t.type=4
+						<if test="login_name !=null and login_name != ''">
+						    and exists(select 1 from tbl_user_info t1 
+						    	where t1.login_name=#{login_name,jdbcType=VARCHAR} and t1.id=t.user_id)
+						</if>
+						<if test="user_real_name != null and user_real_name != ''">
+							and user_real_name like '%'||#{user_real_name,jdbcType=VARCHAR}||'%'
+						</if>
+						<if test="user_manage_mobilephone !=null and user_manage_mobilephone != ''">
+						    and exists(select 1 from tbl_user_info t1 
+						    	where t1.user_manage_mobilephone=#{user_manage_mobilephone,jdbcType=VARCHAR} and t1.id=t.user_id)
+						</if>
+						<if test="public_user_type != null and public_user_type == 3">
+				            and 1=2
+				         </if>
+				         <if test="public_user_type != null and public_user_type == 4">
+				            and a.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+				         </if>
+				         <if test="public_user_type != null and public_user_type == 5">
+				            and 1=2
+				         </if>
+				         <if test="public_user_type != null and public_user_type == 6">
+				            and 1=2
+				         </if>
+				         <if test="public_user_type != null and public_user_type == 7">
+							and a.supervisor_user_id = #{public_user_id,jdbcType=INTEGER}
+				         </if>
+				         <if test="public_user_type != null and public_user_type == 9">
+				            and a.partner_user_id = #{public_user_id,jdbcType=INTEGER}
+				         </if>
+						<if test="state != null">
+							and state IN
+				                <foreach item="item" collection="state" open="(" separator="," close=")">
+									#{item}
+								</foreach>
+						</if>
+					</where>
+			        order by t.create_date desc) t 
+			    where rownum &lt;= #{end_rownum})a
+			where rn &gt; #{start_rownum}
+    </select>
+    <!-- 店铺会员认证审批列表总数 -->
+    <select id="queryStoreMemberAuthApprovalCount" parameterType="java.util.Map" resultType="int">
+    	 select count(1)
+			from tbl_bank_card_user_info t
+			left join tbl_user_info a on t.user_id=a.id
+			<where>
+				t.type=4
+				<if test="login_name !=null and login_name != ''">
+				    and exists(select 1 from tbl_user_info t1 
+				    	where t1.login_name=#{login_name,jdbcType=VARCHAR} and t1.id=t.user_id)
+				</if>
+				<if test="user_real_name != null and user_real_name != ''">
+					and user_real_name like '%'||#{user_real_name,jdbcType=VARCHAR}||'%'
+				</if>
+				<if test="user_manage_mobilephone !=null and user_manage_mobilephone != ''">
+				    and exists(select 1 from tbl_user_info t1 
+				    	where t1.user_manage_mobilephone=#{user_manage_mobilephone,jdbcType=VARCHAR} and t1.id=t.user_id)
+				</if>
+				<if test="public_user_type != null and public_user_type == 3">
+		            and 1=2
+		         </if>
+		         <if test="public_user_type != null and public_user_type == 4">
+		            and a.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+		         </if>
+		         <if test="public_user_type != null and public_user_type == 5">
+		            and 1=2
+		         </if>
+		         <if test="public_user_type != null and public_user_type == 6">
+		            and 1=2
+		         </if>
+		         <if test="public_user_type != null and public_user_type == 7">
+					and a.supervisor_user_id = #{public_user_id,jdbcType=INTEGER}
+		         </if>
+		         <if test="public_user_type != null and public_user_type == 9">
+		            and a.partner_user_id = #{public_user_id,jdbcType=INTEGER}
+		         </if>
+				<if test="state != null">
+					and state IN
+		                <foreach item="item" collection="state" open="(" separator="," close=")">
+							#{item}
+						</foreach>
+				</if>
+			</where>
+    </select>
+    <!-- 店铺会员认证审批详情-->
+	<select id="queryStoreMemberAuthApprovalDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select 
+		id,
+		user_id,
+		user_real_name,
+		user_manage_cardid,
+		user_manage_cardid_img,
+		user_company_address_province,
+		user_company_address_city,
+		user_company_address_county,
+		user_company_address_deails,
+		state,
+		type,
+		to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+		to_char(approval_date,'yyyy-mm-dd hh24:mi:ss') approval_date,
+		rejected_reason,
+		(select user_realname from tbl_sys_user_info T where t.id=approval_user_id) as approval_manage_name,
+		user_company_img,
+		DECODE(state,0,'待审核',1,'已审核',2,'已驳回') as approval_state,
+		(select name from tbl_dic_region where id = user_company_address_province) as province,
+		(select name from tbl_dic_region where id = user_company_address_city) as city,
+		(select name from tbl_dic_region where id = user_company_address_county) as district,
+		(select name
+             from tbl_dic_region
+            where id = user_company_address_province)
+       || (select name
+             from tbl_dic_region
+            where id = user_company_address_city)
+       || (select name
+             from tbl_dic_region
+            where id = user_company_address_county)
+       || user_company_address_deails
+          as address
+		from tbl_bank_card_user_info where id=#{id,jdbcType=INTEGER}
+		and type=4
+	</select>
+	
+	<!-- 店铺会员密码重置 -->
+    <update id="updateStoreMemberPwd"  parameterType="java.util.Map">
+         update tbl_user_info 
+         	<set>
+	           user_pwd = #{user_pwd,jdbcType=VARCHAR}
+	       </set>
+         where id = #{id,jdbcType=INTEGER}
+    </update>
+    
+    <!-- 查询当前业务经理的合作商-->
+	<select id="queryPartnerUserIds" parameterType="java.util.Map" resultType="java.util.Map" resultMap="resMap">
+		SELECT id,user_realname FROM tbl_sys_user_info
+		<choose>  
+            <when test="public_user_type != null and public_user_type == 9">  
+               where id=#{public_user_id,jdbcType=INTEGER}  
+            </when>  
+            <when test="public_user_type != null and public_user_type == 4">  
+                WHERE ORGANIZATION_id IN
+		        (SELECT id FROM TBL_SYS_ORGANIZATION_INFO m
+		           		START WITH m.id = (SELECT parent_id FROM TBL_SYS_ORGANIZATION_INFO
+		                               			WHERE id = (SELECT ORGANIZATION_id
+		                                    FROM tbl_sys_user_info WHERE id = #{public_user_id,jdbcType=INTEGER}))
+		           		CONNECT BY PRIOR m.parent_id = m.id) 
+            </when>  
+            <otherwise>  
+                where user_type=9 
+            </otherwise>  
+      </choose>  
+	</select>
+	<resultMap type="java.util.Map" id="resMap">
+   	    <result column="id" property="id"/>
+		<result column="user_realname" property="option"/>
+   </resultMap>
+   
+   	<!-- 查询商家经营门店列表 -->
+	 <select id="queryStoreUserManageList" parameterType="java.util.Map" resultType="java.util.Map">
+	    select a.*,
+	    	(select login_name from tbl_user_info T where t.id=a.user_id) as login_name,
+	    	(select user_realname from tbl_sys_user_info T where t.id=a.create_user_id) as create_manage_name,
+	    	(select name from tbl_dic_region where id = a.province)
+          		||(select name from tbl_dic_region where id = a.city )
+           		||(select name from tbl_dic_region where id = a.county)
+           		||a.store_detail_address as store_address,
+           	(select to_char(wm_concat(t.store_name)) from tbl_store_user_manage t where t.user_id=a.user_id) as have_stores	
+		     from (
+			    select t.*,
+			    rownum rn from (
+			        select 
+						t.id, 
+						t.user_id, 
+						t.store_name, 
+						t.store_mobilephone, 
+						t.store_duty_person, 
+						t.province, 
+						t.city, 
+						t.county, 
+						t.store_detail_address, 
+						t.store_position_address, 
+						t.longitude, 
+						t.latitude, 
+						to_char(t.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+						t.create_user_id, 
+						t.approval_user_id, 
+						to_char(t.approval_date,'yyyy-mm-dd hh24:mi:ss') approval_date,
+						t.rejected_reason, 
+						t.approval_state
+					from tbl_store_user_manage t
+					<where>
+						<if test="store_name != null and store_name != ''">
+							and t.store_name like concat(concat('%', #{store_name,jdbcType=VARCHAR}),'%')
+				        </if>
+				        <if test="approval_state != null">
+							and t.approval_state IN
+				                <foreach item="item" collection="approval_state" open="(" separator="," close=")">
+									#{item}
+								</foreach>
+						</if>
+				        <if test="create_manage_name != null and create_manage_name != ''">
+				        	and exists
+				        		(SELECT 1
+                               		FROM tbl_sys_user_info tsui
+                              	  WHERE t.create_user_id = tsui.id
+				        			and tsui.user_realname like concat(concat('%', #{create_manage_name,jdbcType=VARCHAR}),'%'))
+				        </if>
+				        <if test="store_mobilephone != null and store_mobilephone != ''">
+				        	and t.store_mobilephone=#{store_mobilephone,jdbcType=VARCHAR}
+				        </if>
+				        <if test="apply_start_date != null and apply_start_date != '' ">
+						    and	t.create_date &gt;= to_date(#{apply_start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+						</if>
+						<if test="apply_end_date != null and apply_end_date != '' ">
+						    and	t.create_date &lt;= to_date(#{apply_end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+						</if>
+						<if test="user_id != null and user_id != '' ">
+						    and	t.user_id=#{user_id,jdbcType=INTEGER}
+						</if>
+						<if test="public_user_type != null and public_user_type == 3">
+				            and 1=2
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 4">
+				        	and exists(select 1 
+				        					from tbl_user_info tui 
+				        				where t.user_id=tui.id 
+				        					and tui.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER})
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 5">
+				            and 1=2
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 6">
+				            and 1=2
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 7">
+				        	and exists(select 1 
+				        					from tbl_user_info tui 
+				        				where t.user_id=tui.id 
+				        					and tui.supervisor_user_id = #{public_user_id,jdbcType=INTEGER})
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 9">
+				        	and exists(select 1 
+				        					from tbl_user_info tui 
+				        				where t.user_id=tui.id 
+				        					and tui.partner_user_id = #{public_user_id,jdbcType=INTEGER})
+				        </if>
+					</where>
+			        order by t.approval_state,t.create_date desc) t 
+			    where rownum &lt;= #{end_rownum})a
+			where rn &gt; #{start_rownum}
+    </select>
+    <!--查询商家经营门店列表总数 -->
+	<select id="queryStoreUserManageCount" parameterType="java.util.Map" resultType="int">
+		select 
+			count(1)
+		from tbl_store_user_manage t
+		<where>
+			<if test="store_name != null and store_name != ''">
+				and t.store_name like concat(concat('%', #{store_name,jdbcType=VARCHAR}),'%')
+	        </if>
+	        <if test="approval_state != null">
+				and t.approval_state IN
+	                <foreach item="item" collection="approval_state" open="(" separator="," close=")">
+						#{item}
+					</foreach>
+			</if>
+	        <if test="create_manage_name != null and create_manage_name != ''">
+	        	and exists
+	        		(SELECT 1
+                   		FROM tbl_sys_user_info tsui
+                  	 WHERE t.create_user_id = tsui.id 
+	        			and tsui.user_realname like concat(concat('%', #{create_manage_name,jdbcType=VARCHAR}),'%'))
+	        </if>
+	        <if test="store_mobilephone != null and store_mobilephone != ''">
+	        	and t.store_mobilephone=#{store_mobilephone,jdbcType=VARCHAR}
+	        </if>
+	        <if test="apply_start_date != null and apply_start_date != '' ">
+			    and	t.create_date &gt;= to_date(#{apply_start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+			<if test="apply_end_date != null and apply_end_date != '' ">
+			    and	t.create_date &lt;= to_date(#{apply_end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+			<if test="user_id != null and user_id != '' ">
+			    and	t.user_id=#{user_id,jdbcType=INTEGER}
+			</if>
+			<if test="public_user_type != null and public_user_type == 3">
+	            and 1=2
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 4">
+	        	and exists(select 1 
+	        					from tbl_user_info tui 
+	        				where t.user_id=tui.id 
+	        					and tui.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER})
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 5">
+	            and 1=2
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 6">
+	            and 1=2
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 7">
+	        	and exists(select 1 
+	        					from tbl_user_info tui 
+	        				where t.user_id=tui.id 
+	        					and tui.supervisor_user_id = #{public_user_id,jdbcType=INTEGER})
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 9">
+	        	and exists(select 1 
+	        					from tbl_user_info tui 
+	        				where t.user_id=tui.id 
+	        					and tui.partner_user_id = #{public_user_id,jdbcType=INTEGER})
+	        </if>
+		</where>
+	</select>
+	
+	<!-- 查询商家库列表 -->
+	 <select id="queryStoreMemberLibraryList" parameterType="java.util.Map" resultType="java.util.Map">
+	    select a.* 
+	    	from (
+			    select t.*,rownum rn from (
+			        select 
+						t.id, 
+						t.login_name, 
+						t.user_manage_name, 
+						t.user_manage_mobilephone, 
+						t.market_supervision_user_id, 
+						t.supervisor_user_id, 
+						to_char(t.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+						(select user_realname from tbl_sys_user_info tsui where tsui.id=t.market_supervision_user_id) as market_supervision_user_realna,
+						(select user_realname from tbl_sys_user_info tsui where tsui.id=t.supervisor_user_id) as supervisor_user_realna
+					from tbl_user_info t
+					<where>
+						t.user_type=2
+						<if test="state != null">
+							and t.user_state IN
+				                <foreach item="item" collection="state" open="(" separator="," close=")">
+									#{item}
+								</foreach>
+						</if>
+						<if test="public_user_type != null and public_user_type == 3">
+				           and 1=2
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 4">
+				           and t.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 5">
+				           and 1=2
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 6">
+				           and 1=2
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 7">
+							and t.supervisor_user_id = #{public_user_id,jdbcType=INTEGER}
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 9">
+				           and t.partner_user_id = #{public_user_id,jdbcType=INTEGER}
+				        </if> 
+						<if test="login_name != null and login_name != ''">
+							and t.login_name like concat(concat('%', #{login_name,jdbcType=VARCHAR}),'%')
+				        </if>
+				        <if test="user_manage_name != null and user_manage_name != '' ">
+						    and t.user_manage_name like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%')
+						</if>
+				        <if test="market_supervision_user_realna != null and market_supervision_user_realna != ''">
+				        	and exists
+				        		(select 1 
+				        			from tbl_sys_user_info tsui 
+				        		where t.market_supervision_user_id=tsui.id 
+				        			and tsui.user_realname like concat(concat('%', #{market_supervision_user_realna,jdbcType=VARCHAR}),'%'))
+				        </if>
+				        <if test="user_manage_mobilephone != null and user_manage_mobilephone != ''">
+				        	and t.user_manage_mobilephone=#{user_manage_mobilephone,jdbcType=VARCHAR}
+				        </if>
+				        <if test="product_itemnumber != null and product_itemnumber != ''">
+				        	and not exists (
+				        		select 1 from tbl_product_store where product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+				        		and user_id = t.id
+				        	)
+				        </if>
+					</where>
+			        ) t 
+			    where rownum &lt;= #{end_rownum})a
+			where rn &gt; #{start_rownum}
+    </select>
+    
+    <!-- 查询商家库列表 总数-->
+	 <select id="queryStoreMemberLibraryCount" parameterType="java.util.Map" resultType="int">
+	     select 
+			count(1)
+		from tbl_user_info t
+		<where>
+			t.user_type=2
+			<if test="state != null">
+				and t.user_state IN
+	                <foreach item="item" collection="state" open="(" separator="," close=")">
+						#{item}
+					</foreach>
+			</if>
+			<if test="public_user_type != null and public_user_type == 3">
+	           and 1=2
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 4">
+	           and t.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 5">
+	           and 1=2
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 6">
+	           and 1=2
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 7">
+				and t.supervisor_user_id = #{public_user_id,jdbcType=INTEGER}
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 9">
+	           and t.partner_user_id = #{public_user_id,jdbcType=INTEGER}
+	        </if> 
+			<if test="login_name != null and login_name != ''">
+				and t.login_name like concat(concat('%', #{login_name,jdbcType=VARCHAR}),'%')
+	        </if>
+	        <if test="user_manage_name != null and user_manage_name != '' ">
+			    and t.user_manage_name like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%')
+			</if>
+	        <if test="market_supervision_user_realna != null and market_supervision_user_realna != ''">
+	        	and exists
+	        		(select 1 
+	        			from tbl_sys_user_info tsui 
+	        		where t.market_supervision_user_id=tsui.id 
+	        			and tsui.user_realname like concat(concat('%', #{market_supervision_user_realna,jdbcType=VARCHAR}),'%'))
+	        </if>
+	        <if test="user_manage_mobilephone != null and user_manage_mobilephone != ''">
+	        	and t.user_manage_mobilephone=#{user_manage_mobilephone,jdbcType=VARCHAR}
+	        </if>
+		</where>
+    </select>
+    
+    <!-- 商家经营店铺新增 -->
+	<insert id="storeUserManageAdd" parameterType="java.util.Map">
+		insert into tbl_store_user_manage
+		(
+			id,
+			user_id,
+			store_name,
+			store_mobilephone,
+			store_duty_person,
+			province,
+			city,
+			county,
+			store_detail_address,
+			store_position_address,
+			longitude,
+			latitude,
+			create_date,
+			create_user_id,
+			approval_state
+		) values (
+			seq_store_user_manage.nextVal,
+			#{user_id,jdbcType=INTEGER},
+			#{store_name,jdbcType=VARCHAR},
+			#{store_mobilephone,jdbcType=VARCHAR},
+			#{store_duty_person,jdbcType=VARCHAR},
+			#{province,jdbcType=INTEGER},
+			#{city,jdbcType=INTEGER},
+			#{area,jdbcType=INTEGER},
+			#{store_detail_address,jdbcType=VARCHAR},
+			#{store_position_address,jdbcType=VARCHAR},
+			#{longitude,jdbcType=INTEGER},
+			#{latitude,jdbcType=INTEGER},
+			sysdate,
+			#{public_user_id,jdbcType=INTEGER},
+			0
+		)
+	</insert>
+	
+	<!--查询商家店铺详情-->
+	<select id="queryStoreUserManageDetail" parameterType="java.util.Map"  resultType="java.util.Map">
+		select 
+			t.id, 
+			t.user_id, 
+			t.store_name, 
+			t.store_mobilephone, 
+			t.store_duty_person, 
+			t.province, 
+			t.city, 
+			t.county, 
+			t.store_detail_address, 
+			t.store_position_address, 
+			t.longitude, 
+			t.latitude, 
+			to_char(t.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+			t.create_user_id, 
+			t.approval_user_id, 
+			to_char(t.approval_date,'yyyy-mm-dd hh24:mi:ss') approval_date,
+			t.rejected_reason, 
+			t.approval_state,
+			(select login_name from tbl_user_info tui where tui.id=t.user_id) as login_name,
+			(select name from tbl_dic_region where id = t.province)
+          		||(select name from tbl_dic_region where id = t.city )
+           		||(select name from tbl_dic_region where id = t.county)
+           		||t.store_detail_address as store_address
+		  FROM tbl_store_user_manage t
+		 where t.id=#{id,jdbcType=INTEGER}
+	</select>
+	
+	<!-- 商家经营店铺编辑 -->
+	<update id="storeUserManageEdit" parameterType="java.util.Map">
+		update tbl_store_user_manage
+			<set>
+				<if test="user_id != null and user_id != '' ">
+				    user_id =#{user_id,jdbcType=INTEGER},
+				</if>
+				<if test="STORE_NAME != null and STORE_NAME != '' ">
+				    store_name =#{STORE_NAME,jdbcType=VARCHAR},
+				</if>
+				<if test="STORE_MOBILEPHONE != null and STORE_MOBILEPHONE != '' ">
+				    store_mobilephone =#{STORE_MOBILEPHONE,jdbcType=VARCHAR},
+				</if>
+				<if test="STORE_DUTY_PERSON != null and STORE_DUTY_PERSON != '' ">
+				    store_duty_person =#{STORE_DUTY_PERSON,jdbcType=VARCHAR},
+				</if>
+				<if test="STORE_DETAIL_ADDRESS != null and STORE_DETAIL_ADDRESS != '' ">
+				    store_detail_address =#{STORE_DETAIL_ADDRESS,jdbcType=VARCHAR},
+				</if>
+				<if test="STORE_POSITION_ADDRESS != null and STORE_POSITION_ADDRESS != '' ">
+				    store_position_address =#{STORE_POSITION_ADDRESS,jdbcType=VARCHAR},
+				</if>
+				<if test="province != null and province != '' ">
+				    province =#{province,jdbcType=INTEGER},
+				</if>
+				<if test="city != null and city != '' ">
+				    city =#{city,jdbcType=INTEGER},
+				</if>
+				<if test="area != null and area != '' ">
+				    county =#{area,jdbcType=INTEGER},
+				</if>
+				<if test="longitude != null and longitude != '' ">
+				    longitude =#{longitude,jdbcType=INTEGER},
+				</if>
+				<if test="latitude != null and latitude != '' ">
+				    latitude =#{latitude,jdbcType=INTEGER},
+				</if>
+				    approval_state =#{approval_state,jdbcType=INTEGER}
+			</set>
+		where id=#{id,jdbcType=INTEGER}
+	</update>
+	
+	<!-- 商家经营店铺审批-->
+	<update id="storeUserManageApproval" parameterType="java.util.Map">
+		update tbl_store_user_manage
+			<set>
+				<if test="approval_state != null and approval_state != '' ">
+				    approval_state =#{approval_state,jdbcType=INTEGER},
+				</if>
+				<if test="rejected_reason != null and rejected_reason != '' ">
+				    rejected_reason =#{rejected_reason,jdbcType=VARCHAR},
+				</if>
+				approval_user_id=#{public_user_id,jdbcType=INTEGER},
+				approval_date=sysdate
+			</set>
+		where id=#{id,jdbcType=INTEGER}
+	</update>
+	
+	<!--查询经营店铺相关信息-->
+	<select id="queryStoreUserManageInfo" parameterType="java.util.Map"  resultType="java.util.Map">
+		select
+			tui.user_name,
+			tui.user_name as agent_id,
+			tui.partner_user_id,
+			tsum.store_name as user_store_name,
+			tsum.id as joint_store_id,
+			tsum.store_duty_person as user_manage_name,
+			tsum.store_mobilephone as user_manage_mobilephone,
+		 	tsum.province as user_store_address_province ,
+		 	tsum.city as user_store_address_city,
+		 	tsum.county as user_store_address_county,
+		 	tsum.store_detail_address as user_store_address_deails
+  		from tbl_store_user_manage tsum,tbl_user_info tui 
+  		where tsum.user_id=tui.id and  tsum.id=#{id,jdbcType=INTEGER}
+	</select>
+	
+	<!--查询店铺名称数量-->
+	<select id="queryStoreNameCount" parameterType="java.util.Map"  resultType="int">
+		select count(1)
+			from tbl_store_user_manage
+		<where>
+			<if test="id != null and id != '' ">
+			    and id &lt;&gt;#{id,jdbcType=INTEGER}
+			</if>
+			<if test="STORE_NAME != null and STORE_NAME != '' ">
+			    and store_name =#{STORE_NAME,jdbcType=VARCHAR}
+			</if>
+			<if test="store_name != null and store_name != '' ">
+			    and store_name =#{store_name,jdbcType=VARCHAR}
+			</if>
+		</where>
+		
+	</select>
+	
+	<!--更新本地php店铺id-->
+	<update id="updateStoreAgentStoreId" parameterType="java.util.Map">
+		  update tbl_store_user_manage 
+		  	set agent_store_id=#{agent_store_id,jdbcType=INTEGER}
+		  where id=#{store_id,jdbcType=INTEGER}
+	</update>
+	<!-- 门店下拉框 -->
+	<resultMap type="java.util.Map" id="storeSelectMap">
+		<result column="id" property="id"/>
+		<result column="store_name" property="option"/>
+	</resultMap>
+	<select id="storeSelect" parameterType="java.util.Map" resultMap="storeSelectMap">
+		select id,store_name
+		  from tbl_store_user_manage t
+		where approval_state = 1
+		  and exists (
+			select 1 from tbl_user_info tui
+			  where t.user_id = tui.id
+			    and tui.user_state = 1
+			 <if test="public_user_type != null and public_user_type == 3">
+	            and 1=2
+	         </if>
+	         <if test="public_user_type != null and public_user_type == 4">
+	            and 1=2
+	         </if>
+	         <if test="public_user_type != null and public_user_type == 5">
+	            and 1=2
+	         </if>
+	         <if test="public_user_type != null and public_user_type == 6">
+	            and 1=2
+	         </if>
+	         <if test="public_user_type != null and public_user_type == 7">
+				and 1=2
+	         </if>
+	         <if test="public_user_type != null and public_user_type == 9">
+	            and tui.partner_user_id = #{public_user_id,jdbcType=INTEGER}
+	         </if>)
+	       <if test="store_id != null and store_id != ''">
+	       	 and id != #{store_id,jdbcType=INTEGER}
+	       </if>
+	</select>
+</mapper>

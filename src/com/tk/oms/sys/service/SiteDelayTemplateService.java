@@ -1,0 +1,370 @@
+package com.tk.oms.sys.service;
+
+import com.tk.oms.sys.dao.SiteDelayTemplateDao;
+import com.tk.sys.util.*;
+
+import org.springframework.expression.spel.ast.LongLiteral;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 站点延后时间模板管理
+ * @author zhenghui
+ */
+@Service("SiteDelayTemplateService")
+public class SiteDelayTemplateService {
+
+    @Resource
+    private SiteDelayTemplateDao siteDelayTemplateDao;
+
+    /**
+     * 添加站点延后时间模板
+     * @param request
+     * @return
+     */
+    @Transactional
+    public ProcessResult addSiteDelayTemplate(HttpServletRequest request) throws Exception {
+        ProcessResult pr = new ProcessResult();
+        try {
+            //获取参数
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+
+            if (StringUtils.isEmpty(params.get("delays"))) {
+                pr.setState(false);
+                pr.setMessage("缺少delays参数");
+                return pr;
+            }
+            if (StringUtils.isEmpty(params.get("templet_name"))) {
+                pr.setState(false);
+                pr.setMessage("请填写模板模板名称");
+                return pr;
+            }
+            if (this.siteDelayTemplateDao.isExistTemplateName(params) > 0) {
+                pr.setState(false);
+                pr.setMessage("该模板名称已存在");
+                return pr;
+            }
+            //新增站点延后时间模板
+            if (this.siteDelayTemplateDao.insert(params) > 0) {
+                List<Map<String, Object>> param = (List<Map<String, Object>>) params.get("delays");
+                for (Map<String, Object> map : param) {
+                    map.put("TEMPLET_ID", Integer.parseInt(params.get("id").toString()));
+                }
+                if(param != null && param.size() > 0){
+                    this.siteDelayTemplateDao.batchInsert(param);
+                }
+                pr.setState(true);
+                pr.setMessage("新增站点延后时间模板成功");
+                pr.setObj(params);
+            }
+        } catch (Exception ex) {
+            pr.setState(false);
+            pr.setMessage(ex.getMessage());
+            throw new RuntimeException(ex.getMessage());
+        }
+        return pr;
+    }
+
+    /**
+     * 分页查询站点延后时间列表信息
+     * @param request
+     * @return
+     */
+    public GridResult querySiteDelayTemplateForPage(HttpServletRequest request) {
+        GridResult pr = new GridResult();
+        try {
+            //获取参数
+            String json = HttpUtil.getRequestInputStream(request);
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            GridResult pageParamResult = PageUtil.handlePageParams(params);
+            if (pageParamResult != null) {
+                return pageParamResult;
+            }
+            //获取总条数和模板list
+            int total = this.siteDelayTemplateDao.queryForCount(params);
+            List<Map<String, Object>> list = this.siteDelayTemplateDao.queryForPage(params);
+
+            if (list != null) {
+                pr.setState(true);
+                pr.setMessage("获取站点延后时间列表成功");
+                pr.setObj(list);
+                pr.setTotal(total);
+            } else {
+                pr.setState(false);
+                pr.setMessage("获取站点延后时间列表失败");
+            }
+        } catch (Exception ex) {
+            pr.setState(false);
+            pr.setMessage(ex.getMessage());
+        }
+        return pr;
+    }
+
+    /**
+     * 获取站点延后时间模板详情
+     * @param request
+     * @return
+     */
+    public ProcessResult querySiteDelayTemplateDetail(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        Map<String, Object> templateMap = new HashMap<String, Object>();
+        try {
+            //获取参数
+            String json = HttpUtil.getRequestInputStream(request);
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            if (StringUtils.isEmpty(params.get("id"))) {
+                pr.setState(false);
+                pr.setMessage("缺少id参数");
+                return pr;
+            }
+            long id = Long.parseLong(params.get("id").toString());
+            Map<String, Object> template = this.siteDelayTemplateDao.queryById(id);
+            if ("2".equals(template.get("IS_DELETE").toString())) {
+                pr.setState(false);
+                pr.setMessage("模板已被删除");
+                return pr;
+            }
+            List<Map<String, Object>> siteDelayList = this.siteDelayTemplateDao.querySiteDelayById(id);
+            templateMap.put("template", template);
+            templateMap.put("siteDelayList", siteDelayList);
+            pr.setState(true);
+            pr.setMessage("获取站点延后时间模板详情成功");
+            pr.setObj(templateMap);
+        } catch (Exception ex) {
+            pr.setState(false);
+            pr.setMessage(ex.getMessage());
+        }
+        return pr;
+    }
+
+    /**
+     * 编辑站点延后时间模板基本信息
+     * @param request
+     * @return
+     */
+    @Transactional
+    public ProcessResult editSiteDelayTemplate(HttpServletRequest request) throws Exception {
+        ProcessResult pr = new ProcessResult();
+        try {
+            //获取参数
+            String json = HttpUtil.getRequestInputStream(request);
+            if(StringUtils.isEmpty(json)){
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            //是否缺少必要的参数
+            if(StringUtils.isEmpty(params.get("id"))){
+                pr.setState(false);
+                pr.setMessage("缺少参数ID");
+                return pr;
+            }
+            if (StringUtils.isEmpty(params.get("delays"))) {
+                pr.setState(false);
+                pr.setMessage("缺少delays参数");
+                return pr;
+            }
+            long id = Long.parseLong(params.get("id").toString());
+            Map<String, Object> template = this.siteDelayTemplateDao.queryById(id);
+            if(template == null){
+                pr.setState(false);
+                pr.setMessage("模板不存在");
+                return pr;
+            }
+            if("2".equals(template.get("IS_DELETE").toString())){
+                pr.setState(false);
+                pr.setMessage("模板已被删除");
+                return pr;
+            }
+            //模板名称是否重复
+            if (this.siteDelayTemplateDao.isExistTemplateName(params) > 0) {
+                pr.setState(false);
+                pr.setMessage("该模板名称已存在");
+                return pr;
+            }
+            //新增站点延后时间模板
+            if (this.siteDelayTemplateDao.update(params) > 0) {
+                //先删除后添加
+                this.siteDelayTemplateDao.deleteSiteDelay(params);
+                List<Map<String, Object>> param = (List<Map<String, Object>>) params.get("delays");
+                //新增站点延后时间模板
+                if(param != null && param.size() > 0){
+                    this.siteDelayTemplateDao.batchInsert(param);
+                }
+                pr.setState(true);
+                pr.setMessage("编辑站点延后时间模板成功");
+                pr.setObj(params);
+            }
+        } catch (Exception ex) {
+            pr.setState(false);
+            pr.setMessage(ex.getMessage());
+            throw new RuntimeException(ex.getMessage());
+        }
+        return pr;
+    }
+
+    /**
+     * 删除站点延后时间模板和配置延后时间
+     * @param request
+     * @return
+     */
+    @Transactional
+    public ProcessResult removeSiteDelayTemplate(HttpServletRequest request) throws Exception {
+        ProcessResult pr = new ProcessResult();
+        try {
+            //获取参数
+            String json = HttpUtil.getRequestInputStream(request);
+            if(StringUtils.isEmpty(json)){
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            if(StringUtils.isEmpty(params.get("id"))){
+                pr.setState(false);
+                pr.setMessage("缺少id参数");
+                return pr;
+            }
+            long id = Long.parseLong(params.get("id").toString());
+            Map<String, Object> siteDelayTemplate = this.siteDelayTemplateDao.queryById(id);
+            if(siteDelayTemplate == null){
+                pr.setState(false);
+                pr.setMessage("模板不存在");
+                return pr;
+            }
+            if("2".equals(siteDelayTemplate.get("IS_DELETE").toString())){
+                pr.setState(false);
+                pr.setMessage("模板已被删除");
+                return pr;
+            }
+            if (Integer.parseInt(siteDelayTemplate.get("DEFAULT_FLAG").toString()) == 1) {
+                pr.setState(true);
+                pr.setMessage("该区域模板为默认模板，不能删除");
+                return pr;
+            }
+
+            if (this.siteDelayTemplateDao.deleteById(Long.parseLong(params.get("id").toString())) > 0) {
+                pr.setState(true);
+                pr.setMessage("模板删除成功");
+                pr.setObj(params);
+            }
+
+        }catch (Exception ex){
+            pr.setState(false);
+            pr.setMessage(ex.getMessage());
+            throw new RuntimeException(ex.getMessage());
+        }
+        return pr;
+    }
+
+    /**
+     * 查询所有站点
+     * @param request
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+	public ProcessResult querySiteInfo(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        Map<String,Object> params = new HashMap<String,Object>();
+        try {
+        	String json = HttpUtil.getRequestInputStream(request);
+    		if(!StringUtils.isEmpty(json))
+    			params = (Map<String,Object>)Transform.GetPacket(json, Map.class);
+            List<Map<String, Object>> list = this.siteDelayTemplateDao.querySiteInfo(params);
+            if (list != null && list.size()>0) {
+                pr.setMessage("获取站点列表成功");
+            } else {
+                pr.setMessage("站点信息不存在");
+            }
+            pr.setState(true);
+            pr.setObj(list);
+        } catch (Exception ex) {
+            pr.setState(false);
+            pr.setMessage(ex.getMessage());
+        }
+        return pr;
+    }
+    
+    /**
+     * 查询站点延后显示时间模板下拉框列表
+     * @param request
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+    public ProcessResult querySiteDelayTempletList(HttpServletRequest request) {
+    	ProcessResult pr = new ProcessResult();
+    	Map<String,Object> params = new HashMap<String,Object>();
+    	try {
+    		String json = HttpUtil.getRequestInputStream(request);
+    		if(!StringUtils.isEmpty(json))
+    			params = (Map<String,Object>)Transform.GetPacket(json, Map.class);
+    		if(params == null||params.isEmpty()){
+    			pr.setState(false);
+    			pr.setMessage("缺少参数");
+    			return pr;
+    		}
+    		List<Map<String,Object>>  tempList = siteDelayTemplateDao.querySiteDelayTempletList(params);
+    		pr.setState(true);
+    		pr.setMessage("获取入驻商可用站点延后显示时间模板列表成功");
+    		pr.setObj(tempList);
+    	} catch (Exception e) {
+    		pr.setState(false);
+    		pr.setMessage(e.getMessage());
+    		e.printStackTrace();
+    	}
+    	return pr;
+    }
+    
+    
+    /**
+     * 查询站点模板详情
+     * @param request
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+    public ProcessResult querySiteDelayTempletDetail(HttpServletRequest request) {
+    	ProcessResult pr = new ProcessResult();
+    	Map<String,Object> params = new HashMap<String,Object>();
+    	try {
+    		String json = HttpUtil.getRequestInputStream(request);
+    		if(!StringUtils.isEmpty(json))
+    			params = (Map<String,Object>)Transform.GetPacket(json, Map.class);
+    		if(params == null||params.isEmpty()){
+    			pr.setState(false);
+    			pr.setMessage("缺少参数");
+    			return pr;
+    		}
+    		/******************************判断参数是否合格-start**********************************/
+    		if(StringUtils.isEmpty(params.get("templet_id"))){
+    			pr.setState(false);
+    			pr.setMessage("缺少模板ID[templet_id]");
+    			return pr;
+    		}
+    		/******************************判断参数是否合格-end**********************************/
+    		List<Map<String,Object>>  tempList = siteDelayTemplateDao.querySiteDelayTempletDetail(params);
+    		pr.setState(true);
+    		pr.setMessage("获取站点模板详情成功");
+    		pr.setObj(tempList);
+    	} catch (Exception e) {
+    		pr.setState(false);
+    		pr.setMessage(e.getMessage());
+    		e.printStackTrace();
+    	}
+    	return pr;
+    }
+
+}

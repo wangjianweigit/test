@@ -1,0 +1,366 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.basicinfo.dao.SiteInfoDao">
+	<!-- 查询站点信息-->
+	<sql id="all">
+		id,
+		name,
+		site_code,
+		discount*100 as discount,
+		remark,
+		to_char(create_date,'yyyy-mm-dd hh24:mi:ss')create_date,
+		create_user_id,
+		state,
+		(SELECT to_char(wm_concat (   (SELECT name
+                         FROM tbl_warehouse_info
+                        WHERE id = tsw.parent_warehouse_id)
+                   || '→'
+                   || (SELECT name
+                         FROM tbl_warehouse_info
+                        WHERE id = tsw.warehouse_id)))
+		   FROM TBL_SITE_WAREHOUSE tsw
+		  WHERE tsw.site_id = TSI.ID)
+		 warehouse_name,
+		 platform_type,
+		 stationed_user_id
+	</sql>
+	<!-- 门店信息字段 -->
+	<sql id="all_column">
+		id,
+		store_code,
+		store_name,
+		store_address,
+		store_phone,
+		store_limit,
+		store_mobile_phone,
+		creater_id,
+		creater_name,
+		create_date,
+		state,
+		off_date,
+		address_max,
+		address_province,
+		address_city,
+		address_county,
+		getMd_CREDIT_MONEY_BALANCE(id) credit_money_balance,
+		verify_code,
+		site_id
+	</sql>
+	<resultMap type="java.util.Map" id="resultDetailMap">
+		<result column="platform_type" property="platform_type" />
+		<result column="stationed_user_id" property="stationed_user_id"/>
+	</resultMap>
+	<!-- 新增站点信息 -->
+	 <insert id="insertSiteInfo"  parameterType="java.util.Map">
+            <selectKey keyProperty="id" resultType="int" order="BEFORE">
+                SELECT SEQ_SITE_INFO.nextval FROM DUAL
+            </selectKey>
+            insert into TBL_SITE_INFO(
+                    id,
+					name,
+		 			site_code,
+					discount,
+					remark,
+					create_date,
+					create_user_id,
+					state,
+					<if test="stationed_user_id != null and stationed_user_id != ''">
+			        stationed_user_id,
+			        </if>
+			        platform_type
+            ) VALUES
+            (
+                #{id,jdbcType=INTEGER},
+                #{name,jdbcType=VARCHAR},
+                #{site_code,jdbcType=VARCHAR},
+                #{discount,jdbcType=FLOAT},
+                #{remark,jdbcType=VARCHAR},
+                sysdate,
+                #{create_user_id,jdbcType=INTEGER},
+                #{state,jdbcType=VARCHAR},
+                <if test="stationed_user_id != null and stationed_user_id != ''">
+		        #{stationed_user_id,jdbcType=INTEGER},
+		        </if>
+		        #{platform_type,jdbcType=INTEGER}
+           )
+    </insert>
+    <!-- 更新站点信息 -->
+    <update id="updateSiteInfo" parameterType="java.util.Map">
+    	update TBL_SITE_INFO
+    	<set>
+    		<if test="NAME!=null and NAME!=''">
+    			NAME = #{NAME,jdbcType=VARCHAR},
+    		</if>
+			<if test="SITE_CODE != null and SITE_CODE != ''">
+				site_code = #{SITE_CODE,jdbcType=VARCHAR},
+			</if>
+    		<if test="discount!=null and discount!=0">
+    			discount = #{discount,jdbcType=FLOAT},
+    		</if>
+    		<if test="REMARK!=null">
+    			REMARK = #{REMARK,jdbcType=VARCHAR},
+    		</if>
+    		<if test="STATE!=null and STATE!=''">
+    			STATE = #{STATE,jdbcType=VARCHAR},
+    		</if>
+    		<choose>
+		   	<when test="stationed_user_id != null and stationed_user_id != ''">
+		   	stationed_user_id = #{stationed_user_id,jdbcType=INTEGER},
+		   	</when>
+		   	<otherwise>
+		   		stationed_user_id = '',
+		   	</otherwise>
+		   </choose>
+		   platform_type = #{platform_type,jdbcType=INTEGER}
+    	</set>
+    	WHERE id = #{id,jdbcType=INTEGER}
+    </update>
+    
+    <!-- 启用禁用站点 -->
+    <update id="updateSiteInfoState" parameterType="java.util.Map">
+    	update TBL_SITE_INFO
+    	<set>
+    		<if test="state!=null and state!=''">
+    			state = #{state,jdbcType=VARCHAR}
+    		</if>
+    	</set>
+    	WHERE id = #{id,jdbcType=INTEGER}
+    </update>
+    <!-- 删除 -->
+    <delete id="deleteSiteInfo" parameterType="java.util.Map">
+    	delete from TBL_SITE_INFO WHERE id = #{id,jdbcType=INTEGER}
+    </delete>
+    <!-- 查询列表 -->
+	<select id="queryListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+            select a.*,
+            (select company_name from tbl_stationed_user_info where id = a.stationed_user_id) stationed_user_name,
+             rownum num from (
+                select
+                <include refid="all"></include>,
+                (select user_name from tbl_sys_user_info where id=tsi.create_user_id) create_user_name
+				from  TBL_SITE_INFO tsi
+				<where>
+					<if test="name!=null and name!=''">
+		    			name LIKE CONCAT(CONCAT('%', #{name,jdbcType=VARCHAR}),'%')
+		    		</if>
+					<if test="start_create_date!=null and start_create_date!=''">
+						and to_char(create_date,'yyyy-mm-dd hh24:mi:ss') &gt;=#{start_create_date,jdbcType=VARCHAR}
+					</if>
+					<if test="end_create_date!=null and end_create_date!=''">
+						and to_char(create_date,'yyyy-mm-dd hh24:mi:ss') &lt;=#{end_create_date,jdbcType=VARCHAR}
+					</if>
+					<if test="state != null">
+						and state IN
+		                <foreach item="item" collection="state" open="(" separator="," close=")">
+							#{item}
+						</foreach>
+					</if>
+					<if test="warehouse_id!=null and warehouse_id!=''">
+						and id in (select site_id from TBL_SITE_WAREHOUSE where parent_warehouse_id = #{warehouse_id,jdbcType=INTEGER})
+					</if>
+					<if test="platform_type != null and platform_type != ''">
+	                	and platform_type = #{platform_type}
+	                </if>
+				</where>
+				order by CREATE_DATE desc
+            ) a where ROWNUM  &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where num &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 查询总数 -->
+	<select id="querySiteInfoCount" parameterType="java.util.Map" resultType="int">
+          select
+                count(1)
+				from  TBL_SITE_INFO
+				<where>
+					<if test="name!=null and name!=''">
+		    			name LIKE CONCAT(CONCAT('%', #{name,jdbcType=VARCHAR}),'%')
+		    		</if>
+					<if test="start_create_date!=null and start_create_date!=''">
+						and to_char(create_date,'yyyy-mm-dd hh24:mi:ss') &gt;=#{start_create_date,jdbcType=VARCHAR}
+					</if>
+					<if test="end_create_date!=null and end_create_date!=''">
+						and to_char(create_date,'yyyy-mm-dd hh24:mi:ss') &lt;=#{end_create_date,jdbcType=VARCHAR}
+					</if>
+					<if test="warehouse_id!=null and warehouse_id!=''">
+						and id in (select site_id from TBL_SITE_WAREHOUSE where parent_warehouse_id = #{warehouse_id,jdbcType=INTEGER})
+					</if>
+					<if test="state != null">
+						and state IN
+		                <foreach item="item" collection="state" open="(" separator="," close=")">
+							#{item}
+						</foreach>
+					</if>
+					<if test="platform_type != null and platform_type != ''">
+	                	and platform_type = #{platform_type}
+	                </if>
+				</where>
+	</select>
+	<!-- 查询所有占站点 -->
+	<select id="queryAllList" parameterType="java.util.Map" resultType="java.util.Map" resultMap="siteListMap">
+		select id,name from tbl_site_info where  state='2'
+	</select>
+	<resultMap id="siteListMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="name" property="option"/>
+    </resultMap>
+	
+	<!-- 查询站点详情 -->
+	<select id="querySiteInfoDetail" parameterType="java.util.Map" resultType="java.util.Map" resultMap="resultDetailMap">
+              select
+              <include refid="all"></include>
+		      from  TBL_SITE_INFO tsi
+		      where id=#{id,jdbcType=INTEGER}
+	</select>
+	<!-- 检测站点名称是否重复 -->
+	<select id="checkSiteName" parameterType="java.util.Map" resultType="int">
+		select count(1) FROM TBL_SITE_INFO WHERE 
+		name = #{name,jdbcType=VARCHAR}
+	</select>
+	<!-- 新增站点仓库信息 -->
+	<insert id="insertSiteWarehouse" parameterType="java.util.Map" >
+		insert into tbl_site_warehouse(
+			site_id,
+			warehouse_id,
+			parent_warehouse_id,
+			sort_number
+		) values(
+			#{site_id,jdbcType=INTEGER},
+            #{warehouse_id,jdbcType=INTEGER},
+            #{parent_warehouse_id,jdbcType=INTEGER},
+            (select case when count(sort_number) = 0 then 1 else max(sort_number)+1 end from tbl_site_warehouse)
+		)
+	</insert>
+	
+	<!-- 删除站点仓库关联信息 -->
+	<delete id="deleteSiteWarehouse" parameterType="java.util.Map">
+		delete from tbl_site_warehouse where site_id=#{site_id,jdbcType=INTEGER}
+	</delete>
+	<!-- 查询大仓列表 -->
+	<select id="queryWarehouseParentInfoList" parameterType="java.util.Map" resultType="java.util.Map">
+		select distinct parent_id as id,
+               (select name from tbl_warehouse_info where id = twi.parent_id) name
+          from tbl_warehouse_info twi,
+               (select distinct warehouse_id from tbl_platform_warehouse) a
+         where twi.id = a.warehouse_id
+         order by id
+	</select>
+	<!-- 查询分仓列表 -->
+	<select id="queryWarehouseChilderInfoList" parameterType="java.util.Map" resultType="java.util.Map">
+		 select distinct twi.id,twi.name 
+           from tbl_warehouse_info twi,(select warehouse_id from tbl_platform_warehouse) a
+          where twi.parent_id =#{ID,jdbcType=INTEGER} and twi.id = a.warehouse_id
+          order by id
+	</select>
+	
+	<!-- 查询站点关联仓库 -->
+	<select id="querySiteWarehouseList" parameterType="java.util.Map" resultType="java.util.Map">
+		select site_id,warehouse_id,parent_warehouse_id
+		  from tbl_site_warehouse
+		 where site_id = #{site_id,jdbcType=INTEGER}
+	</select>
+	
+	<!-- 查询仓库列表 -->
+	<select id="queryPlatformWarehouseList" resultType="java.util.Map" resultMap="PlatformWarehouseListMap">
+		   select id, name
+			 from tbl_warehouse_info
+			where id in
+			      (select parent_id
+			         from tbl_warehouse_info
+			        where id in (select warehouse_id from tbl_platform_warehouse))
+			order by create_date
+	</select>
+	<resultMap id="PlatformWarehouseListMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="name" property="option"/>
+    </resultMap>
+	
+	<!-- 根据站点ID和货号查询站点商品配置信息 -->
+	<select id="querySiteProduct" parameterType="java.util.Map" resultType="java.util.Map">
+		select site_id,product_itemnumber,weighting,temp_weighting,after_day from TBL_SITE_PRODUCT
+		where site_id = #{site_id,jdbcType=INTEGER} and product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+	</select>
+	<!-- 更新排序 -->
+	<update id="updateSiteWarehouseSort" parameterType="java.util.Map">
+		update tbl_site_warehouse
+		   <set>
+		   	<if test="sortid!=null">
+				sort_number = #{sortid,jdbcType=INTEGER}
+			</if>
+			<if test="type == 'top'">
+				sort_number = (select max(sort_number) + 1 from tbl_site_warehouse )
+			</if>
+			<if test="type == 'bottom'">
+				sort_number = (select min(sort_number) - 1 from tbl_site_warehouse)
+			</if>
+		   </set> 
+		 where site_id = #{site_id,jdbcType=INTEGER}
+		  and parent_warehouse_id=#{parent_warehouse_id,jdbcType=INTEGER}
+	</update>
+	<!-- 站点仓库详情 -->
+	<select id="querySiteWarehouseById" parameterType="java.util.Map" resultType="java.util.Map">
+		select site_id,parent_warehouse_id,warehouse_id,sort_number
+		  from tbl_site_warehouse
+		 where site_id = #{site_id,jdbcType=INTEGER}
+		  and parent_warehouse_id=#{parent_warehouse_id,jdbcType=INTEGER}
+	</select>
+	<!-- 查询所有的平台可用展示的仓库列表，同时根据商家ID返回是否已经作为商家的默认缺货订购仓库 -->
+    <select id="queryAllSiteWarehouseList" resultType="java.util.Map"  parameterType="java.util.Map">
+	   	select 
+		t1.WAREHOUSE_ID,
+		t1.PARENT_WAREHOUSE_ID,
+		t1.PARENT_WAREHOUSE_NAME
+		<if test="stationed_user_id!=null and stationed_user_id!=0">
+			,(case when NVL(sui.id,0) = 0 then 0 else 1 end) SELECTED
+		</if>
+		 from 
+		(
+		         select 
+		         wi.id warehouse_id,
+		         wi.parent_id parent_warehouse_id,
+		         (select name from TBL_WAREHOUSE_INFO pwi where pwi.id = wi.parent_id) parent_warehouse_name
+		         from TBL_WAREHOUSE_INFO wi
+		         where exists (
+		            select  1
+		            from tbl_site_warehouse sw where sw.warehouse_id = wi.id
+		         )
+		) t1
+		<if test="stationed_user_id!=null and stationed_user_id!=0">
+			left join TBL_STATIONED_USER_INFO sui on sui.default_outstock_warehouse = t1.warehouse_id and sui.id =  #{stationed_user_id,jdbcType=INTEGER}
+	    </if>
+	    order by t1.PARENT_WAREHOUSE_ID asc
+    </select>
+    
+    <!-- 查询童库平台站点或私有平台站点-->
+    <select id="queryPlatformSiteList" resultMap="platformSiteListMap"  parameterType="java.util.Map">
+	   select id,name from tbl_site_info
+	   <where>
+	   		<choose>
+			   	<when test="platform_type != null and platform_type != ''">
+			   		platform_type =2
+			   	</when>
+			   	<otherwise>
+			   		platform_type = 1
+			   	</otherwise>
+		  </choose>
+	   </where>
+    </select>
+    <resultMap id="platformSiteListMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="name" property="option"/>
+    </resultMap>
+    
+    
+    <!-- 查询站点关联仓库 -->
+	<select id="querySiteInfoByStationedUser" parameterType="java.util.Map" resultType="java.util.Map">
+		select id,
+		 	   name,
+		 	   site_code,
+		 	   state
+		  from tbl_site_info
+		 where stationed_user_id =  #{stationed_user_id,jdbcType=INTEGER}
+		       and platform_type = 2
+	</select>
+</mapper>

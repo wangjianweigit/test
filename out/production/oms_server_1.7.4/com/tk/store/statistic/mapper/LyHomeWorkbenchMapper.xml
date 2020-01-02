@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.store.statistic.dao.LyHomeWorkbenchDao">
+	
+	<!-- 查询商品信息-->
+	<select id="queryProductInfo" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT ITEMNUMBER,
+			   PRODUCT_NAME,
+			   PRODUCT_IMG_URL
+		FROM TBL_PRODUCT_INFO WHERE ITEMNUMBER=#{ITEMNUMBER,jdbcType=VARCHAR}
+	</select>
+	
+	<!-- 查询指定区域内的店铺会员(逗号分隔字符串)-->
+	<select id="queryStoreListByArea" parameterType="java.util.Map" resultType="string">
+		select id from tbl_user_info tui
+		where tui.user_type=2 and tui.user_state=1
+		<if test="public_user_type != null and public_user_type == 3">
+            and 1=2
+        </if>
+        <if test="public_user_type != null and public_user_type == 4">
+            and tui.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+        </if>
+        <if test="public_user_type != null and public_user_type == 5">
+            and 1=2
+        </if>
+        <if test="public_user_type != null and public_user_type == 6">
+            and 1=2
+        </if>
+        <if test="public_user_type != null and public_user_type == 7">
+			and tui.supervisor_user_id = #{public_user_id,jdbcType=INTEGER}
+        </if>
+        <if test="public_user_type != null and public_user_type == 9">
+            and tui.partner_user_id = #{public_user_id,jdbcType=INTEGER}
+        </if>
+		<if test="province != null and province!=''">
+			and tui.user_company_address_province =#{province,jdbcType=INTEGER} 
+		</if>
+		<if test="city != null and city!=''">
+			and tui.user_company_address_city =#{city,jdbcType=INTEGER} 
+		</if>
+		<if test="area != null and area!=''">
+			and tui.user_company_address_county =#{area,jdbcType=INTEGER} 
+		</if>
+		<if test="store_id != null and store_id !=''">
+			and tui.id &lt;&gt;#{store_id,jdbcType=INTEGER} 
+		</if>
+	</select>
+	
+	<!--新增调拨单主表信息-->
+	<insert id="insertStoreAllotTask" parameterType="java.util.Map" >
+		<selectKey keyProperty="id" resultType="int" order="BEFORE"> 
+        	SELECT seq_store_allot_task.nextval FROM DUAL
+    	</selectKey>
+		insert into tbl_store_allot_task
+			(id,
+			in_store_id,
+			out_store_id,
+			create_date,
+			create_user_id,
+			type
+			) 
+		values(
+			#{id,jdbcType=INTEGER},
+			#{in_store_id,jdbcType=INTEGER},
+			#{out_store_id,jdbcType=INTEGER},
+			sysdate,
+			#{public_user_id,jdbcType=INTEGER},
+			1
+		)
+	</insert>
+	
+	<!--新增调拨单详情表信息-->
+	<insert id="insertStoreAllotTaskDetail" parameterType="java.util.Map" >
+		insert into tbl_store_allot_task_detail
+			(id,
+			task_id,
+			itemnumber,
+			create_date,
+			create_user_id
+			) 
+		values(
+			seq_store_allot_task_detail.nextval,
+			#{task_id,jdbcType=INTEGER},
+			#{itemnumber,jdbcType=VARCHAR},
+			sysdate,
+			#{public_user_id,jdbcType=INTEGER}
+		)
+	</insert>
+	
+	<!-- 根据调入调出门店查询调拨任务信息-->
+	<select id="queryStoreAllotTaskByInOutStoreId" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT ID,
+			   IN_STORE_ID,
+			   OUT_STORE_ID
+		FROM TBL_STORE_ALLOT_TASK WHERE 1=1
+		 and type = 1
+		<if test="in_store_id != null and in_store_id !=''">
+			and in_store_id =#{in_store_id,jdbcType=INTEGER} 
+		</if>
+		<if test="out_store_id != null and out_store_id !=''">
+			and out_store_id =#{out_store_id,jdbcType=INTEGER} 
+		</if>
+	</select>
+	
+	<!-- 查询调拨任务数量-->
+	<select id="queryStoreAllotTask" parameterType="java.util.Map" resultType="int">
+		select count(1) from TBL_STORE_ALLOT_TASK where type = 1
+	</select>
+	
+	<!-- 联营工作台查询调拨任务列表 -->
+	<select id="queryStoreAllotTaskList" parameterType="java.util.Map" resultType="java.util.Map">
+		select  a.*,
+				(select store_name from tbl_store_user_manage tsum where tsum.id=a.in_store_id) as in_store_name,
+				(select store_name from tbl_store_user_manage tsum where tsum.id=a.out_store_id) as out_store_name,
+				(select user_id from tbl_store_user_manage tsum where tsum.id=a.in_store_id) as in_store_agent_id,
+				(select user_id from tbl_store_user_manage tsum where tsum.id=a.out_store_id) as out_store_agent_id,
+				(select agent_store_id from tbl_store_user_manage tsum where tsum.id=a.in_store_id) as in_agent_store_id,
+				(select agent_store_id from tbl_store_user_manage tsum where tsum.id=a.out_store_id) as out_agent_store_id
+    	  from (select t.*,rownum as rn
+				  from (select 
+				  			id,
+				  			in_store_id,
+				  			out_store_id
+				  		  from tbl_store_allot_task tsat
+				  		 where type =1
+					    order by tsat.create_date desc) t
+		 		 where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) A
+		 where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	
+	<!-- 查询调拨任务详情-->
+	<select id="queryStoreAllotTaskDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from TBL_STORE_ALLOT_TASK where id=#{task_id,jdbcType=INTEGER}
+	</select>
+	
+	<!--删除调拨任务主表信息 -->
+	<delete id="deleteStoreAllotTask" parameterType="java.util.Map">
+		delete from tbl_store_allot_task where id = #{task_id,jdbcType=INTEGER}
+	</delete>
+	
+	<!--删除调拨任务详情表信息 -->
+	<delete id="deleteStoreAllotTaskDetail" parameterType="java.util.Map">
+		delete from tbl_store_allot_task_detail 
+		<where>
+			<if test="task_id != null and task_id !=''">
+				and task_id = #{task_id,jdbcType=INTEGER}
+			</if>
+			<if test="id != null and id !=''">
+				and id = #{id,jdbcType=INTEGER}
+			</if>
+		</where> 
+	</delete>
+	
+	<!-- 查询当前任务单所有货号-->
+	<select id="queryStoreAllotTaskItemnumber" parameterType="java.util.Map" resultType="string">
+		select itemnumber from TBL_STORE_ALLOT_TASK_detail where task_id=#{task_id,jdbcType=INTEGER}
+	</select>
+	
+	<!-- 查询当前调拨任务单里货号是否已存在-->
+	<select id="queryStoreAllotTaskDetailByTaskIdAndItemnumber" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from TBL_STORE_ALLOT_TASK_detail
+		<where>
+			<if test="task_id != null and task_id !=''">
+				and task_id = #{task_id,jdbcType=INTEGER}
+			</if>
+			<if test="itemnumber != null and itemnumber !=''">
+				and itemnumber = #{itemnumber,jdbcType=VARCHAR}
+			</if>
+		</where> 
+	</select>
+	
+	<!-- 查询当前调拨任务单的所有货号信息-->
+	<select id="queryStoreAllotTaskItemnumberInfoList" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT T.*,
+		       (SELECT product_name FROM TBL_DIC_PRODUCT_TYPE tdpt WHERE tdpt.id = T.PRODUCT_TYPE_ID)AS type_name,
+		       (SELECT name FROM TBL_DIC_PRODUCT_SEASON tdps WHERE tdps.id = T.season_id)AS season_name
+		  FROM (SELECT tsatd.id,
+		               tsatd.itemnumber,
+		               tpi.product_name,
+		               tpi.year,
+		               tpi.season_id,
+		               tpi.PRODUCT_IMG_URL,
+		               tpi.PRODUCT_TYPE_ID,
+		               (tsatd.itemnumber || '_' || (select agent_store_id from tbl_store_user_manage where id=tsat.in_store_id)) item_in_store,
+		               (tsatd.itemnumber || '_' || (select agent_store_id from tbl_store_user_manage where id=tsat.out_store_id)) item_out_store
+		          FROM TBL_STORE_ALLOT_TASK_DETAIL tsatd
+		               LEFT JOIN tbl_product_info tpi ON tsatd.itemnumber = tpi.itemnumber
+		               LEFT JOIN TBL_STORE_ALLOT_TASK tsat ON tsatd.task_id = tsat.id and tsat.type=1
+		         WHERE task_id = #{task_id,jdbcType=INTEGER}) T
+	</select>
+	
+	<!-- 根据商家id查询门店id-->
+	<select id="queryUserStores" parameterType="java.util.Map" resultType="string">
+		select agent_store_id from tbl_store_user_manage
+		where user_id in
+		<foreach item="item" collection="user_ids" open="(" separator="," close=")">
+			#{item}
+		</foreach>
+		<if test="EXCEPT_STORE_ID != null and EXCEPT_STORE_ID !=''">
+			and agent_store_id &lt;&gt; #{EXCEPT_STORE_ID,jdbcType=INTEGER}
+		</if>
+	</select>
+	
+	<!-- 将经销商门店id转换为本地id-->
+	<select id="queryStoreIdByAgentStoreId" parameterType="java.util.Map" resultType="string">
+		select id from tbl_store_user_manage 
+		<where>
+			<if test="agent_store_id != null and agent_store_id !=''">
+				and agent_store_id = #{agent_store_id,jdbcType=INTEGER}
+			</if>
+		</where>
+	</select>
+</mapper>

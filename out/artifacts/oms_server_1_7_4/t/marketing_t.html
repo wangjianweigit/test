@@ -1,0 +1,138 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+ <head>
+    <meta http-equiv="content-type" content="text/html;charset=utf-8">
+    <title>测试界面</title>
+    <script src="http://apps.bdimg.com/libs/jquery/1.8.0/jquery.min.js"></script>
+    <script src="jquery.form.js"></script>
+    <script src="webtoolkit.md5.js"></script>
+    <script src="t.js"></script>
+    <style type="text/css">
+    	body
+		{
+			font-size:18px;
+		}
+    </style>
+    <script type="text/javascript">
+        // ################################ 常量定义 ################################
+        var BaseURL = "/oms_server/";
+        var jmURL = BaseURL+"test/encryption";//加密url
+		var jm2URL = BaseURL+"test/decrypt";//解密url
+		/**
+		测试地址，注意,测试地址中的 / 使用两个下划线代替
+		**/
+        var DATA_MAP = {
+            member_grade__list: {
+                info: '查询积分等级列表',
+                data: '{"pageIndex":1,"pageSize":10}'
+            },
+            member_grade__add: {
+                info: '添加积分等级',
+                data: '{"create_user_id":1,"grade_name":"A","min_score":1001,"max_score":2000,"discount":90,"remark":"无"}'
+            },
+            member_grade__remove: {
+                info: '删除积分等级',
+                data: '{"pageIndex":1,"pageSize":10}'
+            },
+            member_grade__edit: {
+                info: '编辑积分等级',
+                data: '{"id":1,"discount":95}'
+            },
+            member_grade__detail: {
+                info: '查询积分详情',
+                data: '{"id":1}'
+            },
+            member_grade__all: {
+                info: '获取全部会员等级(下拉框)',
+                data: '{}'
+            },
+            product_sort__list: {
+            	info: '查询规则列表',
+                data: '{}'
+            },
+            product_sort__edit: {
+            	info: '编辑规则权重百分比',
+                data: '{"role_arra":[{"code":"SALES","weight_percent":"15"}]}'
+            },
+            product_sort__product_list: {
+            	info: '查询人工加权商品列表',
+                data: '{"pageIndex":1,"pageSize":10}'
+            },
+            product_sort__weighting: {
+            	info: '编辑商品人工加权',
+                data: '{"create_user_id":90000001,"site_id":1,"product_itemnumber":28601001,"temp_weighting":100}'
+            },
+            product_sort__weighting_release: {
+            	info: '发布商品人工加权',
+                data: '{"site_id":1}'
+            },
+            recommended__list: {
+            	info: '查询推荐列表',
+                data: '{"pageIndex":1,"pageSize":10}'
+            },
+            recommended__add: {
+            	info: '添加推荐信息',
+                data: '{"create_user_id":1,"name":"测试","type":"1","remark":"无","product_itemnumbers":"28601001"}'
+            },
+            recommended__remove: {
+            	info: '删除推荐信息',
+                data: '{"id":1}'
+            },
+            recommended__edit: {
+            	info: '编辑推荐信息',
+                data: '{"id":1,"name":"测试","type":"1","remark":"无","state":"1","product_itemnumbers":"28601001"}'
+            },
+            recommended__detail: {
+            	info: '查询推荐详情',
+                data: '{"id":1}'
+            },
+            recommended__product_list: {
+            	info: '查询推荐的商品列表',
+                data: '{"id":1}'
+            },
+            region_product__list: {
+            	info: '查询区域商品列表',
+                data: '{"pageIndex":1,"pageSize":10,"id":100000}'
+            },
+            region_product__region: {
+            	info: '根据父ID查找子节点信息',
+                data: '{"parent_id":100000,"level":0}'
+            },
+            region_product__whole_region: {
+            	info: '查询所有省市县数据信息',
+                data: '{"parent_id":100000}'
+            },
+            region_product__region_first: {
+            	info: '查询大区及省区域',
+                data: '{"parent_id":0}'
+            },
+            
+            
+        };
+    </script>
+</head>
+<body>
+Action:
+<!-- 
+<input type="radio" name="action" value="http://localhost:8080/esb/" onclick="changeAction(this);" checked="checked"/>localhost
+<input type="radio" name="action" value="http://192.168.0.188:8080/esb/" onclick="changeAction(this);"/>188
+ -->
+<br/>
+<select id="action_select" onchange="h($('#action_select option:selected').attr('value'))" size="8"
+        style="width:40%;">
+</select><br/>
+访问URL:
+<input id="submit_url" onchange="h(this.value)" value=".action" style="width:35%;background-color:pink;height:30"><form id="htmlForm" name="htmlForm" action="" method="post">
+    data:<input type="button" value="提交" onclick="submit_function('data');"/>
+    <input type="button" onclick="javascript: $('#ret').val('');" value="清除"/><br/>
+    <textarea id="data" name="data" style="width:40%;height:100px;font-size: 15px;font-family:monaco" onchange="load_data('data')"></textarea>
+    <input id="req_h_data" type="hidden" value=""/>
+    <input id="res_h_data" type="hidden" value=""/>
+</form>
+<div style="position: fixed;top: 20px;right:30px;width:45%;overflow-y: auto;height:100%;background: #eee;">
+    response:<br/>
+    <span id="ret" style="font-size: 15px;font-family:monaco"></span>
+</div>
+<div id="data_view" style="position: fixed;top:350px;width:40%;overflow-y: auto;height: 400px;background: #eee;font-size: 15px;font-family:monaco"></div>
+</body>
+</html>

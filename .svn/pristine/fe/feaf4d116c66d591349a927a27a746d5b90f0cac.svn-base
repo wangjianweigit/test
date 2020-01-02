@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tk.oms.basicinfo.dao.MemberFlagDao">
+
+    <!--分页查询会员标记列表-->
+    <select id="queryListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select rownum rn, tt.* from (
+                select
+                    id,
+                    mark_name,
+                    mark_img_url,
+                    create_date,
+                    mark_type,
+                    create_user_id,
+                    sort_id
+                from
+                    tbl_dic_user_mark
+                <where>
+                    <if test="mark_name != null and mark_name != ''">
+                        mark_name = #{mark_name,jdbcType=VARCHAR}
+                    </if>
+                    <if test="mark_type != null and mark_type != ''">
+                        mark_type = #{mark_type,jdbcType=CHAR}
+                    </if>
+                </where>
+                    order by sort_id
+            ) tt where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+        where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--查询会员标记总数量-->
+    <select id="queryCountForPage" parameterType="java.util.Map" resultType="int">
+        select
+            count(1)
+        from
+            tbl_dic_user_mark
+        <where>
+            <if test="mark_name != null and mark_name != ''">
+                mark_name = #{mark_name,jdbcType=VARCHAR}
+            </if>
+            <if test="mark_type != null and mark_type != ''">
+                mark_type = #{mark_type,jdbcType=CHAR}
+            </if>
+        </where>
+    </select>
+
+    <!--查询会员标记列表-->
+    <select id="queryMemberFlagForList" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            id,
+            mark_name,
+            mark_img_url,
+            create_date,
+            create_user_id,
+            mark_type,
+            sort_id
+        from
+            tbl_dic_user_mark
+        where
+            mark_type = #{mark_type,jdbcType=CHAR}
+        order by sort_id
+    </select>
+
+    <!--通过ID查询会员标记-->
+    <resultMap id="memberFlagMap" type="java.util.Map">
+        <result column="mark_name" property="mark_name"/>
+        <result column="mark_type" property="mark_type"/>
+        <result column="mark_img_url" property="mark_img_url"/>
+    </resultMap>
+    <select id="queryById" parameterType="long" resultMap="memberFlagMap">
+        select
+            mark_name,
+            mark_type,
+            mark_img_url
+        from
+            tbl_dic_user_mark
+        where
+            id = #{id,jdbcType=INTEGER}
+    </select>
+
+    <!--新增会员标记-->
+    <insert id="insert" parameterType="java.util.Map">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            select seq_dic_user_mark.nextval from dual
+        </selectKey>
+        insert into tbl_dic_user_mark(
+            id,
+            mark_name,
+            mark_img_url,
+            mark_type,
+            create_date,
+            create_user_id,
+            sort_id
+        ) values (
+            #{id,jdbcType=INTEGER},
+            #{mark_name,jdbcType=VARCHAR},
+            #{mark_img_url,jdbcType=VARCHAR},
+            #{mark_type,jdbcType=CHAR},
+            sysdate,
+            #{public_user_id,jdbcType=INTEGER},
+            #{id,jdbcType=INTEGER}
+        )
+    </insert>
+
+    <!--修改会员标记-->
+    <update id="update" parameterType="java.util.Map">
+        update
+            tbl_dic_user_mark
+        <set>
+            <if test="mark_name != null and mark_name != ''">
+                mark_name = #{mark_name,jdbcType=VARCHAR},
+            </if>
+            <if test="mark_img_url != null and mark_img_url != ''">
+                mark_img_url = #{mark_img_url,jdbcType=VARCHAR},
+            </if>
+            <if test="mark_type != null and mark_type != ''">
+                mark_type = #{mark_type,jdbcType=VARCHAR}
+            </if>
+        </set>
+        where
+            id = #{id,jdbcType=INTEGER}
+    </update>
+
+    <!--删除会员标记-->
+    <delete id="delete" parameterType="java.util.Map">
+        delete from tbl_dic_user_mark where id = #{id,jdbcType=INTEGER}
+    </delete>
+
+    <!--修改会员标记排序-->
+    <update id="updateMemberFlagForSort" parameterType="java.util.Map">
+        update tbl_dic_user_mark
+        set sort_id =
+        (
+          case when id = #{fromId,jdbcType=INTEGER} then
+            (select sort_id from tbl_dic_user_mark where id = #{toId,jdbcType=INTEGER})
+          when id = #{toId,jdbcType=INTEGER} then
+            (select sort_id from tbl_dic_user_mark where id = #{fromId,jdbcType=INTEGER})
+          end
+        ) where id = #{fromId,jdbcType=INTEGER} or id = #{toId,jdbcType=INTEGER}
+    </update>
+
+    <!--通过标记名称获取会员标记数量-->
+    <select id="queryMemberFlagCountByName" parameterType="java.util.Map" resultType="int">
+        select
+            count(1)
+        from
+            tbl_dic_user_mark
+        where
+            mark_name = #{mark_name,jdbcType=VARCHAR}
+        <if test="id != null and id != 0">
+            and id != #{id,jdbcType=INTEGER}
+        </if>
+    </select>
+
+    <!--通过ID查询已经标记的会员标记数量-->
+    <select id="queryUserMarkCountById" parameterType="java.util.Map" resultType="int">
+        select count(1) from tbl_user_mark where mark = #{id,jdbcType=INTEGER}
+    </select>
+
+    <!--通过ID查询已经标记的库存标记数量-->
+    <select id="queryStockMarkCountById" parameterType="java.util.Map" resultType="int">
+        select count(1) from tbl_stock_mark where mark_id = #{id,jdbcType=INTEGER}
+    </select>
+</mapper>

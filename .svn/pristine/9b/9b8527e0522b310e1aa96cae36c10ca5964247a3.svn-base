@@ -1,0 +1,23 @@
+package com.tk.pvtp.stationed.dao;
+
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface PvtpStationedDao {
+	/**
+	 * 查询私有平台商家列表数量
+	 * @param params
+	 * @return
+	 */
+	int queryPvtpStationedCount(Map<String, Object> params);
+	/**
+	 * 查询私有平台商家列表
+	 * @param params
+	 * @return
+	 */
+	List<Map<String, Object>> queryPvtpStationedList(Map<String, Object> params);
+	
+}

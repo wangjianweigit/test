@@ -1,0 +1,624 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.marketing.dao.ProductControlDao">
+	
+	<sql id="where_column">
+		<where>
+			tusa.approval_state in (0,1)
+			and tusa.LONGITUDE is not null
+			and tusa.LATITUDE is not null
+		   <if test="login_name !=null and login_name !=''">
+           		and exists (select 1 from tbl_user_info where login_name like concat(concat('%', #{login_name,jdbcType=VARCHAR}),'%') and id = tusa.user_id)
+           </if>
+           <if test="user_manage_name !=null and user_manage_name !=''">
+           		and exists (select 1 from tbl_user_info where user_manage_name like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%') and id = tusa.user_id)
+           </if>
+           <if test="store_address !=null and store_address !=''">
+           		and tusa.store_address like concat(concat('%', #{store_address,jdbcType=VARCHAR}),'%')
+           </if>
+           <if test="user_company_type !=null and user_company_type !=''">
+           		and exists (select 1 from tbl_user_info where user_company_type = #{user_company_type,jdbcType=INTEGER} and id =tusa.user_id)
+           </if>
+           <if test="product_control_brand !=null and product_control_brand !=''">
+           		and exists (select 1 from tbl_product_control_detail where product_control_brand = #{product_control_brand,jdbcType=INTEGER} and product_control_id = (select id from tbl_product_control where user_store_address_id =tusa.id))
+           </if>
+           <if test="province !=null and province !=''">
+           		and tusa.province = #{province,jdbcType=INTEGER}
+           </if>
+           <if test="city !=null and city !=''">
+           		and tusa.city = #{city,jdbcType=INTEGER}
+           </if>
+           <if test="area !=null and area !=''">
+           		and tusa.county = #{area,jdbcType=INTEGER}
+           </if>
+           <if test="public_user_type != null and public_user_type == 3">
+                and exists (select 1 from tbl_user_info where id = tusa.user_id and referee_user_id = #{public_user_id,jdbcType=INTEGER}) 
+           		and exists (select 1 from tbl_agent_control_area_conf where city_id = tusa.city and user_id = #{public_user_id,jdbcType=INTEGER})
+           </if>
+           <if test="public_user_type != null and public_user_type == 4">
+                and exists (select 1 from tbl_user_info where id = tusa.user_id and market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}) 
+           		and exists (select 1 from tbl_agent_control_area_conf where city_id = tusa.city and user_id = #{public_user_id,jdbcType=INTEGER})
+           </if>
+           <if test="public_user_type != null and public_user_type == 5">
+                and exists (select 1 from tbl_user_info where id = tusa.user_id and referee_user_id in (select user_id from tbl_store_user_rel where type = '3' and store_id in (select id from tbl_store_info where state = '2' and shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER})))
+           		and exists (select 1 from tbl_store_control_area_conf where city_id = tusa.city and store in (select id from tbl_store_info where shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER}))
+           </if>
+           <if test="state !=null and state !=''">
+           		and tusa.state = #{state,jdbcType=CHAR}
+           </if>
+           <if test="product_control_type !=null and product_control_type !=''">
+           		and tpc.product_control_type = #{product_control_type,jdbcType=CHAR}
+           </if>
+           <if test="user_store_state !=null and user_store_state !=''">
+           		and tusa.user_store_state in
+           		<foreach item="item" collection="user_store_state" open="(" separator="," close=")">
+    	 			#{item,jdbcType=INTEGER}
+    	 		</foreach>
+           </if>
+           <if test="(product_control_mode !=null and product_control_mode !='') or (product_control_blend !=null and product_control_blend !='')">
+           		and (
+           		<if test="product_control_mode !=null and product_control_mode !=''">
+           			exists
+           		   (select 1
+                      from tbl_product_control t,tbl_product_control_detail t1
+                     where t.id = t1.product_control_id
+                       and t1.product_control_mode in
+                        <foreach item="item" collection="product_control_mode" open="(" separator="," close=")">
+		    	 			#{item,jdbcType=CHAR}
+		    	 		</foreach>
+                       and t.user_store_address_id = tusa.id)
+           		</if>
+           		<if test="(product_control_mode !=null and product_control_mode !='') and (product_control_blend !=null and product_control_blend !='')">
+           			or
+           		</if>
+           		<if test="product_control_blend !=null and product_control_blend !=''">
+           			exists
+           		   (select 1
+                      from tbl_product_control t,tbl_product_control_detail t1
+                     where t.id = t1.product_control_id
+                       and t.user_store_address_id = tusa.id
+                       group by t1.product_control_id having count(distinct t1.product_control_mode) > 1)
+           		</if>)
+           </if>
+		</where>
+	</sql>
+    <!-- 查询控货数量 -->
+    <select id="queryProductControlCount" parameterType="java.util.Map" resultType="int" >
+		select count(1)
+          from tbl_user_store_address tusa left join tbl_product_control tpc on tusa.id = tpc.user_store_address_id
+		<include refid="where_column"/>
+    </select>
+    <!-- 查询控货列表 -->
+    <select id="queryProductControlList" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select a.*, rownum num from (
+                select tusa.id,
+                       tusa.user_id,
+                       (select user_state from tbl_user_info where id = tusa.user_id) user_state,
+                       (select login_name from tbl_user_info where id = tusa.user_id) login_name,
+                       (select user_manage_name from tbl_user_info where id = tusa.user_id) user_manage_name,
+                       tusa.store_name,
+                       (select name from tbl_dic_region where id = tusa.province)||(select name from tbl_dic_region where id = tusa.city)||(select name from tbl_dic_region where id = tusa.county)||tusa.store_address as store_address,
+                       (select name from tbl_dic_region where id = tusa.province)||(select name from tbl_dic_region where id = tusa.city)||(select name from tbl_dic_region where id = tusa.county)||tusa.management_address as management_address,
+                       tusa.longitude,
+                       tusa.latitude,
+                       tusa.state,
+                       tpc.product_control_type,
+                       (select type_name from tbl_product_control_type where id = tpc.product_control_type) type_name,
+                       nvl(tpc.product_control_radius,0) product_control_radius,
+                       (select user_company_type from tbl_user_info where id = tusa.user_id) user_company_type,
+                       (select count(1) from tbl_product_control_detail where product_control_id = (select id from tbl_product_control where user_store_address_id =tusa.id)) total,
+                       tpc.id as product_control_id,
+                       (select to_char(wm_concat(brand_name)) from tbl_dic_product_brand where id in (select product_control_brand from tbl_product_control_det_apply where product_control_id = (select id from tbl_product_control_apply where user_store_address_id = tusa.id))) brand_name,
+                       (select name from tbl_dic_region where id = tusa.province) province_name,
+                       (select name from tbl_dic_region where id = tusa.city) city_name,
+                       to_char(tusa.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+                       (select to_char(approval_date,'yyyy-mm-dd hh24:mi:ss') from tbl_product_control_apply where user_id = tusa.user_id
+                        and user_store_address_id = tusa.id) approval_date,
+                       (select user_realname from tbl_sys_user_info where id = tusa.approval_user_id) approval_user_name,
+                       (select user_realname from tbl_sys_user_info where id = tusa.update_user_id) update_user_name,
+                       user_store_state,
+                       tusa.approval_state
+                  from tbl_user_store_address tusa left join tbl_product_control tpc on tusa.id = tpc.user_store_address_id
+				<include refid="where_column"/>
+            ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where num &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+    
+    <!-- 控货开关 -->
+    <update id="updateState" parameterType="java.util.Map">
+    	update tbl_user_store_address
+    	   set state = #{state,jdbcType=CHAR},
+    	   		<if test="state == 1">
+	    	   		update_user_id = #{public_user_id,jdbcType=INTEGER},
+    	   		</if>
+    	   		<if test="state == 2">
+	    	   		update_user_id = '',
+    	   		</if>
+    	   		update_date = sysdate
+    	 where id = #{id,jdbcType=INTEGER}
+    </update>
+    <!-- 查询控货详情 -->
+    <select id="queryProductControlDetail" parameterType="java.util.Map" resultType="java.util.Map">
+    	select id,
+    		   product_control_type,
+    		   (select type_name from tbl_product_control_type where id = tpc.product_control_type) type_name,
+    		   product_control_radius,
+    		   remark,
+    		   (select (select name from tbl_dic_region where id = tusa.province)||(select name from tbl_dic_region where id = tusa.city)||(select name from tbl_dic_region where id = tusa.county)||tusa.management_address from tbl_user_store_address tusa where id = tpc.user_store_address_id) management_address
+          from tbl_product_control tpc
+         where user_store_address_id = #{user_store_address_id,jdbcType=INTEGER}
+    </select>
+    <!-- 根据控货ID查询控货详情品牌列表 -->
+    <select id="queryProductControlDetailListById" parameterType="long" resultType="java.util.Map">
+    	select (select brand_name from tbl_dic_product_brand where id = product_control_brand) brand_name,
+    		   case when product_control_mode = '1' then '全部控货'
+    		   		else '下单控货' end product_control_modes,
+    		   logo
+    	  from tbl_product_control_detail
+    	 where product_control_id = #{id,jdbcType=INTEGER}
+    </select>
+    <!-- 查询控货详情品牌列表 -->
+    <select id="queryProductControlDetailList" parameterType="java.util.Map" resultType="java.util.Map">
+    	select product_control_id,(select brand_name from tbl_dic_product_brand where id = product_control_brand) brand_name,
+    		   case when product_control_mode = '1' then '全部控货'
+    		   		else '下单控货' end product_control_modes,
+    		   logo
+    	  from tbl_product_control_detail
+    	 where product_control_id in 
+    	 <foreach collection="list" item="item" open="(" separator="," close=")">
+    	 	#{item}
+    	 </foreach>
+    	 order by product_control_id
+    </select>
+    <!-- 查询控货申请的ID -->
+    <select id="queryProductControlApplyByUserId" parameterType="java.util.Map" resultType="java.util.Map">
+    	select id
+    	  from tbl_product_control_apply 
+    	 where user_store_address_id = #{user_store_address_id,jdbcType=INTEGER}
+    </select>
+    <!-- 删除申请控货品牌 -->
+    <delete id="deleteProductControlDetailApply" parameterType="long">
+    	delete from tbl_product_control_det_apply where product_control_id = #{product_control_id,jdbcType=INTEGER}
+    </delete>
+    <!-- 新增控货申请数据 -->
+    <insert id="insertProductControlApply" parameterType="java.util.Map">
+    	<selectKey keyProperty="id" resultType="int" order="BEFORE">
+			select seq_product_control.nextval from dual
+		</selectKey>
+    	insert into tbl_product_control_apply
+    	(
+    		id,
+    		user_id,
+    		user_store_address_id,
+    		product_control_type,
+    		product_control_radius,
+    		create_user_id,
+    		remark
+    	)
+    	 values
+    	(
+    		#{id,jdbcType=INTEGER},
+    		#{user_id,jdbcType=INTEGER},
+    		#{user_store_address_id,jdbcType=INTEGER},
+    		#{product_control_type,jdbcType=CHAR},
+    	 	#{product_control_radius,jdbcType=INTEGER},
+    	 	#{public_user_id,jdbcType=INTEGER},
+    	 	#{remark,jdbcType=VARCHAR}
+    	)
+    </insert>
+    <!-- 新增控货申请明细数据 -->
+    <insert id="insertProductControlDetailApply" parameterType="java.util.List">
+    	insert into tbl_product_control_det_apply
+    	(
+    		product_control_id,
+    		product_control_brand,
+    		product_control_mode,
+    		logo
+    	)
+    	select 
+    		product_control_id,
+        	product_control_brand,
+        	product_control_mode,
+        	logo
+        from
+        <foreach collection="list" item="item" open="(" close=")" separator=" union all ">
+            select
+            #{item.product_control_id,jdbcType=INTEGER} product_control_id,
+            #{item.product_control_brand,jdbcType=VARCHAR} product_control_brand,
+            #{item.product_control_mode,jdbcType=CHAR} product_control_mode,
+            #{item.logo,jdbcType=VARCHAR} logo
+            from dual
+        </foreach>
+    </insert>
+    <!-- 更新控货申请数据 -->
+    <update id="updateProductControlApply" parameterType="java.util.Map">
+    	update tbl_product_control_apply
+    	   set product_control_type = #{product_control_type,jdbcType=CHAR},
+    	   	   product_control_radius = #{product_control_radius,jdbcType=INTEGER},
+    	   	   remark = #{remark,jdbcType=VARCHAR},
+    	   	   create_user_id = #{public_user_id,jdbcType=INTEGER},
+    	   	   create_date = sysdate,
+               approval_date = '',
+               approval_user_id = '',
+               rejected_reason = '',
+               approval_state = '1'
+    	 where user_store_address_id = #{user_store_address_id,jdbcType=INTEGER}
+    </update>
+    	
+    <!-- 查询申请控货详情 -->
+    <select id="queryProductControlApplyDetail" parameterType="java.util.Map" resultMap="resultApplyDetailMap">
+    	select id,
+    		   product_control_type,
+    		   (select type_name from tbl_product_control_type where id = tpc.product_control_type) type_name,
+    		   product_control_radius,
+    		   remark,
+    		   (select file_path from tbl_product_control_att where product_control_id = tpc.id) file_path
+          from tbl_product_control_apply tpc
+         where user_store_address_id = #{user_store_address_id,jdbcType=INTEGER}
+    </select>
+    <resultMap type="java.util.Map" id="resultApplyDetailMap">
+    	<result column="product_control_type" property="product_control_type"/>
+    	<result column="type_name" property="type_name"/>
+    	<result column="product_control_radius" property="product_control_radius"/>
+    	<result column="remark" property="remark"/>
+    	<result column="file_path" property="file_path"/>
+    </resultMap>
+    <!-- 查询申请控货品牌列表 -->
+    <select id="queryProductControlApplyDetailList" parameterType="long" resultType="java.util.Map">
+    	select product_control_brand,
+    		   (select brand_name from tbl_dic_product_brand where id = product_control_brand) brand_name,
+    		   product_control_mode,
+    		   logo
+    	  from tbl_product_control_det_apply
+    	 where product_control_id = #{id,jdbcType=INTEGER}
+    </select>
+    <!-- 查询申请数量 -->
+    <select id="queryProductControlApplyCount" parameterType="java.util.Map" resultType="int">
+    			select count(1)
+				  from tbl_product_control_apply a
+				       left join (select id,
+				       					 user_id,
+				                         city,
+				                         (select user_company_type
+				                            from tbl_user_info
+				                           where id = tusa.user_id)
+				                            user_company_type
+				                    from tbl_user_store_address tusa
+				                   where tusa.approval_state = '1') b
+				          on a.user_store_address_id = b.id
+				<where>
+				   <if test="login_name !=null and login_name !=''">
+		           		and exists (select 1 from tbl_user_info where login_name like concat(concat('%', #{login_name,jdbcType=VARCHAR}),'%') and id = a.user_id)
+		           </if>
+		           <if test="user_company_type !=null and user_company_type !=''">
+		           		and exists (select 1 from tbl_user_info where user_company_type = #{user_company_type,jdbcType=INTEGER} and id = a.user_id)
+		           </if>
+		           <if test="product_control_brand !=null and product_control_brand !=''">
+		           		and exists (select 1 from tbl_product_control_detail where product_control_brand = #{product_control_brand,jdbcType=INTEGER} and product_control_id = a.id)
+		           </if>
+		           <if test="approval_state !=null and approval_state !=''">
+		            	and a.approval_state in 
+		            	<foreach item="item" collection="approval_state" open="(" separator="," close=")">
+		    	 			#{item,jdbcType=CHAR}
+		    	 		</foreach>
+		           </if>
+		           <if test="public_user_type != null and public_user_type == 3">
+		                and exists (select 1 from tbl_user_info where id = b.user_id and referee_user_id = #{public_user_id,jdbcType=INTEGER}) 
+		           		and exists (select 1 from tbl_agent_control_area_conf where city_id = b.city and user_id = #{public_user_id,jdbcType=INTEGER})
+		           </if>
+		           <if test="public_user_type != null and public_user_type == 4">
+		                and exists (select 1 from tbl_user_info where id = b.user_id and market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}) 
+		           		and exists (select 1 from tbl_agent_control_area_conf where city_id = b.city and user_id = #{public_user_id,jdbcType=INTEGER})
+		           </if>
+		           <if test="public_user_type != null and public_user_type == 5">
+		                and exists (select 1 from tbl_store_user_rel where user_id = b.user_id and type = '3' and store_id in (select id from tbl_store_info where state = '2' and shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER})) 
+		           		and exists (select 1 from tbl_store_control_area_conf where city_id = b.city and store in (select id from tbl_store_info where shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER}))
+		           </if>
+				</where>
+    </select>
+    <!-- 申请列表 -->
+    <select id="queryProductControlApplyList" parameterType="java.util.Map" resultType="java.util.Map">
+    	 select * from (
+            select a.*, rownum num from (
+		    	select a.id,
+		    		   a.user_id,
+		    		   b.id as user_store_address_id,
+		    		   (select login_name from tbl_user_info where id = a.user_id) login_name,
+                       (select user_manage_name from tbl_user_info where id = a.user_id) user_manage_name,
+				       b.management_address,
+				       b.user_company_type,
+				       b.longitude,
+				       b.latitude,
+				       (select to_char(wm_concat(brand_name)) from tbl_dic_product_brand where id in (select product_control_brand from tbl_product_control_det_apply where product_control_id = a.id)) brand_name,
+				       a.product_control_type,
+				       (select type_name from tbl_product_control_type where id = a.product_control_type) type_name,
+				       (select user_realname from tbl_sys_user_info where id = a.CREATE_USER_ID) create_user_name,
+				       to_char(a.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+				       (select user_realname from tbl_sys_user_info where id = a.approval_user_id) approval_user_name,
+				       to_char(a.approval_date,'yyyy-mm-dd hh24:mi:ss') approval_date,
+				       a.approval_state,
+				       a.rejected_reason
+				  from tbl_product_control_apply a
+				       left join (select id,
+				       					 user_id,
+				                         (select name from tbl_dic_region where id = tusa.province)||(select name from tbl_dic_region where id = tusa.city)||(select name from tbl_dic_region where id = tusa.county)||tusa.management_address as management_address,
+				                         longitude,
+				                         latitude,
+				                         city,
+				                         (select user_company_type
+				                            from tbl_user_info
+				                           where id = tusa.user_id)
+				                            user_company_type
+				                    from tbl_user_store_address tusa
+				                   where tusa.approval_state = '1') b
+				          on a.user_store_address_id = b.id
+				<where>
+				   <if test="login_name !=null and login_name !=''">
+		           		and exists (select 1 from tbl_user_info where login_name like concat(concat('%', #{login_name,jdbcType=VARCHAR}),'%') and id = a.user_id)
+		           </if>
+		           <if test="user_company_type !=null and user_company_type !=''">
+		           		and exists (select 1 from tbl_user_info where user_company_type = #{user_company_type,jdbcType=INTEGER} and id = a.user_id)
+		           </if>
+		           <if test="product_control_brand !=null and product_control_brand !=''">
+		           		and exists (select 1 from tbl_product_control_det_apply where product_control_brand = #{product_control_brand,jdbcType=INTEGER} and product_control_id = a.id)
+		           </if>
+		           <if test="approval_state !=null and approval_state !=''">
+		            	and a.approval_state in 
+		            	<foreach item="item" collection="approval_state" open="(" separator="," close=")">
+		    	 			#{item,jdbcType=CHAR}
+		    	 		</foreach>
+		            </if>
+		            <if test="public_user_type != null and public_user_type == 3">
+		                and exists (select 1 from tbl_user_info where id = b.user_id and referee_user_id = #{public_user_id,jdbcType=INTEGER}) 
+		           		and exists (select 1 from tbl_agent_control_area_conf where city_id = b.city and user_id = #{public_user_id,jdbcType=INTEGER})
+		           </if>
+		           <if test="public_user_type != null and public_user_type == 4">
+		                and exists (select 1 from tbl_user_info where id = b.user_id and market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}) 
+		           		and exists (select 1 from tbl_agent_control_area_conf where city_id = b.city and user_id = #{public_user_id,jdbcType=INTEGER})
+		           </if>
+		           <if test="public_user_type != null and public_user_type == 5">
+		                and exists (select 1 from tbl_store_user_rel where user_id = b.user_id and type = '3' and store_id in (select id from tbl_store_info where state = '2' and shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER})) 
+		           		and exists (select 1 from tbl_store_control_area_conf where city_id = b.city and store in (select id from tbl_store_info where shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER}))
+		           </if>
+				</where>
+				order by a.approval_state asc,a.create_date desc
+			) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where num &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+    <!-- 申请详情 -->
+    <select id="queryApplyDetail" parameterType="java.util.Map" resultType="java.util.Map">
+    	select a.id,
+    		   (select login_name from tbl_user_info where id = a.user_id) login_name,
+               (select user_manage_name from tbl_user_info where id = a.user_id) user_manage_name,
+		       b.management_address,
+		       a.product_control_type,
+		       (select type_name from tbl_product_control_type where id = a.product_control_type) type_name,
+		       a.product_control_radius,
+		       a.remark,
+		       (select file_path from tbl_product_control_att where product_control_id = a.id) file_path
+		  from tbl_product_control_apply a
+		       left join (select id,
+		       					 user_id,
+		                         (select name from tbl_dic_region where id = tusa.province)||(select name from tbl_dic_region where id = tusa.city)||(select name from tbl_dic_region where id = tusa.county)||tusa.management_address as management_address
+		                    from tbl_user_store_address tusa
+		                   where tusa.approval_state = '1') b
+		          on a.user_store_address_id = b.id
+		 where a.id = #{id,jdbcType=INTEGER}
+    </select>
+    <!-- 申请详情品牌列表 -->
+    <select id="queryApplyDetailList" parameterType="java.util.Map" resultType="java.util.Map">
+    	select product_control_brand,
+    		   (select brand_name from tbl_dic_product_brand where id = product_control_brand) brand_name,
+    		   case when product_control_mode = '1' then '全部控货'
+    		   		else '下单控货' end product_control_modes,
+    		   logo
+    	  from tbl_product_control_det_apply
+    	 where product_control_id = #{id,jdbcType=INTEGER}
+    </select>
+    <!-- 审批数据是否存在 -->
+    <select id="queryProductControlApplyById" parameterType="java.util.Map" resultType="int">
+    	select count(1) 
+  		  from tbl_product_control_apply 
+  		 where id = #{id,jdbcType=INTEGER}
+  		 <if test="approval_state !=null and approval_state !=''">
+  		   and approval_state = #{approval_state,jdbcType=CHAR}
+  		 </if>
+    </select>
+    <!-- 更新审批信息 -->
+    <update id="updateProductControlApplyApprovalState" parameterType="java.util.Map">
+    	update tbl_product_control_apply
+    	   set approval_date = sysdate,
+               approval_user_id = #{public_user_id,jdbcType=INTEGER},
+               <if test="rejected_reason !=null and rejected_reason !=''">
+               rejected_reason = #{rejected_reason,jdbcType=VARCHAR},
+               </if>
+               approval_state = #{approval_state,jdbcType=CHAR}
+         where id = #{id,jdbcType=INTEGER}
+    </update>
+    <!-- 新增控货信息 -->
+    <insert id="inserProductControl" parameterType="java.util.Map">
+    	insert into tbl_product_control
+		(
+			id,
+			user_id,
+			user_store_address_id,
+			product_control_type,
+			product_control_radius,
+			create_user_id,
+			create_date,
+			remark
+		)
+		 select id,
+				user_id,
+				user_store_address_id,
+				product_control_type,
+				product_control_radius,
+				create_user_id,
+				create_date,
+				remark
+		  from tbl_product_control_apply
+		 where id = #{id,jdbcType=INTEGER}
+    </insert>
+    <!-- 新增控货明细 -->
+    <insert id="insertProductControlDetail" parameterType="java.util.Map">
+    	insert into tbl_product_control_detail
+    	(
+    		product_control_id,
+    		product_control_brand,
+    		product_control_mode,
+    		logo
+    	)
+		select product_control_id,
+	    	   product_control_brand,
+	    	   product_control_mode,
+	    	   logo
+	      from tbl_product_control_det_apply
+	     where product_control_id = #{id,jdbcType=INTEGER}
+    </insert>
+    
+    <!-- 删除控货明细 -->
+    <delete id="deleteProductControlDetail" parameterType="java.util.Map">
+		delete from tbl_product_control_detail where product_control_id = #{id,jdbcType=INTEGER}
+    </delete>
+    <!-- 查询控货信息是否存在 -->
+    <select id="queryProductControlIsExist" parameterType="java.util.Map" resultType="int">
+    	select count(1) from tbl_product_control where id = #{id,jdbcType=INTEGER}
+    </select>
+    <!-- 更新控货信息 -->
+    <update id="updateProductControl" parameterType="java.util.Map">
+    	update tbl_product_control
+    	   set (product_control_type,
+			   product_control_radius,
+			   create_user_id,
+			   create_date,
+			   remark) = (select product_control_type,
+			   					 product_control_radius,
+			   					 create_user_id,
+			   					 create_date,
+			   					 remark 
+			   			    from tbl_product_control_apply
+			   			   where id = #{id,jdbcType=INTEGER})	
+		where id = #{id,jdbcType=INTEGER}
+    </update>
+    
+    <resultMap type="java.util.Map" id="resultPeripheryList">
+    	<result column="login_name" property="name"/>
+    	<result column="longitude" property="lng"/>
+    	<result column="latitude" property="lat"/>
+    	<result column="product_control_radius" property="radius"/>
+    	<result column="type_name" property="controlType"/>
+    	<result column="total" property="total"/>
+    	<result column="state" property="state"/>
+    	<result column="user_id" property="user_id"/>
+    	<result column="user_state" property="user_state"/>
+    </resultMap>
+    <!-- 查询控货信息  -->
+    <!-- 查询控货信息  20171007 shif优化-->
+    <select id="queryPeripheryList" parameterType="java.util.Map" resultMap="resultPeripheryList">
+<!--     	select distinct tpc.id, -->
+<!--     	       tusa.state, -->
+<!--     	       tusa.user_id, -->
+<!--     		   (select login_name from tbl_user_info where id = tusa.user_id) login_name, -->
+<!--                tusa.longitude, -->
+<!--                tusa.latitude, -->
+<!--                (select type_name from tbl_product_control_type where id = tpc.product_control_type) type_name, -->
+<!--                tpc.product_control_radius, -->
+<!--                (select count(1) from tbl_product_control_detail where product_control_id = tpc.id) total, -->
+<!--                case when temp.user_id = tusa.user_id then '1' -->
+<!--                 else '0' end show_flag -->
+<!--           from tbl_user_store_address tusa left join tbl_product_control tpc on tusa.id = tpc.user_store_address_id, -->
+<!--                                             tbl_user_info tui, -->
+<!--                                             (select user_id -->
+<!-- 			                                   from tbl_user_store_address tusa -->
+<!-- 			                                  where tusa.approval_state = '1' -->
+<!-- 			                                  <if test="public_user_type != null and public_user_type == 3"> -->
+<!-- 									                and exists (select 1 from tbl_user_info where id = tusa.user_id and referee_user_id = #{public_user_id,jdbcType=INTEGER})  -->
+<!-- 									           		and exists (select 1 from tbl_agent_control_area_conf where city_id = tusa.city and user_id = #{public_user_id,jdbcType=INTEGER}) -->
+<!-- 									           </if> -->
+<!-- 									           <if test="public_user_type != null and public_user_type == 4"> -->
+<!-- 									                and exists (select 1 from tbl_user_info where id = tusa.user_id and market_supervision_user_id = #{public_user_id,jdbcType=INTEGER})  -->
+<!-- 									           		and exists (select 1 from tbl_agent_control_area_conf where city_id = tusa.city and user_id = #{public_user_id,jdbcType=INTEGER}) -->
+<!-- 									           </if> -->
+<!-- 									           <if test="public_user_type != null and public_user_type == 5"> -->
+<!-- 									                and exists (select 1 from tbl_store_user_rel where user_id = tusa.user_id and type = '3' and store_id in (select id from tbl_store_info where state = '2' and shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER}))  -->
+<!-- 									           		and exists (select 1 from tbl_store_control_area_conf where city_id = tusa.city and store in (select id from tbl_store_info where shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER})) -->
+<!-- 									           </if>) temp -->
+<!--          where tusa.id != #{user_store_address_id,jdbcType=INTEGER} -->
+<!--            and tusa.approval_state = '1' -->
+<!--            and tusa.user_id = tui.id  -->
+<!--            and tui.user_state != '2' -->
+           SELECT  t2.id,
+           		   t1.state,
+           		   t1.surrounding_USER_ID as USER_ID,
+           		   (select user_state from tbl_user_info where id=t1.surrounding_USER_ID) as user_state,
+			       (select login_name from tbl_user_info where id = t1.surrounding_USER_ID) login_name,
+			       t1.longitude,
+			       t1.latitude, 
+			       (select type_name from tbl_product_control_type where id = t2.product_control_type) type_name,
+			       nvl(t2.product_control_radius,0) product_control_radius,
+			       (select count(1) from tbl_product_control_detail where product_control_id = t2.id) total
+			  FROM (SELECT TUSA1.USER_ID AS USER_ID,
+			               TUSA1.ID AS STORE_ID,
+			               TUSA2.STATE,
+			               TUSA2.USER_ID AS surrounding_USER_ID,
+			               TUSA2.ID AS surrounding_STORE_ID,
+			               GETDISTANCE (TUSA1.LONGITUDE,
+			                            TUSA1.LATITUDE,
+			                            TUSA2.LONGITUDE,
+			                            TUSA2.LATITUDE)
+			                  AS DISTANCE,
+			               tusa2.longitude,
+			               tusa2.latitude   
+			          FROM TBL_USER_STORE_ADDRESS TUSA1, TBL_USER_STORE_ADDRESS TUSA2
+			         WHERE     TUSA2.APPROVAL_STATE in (0,1)
+			         	   AND TUSA1.USER_STORE_STATE = 2
+			         	   AND TUSA2.USER_STORE_STATE = 2
+			               AND TUSA1.LONGITUDE IS NOT NULL
+			               AND TUSA1.LATITUDE IS NOT NULL
+			               AND TUSA2.LONGITUDE IS NOT NULL
+			               AND TUSA2.LATITUDE IS NOT NULL
+			               AND TUSA2.ID != #{user_store_address_id,jdbcType=INTEGER}
+			               AND TUSA1.ID = #{user_store_address_id,jdbcType=INTEGER}
+			               <if test="public_user_type != null and public_user_type == 3">
+				                and exists (select 1 from tbl_user_info where id = TUSA2.USER_ID and referee_user_id = #{public_user_id,jdbcType=INTEGER}) 
+				           		and exists (select 1 from tbl_agent_control_area_conf where city_id = TUSA2.city and user_id = #{public_user_id,jdbcType=INTEGER})
+				           </if>
+				           <if test="public_user_type != null and public_user_type == 4">
+				                and exists (select 1 from tbl_user_info where id = TUSA2.USER_ID and market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}) 
+				           		and exists (select 1 from tbl_agent_control_area_conf where city_id = TUSA2.city and user_id = #{public_user_id,jdbcType=INTEGER})
+				           </if>
+				           <if test="public_user_type != null and public_user_type == 5">
+				                and exists (select 1 from tbl_store_user_rel where user_id = TUSA2.USER_ID and type = '3' and store_id in (select id from tbl_store_info where state = '2' and shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER})) 
+				           		and exists (select 1 from tbl_store_control_area_conf where city_id = TUSA2.city and store in (select id from tbl_store_info where shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER}))
+				           </if>
+			               ) T1,tbl_product_control t2
+			 WHERE T1.DISTANCE &lt;= 15000
+			       AND T1.surrounding_USER_ID = T2.USER_ID(+)
+			       AND T1.surrounding_STORE_ID = T2.USER_STORE_ADDRESS_ID(+)
+           
+           
+    </select>
+    <!-- 查询距离 -->
+    <select id="queryDistance" parameterType="java.util.Map" resultType="double">
+    	 select getdistance(#{latitude,jdbcType=INTEGER},#{longitude,jdbcType=INTEGER},#{latitude1,jdbcType=INTEGER},#{longitude1,jdbcType=INTEGER}) from dual
+    </select>
+    <!-- 新增控货附件 -->
+    <insert id="insertProductControlAttachment" parameterType="java.util.Map">
+    	insert into tbl_product_control_att(product_control_id,file_path) values(#{id,jdbcType=INTEGER},#{file_path,jdbcType=VARCHAR})
+    </insert>
+    <!-- 删除控货附件 -->
+    <delete id="deleteProductControlAttachment" parameterType="java.util.Map">
+    	delete from tbl_product_control_att where product_control_id = #{id,jdbcType=INTEGER}
+    </delete>
+    <!-- 打开控货开关 -->
+    <update id="updateUserSAState" parameterType="java.util.Map">
+    	update tbl_user_store_address
+    	   set state = '2',
+	    	   update_user_id = #{public_user_id,jdbcType=INTEGER},
+    	   	   update_date = sysdate
+    	 where id = (select user_store_address_id from tbl_product_control_apply where id = #{id,jdbcType=INTEGER})
+    </update>
+</mapper>

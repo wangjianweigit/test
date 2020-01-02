@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.basicinfo.dao.AddressLibraryManageDao">
+
+    <sql id="all_column">
+        id,
+        parent_id,
+        name,
+        code,
+        area_code,
+        zip_code,
+        alias_name,
+        is_delete
+    </sql>
+
+    <resultMap id="addressFile" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="parent_id" property="parent_id"/>
+        <result column="name" property="name"/>
+        <result column="code" property="code"/>
+        <result column="is_display" property="is_display"/>
+    </resultMap>
+    
+	<resultMap id="addressLibrary" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="parent_id" property="pId"/>
+        <result column="name" property="name"/>
+        <result column="code" property="code"/>
+        <result column="area_code" property="area_code"/>
+        <result column="zip_code" property="zip_code"/>
+        <result column="alias_name" property="alias_name"/>
+        <result column="is_delete" property="is_delete"/>
+    </resultMap>
+
+    <select id="queryById" resultMap="addressLibrary" parameterType="long">
+        select <include refid="all_column"/>,sort
+        from TBL_ADDRESS_LIBRARY_INFO
+        where is_delete = 1
+            and id = #{id, jdbcType=INTEGER}
+    </select>
+
+    <select id="queryList" resultMap="addressLibrary">
+        select <include refid="all_column"/>,sort
+        from TBL_ADDRESS_LIBRARY_INFO
+        where is_delete = 1
+        <if test="parent_id != null">
+           and parent_id = #{parent_id, jdbcType=INTEGER}
+        </if>
+        order by sort, code
+    </select>
+
+    <select id="queryReleaseDate" resultType="java.lang.String">
+        select to_char(release_date,'YYYY-MM-DD HH24:MI:SS') release_date
+        from (
+            select release_date
+            from TBL_ADDRESS_LIBRARY_LOG
+            order by release_date desc
+        ) where rownum = 1
+    </select>
+
+    <!-- 批量插入或更新省市县数据信息 -->
+    <update id="batchInsertOrUpdate" parameterType="java.util.Map">
+        merge into TBL_ADDRESS_LIBRARY_INFO c1
+        using
+        (
+            <foreach collection="list" item="item" index="index" separator="UNION">
+                select
+                #{item.id, jdbcType=INTEGER} id,
+                #{item.parent_id, jdbcType=INTEGER} parent_id,
+                #{item.name, jdbcType=VARCHAR} name,
+                #{item.code, jdbcType=VARCHAR} code,
+                #{item.area_code, jdbcType=VARCHAR} area_code,
+                #{item.zip_code, jdbcType=VARCHAR} zip_code,
+                #{item.alias_name, jdbcType=VARCHAR} alias_name,
+                #{item.sort, jdbcType=INTEGER} sort
+                from dual
+            </foreach>
+        ) t1 on (c1.id = t1.id)
+        when matched then
+            update set
+                c1.name = t1.name,
+                c1.area_code = t1.area_code,
+                c1.zip_code = t1.zip_code,
+                c1.alias_name = t1.alias_name,
+                c1.sort = t1.sort
+        when not matched then
+            insert
+            (
+                id,
+                parent_id,
+                name,
+                code,
+                area_code,
+                zip_code,
+                alias_name,
+                sort
+            )
+            values
+            (
+                t1.code,
+                t1.parent_id,
+                t1.name,
+                t1.code,
+                t1.area_code,
+                t1.zip_code,
+                t1.alias_name,
+                t1.sort
+            )
+    </update>
+
+    <!--批量新增或者更新区域相关信息-->
+    <update id="batchInsertOrUpdateRegion">
+        merge into tbl_dic_region c1 using
+        (
+            select
+                ali.id,
+                ali.parent_id,
+                ali.name,
+                (case when ali.is_delete = 1 then 1 else 0 end) is_display,
+                ali.code,
+                ali.area_code,
+                ali.zip_code,
+                ali.alias_name,
+                ali.sort
+            from tbl_address_library_info ali
+            left join tbl_dic_region dr on dr.id = ali.id
+            where dr.id is null or dr.name != ali.name or dr.parent_id != ali.parent_id or dr.is_display != (case when ali.is_delete = 1 then 1 else 0 end)
+            or dr.code != ali.code or dr.area_code != ali.area_code or dr.zip_code != ali.zip_code or dr.alias_name != ali.alias_name or dr.sort != ali.sort
+        ) t1 on (c1.id = t1.id)
+        when matched then
+            update set
+                c1.parent_id = t1.parent_id,
+                c1.name = t1.name,
+                c1.code = t1.code,
+                c1.area_code = t1.area_code,
+                c1.zip_code = t1.zip_code,
+                c1.alias_name = t1.alias_name,
+                c1.sort = t1.sort,
+                c1.is_display = t1.is_display
+        when not matched then
+            insert (
+                id,
+                parent_id,
+                name,
+                code,
+                area_code,
+                zip_code,
+                alias_name,
+                sort,
+                is_display
+            ) values (
+                t1.id,
+                t1.parent_id,
+                t1.name,
+                t1.code,
+                t1.area_code,
+                t1.zip_code,
+                t1.alias_name,
+                t1.sort,
+                t1.is_display
+            )
+    </update>
+
+    <!-- 逻辑删除省市县数据 -->
+    <update id="delete" parameterType="java.util.Map">
+        update TBL_ADDRESS_LIBRARY_INFO
+          set is_delete = 2
+        where id = #{id, jdbcType=INTEGER}
+    </update>
+
+    <select id="isExist" parameterType="java.util.Map" resultMap="addressLibrary">
+        select t1.* from (
+            <foreach collection="list" item="item" index="index" separator="UNION">
+                select
+                #{item.id, jdbcType=INTEGER} id,
+                #{item.parent_id, jdbcType=INTEGER} parent_id,
+                #{item.name, jdbcType=VARCHAR} name,
+                #{item.code, jdbcType=VARCHAR} code,
+                #{item.area_code, jdbcType=VARCHAR} area_code,
+                #{item.zip_code, jdbcType=VARCHAR} zip_code,
+                #{item.alias_name, jdbcType=VARCHAR} alias_name,
+                #{item.sort, jdbcType=INTEGER} sort
+                from dual
+            </foreach>
+        ) t1  where exists (select 1 from TBL_ADDRESS_LIBRARY_INFO t2 where t1.parent_id = t2.parent_id and nvl(t1.id,0) != t2.id and t1.name = t2.name)
+    </select>
+
+    <select id="isExistCode" parameterType="java.util.Map" resultType="java.lang.Integer">
+        select count(1) from (
+            <foreach collection="list" item="item" index="index" separator="UNION">
+                select
+                #{item.id, jdbcType=INTEGER} id,
+                #{item.parent_id, jdbcType=INTEGER} parent_id,
+                #{item.name, jdbcType=VARCHAR} name,
+                #{item.code, jdbcType=VARCHAR} code,
+                #{item.area_code, jdbcType=VARCHAR} area_code,
+                #{item.zip_code, jdbcType=VARCHAR} zip_code,
+                #{item.alias_name, jdbcType=VARCHAR} alias_name,
+                #{item.sort, jdbcType=INTEGER} sort
+                from dual
+            </foreach>
+        ) t1 where exists (select 1 from TBL_ADDRESS_LIBRARY_INFO t2 where (nvl(t1.id,0) != t2.id and t1.code = t2.code))
+    </select>
+
+    <!--查询已更新区域列表-->
+    <resultMap id="updateRegionListColumn" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="parent_id" property="parent_id"/>
+        <result column="name" property="name"/>
+        <result column="code" property="code"/>
+        <result column="area_code" property="area_code"/>
+        <result column="zip_code" property="zip_code"/>
+        <result column="alias_name" property="alias_name"/>
+        <result column="sort" property="sort"/>
+        <result column="is_delete" property="is_delete"/>
+    </resultMap>
+    <select id="queryUpdateRegionList" parameterType="java.util.Map" resultMap="updateRegionListColumn">
+        select
+            ali.id,
+            ali.parent_id,
+            ali.name,
+            ali.is_delete
+        from tbl_address_library_info ali
+        left join tbl_dic_region dr on dr.id = ali.id
+        where dr.id is null or dr.name != ali.name or dr.parent_id != ali.parent_id or dr.is_display != (case when ali.is_delete = 1 then 1 else 0 end)
+    </select>
+	<!-- 发布省市县数据，生产文件时的数据信息 -->
+    <select id="queryRelease" resultMap="addressFile">
+        select
+            dr.id,
+            (case when (select parent_id from tbl_dic_region where id = dr.parent_id) = 0 then 0 else dr.parent_id end) parent_id,
+            dr.name,
+            dr.code,
+            dr.is_display
+        from tbl_dic_region dr
+        WHERE dr.parent_id != 0
+        order by dr.sort asc
+    </select>
+
+    <insert id="insertReleaseLog" parameterType="java.util.Map">
+        insert into TBL_ADDRESS_LIBRARY_LOG
+        select SEQ_ADDRESS_LIBRARY_LOG.nextval, a.url, a.release_date , #{create_user_id,jdbcType=INTEGER} from (
+            <foreach collection="list" item="item" index="index" separator="UNION">
+                select
+                #{item} url,
+                sysdate release_date
+                from dual
+            </foreach>
+        )a
+    </insert>
+
+    <update id="updateSort" parameterType="java.util.Map">
+        update TBL_ADDRESS_LIBRARY_INFO
+        <set>
+            <if test="sort!=null">
+                sort = #{sort,jdbcType=INTEGER}
+            </if>
+            <if test="type == 'top'">
+                <if test="parent_id!=null">
+                    sort = (select min(sort) - 1 from TBL_ADDRESS_LIBRARY_INFO where parent_id = #{parent_id,jdbcType=INTEGER})
+                </if>
+            </if>
+            <if test="type == 'bottom'">
+                <if test="parent_id!=null">
+                    sort = (select max(sort) + 1 from TBL_ADDRESS_LIBRARY_INFO where parent_id = #{parent_id,jdbcType=INTEGER})
+                </if>
+            </if>
+        </set>
+        WHERE id = #{id,jdbcType=INTEGER}
+    </update>
+
+</mapper>

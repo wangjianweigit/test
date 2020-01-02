@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.decoration.dao.AdvertisingDao">
+    <sql id="all_column">
+        id,
+        name,
+        remark,
+        type,
+        width,
+        height
+    </sql>
+    <sql id="all_column_detail">
+        id,
+        name,
+        DVERTISING_id,
+        file_url,
+        link_url,
+        order_id,
+        to_char(APPLY_START_DATE,'yyyy-mm-dd hh24:mi:ss') as apply_start_date,
+        to_char(APPLY_END_DATE,'yyyy-mm-dd hh24:mi:ss') as apply_end_date
+    </sql>
+    <!--查询广告位列表  -->
+    <select id="queryList" parameterType="java.util.Map" resultType="java.util.Map">
+        select <include refid="all_column"/>,(b.width || 'X' || b.height) measure
+          from TBL_ADVERTISING_INFO b where b.advertising_type=#{advertising_type,jdbcType=VARCHAR}
+    </select>
+    <!-- 广告文本编辑器封装封装 -->
+	<resultMap type="java.util.Map" id="advertisingDetailResultMap">
+        <result property="CONTENT" column="CONTENT" jdbcType="CLOB" javaType = "java.lang.String"/>
+    </resultMap>
+    <!--查询广告 -->
+    <select id="queryDetail" parameterType="java.util.Map" resultType="java.util.Map" resultMap="advertisingDetailResultMap">
+        select
+          d.id,
+          d.name,
+          d.DVERTISING_id,
+          d.file_url,
+          d.link_url,
+          d.order_id,
+          d.content,
+          to_char(d.APPLY_START_DATE,'yyyy-mm-dd hh24:mi:ss') as apply_start_date,
+          to_char(d.APPLY_END_DATE,'yyyy-mm-dd hh24:mi:ss') as apply_end_date,
+          case when d.APPLY_START_DATE &gt; sysdate then '2' 
+          	   when d.APPLY_END_DATE &lt; sysdate then '3'
+          	   else '1' end as apply_state,
+          I.name info_name
+        from TBL_ADVERTISING_DETAIL d,TBL_ADVERTISING_INFO I
+        <where>
+            d.DVERTISING_id = I.id
+            <if test="dvertising_id != null and dvertising_id != 0">
+                and dvertising_id = #{dvertising_id}
+            </if>
+                and d.site_id=#{public_user_site_id,jdbcType=INTEGER}
+        </where>
+        order by DVERTISING_ID,order_id desc
+    </select>
+    <!--根据ID查询广告信息 -->
+    <select id="queryDetailById" parameterType="java.util.Map" resultType="java.util.Map" resultMap="advertisingDetailResultMap">
+        select <include refid="all_column_detail"/>,
+        	   CONTENT
+        from TBL_ADVERTISING_DETAIL
+        where id = #{id} 
+    </select>
+    <!--查询广告位详情 -->
+     <select id="queryAdvertisingDetail" parameterType="java.util.Map" resultType="java.util.Map">
+        select <include refid="all_column"/>
+        from TBL_ADVERTISING_INFO
+        where id = #{id,jdbcType=INTEGER}
+    </select>
+    
+    <!--新增广告位 -->
+    <insert id="insertAdvertising" parameterType="java.util.Map">
+        <selectKey keyProperty="id" resultType="int" order="BEFORE">
+            select SEQ_ADVERTISING_INFO.nextval from dual
+        </selectKey>
+        insert into TBL_ADVERTISING_INFO( 
+        id,
+        name,
+        remark,
+        type,
+        width,
+        height,
+        create_user_id,
+        create_date,
+        advertising_type)
+        values (
+            #{id,jdbcType=INTEGER},
+            #{name,jdbcType=VARCHAR},
+            #{remark,jdbcType=VARCHAR},
+            #{type,jdbcType=VARCHAR},
+            #{width,jdbcType=INTEGER},
+            #{height,jdbcType=INTEGER},
+            #{public_user_id,jdbcType=INTEGER},
+            sysdate,
+            #{advertising_type,jdbcType=CHAR}
+        )
+    </insert>
+   <!--修改广告位 -->
+    <update id="updateAdvertising" parameterType="java.util.Map">
+        update TBL_ADVERTISING_INFO
+        <set>
+            <if test="name != null and name != ''">
+                name = #{name,jdbcType=VARCHAR},
+            </if>
+            <if test="remark != null">
+                remark = #{remark,jdbcType=VARCHAR},
+            </if>
+            <if test="type != null and type != ''">
+                type = #{type,jdbcType=VARCHAR},
+            </if>
+            <if test="width != null">
+                width = #{width,jdbcType=VARCHAR},
+            </if>
+            <if test="height != null">
+                height = #{height,jdbcType=VARCHAR}
+            </if>
+        </set>
+        where id = #{id}
+    </update>
+    <!--删除广告位 -->
+    <delete id="" parameterType="java.util.Map">
+        delete from TBL_ADVERTISING_INFO where id = #{id}
+    </delete>
+    
+    <!--新增广告 -->
+     <insert id="insertAdvertisingDetail" parameterType="java.util.Map">
+        <selectKey keyProperty="id" resultType="int" order="BEFORE">
+            select SEQ_ADVERTISING_DETAIL.nextval from dual
+        </selectKey>
+        insert into TBL_ADVERTISING_DETAIL( 
+        id,
+        dvertising_id,
+        file_url,
+        type,
+        link_url,
+        order_id,
+        content,
+        create_date,
+        create_user_id,
+        site_id,
+        apply_start_date,
+        apply_end_date
+         )
+        values (
+          #{id,jdbcType=INTEGER},
+          #{dvertising_id,jdbcType=INTEGER},
+          #{file_url,jdbcType=VARCHAR},
+          #{type,jdbcType=VARCHAR},
+          #{link_url,jdbcType=VARCHAR},
+          #{id,jdbcType=INTEGER},
+          #{content,jdbcType=VARCHAR},
+          sysdate,
+          #{public_user_id,jdbcType=INTEGER},
+          #{public_user_site_id,jdbcType=INTEGER},
+          to_date(#{apply_start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss'),
+          to_date(#{apply_end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+        )
+    </insert>
+    <!--修改广告 -->
+    <update id="updateAdvertisingDetail" parameterType="java.util.Map">
+        update TBL_ADVERTISING_DETAIL
+        <set>
+            <if test="name != null and name != ''">
+                name = #{name,jdbcType=VARCHAR},
+            </if>
+            <if test="file_url != null and file_url != ''">
+                file_url = #{file_url,jdbcType=VARCHAR},
+            </if>
+            <if test="link_url != null">
+                link_url = #{link_url,jdbcType=VARCHAR},
+            </if>
+            <if test="content != null and content != ''">
+                content = #{content,jdbcType=VARCHAR},
+            </if>
+            <if test="order_id != null and order_id != 0">
+                order_id = #{order_id,jdbcType=INTEGER},
+            </if>
+            <if test="apply_start_date != null and apply_start_date != ''">
+                apply_start_date =  to_date(#{apply_start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss'),
+            </if>
+            <if test="apply_end_date != null and apply_end_date != ''">
+                apply_end_date =  to_date(#{apply_end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+            </if>
+        </set>
+        where id = #{id} and site_id=#{public_user_site_id,jdbcType=INTEGER}
+    </update>
+    <!--删除广告 -->
+    <delete id="removeAdvertisingDetail" parameterType="java.util.Map">
+        delete from TBL_ADVERTISING_DETAIL where id = #{id}
+    </delete>
+    <!--删除广告位 -->
+    <delete id="removeAdvertising" parameterType="java.util.Map">
+        delete from TBL_ADVERTISING_INFO where id = #{id}
+    </delete>
+    
+    <!--根据广告位iD查询广告条数 -->
+    <select id="queryDetailByDvertisingId" parameterType="java.util.Map" resultType="java.util.Map">
+        select id from tbl_advertising_detail where dvertising_id=#{dvertising_id,jdbcType=INTEGER}
+        and site_id=#{public_user_site_id,jdbcType=INTEGER}
+    </select>
+
+   
+</mapper>

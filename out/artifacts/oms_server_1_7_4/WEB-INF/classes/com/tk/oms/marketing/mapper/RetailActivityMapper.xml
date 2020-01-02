@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.marketing.dao.RetailActivityDao">
+
+	<!--查询经销商列表数据-->
+    <select id="queryDistributorList" parameterType="java.util.Map" resultType="java.util.Map">
+                select id
+                	from tbl_user_info tui
+                where
+                    tui.distribution_state = 1
+                <if test="mobile!=null and mobile!=''">
+                    and user_manage_mobilephone = #{mobile,jdbcType=VARCHAR}
+                </if>
+                <if test="shop_id!=null and shop_id!=''">
+                	and id=#{shop_id,jdbcType=VARCHAR}
+                </if>
+    </select>
+    
+    <!--查询店铺列表数据-->
+    <select id="queryShopList" parameterType="java.util.Map" resultType="java.util.Map">
+    	select t1.id,case when t2.shop_name is null then t1.user_manage_name else t2.shop_name end shop_name
+    	  from tbl_user_info t1,tbl_retail_user_info t2
+    	 where t1.distribution_state = 1
+    	   and t1.id = t2.id(+)
+    	   <if test="shop_name!=null and shop_name!=''">
+           	and (t1.user_manage_name like concat(concat('%', #{shop_name,jdbcType=VARCHAR}),'%')
+           	or t2.shop_name like concat(concat('%', #{shop_name,jdbcType=VARCHAR}),'%'))
+           </if>
+    </select>
+
+</mapper>

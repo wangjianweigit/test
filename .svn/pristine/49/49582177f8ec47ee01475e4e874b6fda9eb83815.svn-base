@@ -1,0 +1,1383 @@
+package com.tk.oms.member.dao;
+
+import java.util.List;
+import java.util.Map;
+
+import com.tk.oms.member.entity.MemberInfo;
+import org.apache.ibatis.annotations.Param;
+import org.springframework.stereotype.Repository;
+
+
+@Repository
+public interface MemberInfoDao {
+	 /**
+     * 根据登录用户名查找用户
+     * @param login_name
+     * @return
+     */
+    public int queryMemberInfoApplyByLoginName(String login_name);
+    /**
+     * 根据登录用户名查找用户
+     * @param login_name
+     * @return
+     */
+    public int queryMemberInfoByLoginName(String login_name);
+    /**
+     * 根据电话查找用户查找用户
+     * @param login_name
+     * @return
+     */
+    public int queryMemberInfoApplyByMobilePhone(Map<String,Object> params);
+	/**
+	 * 根据身份证号查找用户数量(临时表)
+	 * @param params
+	 * @return
+	 */
+	public int queryMemberInfoApplyByUserManageCardId(Map<String,Object> params);
+	/**
+	 * 根据身份证号查找用户数量(主表)
+	 * @param params
+	 * @return
+	 */
+	public int queryMemberInfoByUserManageCardId(Map<String,Object> params);
+    /**
+     * 根据电话查找用户查找用户
+     * @param login_name
+     * @return
+     */
+    public int queryMemberInfoByMobilePhone(Map<String,Object> params);
+    /**
+     * 根据ID查询区域信息
+     * @param login_name
+     * @return
+     */
+     public Map<String,Object> queryDicRegionById(long id);
+     /**
+      * 新增用户信息申请表
+      * @param login_name
+      * @return
+      */
+     public int insertMemberInfoApply(Map<String,Object> params);
+     /**
+      * 新增平台会员申请成为经销商申请记录
+      * @param login_name
+      * @return
+      */
+     public int addUserAgentApply(Map<String,Object> params);
+     /**
+      * 平台会员申请成为经销商审核
+      * @param login_name
+      * @return
+      */
+     public int updateUserAgentApply(Map<String,Object> params);
+     /**
+      * 新增用户信息
+      * @param login_name
+      * @return
+      */
+     public int insertMemberInfo(Map<String,Object> params);
+     /**
+      * 根据用户名查询用户信息
+      * @param login_name
+      * @return
+      */
+     public  Map<String,Object> queryMemberInfoById (Map<String,Object> params);
+     /**
+      * 根据用户名查询用户物流关系表
+      * @param login_name
+      * @return
+      */
+     public  List<String> queryUserLogisticsCompamy (String user_name);
+     /**
+      * 根据用户名批量删除用户关联的物流公司信息
+      * @param user_name
+      * @return
+      */
+     public int deleteByUserName(String user_name);
+     /**
+      * 根据id删除用户信息表
+      * @param user_name
+      * @return
+      */
+     public int deleteMemberInfoById(long id);
+     /**
+      * 批量插入用户物流关系
+      * @param user_name
+      * @return
+      */
+     public int batchInsert(List<Map<String,Object>> list);
+     /**
+      * 分页获取待审批会员列表
+      * @param params 查询条件
+      * @return
+      */
+     public List<Map<String,Object>> queryMemberInfoPageBy(Map<String,Object> params);
+     /**
+      * 分页获会员管理列表
+      * @param params 查询条件
+      * @return
+      */
+     public List<Map<String,Object>> queryMemberInfoApplyPageBy(Map<String,Object> params);
+     /**
+      * 统计待审批列表总数
+      * @param params
+      * @return
+      */
+     public int queryMemberInfoCount(Map<String,Object> params);
+     /**
+      * 统计会员管理总数
+      * @param params
+      * @return
+      */
+     public int queryMemberInfoApplyCount(Map<String,Object> params);
+     /**
+ 	 * 暂不审核
+ 	 * @param params
+ 	 * @return
+ 	 */
+ 	public int updateMemberStateToPause(Map<String, Object> params);
+ 	/**
+     * 申请表根据用户名查找用户
+     * @param user_name
+     * @return
+     */
+    public Map<String, Object> queryMemberInfoApplyById(String user_name);
+    /**
+     * 更新会员申请信息
+     * @param params
+     * @return
+     */
+    public int updateMemberInfoApply(Map<String,Object> params);
+    /**
+     * 更新会员审核通过状态
+     * @param params
+     * @return
+     */
+    public int updateMemberInfoApplyState(Map<String,Object> params);
+    /**
+     * 更新会员信息
+     * @param params
+     * @return
+     */
+    public int updateMemberInfo(Map<String,Object> params);
+    /**
+     * 根据用户ID查询用户账户信息个数 
+     *
+     * @param userAccount
+     * @return
+     */
+    public int queryBankAccountByUserId(long user_id);
+    /**
+     * 根据用户ID查询用户账户信息 
+     *
+     * @param userAccount
+     * @return
+     */
+    public Map<String,Object> queryBankAccountInfoByUserId(long user_id);
+    /**
+     * 获取用户key，用于生产校检码
+     * @param params
+     * @return
+     */
+    public String getUserKey(Map<String,Object> params);
+    /**
+     * 获取余额校验码
+     * @param params
+     * @return
+     */
+    public String getCheck_Code(Map<String,Object> params);
+    /**
+     * 新增用户key缓存表
+     * @param login_name
+     * @return
+     */
+    public int insertCacheKey(Map<String,Object> params);
+    /**
+     * 新增用户账户信息表
+     * @param login_name
+     * @return
+     */
+    public int insertBankAccount(Map<String,Object> params);
+    /**
+     * 新增用户地址
+     * @param login_name
+     * @return
+     */
+    public int insertUserAddress(Map<String,Object> params);
+    /**
+     * 获取会员信息
+     * @param params 查询条件
+     * @return
+     */
+    public Map<String,Object> queryMemberDetailByUserName(String user_name);
+    /**
+     * 根据用户名启用或禁用用户
+     * @param params
+     * @return
+     */
+    public int disableUserInfoById(Map<String,Object> params);
+    /**
+     * 根据用户名启用或禁用用户
+     * @param params
+     * @return
+     */
+    public int multiDisableUserInfoByUserId(Map<String,Object> params);
+    /**
+     * 根据用户名更新用户账户
+     *
+     * @param userAccount
+     * @return
+     */
+    public int updateBankAccountByUserId(Map<String,Object> params);
+    /**
+     * 更新用户折扣率
+     *
+     * @param userAccount
+     * @return
+     */
+    public int updateUserInfoDiscount(Map<String,Object> params);
+    /**
+     * 根据用户ID查询用户账户积分
+     *
+     * @param user_id
+     * @return
+     */
+    public int queryScoreByUserId(long user_id);
+    /**
+     * 设置会员代发等级
+     *
+     * @param userInfo
+     * @return
+     */
+    public int updateMemberIssuingGrade(Map<String,Object> params);
+	/**
+	 * 获取业务员、业务经理、门店下属会员列表
+	 */
+	public List<Map<String, Object>> querySubsidiaryMemberList(Map<String, Object> params);
+	
+    /**
+	 * 获取业务员、业务经理、门店下属会员数量
+	 */
+	public int querySubsidiaryMemberCount(Map<String, Object> params);
+	/**
+     * 获取个人收支记录
+     * @param params
+     * @return
+     */
+    public List<Map<String,Object>> queryMemberAccountRecordList(Map<String,Object> params);
+    /**
+   	 * 获取个人收支记录详情
+   	 * @param orderinfoMap
+   	 */
+   	public Map<String,Object> queryMemberAccountRecordDetail(Map<String,Object> map);
+   	/**
+     * 统计个人收支记录总数
+     * @param paramMap
+     * @return
+     */
+    public int queryMemberAccountRecordCount(Map<String, Object> paramMap);
+	 /**
+	 * 获取授信管理记录数量
+	 * @param paramMap
+	 * @return
+	 */
+	public int queryCreditCount(Map<String, Object> paramMap);
+	/**
+	 * 获取授信管理记录列表
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> queryCreditList(Map<String, Object> paramMap);
+	/**
+	 * 获取授信管理详情信息
+	 * @param paramMap
+	 * @return
+	 */
+	public Map<String, Object> queryCreditById(long id);
+	/**
+     * 新增授信管理
+     * @param login_name
+     * @return
+     */
+    public int insertCredit(Map<String,Object> params);
+    /**
+     * 修改授信管理
+     * @param login_name
+     * @return
+     */
+    public int updateCredit(Map<String,Object> params);
+    /**
+     * 删除授信管理
+     * @param login_name
+     * @return
+     */
+    public int removeCredit(long id);
+    /**
+	 * 根据ID更新审批用户信息
+	 * @return
+	 */
+	int updateById(Map<String,Object> params);
+	/**
+     * 根据用户ID查询代发等级
+     *
+     * @param user_id
+     * @return
+     */
+    public Map<String,Object> queryIssuingGradeByUserId(long user_name);
+    /**
+     * 根据用户ID查询信息
+     *
+     * @param user_id
+     * @return
+     */
+    public String querySysUserInfoById(long id);
+    /**
+     * 查询临时会员信息
+     * @param 
+     * @return
+     */
+    public  Map<String,Object> queryTempMemberInfo(Map<String,Object> params);
+    /**
+     * 获取注册临时会员ID
+     * @param 
+     * @return
+     */
+	public int queryTempMemberInfoId(Map<String, Object> tempParamMap);
+    /**
+     * 注册临时会员信息
+     * @param 
+     * @return
+     */
+	public int insertTempMemberInfo(Map<String, Object> tempParamMap);
+	/**
+     * 更新临时会员信息
+     * @param 
+     * @return
+     */
+	public int updateTempMemberInfo(Map<String, Object> tempParamMap);
+	/**
+	 * 根据会员用户名获取会员信息以及会员账号信息
+	 * @param login_name
+	 * @return
+	 */
+	Map<String, Object> queryUserAccountByUserName(@Param("user_name")String user_name);
+	/**
+	 * 根据会员用户ID获取会员信息以及会员账号信息
+	 * @param login_name
+	 * @return
+	 */
+	Map<String, Object> queryUserAccountById(long id);
+	/**
+	 * 获取账号预审总条数
+	 */
+	public int queryAccountPreCount(Map<String, Object> params);
+	/**
+	 * 获取账号预审列表
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> queryAccountPreList(Map<String, Object> paramMap);
+	/**
+	 *会员预审通过次数加1或者预审登入次数加1
+	 * @param paramMap
+	 * @return
+	 */
+	public int updateMemberInfoById(Map<String, Object> paramMap);
+	/**
+	 *会员授信审核后修改一系列金额并修改验证码
+	 * @param paramMap
+	 * @return
+	 */
+	public void updateBankAccount(Map<String, Object> paramMap);
+	/**
+	 * 获取特殊价格总条数
+	 */
+	public int queryMemberSpecialPriceCount(Map<String, Object> params);
+	/**
+	 *获取特殊价格列表
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> queryMemberSpecialPriceList(Map<String, Object> paramMap);
+	/**
+	 *查询该申请单号下的用户
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> queryUserDicountUserInfo(String apply_number);
+	/**
+	 *查询特殊价格会员下的商品
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> queryUserDicountProduct(Map<String, Object> paramMap);
+	/**
+	 *新增用户特殊价格
+	 * @param paramMap
+	 * @return
+	 */
+	public int insertUserDiscount(Map<String, Object> paramMap);
+	/**
+	 *新增用户特殊价格商品表
+	 * @param paramMap
+	 * @return
+	 */
+	public int insertUserDiscountProduct(Map<String, Object> paramMap);
+	/**
+	 *根据id查询特殊价格
+	 * @param paramMap
+	 * @return
+	 */
+	public Map<String, Object> queryUserDiscountById(long id);
+	/**
+     * 删除特殊价格单
+     * @param login_name
+     * @return
+     */
+    public int removeUserDiscount(String apply_number);
+    /**
+     * 删除特殊价格商品表
+     * @param login_name
+     * @return
+     */
+    public int removeUserDiscountProduct(String apply_number);
+    /**
+     * 删除特殊价格商品表明细
+     * @param login_name
+     * @return
+     */
+    public int removeByApplyNumberAndUserName(Map<String, Object> paramMap);
+    /**
+     * 删除特殊价格商品表明细
+     * @param login_name
+     * @return
+     */
+    public int removeByCondition(Map<String, Object> paramMap);
+    /**
+     * 生成申请单号
+     * @param login_name
+     * @return
+     */
+    public String queryApplyNumber();
+    /**
+     * 修改特价单状态
+     * @param login_name
+     * @return
+     */
+    public int updateUserDiscountState(Map<String, Object> paramMap);
+	/**
+	 * 获取会员折后价
+	 * @param params
+	 * @return
+     */
+	public Map<String, Object> querySpecialDiscountPrice(Map<String, Object> params);
+    /**
+	 * 用户销售日报表数量  （废弃）
+	 * @param params
+	 * @return
+	 */
+	public int queryUserDailyReportCountBy(Map<String, Object> params);
+	/**
+     * (分页)用户销售日报表列表  （废弃）
+     * @param params
+     * @return
+     */
+	public List<Map<String, Object>> queryUserDailyReportListBy(Map<String, Object> params);
+	/**
+	 * (无分页)查询用户销售日报表  (废弃)
+	 * @param params
+	 * @return
+	 */
+	public Map<String, Object> queryUserDailyReportToMap(Map<String, Object> params);
+	
+	/**
+	 * 查询用户销售日报表数量-默认（新）
+	 * @param params
+	 * @return
+	 */
+	public int queryUserDailyReportCountBy_Default(Map<String, Object> params);
+	
+	/**
+	 * 查询用户销售日报表数量-全部销售订单（新）
+	 * @param params
+	 * @return
+	 */
+	public int queryUserDailyReportCountBy_SaleOrder(Map<String, Object> params);
+	
+	/**
+	 *  查询用户销售日报表数量-待付款 （新）
+	 * @param params
+	 * @return
+	 */
+	public int queryUserDailyReportCountBy_NoPay(Map<String, Object> params);
+	
+	/**
+	 * 查询用户销售日报表数量-未发货（新）
+	 * @param params
+	 * @return
+	 */
+	public int queryUserDailyReportCountBy_NoSend(Map<String, Object> params);
+	
+	/**
+	 * 查询用户销售日报表数量-发货订单 （新）
+	 * @param params
+	 * @return
+	 */
+	public int queryUserDailyReportCountBy_Send(Map<String, Object> params);
+	
+	
+	/**
+	 * 排序获取用户某一页的用户列表-无排序字段 （新）
+	 * @param params
+	 * @return
+	 */
+	public List<String> queryUserDailyReportListBy_Default(Map<String, Object> params);
+	/**
+	 * 排序获取用户某一页的用户列表-用户基础资料排序 （新）
+	 * @param params
+	 * @return
+	 */
+	public List<String> queryUserDailyReportListBy_User(Map<String, Object> params);
+	/**
+	 * 排序获取用户某一页的用户列表-日志排序 （新）
+	 * @param params
+	 * @return
+	 */
+	public List<String> queryUserDailyReportListBy_Log(Map<String, Object> params);
+	/**
+	 * 排序获取用户某一页的用户列表-全部销售订单 （新）
+	 * @param params
+	 * @return
+	 */
+	public List<String> queryUserDailyReportListBy_Allorder(Map<String, Object> params);
+	/**
+	 * 排序获取用户某一页的用户列表-待付款订单 （新）
+	 * @param params
+	 * @return
+	 */
+	public List<String> queryUserDailyReportListBy_Obliorder(Map<String, Object> params);
+	/**
+	 * 排序获取用户某一页的用户列表-未发订单 （新）
+	 * @param params
+	 * @return
+	 */
+	public List<String> queryUserDailyReportListBy_Unshiporder(Map<String, Object> params);
+	/**
+	 * 排序获取用户某一页的用户列表-发货订单 （新）
+	 * @param params
+	 * @return
+	 */
+	public List<String> queryUserDailyReportListBy_Shiporder(Map<String, Object> params);
+	/**
+	 * 排序获取用户某一页的用户列表-退款订单 （新）
+	 * @param params
+	 * @return
+	 */
+	public List<String> queryUserDailyReportListBy_Refund(Map<String, Object> params);
+	/**
+	 * 排序获取用户某一页的用户列表-退货订单 （新）
+	 * @param params
+	 * @return
+	 */
+	public List<String> queryUserDailyReportListBy_Returns(Map<String, Object> params);
+	/**
+	 * 排序获取用户某一页的用户列表-实际销售 （新）
+	 * @param params
+	 * @return
+	 */
+	public List<String> queryUserDailyReportListBy_Actual(Map<String, Object> params);
+	
+	
+	/**
+	 * 数据获取-用户进行信息（新）
+	 * @param params
+	 * @return
+	 */
+	public List<Map<String,Object>> queryUserDailyReportList_User(Map<String, Object> params);
+	
+	/**
+	 * 数据获取-日志 -登录数（新）
+	 * @param params
+	 * @return
+	 */
+	public List<Map<String,Object>> queryUserDailyReportList_Log_Login(Map<String, Object> params);
+	
+	/**
+	 * 数据获取-日志 -访问数（新）
+	 * @param params
+	 * @return
+	 */
+	public List<Map<String,Object>> queryUserDailyReportList_Log_Page(Map<String, Object> params);
+	
+	/**
+	 * 数据获取-全部销售订单 （新）
+	 * @param params
+	 * @return
+	 */
+	public List<Map<String,Object>> queryUserDailyReportList_Allorder(Map<String, Object> params);
+	
+	/**
+	 * 数据获取-预定订单 （新）
+	 * @param params
+	 * @return
+	 */
+	public List<Map<String,Object>> queryUserDailyReportList_Preorder(Map<String, Object> params);
+	
+	/**
+	 * 数据获取-待付款订单 （新） 
+	 * @param params
+	 * @return
+	 */
+	public List<Map<String,Object>> queryUserDailyReportList_Obliorder(Map<String, Object> params);
+	
+	/**
+	 * 数据获取-未发订单 （新）
+	 * @param params
+	 * @return
+	 */
+	public List<Map<String,Object>> queryUserDailyReportList_Unshiporder(Map<String, Object> params);
+	
+	/**
+	 * 数据获取-发货订单 （新）
+	 * @param params
+	 * @return
+	 */
+	public List<Map<String,Object>> queryUserDailyReportList_Shiporder(Map<String, Object> params);
+	
+	/**
+	 * 数据获取-退款订单 （新）
+	 * @param params
+	 * @return
+	 */
+	public List<Map<String,Object>> queryUserDailyReportList_Refund(Map<String, Object> params);
+	
+	/**
+	 * 数据获取-退货订单 （新）
+	 * @param params
+	 * @return
+	 */
+	public List<Map<String,Object>> queryUserDailyReportList_Returns(Map<String, Object> params);
+	
+	
+	/**
+	 * 获取数据全局统计数据-日志 -登录数（新）
+	 * @param params
+	 * @return
+	 */
+	public Map<String,Object> queryUserDailyReportTotal_Log_Login(Map<String, Object> params);
+	
+	/**
+	 * 获取数据全局统计数据-日志 -访问数（新）
+	 * @param params
+	 * @return
+	 */
+	public Map<String,Object> queryUserDailyReportTotal_Log_Page(Map<String, Object> params);
+	
+	/**
+	 * 获取数据全局统计数据-全部销售订单 （新）
+	 * @param params
+	 * @return
+	 */
+	public Map<String,Object> queryUserDailyReportTotal_Allorder(Map<String, Object> params);
+	
+	/**
+	 * 获取数据全局统计数据-预定订单 （新）
+	 * @param params
+	 * @return
+	 */
+	public Map<String,Object> queryUserDailyReportTotal_Preorder(Map<String, Object> params);
+	
+	/**
+	 * 获取数据全局统计数据-待付款订单 （新） 
+	 * @param params
+	 * @return
+	 */
+	public Map<String,Object> queryUserDailyReportTotal_Obliorder(Map<String, Object> params);
+	
+	/**
+	 * 获取数据全局统计数据-未发订单 （新）
+	 * @param params
+	 * @return
+	 */
+	public Map<String,Object> queryUserDailyReportTotal_Unshiporder(Map<String, Object> params);
+	
+	/**
+	 * 获取数据全局统计数据-发货订单 （新）
+	 * @param params
+	 * @return
+	 */
+	public Map<String,Object> queryUserDailyReportTotal_Shiporder(Map<String, Object> params);
+	
+	/**
+	 * 获取数据全局统计数据-退款订单 （新）
+	 * @param params
+	 * @return
+	 */
+	public Map<String,Object> queryUserDailyReportTotal_Refund(Map<String, Object> params);
+	
+	/**
+	 * 获取数据全局统计数据-退货订单 （新）
+	 * @param params
+	 * @return
+	 */
+	public Map<String,Object> queryUserDailyReportTotal_Returns(Map<String, Object> params);
+	
+	/**
+	 * 查询订单明细(全部订单、待付款订单)   （废弃）
+	 * @param params
+	 * @return
+	 */
+	public List<Map<String, Object>> queryOrderRecord(Map<String, Object> params);
+	/**
+	 * 查询订单列表总数(全部订单、待付款订单)  （废弃）
+	 * @param params
+	 * @return
+	 */
+	public int queryOrderRecordCount(Map<String, Object> params);
+	
+	/**
+	 * 明细数量-销售订单（新）
+	 * @param params
+	 * @return
+	 */
+	public int queryOrderRecordCount_Allorder(Map<String, Object> params);
+	
+	/**
+	 * 明细列表-销售订单（新）
+	 * @param params
+	 * @return
+	 */
+	public List<Map<String, Object>> queryOrderRecordList_Allorder(Map<String, Object> params);
+	
+	/**
+	 * 查询预定订单列表总数
+	 * @param params
+	 * @return
+	 */
+	public int queryOrderRecordCount_Preorder(Map<String, Object> params);
+	/**
+	 * 查询预定订单明细
+	 * @param params
+	 * @return
+	 */
+	public List<Map<String, Object>> queryOrderRecordList_Preorder(Map<String, Object> params);
+	
+	/**
+	 * 明细数量-未付款（新）
+	 * @param params
+	 * @return
+	 */
+	public int queryOrderRecordCount_NoPayorder(Map<String, Object> params);
+	
+	/**
+	 * 明细列表-未付款（新）
+	 * @param params
+	 * @return
+	 */
+	public List<Map<String, Object>> queryOrderRecordList_NoPayorder(Map<String, Object> params);
+	
+	/**
+	 * 查询未发货订单明细
+	 * @param params
+	 * @return
+	 */
+	public List<Map<String, Object>> queryUnshipOrderRecord(Map<String, Object> params);
+	/**
+	 * 查询未发货订单列表总数
+	 * @param params
+	 * @return
+	 */
+	public int queryUnshipOrderRecordCount(Map<String, Object> params);
+	/**
+	 * 查询未发货订单明细
+	 * @param params
+	 * @return
+	 */
+	public List<Map<String, Object>> queryShipOrderRecord(Map<String, Object> params);
+	/**
+	 * 查询未发货订单列表总数
+	 * @param params
+	 * @return
+	 */
+	public int queryShipOrderRecordCount(Map<String, Object> params);
+	
+	/**
+	 * 查询退款单明细
+	 * @param params
+	 * @return
+	 */
+	public List<Map<String, Object>> queryRefundOrderRecord(Map<String, Object> params);
+	/**
+	 * 查询退款单列表总数
+	 * @param params
+	 * @return
+	 */
+	public int queryRefundOrderRecordCount(Map<String, Object> params);
+	
+	/**
+	 * 查询退货单明细
+	 * @param params
+	 * @return
+	 */
+	public List<Map<String, Object>> queryReturnOrderRecord(Map<String, Object> params);
+	/**
+	 * 查询退货单列表总数
+	 * @param params
+	 * @return
+	 */
+	public int queryReturnOrderRecordCount(Map<String, Object> params);
+	/**
+	 * 查询浏览记录和登录次数
+	 * @param params
+	 * @return
+	 */
+	public List<Map<String, Object>> queryBrowseRecord(Map<String, Object> params);
+	/**
+	 * 查询浏览记录和登录次数列表总数
+	 * @param params
+	 * @return
+	 */
+	public int queryBrowseRecordCount(Map<String, Object> params);
+
+	/**
+	 * 查询账户额度信息
+	 * @param user_id
+	 * @return
+     */
+	public Map<String,Object> queryBankAccount(long user_id);
+	/**
+	 * 取消月结
+	 * @param user_id
+	 * @return
+     */
+	public int cancelMonthlyStatement(long user_id);
+	/**
+	 * 更新用户校验码
+	 * @param user_id
+     */
+	public void updateUserAccountCode(long user_id);
+
+	/**
+	 * 更新会员余额及冻结余额
+	 *
+	 * @param params
+	 * @return
+     */
+	public int updateAccountAndFrozenBalance(Map<String, Object> params);
+
+	/**
+	 * 更新会员余额
+	 *
+	 * @param params
+	 * @return
+     */
+	public int updateAccountBalance(Map<String, Object> params);
+
+	/**
+	 * 更新授信余额和已使用额度
+	 *
+	 * @param params
+	 * @return
+	 */
+	int updateCreditBalanceAndUse(Map<String, Object> params);
+
+	/**
+     * 统计会员门店管理总数
+     * @param params
+     * @return
+     */
+    public int queryMemberStoreInfoCount(Map<String,Object> params);
+    /**
+     * 获取会员门店管理列表
+     * @param params
+     * @return
+     */
+    public List<Map<String,Object>> queryMemberStoreInfoList(Map<String,Object> params);
+    /**
+     * 新增会员门店关系
+     * @param params
+     * @return
+     */
+    public int insertMemberStore(Map<String,Object> params);
+    /**
+     * 获取会员门店管理详情
+     * @param params
+     * @return
+     */
+    public Map<String,Object> queryMemberStoreDetail(Map<String,Object> params);
+    /**
+     * 会员门店审批
+     * @param params
+     * @return
+     */
+    public int updateMemberStoreApprovalState(Map<String,Object> params);
+    /**
+     * 会员门店编辑
+     * @param params
+     * @return
+     */
+    public int memberStoreEdit(Map<String,Object> params);
+    /**
+     * 会员门店启用禁用
+     * @param params
+     * @return
+     */
+    public int memberStoreUpdateState(Map<String,Object> params);
+    /**
+     * 根据用户id查询会员门店地址数量
+     * @param params
+     * @return
+     */
+    public int queryUserStoreAddressByUserId(long user_id);
+    /**
+     * 查询是否有重复的会员门店名称
+     * @param params
+     * @return
+     */
+    public int queryMemberStoreNameCount(String store_name);
+    
+	/**
+	 * 更新会员业务归属
+	 *
+	 * @param params
+	 * @return
+     */
+	public int updateMemberBussiness(Map<String, Object> params);
+	/**
+	 * 根据条件查询特殊价格条数
+	 *
+	 * @param params
+	 * @return
+     */
+	public int queryUserDiscountCount(Map<String, Object> params);
+	
+	/**
+	 * 更新特殊价格
+	 *
+	 * @param params
+	 * @return
+     */
+	public int updateUserDiscount(Map<String, Object> params);
+	
+	/**
+	 * 变更会员业务经理【门店业务经理编辑时切换】
+	 *
+	 * @param params
+	 * @return
+     */
+	public int updateUserMSUIBecauseStoreMangerChange(Map<String, Object> params);
+	
+	/**
+	 * 变更会员业务经理【门店业务经理编辑时切换】apply
+	 *
+	 * @param params
+	 * @return
+     */
+	public int updateUserApplyMSUIBecauseStoreMangerChange(Map<String, Object> params);
+	
+	/**
+	 * 会员政策期设置
+	 *
+	 * @param params
+	 * @return
+     */
+	public int memberUpdatePolicyPeriod(Map<String, Object> params);
+	
+	/**
+	 * 会员状态日志记录
+	 *
+	 * @param params
+	 * @return
+     */
+	public int insertMemberStateLogs(Map<String, Object> params);
+	
+	/**
+	 * 会员状态日志总条数
+	 *
+	 * @param params
+	 * @return
+     */
+	public int queryMemberStateLogsCount(Map<String, Object> params);
+	
+	/**
+	 * 会员状态日志列表
+	 *
+	 * @param params
+	 * @return
+     */
+	public List<Map<String,Object>> queryMemberStateLogsList(Map<String, Object> params);
+	
+	/**
+	 * 查询所有订单在某个区间内的会员
+	 *
+	 * @param params
+	 * @return
+     */
+	public List<String> queryAllOrderMember(Map<String, Object> params);
+	
+	/**
+	 * 查询待付款订单在某个区间内的会员
+	 *
+	 * @param params
+	 * @return
+     */
+	public List<String> queryObliOrderMember(Map<String, Object> params);
+	
+	/**
+	 * 查询未发订单在某个区间内的会员
+	 *
+	 * @param params
+	 * @return
+     */
+	public List<String> queryUnshipOrderMember(Map<String, Object> params);
+	
+	/**
+	 * 查询已发订单在某个区间内的会员
+	 *
+	 * @param params
+	 * @return
+     */
+	public List<String> queryShipOrderMember(Map<String, Object> params);
+	
+	/**
+	 * 会员认证审批列表总条数
+	 *
+	 * @param params
+	 * @return
+     */
+	public int queryMemberCertificationApprovalCount(Map<String, Object> params);
+	
+	/**
+	 * 会员认证审批列表
+	 *
+	 * @param params
+	 * @return
+     */
+	public List<Map<String,Object>> queryMemberCertificationApprovalList(Map<String, Object> params);
+	
+	/**
+     * 会员认证审批详情
+     * @param params
+     * @return
+     */
+    public Map<String,Object> queryMemberCertificationApprovalDetail(Map<String,Object> params);
+    
+    /**
+	 * 会员账户表更新见证宝相关信息
+	 *
+	 * @param params
+	 * @return
+     */
+	public int updateBankAccountInfo(Map<String, Object> params);
+	
+	/**
+	 * 更新银行卡会员资料信息状态
+	 *
+	 * @param params
+	 * @return
+     */
+	public int updateBankCardUserInfo(Map<String, Object> params);
+	/**
+	 * 会员门店列表(店铺)
+	 * @param params
+	 * @return
+	 */
+	public List<Map<String,Object>> queryMemberStoreSelectList(Map<String, Object> params);
+	
+	/**
+	 * 联营门店账号信息添加
+	 *
+	 * @param params
+	 * @return
+     */
+	public int insertStoreBankAccount(Map<String, Object> params);
+	/**
+	 * 新增店铺用户key缓存表
+	 *
+	 * @param params
+	 * @return
+     */
+	public int insertStoreUserCacheKey(Map<String, Object> params);
+	/**
+	 * 退货扣款规则
+	 * @param params
+	 * @return
+	 */
+	public int memberUpdateDeductions(Map<String, Object> params);
+	/**
+	 * 用户级别设置
+	 * @param params
+	 * @return
+	 */
+	public int memberUpdateUserLevel(Map<String, Object> params);
+	
+	/**
+	 * 查询会员子账户列表
+	 * @param params
+	 * @return
+	 */
+	public List<Map<String, Object>> queryMemberSubAccount(Map<String, Object> params);
+	/**
+	 * 更新会员子账户
+	 * @param params
+	 * @return
+	 */
+	public int updateMemberSubAccount(Map<String, Object> params);
+	/**
+	 * 删除会员子账号
+	 * @param params
+	 * @return
+	 */
+	public int deleteMemberSubAccount(Map<String, Object> params);
+	/**
+	 * 添加会员子账号
+	 * @param params
+	 * @return
+	 */
+	public int addMemeberSubAccount(Map<String, Object> params);
+	/**
+	 * 三方订单启/禁用
+	 * @param params
+	 * @return
+	 */
+	public int updateUserInfoForOtherSyncState(Map<String, Object> params);
+	/**
+	 * 更新本地经销商ID
+	 * @param params
+	 * @return
+	 */
+	public int updateAgentId(Map<String, Object> params);
+	/**
+     * 商家审核通过默认初始化商家门店数据
+     * @param login_name
+     * @return
+     */
+    public int insertStoreUserManage(String user_name);
+    /**
+     * 删除控货明细表数据
+     * @param params
+     * @return
+     */
+	public int deleteProductControlDetail(Map<String, Object> params);
+	/**
+	 * 删除控货明细申请表数据
+	 * @param params
+	 * @return
+	 */
+	public int deleteProductControlDetApply(Map<String, Object> params);
+	/**
+	 * 删除控货文件表数据
+	 * @param params
+	 * @return
+	 */
+	public int deleteProductControlAtt(Map<String, Object> params);
+	/**
+	 * 删除控货表数据
+	 * @param params
+	 * @return
+	 */
+	public int deleteProductControl(Map<String, Object> params);
+	/**
+	 * 删除控货申请表数据
+	 * @param params
+	 * @return
+	 */
+	public int deleteProductControlApply(Map<String, Object> params);
+	/**
+	 * 更新控货开关
+	 * @param params
+	 * @return
+	 */
+	public int updateUserStoreAddress(Map<String, Object> params);
+
+	/**
+	 * 查询会员预审信息
+	 * @param userName
+	 * @return
+	 */
+	MemberInfo queryUserInfoPreChkInfo(@Param("userName") String userName);
+	
+	/**
+     * 会员送货入户设置信息
+     * @param params
+     * @return
+     */
+    public Map<String,Object> queryMemberDeliveryHomeByUserId(Map<String,Object> params);
+    
+    /**
+	 * 会员送货入户设置新增
+	 * @param params
+	 * @return
+	 */
+	public int insertMemberDeliveryHome(Map<String, Object> params);
+	
+	 /**
+	 * 会员送货入户设置编辑
+	 * @param params
+	 * @return
+	 */
+	public int updateMemberDeliveryHome(Map<String, Object> params);
+	
+	/**
+	 * 会员账号预审删除
+	 * @param params
+	 * @return
+	 */
+	public int accountPreRemove(Map<String, Object> params);
+	/**
+	 * 更新会员快递状态
+	 * @param paramMap
+	 */
+	public void updateUserLogisticsState(Map<String, Object> paramMap);
+	/**
+	 * 新增会员快递
+	 * @param paramMap
+	 * @return
+	 */
+	public int insertUserLogistics(Map<String, Object> paramMap);
+	/**
+	 * 查询会员快递详情
+	 * @param paramMap
+	 * @return
+	 */
+	public Map<String, Object> queryUserLogisticsDetail(Map<String, Object> paramMap);
+	/**
+	 * 判断子账号用户名是否重复
+	 * @param paramMap
+	 * @return
+	 */
+	public int queryMemberSubAccountLoginName(Map<String, Object> paramMap);
+	/**
+     * 记录用户操作日志
+     * @param login_name
+     * @return
+     */
+    public int insertUserOperationLog(Map<String,Object> param);
+    /**
+	 * 控货设置信息
+	 * @param paramMap
+	 * @return
+	 */
+	public Map<String, Object> queryControlSetInfo(Map<String, Object> paramMap);
+	/**
+	 * 控货设置明细
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> queryControlSetDetail(Map<String, Object> paramMap);
+	/**
+	 * 新增控货设置
+	 * @param paramMap
+	 * @return
+	 */
+	public int insertControlSet(Map<String, Object> paramMap);
+	/**
+	 * 删除控货设置
+	 * @param paramMap
+	 * @return
+	 */
+	public int deleteControlSet(Map<String, Object> paramMap);
+	/**
+	 * 更新控货设置
+	 * @param paramMap
+	 * @return
+	 */
+	public int updateControlSet(Map<String, Object> paramMap);
+	/**
+	 * 删除控货设置明细
+	 * @param paramMap
+	 * @return
+	 */
+	public int deleteControlSetDetail(Map<String, Object> paramMap);
+	/**
+	 * 新增控货设置明细
+	 * @param paramMap
+	 * @return
+	 */
+	public int insertControlSetDetail(Map<String, Object> paramMap);
+	/**
+	 * 查询品牌列表
+	 * @param paramMap 
+	 * @return
+	 */
+	public List<Map<String, Object>> queryBrandList_Default(Map<String, Object> paramMap);
+	/**
+	 * 是否存在控货设置
+	 * @param paramMap
+	 * @return
+	 */
+	public int queryControlSetIsExists(Map<String, Object> paramMap);
+
+    /**
+     * 查询会员补扣款总数
+     * @param paramMap
+     * @return
+     */
+    public int querySupDeductCount(Map<String, Object> paramMap);
+
+    /**
+     * 查询会员补扣款列表
+     * @param paramMap
+     * @return
+     */
+    List<Map<String, Object>> querySupDeductListForPage(Map<String, Object> paramMap);
+
+    /**
+     * 保存会员补扣款
+     * @param paramMap
+     * @return
+     */
+    int insertOrUpdateSupDeduct(Map<String, Object> paramMap);
+
+    /**
+     * 删除会员补扣款
+     * @param paramMap
+     * @return
+     */
+    public int deleteSupDeduct(Map<String, Object> paramMap);
+
+    /**
+     * 查询会员扣款详情
+     * @param paramMap
+     * @return
+     */
+    public Map<String, Object> querySupDeductDetail(Map<String, Object> paramMap);
+
+    /**
+     * 会员补扣款审批
+     * @param paramMap
+     * @return
+     */
+    public int approvalSupDeduct(Map<String, Object> paramMap);
+    /**
+     * 会员补签批
+     * @param paramMap
+     * @return
+     */
+    public int signApprovalSupDeduct(Map<String, Object> paramMap);
+
+    /**
+     * 新增会员收支记录
+     * @param paramMap
+     * @return
+     */
+    int insertMemberRecordBySupDeduct(Map<String, Object> paramMap);
+
+    /**
+     * 校验会员余额校验码
+     * @param paramMap
+     * @return
+     */
+    int queryCheckAccountBalance(Map<String, Object> paramMap);
+    /**
+     * 新增销售日报表临时表
+     * @param params
+     */
+	public void insertTmpUserDailyReport(Map<String, Object> params);
+	/**
+	 * 查询销售日报表总数
+	 * @param params
+	 * @return
+	 */
+	public int queryUserDailyReportCount(Map<String, Object> params);
+}

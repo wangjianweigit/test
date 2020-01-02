@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.marketing.dao.ActivityProductDiscountDao">
+
+	<!-- 获取参与促销活动商品优惠列表 -->
+    <select id="queryActivityProductDiscountList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT ACTIVITY_PRODUCT_ID,
+    		   PRODUCT_ITEMNUMBER,
+    		   PRODUCT_SPEC,
+    		   MIN_COUNT,
+    		   PRIZE
+    	  FROM TBL_ACTIVITY_PRODUCT_SPECPRIZE
+    	 WHERE ACTIVITY_PRODUCT_ID = #{activity_product_id,jdbcType=INTEGER}
+    	 ORDER BY PRODUCT_SPEC,MIN_COUNT ASC
+	</select>
+	
+	<!-- 插入促销活动商品优惠列表 -->
+	<insert  id ="insertActivityProductDiscount" parameterType ="java.util.List">
+		insert into TBL_ACTIVITY_PRODUCT_SPECPRIZE(
+			ID,
+			ACTIVITY_ID,
+			ACTIVITY_PRODUCT_ID,
+			PRODUCT_ITEMNUMBER,
+			PRODUCT_SPEC,
+			MIN_COUNT,
+			PRIZE
+		)
+		select SEQ_ACTIVITY_PRODUCT_SPECPRIZE.NEXTVAL,
+			   A.ACTIVITY_ID,
+			   A.ACTIVITY_PRODUCT_ID,
+			   A.PRODUCT_ITEMNUMBER,
+			   A.PRODUCT_SPEC,
+			   A.MIN_COUNT,
+			   A.PRIZE
+		  from(
+		<foreach collection="list" item="item" index="index" separator="UNION">
+			SELECT
+				#{item.activity_id,jdbcType=INTEGER} AS activity_id,
+				#{item.activity_product_id,jdbcType=INTEGER} AS activity_product_id,
+				#{item.product_itemnumber,jdbcType=VARCHAR} AS product_itemnumber,
+				#{item.product_spec,jdbcType=VARCHAR} AS product_spec,
+				#{item.min_count,jdbcType=INTEGER} AS min_count,
+				#{item.prize,jdbcType=DOUBLE} AS prize
+			from dual
+		</foreach>
+		) A
+	</insert>
+	<!-- 插入前删除促销活动商品优惠列表 -->
+	<delete  id ="deleteActivityProductDiscount" parameterType ="java.util.Map">
+		DELETE FROM TBL_ACTIVITY_PRODUCT_SPECPRIZE
+		WHERE ACTIVITY_PRODUCT_ID = #{activity_product_id,jdbcType=INTEGER}
+	</delete>
+	<!-- 查询一个参加活动的商品的各个规格的原始售价以及最低售价，作为设置阶梯价格的参考 -->
+	<select id="queryActivityProductPrice" parameterType ="java.util.Map" resultType="java.util.Map">
+	    select 
+	        ps.product_itemnumber,
+	        ps.product_group_member,
+	        NVL(ps.product_prize_cost,0) product_prize_cost,
+	        /**原始活动售价**/
+	        getProductSpec_HdPrice(
+	        max(ps.id),
+	        (select activity_discount from TBL_ACTIVITY_PRODUCT_APPLY where is_delete='1' and activity_id = #{activity_id,jdbcType=INTEGER} and product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}),
+	        (select activity_service_discount from TBL_ACTIVITY_DETAIL where ACTIVITY_ID = #{activity_id,jdbcType=INTEGER})
+	        ) original_price,
+	        /**最低售价**/
+	        getSku_min_pre(max(ps.id),(select activity_discount from TBL_ACTIVITY_PRODUCT_APPLY where is_delete='1' and activity_id = #{activity_id,jdbcType=INTEGER} and product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR})) floor_price
+	    from tbl_product_sku ps,(
+	        select 
+	        product_group_member product_specs,
+	        max(product_prize_cost) product_prize_cost
+	        from tbl_product_sku where  product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR} and PRODUCT_GROUP = '规格' 
+	        group by product_group_member
+	    ) temp1
+	    where  
+	        ps.product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+	        AND ps.PRODUCT_GROUP = '规格' 
+	        AND temp1.product_specs = ps.product_group_member
+	        AND temp1.product_prize_cost = ps.product_prize_cost
+	    group by 
+	        ps.product_itemnumber,
+	        ps.product_group_member,
+	        ps.product_prize_cost
+	    order by  ps.product_group_member
+	</select>
+</mapper>

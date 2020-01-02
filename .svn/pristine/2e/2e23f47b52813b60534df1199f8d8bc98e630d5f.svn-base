@@ -1,0 +1,485 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.pvtp.member.dao.PvtpMemberInfoDao">
+	<sql id="all_column">
+		id,
+		user_name,
+		login_name,
+		user_pwd,
+		user_state,
+		user_resource,
+		create_user_id,
+		to_char(create_date,'yyyy-mm-dd hh24:mi:ss')  as  create_date,
+		edit_user_id,
+		to_char(edit_date,'yyyy-mm-dd hh24:mi:ss')  as  edit_date,
+		approval_user_id,
+		to_char(approval_date,'yyyy-mm-dd hh24:mi:ss')  as  approval_date,
+		user_create_ip,
+		user_login_count,
+		to_char(user_last_login_date,'yyyy-mm-dd hh24:mi:ss')  as  user_last_login_date,
+		user_last_login_ip,
+		user_head_imgurl,
+		user_manage_name,
+		user_manage_sex,
+		user_manage_cardid,
+		user_manage_cardid_file1,
+		user_manage_cardid_file2,
+		user_manage_current_address,
+		user_manage_telephone,
+		user_manage_mobilephone,
+		user_manage_weixin,
+		user_manage_qq,
+		user_manage_email,
+		user_company_name,
+		user_company_corporation,
+		user_company_telephone,
+		user_company_type,
+		user_company_address_max,
+		user_company_address_province,
+		user_company_address_city,
+		user_company_address_county,
+		user_company_address_deails,
+		user_company_comment,
+		referee_user_id,
+		referee_user_realname,
+		market_supervision_user_id,
+		market_supervision_user_realna,
+		store_id,
+		store_name,
+		openid,
+		to_char(last_update_time,'yyyy-mm-dd hh24:mi:ss')  as  last_update_time,
+		distribution_state,
+		issuing_grade_id,
+		user_business_licence_imgurl,
+		shop_website,
+		shop_name,
+		platform,
+		main_category,
+		shop_photo,
+		to_char(unbunding_date,'yyyy-mm-dd hh24:mi:ss')  as  unbunding_date,
+		site_id,
+		business_license_number,
+		user_company_location_address,
+		user_control_store_name, 
+		user_store_address_province, 
+		user_store_address_city,
+		user_store_address_county, 
+		user_store_address_deails,
+		user_store_location_address,
+		user_type,
+		partner_user_id,
+		partner_user_realna,
+		supervisor_user_id,
+		supervisor_user_realna,
+		commission_rate,
+		store_user_type,
+		user_logistics_template_id,
+		recommend_user_id
+	</sql>
+	<!-- 获取业务员、业务经理、门店下属会员列表 -->
+    <select id="querySubsidiaryMemberList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT  A.*,
+    			(SELECT TBA.CREDIT_MONEY FROM TBL_BANK_ACCOUNT TBA WHERE TBA.USER_ID = A.ID) AS CREDIT_MONEY,
+    			(SELECT TBA.ACCOUNT_BALANCE FROM TBL_BANK_ACCOUNT TBA WHERE TBA.USER_ID = A.ID) AS ACCOUNT_BALANCE,
+    			(SELECT TBA.CREDIT_MONEY_BALANCE FROM TBL_BANK_ACCOUNT TBA WHERE TBA.USER_ID = A.ID) AS CREDIT_MONEY_BALANCE,
+    			(SELECT TSUI.USER_REALNAME FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.ID = A.CREATE_USER_ID) AS CREATE_USER_REALNAME,
+    			(SELECT TSUI.USER_REALNAME FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.ID = A.APPROVAL_USER_ID) AS APPROVAL_USER_REALNAME,
+    			(select e.name  from  tbl_dic_region e where a.user_company_address_province=e.id) province,
+				(select f.name  from   tbl_dic_region f where A.user_company_address_city=f.id) city,
+				(select g.name  from   tbl_dic_region g where A.user_company_address_county=g.id) area
+    	  FROM (SELECT T.*,ROWNUM AS RN
+				  FROM (SELECT <include refid="all_column"/>
+				  		  FROM TBL_USER_INFO TUI
+					    <where>
+							   TUI.user_state !='2'
+							   and tui.user_type = 5
+							   and tui.stationed_user_id = #{public_user_stationed_user_id,jdbcType=INTEGER}
+							<if test="referee_user_id != null and referee_user_id != 0 ">
+								AND	TUI.REFEREE_USER_ID = #{referee_user_id,jdbcType=INTEGER}
+							</if>
+							<if test="store_user_id != null and store_user_id != 0 ">
+								AND (EXISTS (SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.SHOPKEEPER_USER_ID = #{store_user_id,jdbcType=INTEGER} AND TSI.ID = TUI.STORE_ID)
+									OR EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUR WHERE TSUR.USER_ID = #{store_user_id,jdbcType=INTEGER} AND TSUR.STORE_ID = TUI.STORE_ID)
+								)
+							</if>
+							<if test="login_name != null and login_name != ''">
+					            AND TUI.LOGIN_NAME LIKE '%'||#{login_name}||'%'
+					        </if>
+					        <if test="user_manage_name != null and user_manage_name != ''">
+					            AND TUI.USER_MANAGE_NAME LIKE '%'||#{user_manage_name}||'%'
+					        </if>
+					        <if test="user_manage_mobilephone != null and user_manage_mobilephone != ''">
+					            AND TUI.USER_MANAGE_MOBILEPHONE =#{user_manage_mobilephone}
+					        </if>
+					    </where>) T
+		 		 WHERE ROWNUM &lt;= #{end_rownum,jdbcType=INTEGER}) A
+		 WHERE RN &gt; #{start_rownum,jdbcType=INTEGER} 
+	</select>
+	
+	<!-- 获取业务员、业务经理、门店下属会员数量 -->
+    <select id="querySubsidiaryMemberCount" parameterType="java.util.HashMap" resultType="int">
+    	SELECT COUNT(1) 
+		  FROM TBL_USER_INFO TUI
+		<where>
+			   TUI.user_state !='2'
+			   and tui.user_type = 5
+			   and tui.stationed_user_id = #{public_user_stationed_user_id,jdbcType=INTEGER}
+			<if test="referee_user_id != null and referee_user_id != 0 ">
+				AND	TUI.REFEREE_USER_ID = #{referee_user_id,jdbcType=INTEGER}
+			</if>
+			<if test="store_user_id != null and store_user_id != 0 ">
+				AND (EXISTS (SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.SHOPKEEPER_USER_ID = #{store_user_id,jdbcType=INTEGER} AND TSI.ID = TUI.STORE_ID)
+					OR EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUR WHERE TSUR.USER_ID = #{store_user_id,jdbcType=INTEGER} AND TSUR.STORE_ID = TUI.STORE_ID)
+				)
+			</if>
+			<if test="login_name != null and login_name != ''">
+	            AND TUI.LOGIN_NAME LIKE '%'||#{login_name}||'%'
+	        </if>
+	        <if test="user_manage_name != null and user_manage_name != ''">
+	            AND TUI.USER_MANAGE_NAME LIKE '%'||#{user_manage_name}||'%'
+	        </if>
+	        <if test="user_manage_mobilephone != null and user_manage_mobilephone != ''">
+	            AND TUI.USER_MANAGE_MOBILEPHONE =#{user_manage_mobilephone}
+	        </if>
+		</where>
+	</select>
+	
+	<!--根据id查询用户信息 -->
+	<select id="queryMemberInfoById" parameterType="java.util.Map"  resultType="java.util.Map">
+		select
+		<include refid="all_column"/>,nvl(pre_aprv_allowed_number,0)pre_aprv_allowed_number,
+		nvl(pre_aprv_login_number,0)pre_aprv_login_number,user_policy_period,
+		service_rate,
+		to_char(distributor_date,'yyyy-mm-dd hh24:mi:ss')  as  distributor_date,
+		discount,
+		is_pos,
+		is_wechat,
+		decoration_state,
+		to_char(decoration_date,'yyyy-mm-dd hh24:mi:ss')  as  decoration_date,
+		platform_login_state,
+		expired_deductions,
+		unexpired_deductions,
+		user_level,
+		other_sync_state,
+		sleep_state,
+		agent_id
+		from tbl_user_info 
+		where id = #{id,jdbcType=INTEGER}
+		<if test="public_user_type != null and public_user_type == 2">
+            and EXISTS (SELECT 1 FROM TBL_SYS_USER_STORE TSUS WHERE TSUS.STORE_ID = STORE_ID AND TSUS.USER_ID = #{public_user_id,jdbcType=INTEGER})
+        </if>
+        <if test="public_user_type != null and public_user_type == 3">
+            and referee_user_id = #{public_user_id,jdbcType=INTEGER}
+        </if>
+        <if test="public_user_type != null and public_user_type == 4">
+            and market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+        </if>
+        <if test="public_user_type != null and public_user_type == 5">
+            and EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID = STORE_ID AND TSI.SHOPKEEPER_USER_ID = #{public_user_id,jdbcType=INTEGER})
+        </if>
+        <if test="public_user_type != null and public_user_type == 6">
+            and EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUI WHERE TSUI.STORE_ID = STORE_ID AND TSUI.USER_ID = #{public_user_id,jdbcType=INTEGER})
+        </if>
+        <if test="public_user_type != null and public_user_type == 9">
+            and EXISTS(SELECT 1 
+                         FROM TBL_SYS_USER_INFO TSUI
+                        WHERE TSUI.USER_TYPE = 4
+            				  AND TSUI.ORGANIZATION_ID IN (
+								  	SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+								  	START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER} CONNECT BY PRIOR ID = PARENT_ID
+					              )
+					          AND TSUI.id =market_supervision_user_id)
+        </if>
+	</select>
+	<!-- 获取二级域名 -->
+	<select id="getSLD" parameterType="java.util.Map" resultType="java.util.Map">
+		  select (select domain_name from tbl_sta_domain_name where stationed_user_id = t.id and state = 2 and is_delete = 1) domain_name,
+		  		 case when t.is_open_shop = 2 then 'shop'||t.shop_id
+		  		   else '0' end shop_id
+		  from tbl_stationed_user_info t
+		 where t.id = #{public_user_stationed_user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 查询私有站会员列表 -->
+	<select id="queryPvtpMemberInfoList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		select t.*,
+			(select company_name from tbl_stationed_user_info where id = t.stationed_user_id) stationed_user_name from (
+		select b.*, rownum rn from (
+			select a.id,a.user_name,a.user_state ,a.store_name,a.referee_user_realname,a.market_supervision_user_realna,a.login_name,a.user_manage_name,a.user_manage_mobilephone,a.user_manage_cardid,
+			a.user_manage_current_address,case a.user_resource when '1' then '自行注册' when '2' then '后台注册' end user_resource,
+			to_char(a.create_date,'yyyy-mm-dd hh24:mi:ss')create_date,to_char(a.edit_date,'yyyy-mm-dd hh24:mi:ss')edit_date,c.CONTACTS create_user_name,d.CONTACTS edit_name,
+			e.id grade_id,e.grade_name,nvl(f.score,0)score,nvl(a.discount,0)*100 discount,f.certification,
+			g.name||h.name||i.name||a.user_company_address_deails address,
+			f.ACCOUNT_BALANCE,f.CREDIT_MONEY,f.CREDIT_MONEY_BALANCE,f.CREDIT_MONEY_USE,
+			(case f.score 
+                 when null then ' '
+                 else (select GRADE_NAME from TBL_USER_GRADE_INFO sg where MIN_SCORE &lt;=f.score and MAX_SCORE &gt;f.score and rownum &lt;= 1)
+                 end) score_grade,j.name site_name,g.name province,h.name city,i.name county,k.CONTACTS ywy_user_name,l.CONTACTS ywjl_user_name, m.store_name md_name,
+			nvl(a.expired_deductions,0) expired_deductions,
+			nvl(a.unexpired_deductions,0) unexpired_deductions,
+			a.user_level,
+			a.other_sync_state,
+			a.stationed_user_id
+			from tbl_user_info a
+			left join TBL_STATIONED_USER_INFO c on a.create_user_id=c.id
+			left join TBL_STATIONED_USER_INFO d on a.edit_user_id=d.id
+			left join tbl_issuing_grade e on a.issuing_grade_id=e.id
+			left join tbl_bank_account f on a.id=f.user_id
+			left join tbl_dic_region g on a.user_company_address_province=g.id
+			left join tbl_dic_region h on a.user_company_address_city=h.id
+			left join tbl_dic_region i on a.user_company_address_county=i.id
+			left join tbl_site_info j on a.site_id=j.id
+			left join TBL_STATIONED_USER_INFO k on a.referee_user_id=k.id
+			left join TBL_STATIONED_USER_INFO l on a.market_supervision_user_id=l.id
+			left join tbl_store_info m on a.store_id=m.id
+			<where>
+			    a.user_state in(1,2)
+			    and a.user_type=5
+			    <if test="login_name!=null and login_name!=''">
+					and trim(a.login_name) =#{login_name,jdbcType=VARCHAR}
+				</if>
+				<if test="user_manage_name!=null and user_manage_name!=''">
+					and a.user_manage_name = #{user_manage_name,jdbcType=VARCHAR}
+				</if>
+				<if test="user_manage_mobilephone!=null and user_manage_mobilephone!=''">
+					and a.user_manage_mobilephone = #{user_manage_mobilephone, jdbcType=VARCHAR}
+				</if>
+				<if test="ywjl_user_id != null and ywjl_user_id != '' ">
+				    and	a.market_supervision_user_id = #{ywjl_user_id,jdbcType=VARCHAR}
+				</if>
+				<if test="md_id != null and md_id != 0 ">
+				    and	a.store_id = #{md_id,jdbcType=INTEGER}
+				</if>
+				<if test="ywy_user_id != null and ywy_user_id != '' ">
+				    and	a.referee_user_id = #{ywy_user_id,jdbcType=VARCHAR}
+				</if>
+				<if test="state != null">
+					and a.user_state IN
+		                <foreach item="item" collection="state" open="(" separator="," close=")">
+							#{item}
+						</foreach>
+				</if>
+				<if test="site_id != null and site_id!=''">
+					and a.site_id =#{site_id,jdbcType=INTEGER} 
+				</if>
+				<if test="province != null and province!=''">
+					and a.user_company_address_province =#{province,jdbcType=INTEGER} 
+				</if>
+				<if test="city != null and city!=''">
+					and a.user_company_address_city =#{city,jdbcType=INTEGER} 
+				</if>
+				<if test="area != null and area!=''">
+					and a.user_company_address_county =#{area,jdbcType=INTEGER} 
+				</if>
+				<if test="distribution_state != null and distribution_state !=''">
+					and a.distribution_state =#{distribution_state,jdbcType=INTEGER} 
+				</if>
+				<if test="user_company_type != null and user_company_type !=''">
+					and a.user_company_type =#{user_company_type,jdbcType=INTEGER} 
+				</if>
+				<if test="user_manage_cardid != null and user_manage_cardid != ''">
+				 	and a.user_manage_cardid = #{user_manage_cardid,jdbcType=VARCHAR}
+				</if>
+				<if test="stationed_id != null and stationed_id != ''">
+		   			and a.stationed_user_id = #{stationed_id,jdbcType=INTEGER}
+		   		</if>
+				<choose>
+					<when test="sort != null and sort != ''">
+						order by ${sort} ${sort_by},a.user_name
+					</when>
+					<otherwise>
+						order by a.create_date desc
+					</otherwise>
+				</choose>
+			</where>
+		) b where
+		rownum &lt;= #{end_rownum}) t
+		where rn &gt; #{start_rownum}
+	</select>
+	
+	<!--获取审批列表总数 -->
+	<select id="queryPvtpMemberInfoCount" parameterType="java.util.Map" resultType="int">
+				select count(1)
+				from tbl_user_info a
+				<where>
+				    a.user_state in(1,2)
+					and a.user_type=5
+				    <if test="login_name!=null and login_name!=''">
+						and trim(a.login_name) =#{login_name,jdbcType=VARCHAR}
+					</if>
+					<if test="user_manage_name!=null and user_manage_name!=''">
+						and a.user_manage_name = #{user_manage_name,jdbcType=VARCHAR}
+					</if>
+					<if test="user_manage_mobilephone!=null and user_manage_mobilephone!=''">
+						and a.user_manage_mobilephone = #{user_manage_mobilephone, jdbcType=VARCHAR}
+					</if>
+					<if test="ywjl_user_id != null and ywjl_user_id != '' ">
+				    	and	a.market_supervision_user_id = #{ywjl_user_id,jdbcType=VARCHAR}
+					</if>
+					<if test="md_id != null and md_id != 0 ">
+					    and	a.store_id = #{md_id,jdbcType=INTEGER}
+					</if>
+					<if test="ywy_user_id != null and ywy_user_id != '' ">
+					    and	a.referee_user_id = #{ywy_user_id,jdbcType=VARCHAR}
+					</if>
+					<if test="state != null">
+						and a.user_state IN
+			                <foreach item="item" collection="state" open="(" separator="," close=")">
+								#{item}
+							</foreach>
+					</if>
+					<if test="site_id != null and site_id!=''">
+						and a.site_id =#{site_id,jdbcType=INTEGER} 
+					</if>
+					<if test="province != null and province!=''">
+						and a.user_company_address_province =#{province,jdbcType=INTEGER} 
+					</if>
+					<if test="city != null and city!=''">
+						and a.user_company_address_city =#{city,jdbcType=INTEGER} 
+					</if>
+					<if test="area != null and area!=''">
+						and a.user_company_address_county =#{area,jdbcType=INTEGER} 
+					</if>
+					<if test="distribution_state != null and distribution_state !=''">
+						and a.distribution_state =#{distribution_state,jdbcType=INTEGER} 
+					</if>
+					<if test="user_company_type != null and user_company_type !=''">
+						and a.user_company_type =#{user_company_type,jdbcType=INTEGER} 
+					</if>
+					<if test="user_manage_cardid != null and user_manage_cardid != ''">
+					 	and a.user_manage_cardid = #{user_manage_cardid,jdbcType=VARCHAR}
+					</if>
+					<if test="stationed_id != null and stationed_id != ''">
+			   			and a.stationed_user_id = #{stationed_id,jdbcType=INTEGER}
+			   		</if>
+				</where>
+	</select>
+	<!--根据id查询用户信息 -->
+	<select id="queryPvtpMemberDetail" parameterType="java.util.Map"  resultType="java.util.Map">
+		SELECT
+			id,
+			user_name,
+			login_name,
+			user_pwd,
+			user_state,
+			user_resource,
+			create_user_id,
+			to_char(create_date,'yyyy-mm-dd hh24:mi:ss')  as  create_date,
+			edit_user_id,
+			to_char(edit_date,'yyyy-mm-dd hh24:mi:ss')  as  edit_date,
+			approval_user_id,
+			to_char(approval_date,'yyyy-mm-dd hh24:mi:ss')  as  approval_date,
+			user_create_ip,
+			user_login_count,
+			to_char(user_last_login_date,'yyyy-mm-dd hh24:mi:ss')  as  user_last_login_date,
+			user_last_login_ip,
+			user_head_imgurl,
+			user_manage_name,
+			user_manage_sex,
+			user_manage_cardid,
+			user_manage_cardid_file1,
+			user_manage_cardid_file2,
+			user_manage_current_address,
+			user_manage_telephone,
+			user_manage_mobilephone,
+			user_manage_weixin,
+			user_manage_qq,
+			user_manage_email,
+			user_company_name,
+			user_company_corporation,
+			user_company_telephone,
+			user_company_type,
+			user_company_address_max,
+			user_company_address_province,
+			user_company_address_city,
+			user_company_address_county,
+			user_company_address_deails,
+			user_company_comment,
+			referee_user_id,
+			referee_user_realname,
+			market_supervision_user_id,
+			market_supervision_user_realna,
+			store_id,
+			store_name,
+			openid,
+			to_char(last_update_time,'yyyy-mm-dd hh24:mi:ss')  as  last_update_time,
+			distribution_state,
+			issuing_grade_id,
+			user_business_licence_imgurl,
+			shop_website,
+			shop_name,
+			platform,
+			main_category,
+			shop_photo,
+			to_char(unbunding_date,'yyyy-mm-dd hh24:mi:ss')  as  unbunding_date,
+			site_id,
+			business_license_number,
+			user_company_location_address,
+			user_control_store_name, 
+			user_store_address_province, 
+			user_store_address_city,
+			user_store_address_county, 
+			user_store_address_deails,
+			user_store_location_address,
+			user_type,
+			partner_user_id,
+			partner_user_realna,
+			supervisor_user_id,
+			supervisor_user_realna,
+			commission_rate,
+			store_user_type,
+			user_logistics_template_id,
+			recommend_user_id,
+			nvl(pre_aprv_allowed_number,0)pre_aprv_allowed_number,
+			nvl(pre_aprv_login_number,0)pre_aprv_login_number,user_policy_period,
+			service_rate,
+			to_char(distributor_date,'yyyy-mm-dd hh24:mi:ss')  as  distributor_date,
+			discount,
+			is_pos,
+			is_wechat,
+			decoration_state,
+			to_char(decoration_date,'yyyy-mm-dd hh24:mi:ss')  as  decoration_date,
+			platform_login_state,
+			expired_deductions,
+			unexpired_deductions,
+			user_level,
+			other_sync_state,
+			sleep_state,
+			agent_id,
+			(SELECT company_name FROM TBL_STATIONED_USER_INFO TSUI WHERE TSUI.id=t.STATIONED_USER_ID) AS STATIONED_USER_REALNAME,
+			(SELECT CONTACTS FROM TBL_STATIONED_USER_INFO TSUI WHERE TSUI.id=t.MARKET_SUPERVISION_USER_ID) AS STATIONED_YWJL_USER_REALNAME,
+			(SELECT STORE_NAME FROM TBL_STORE_INFO TSI WHERE TSI.id=t.STORE_ID) AS STATIONED_STORE_NAME,
+			(SELECT CONTACTS FROM TBL_STATIONED_USER_INFO TSUI WHERE TSUI.id=t.REFEREE_USER_ID) AS STATIONED_YWY_USER_REALNAME,
+			(SELECT NAME FROM TBL_SITE_INFO TSI WHERE TSI.ID=T.SITE_ID) AS SITE_NAME
+		FROM tbl_user_info t WHERE id = #{id,jdbcType=INTEGER}
+	</select>
+	<!-- 查询私有站的业务员、业务经理 列表-->
+	<select id="queryStationUserList" parameterType="java.util.Map"  resultType="java.util.Map">
+		select id,user_name,contacts
+		FROM tbl_stationed_user_info sui
+		WHERE     
+        stationed_user_type = 1
+        AND stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+        <!-- 用户类型，20：系统用户、21：业务经理、22：销售人员 -->
+        <if test="user_type!=null and user_type!=0">
+	        AND user_type = #{user_type,jdbcType=INTEGER}
+        </if>
+        <if test="store_id!=null and store_id!=0">
+	        AND exists (
+	             select 1 from TBL_STORE_USER_REL sur where sur.user_id = sui.id
+	             AND store_id = #{store_id,jdbcType=INTEGER}
+	        )
+        </if>
+	</select>
+	<!-- 查询某个私有站业务经理下属的私有站门店列表 -->
+	<select id="queryStationListByManager" parameterType="java.util.Map"  resultType="java.util.Map">
+		select 
+			id,
+			store_code,
+			store_name
+		FROM TBL_STORE_INFO
+		WHERE manager_user_id = #{manager_user_id,jdbcType=INTEGER}  
+	</select>
+</mapper>
+

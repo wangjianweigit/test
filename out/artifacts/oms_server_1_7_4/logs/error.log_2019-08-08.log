@@ -1,0 +1,4 @@
+2019-08-08 14:21:49 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-08-08 14:21:59 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-08-08 14:22:02 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-08-08 14:22:07 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.

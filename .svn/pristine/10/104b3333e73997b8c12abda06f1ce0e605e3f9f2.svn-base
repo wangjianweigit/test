@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.store.order.dao.StoreTransactDao">
+	<!-- 商家列表 -->
+    <select id="queryMemberStoreSelectList" parameterType="java.util.Map" resultType="java.util.Map" resultMap="memberSelectListMap">
+    	select id, user_control_store_name
+    	  from tbl_user_info tui
+    	 where user_type = 2
+    	 and user_state=1
+    	 <if test="public_user_type != null and public_user_type == 3">
+            and 1=2
+         </if>
+         <if test="public_user_type != null and public_user_type == 4">
+            and tui.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+         </if>
+         <if test="public_user_type != null and public_user_type == 5">
+            and 1=2
+         </if>
+         <if test="public_user_type != null and public_user_type == 6">
+            and 1=2
+         </if>
+         <if test="public_user_type != null and public_user_type == 7">
+			and tui.supervisor_user_id = #{public_user_id,jdbcType=INTEGER}
+         </if>
+         <if test="public_user_type != null and public_user_type == 9">
+            and tui.partner_user_id = #{public_user_id,jdbcType=INTEGER}
+         </if>
+    	 order by id
+    </select>
+    <resultMap id="memberSelectListMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="user_control_store_name" property="option"/>
+    </resultMap>
+    <!-- 查询商家下的店铺列表 -->
+	<select id="queryUserStoreList" parameterType="java.util.Map" resultType="java.util.Map" resultMap="userStoreListMap">
+		select id,store_name from tbl_store_user_manage
+		 where user_id = #{user_id,jdbcType=INTEGER}
+		 and approval_state=1
+	</select>
+    <resultMap id="userStoreListMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="store_name" property="option"/>
+    </resultMap>
+	
+</mapper>

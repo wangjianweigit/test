@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.analysis.dao.MemberLogDao">
+
+    <sql id="where_case">
+        <where>
+            <if test="platform_type!=null and platform_type!=''">
+                and a.platform_type = #{platform_type,jdbcType=INTEGER}
+            </if>
+            <if test="login_name!=null and login_name!=''">
+                and a.login_name = #{login_name,jdbcType=VARCHAR}
+            </if>
+            <if test="user_manage_name!=null and user_manage_name!=''">
+                and a.user_manage_name like '%'||#{user_manage_name, jdbcType=VARCHAR}||'%'
+            </if>
+            <if test="source_type!=null and source_type!=''">
+                and upper(a.source_type) = upper(#{source_type,jdbcType=VARCHAR})
+            </if>
+            <if test="begin_time != null and begin_time != ''">
+                and a.create_date &gt;= TO_DATE(#{begin_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+            </if>
+            <if test="end_time != null and end_time != ''">
+                and a.create_date &lt;= TO_DATE(#{end_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+            </if>
+            <if test="ip!=null and ip!=''">
+                and a.ip = #{ip, jdbcType=VARCHAR}
+            </if>
+        </where>
+
+    </sql>
+    <select id="queryListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select b.*, rownum rn from (
+                select
+                    a.ID,
+                    a.PLATFORM_TYPE,
+                    a.LOGIN_NAME,
+                    a.USER_MANAGE_NAME,
+                    a.SOURCE_TYPE,
+                    a.SOURCE_DEVICE,
+                    a.SOURCE_DEVICE_VERSION,
+                    a.LOG_TYPE,
+                    a.LOG_OBJECT_TYPE,
+                    a.REFERRER_URL,
+                    a.IP,
+                    TO_CHAR(a.CREATE_DATE,'yyyy-mm-dd hh24:mi:ss') CREATE_DATE,
+            		NVL(TO_CHAR(a.SYSDATE_DATE,'yyyy-mm-dd hh24:mi:ss'),'--') SYSDATE_DATE
+                from tbl_user_log_info_new a
+                left join tbl_user_log_extra b on a.SESSION_TOKEN = b.SESSION_TOKEN and a.PAGE_TOKEN=b.PAGE_TOKEN
+                <include refid="where_case"/>
+                order by a.CREATE_DATE desc
+            ) b
+            where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <select id="queryCountForPage" parameterType="java.util.Map" resultType="int">
+        select count(1)
+        from tbl_user_log_info_new a
+        <include refid="where_case"/>
+    </select>
+	<resultMap type="java.util.Map" id="detailMap">
+        <result property="LOG_CONTENT_C" column="LOG_CONTENT_C" jdbcType="CLOB" javaType = "java.lang.String"/>
+    </resultMap>
+    <select id="queryDetail" parameterType="java.util.Map" resultMap="detailMap">
+        select
+            a.PLATFORM_TYPE,
+            a.LOGIN_NAME,
+            a.USER_MANAGE_NAME,
+            a.SOURCE_TYPE,
+            a.SOURCE_DEVICE,
+            a.SOURCE_DEVICE_VERSION,
+            a.OS_VERSION,
+            a.LOG_TYPE,
+            a.LOG_OBJECT_TYPE,
+            a.KEYWORD,
+            a.REFERRER_URL,
+            a.IP,
+            a.IP_LOCATION,
+            a.TIME_ON_PAGE,
+            a.LOG_CONTENT,
+            b.LOG_CONTENT LOG_CONTENT_C,
+            b.BROWSER_HEADER,
+            TO_CHAR(a.CREATE_DATE,'yyyy-mm-dd hh24:mi:ss') CREATE_DATE,
+            NVL(TO_CHAR(a.SYSDATE_DATE,'yyyy-mm-dd hh24:mi:ss'),'--') SYSDATE_DATE
+        from tbl_user_log_info_new a
+        left join tbl_user_log_extra b on a.SESSION_TOKEN = b.SESSION_TOKEN and a.PAGE_TOKEN=b.PAGE_TOKEN
+        where a.id = #{id, jdbcType=INTEGER}
+    </select>
+
+</mapper>

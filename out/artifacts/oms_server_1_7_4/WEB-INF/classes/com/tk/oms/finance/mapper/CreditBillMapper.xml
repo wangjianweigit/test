@@ -1,0 +1,861 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tk.oms.finance.dao.CreditBillDao">
+	<sql id="memberCreditWhereCase">
+		WHERE a.id = b.user_id
+		and a.user_type &lt;&gt;5
+		<if test="login_name !=null and login_name !=''">
+			and a.login_name like concat(concat('%', #{login_name,jdbcType=VARCHAR}),'%')
+		</if>
+		<if test="user_manage_name !=null and user_manage_name !=''">
+			and a.user_manage_name like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%')
+		</if>
+		AND b.credit_money + b.credit_money_use > 0
+	</sql>
+	<!-- 查询资金清算列表 -->
+	<select id="queryCapitalSettlementList" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT login_name,
+			user_manage_name,
+			user_id,
+			credit_money,
+			credit_money_balance,
+			bill_amount,
+			repayment_amount,
+			CASE WHEN (bill_amount + repayment_amount) > 0 THEN bill_amount + repayment_amount ELSE 0 END should_repayment_amount,
+			bill_date,
+			CASE WHEN (bill_amount + repayment_amount) > 0 THEN tran_amount ELSE tran_amount + bill_amount + repayment_amount END tran_amount,
+			repayment_date
+		FROM (
+			SELECT t1.*,
+				NVL (t2.bill_amount, 0) bill_amount,
+				t2.bill_date,
+				(SELECT NVL (SUM (tran_amount), 0) tran_amount FROM tbl_credit_bill_detail c WHERE bill_id IS NULL AND user_id = t1.user_id AND tran_type IN ('2', '3', '4')) repayment_amount,
+				(SELECT NVL (SUM (tran_amount), 0) FROM tbl_credit_bill_detail WHERE user_id = t1.user_id AND bill_id IS NULL AND tran_type = '1') tran_amount,
+				(
+				select
+					case when to_number(to_char(nvl(t2.create_date,sysdate),'dd')) >= to_number(value)
+						then to_char(add_months(nvl(t2.create_date,sysdate),1),'yyyy-mm')||'-'||lpad(value,2,'0')
+						else to_char(nvl(t2.create_date,sysdate),'yyyy-mm')||'-'||lpad(value,2,'0')
+					end
+				from tbl_sys_param_config where key = 'repayment_day'
+				) repayment_date
+			FROM (
+				SELECT * FROM (
+					SELECT i.*, ROWNUM num FROM (
+						SELECT a.login_name,
+							a.user_manage_name,
+							b.user_id,
+							b.credit_money,
+							b.credit_money_balance
+						FROM TBL_USER_INFO a, tbl_bank_account b
+						<include refid="memberCreditWhereCase"/>
+					) i where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+				) where num &gt;#{start_rownum,jdbcType=INTEGER}
+			) t1,
+				(
+				SELECT b1.id,
+					b1.bill_amount,
+					b1.user_id,
+					b1.year || '年' || b1.month || '月' AS bill_date,
+					b1.create_date
+				FROM tbl_credit_bill b1,
+				(SELECT user_id, MAX (id) AS id FROM tbl_credit_bill GROUP BY user_id) b2
+				WHERE b1.id = b2.id AND b1.user_id = b2.user_id
+			) t2
+		WHERE t1.user_id = t2.user_id(+))
+	</select>
+	<!-- 查询资金清算数量 -->
+	<select id="queryCapitalSettlementCount" parameterType="java.util.Map" resultType="int">
+		SELECT count(a.id)
+		FROM TBL_USER_INFO a, tbl_bank_account b
+		<include refid="memberCreditWhereCase"/>
+	</select>
+	<!-- 账户概况 -->
+	<select id="queryViewAccounts" parameterType="java.util.Map" resultType="java.util.Map">
+		 SELECT
+            login_name,
+            user_manage_name,
+            user_id,
+            credit_money,
+            credit_money_balance,
+            bill_amount,
+            repayment_amount,
+            CASE WHEN (bill_amount + repayment_amount) > 0 THEN bill_amount + repayment_amount ELSE 0 END should_repayment_amount,
+            CASE WHEN (bill_amount + repayment_amount) > 0 THEN tran_amount ELSE tran_amount + bill_amount + repayment_amount END tran_amount,
+            repayment_date
+        FROM (
+            SELECT t1.*, NVL (t2.bill_amount, 0) bill_amount,
+                (select case when to_number(to_char(nvl(t2.create_date,sysdate),'dd')) >= to_number(value)
+                            then to_char(add_months(nvl(t2.create_date,sysdate),1),'yyyy-mm')||'-'||lpad(value,2,'0')
+                            else to_char(nvl(t2.create_date,sysdate),'yyyy-mm')||'-'||lpad(value,2,'0')
+                        end
+                from tbl_sys_param_config where key = 'repayment_day') repayment_date,
+                (SELECT NVL (SUM (tran_amount), 0) tran_amount FROM tbl_credit_bill_detail c WHERE bill_id IS NULL AND user_id = t1.user_id AND tran_type IN ('2', '3', '4')) repayment_amount,
+                (SELECT NVL (SUM (tran_amount), 0) FROM tbl_credit_bill_detail WHERE user_id = t1.user_id AND bill_id IS NULL AND tran_type = '1') tran_amount
+            FROM (
+                SELECT
+                    a.login_name,
+                    a.user_manage_name,
+                    b.user_id,
+                    b.credit_money,
+                    b.credit_money_balance
+                FROM TBL_USER_INFO a, tbl_bank_account b
+                where a.id = b.user_id and a.id = #{user_id,jdbcType=INTEGER}
+            ) t1,
+            (
+                SELECT
+                    b1.id,
+                    b1.bill_amount,
+                    b1.user_id,
+                    b1.create_date
+                FROM tbl_credit_bill b1,(SELECT user_id, MAX (id) AS id FROM tbl_credit_bill GROUP BY user_id) b2
+                WHERE b1.id = b2.id AND b1.user_id = b2.user_id and b1.user_id = #{user_id,jdbcType=INTEGER}
+            ) t2
+        WHERE t1.user_id = t2.user_id(+))
+	</select>
+	<!-- 已出账单列表 -->
+	<select id="queryBillQueryOkList" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT * FROM (
+			SELECT id,
+				bill_month,
+				bill_amount,
+				case when bill_amount <![CDATA[ <= ]]> 0 then 0 when bill_amount + NVL (repayment_amount, 0) > 0 then 0 - NVL (repayment_amount, 0) else bill_amount end repayment_amount,
+				ROWNUM num
+			FROM (
+				SELECT id,
+					year || '年' || month || '月' AS bill_month,
+					bill_amount,
+					CASE WHEN (
+						SELECT MIN (id) FROM tbl_credit_bill WHERE id > c.id AND user_id = c.user_id) IS NOT NULL
+					THEN (
+						SELECT SUM (CASE WHEN tran_amount > 0 THEN 0 ELSE tran_amount END)
+						FROM tbl_credit_bill_detail b
+						WHERE bill_id = (SELECT MIN (id) FROM tbl_credit_bill WHERE id > c.id AND user_id = c.user_id)
+						AND user_id = c.user_id AND tran_type IN ('2', '3', '4'))
+					ELSE (
+						SELECT SUM (tran_amount) FROM tbl_credit_bill_detail b
+						WHERE bill_id IS NULL AND user_id = c.user_id AND tran_type IN ('2', '3', '4'))
+					END repayment_amount
+				FROM tbl_credit_bill c
+				WHERE user_id = #{user_id,jdbcType=INTEGER}
+				<if test="year !=null and year !=''">
+					and year = #{year,jdbcType=VARCHAR}
+				</if>
+				<if test="month !=null and month !=''">
+					and month = #{month,jdbcType=INTEGER}
+				</if>
+				ORDER BY year DESC, month DESC) a
+			WHERE ROWNUM <![CDATA[ <= ]]> #{end_rownum,jdbcType=INTEGER})
+		WHERE num > #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 已出账单数量 -->
+	<select id="queryBillQueryOkCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_credit_bill
+		 where user_id = #{user_id,jdbcType=INTEGER}
+		 <if test="year !=null and year !=''">
+			and year = #{year,jdbcType=VARCHAR}
+		</if>
+		<if test="month !=null and month !=''">
+			and month = #{month,jdbcType=INTEGER}
+		</if>
+	</select>
+	<!-- 未出账单列表 -->
+	<select id="queryBillQueryNoList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+            select a.*,rownum num from (
+				select id,
+					   tran_number,
+					   to_char(tran_date,'yyyy-mm-dd hh24:mi:ss') tran_date,
+					   tran_amount,
+					   tran_type,
+					   case when tran_type = '1' then '消费'
+							when tran_type = '2' then '上期结余'
+							when tran_type = '3' then '还款'
+						else '退款' end tran_types
+				  from tbl_credit_bill_detail
+				where bill_id is null
+					and user_id = #{user_id,jdbcType=INTEGER}
+					and posting_type = '2'
+				order by tran_date desc
+		   	) a
+			where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+		) where num &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 未出账单数量 -->
+	<select id="queryBillQueryNoCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_credit_bill_detail
+		 where bill_id is null
+		   and posting_type = '2'
+		   and user_id = #{user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 账单详情 -->
+	<select id="queryBillDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select id,tally_start_date,tally_end_date,bill_amount,
+            case when bill_amount <![CDATA[ <= ]]> 0 then 0 when bill_amount + NVL (repayment_amount, 0) > 0 then 0 - NVL (repayment_amount, 0) else bill_amount end repayment_amount,
+            repayment_date
+        from (
+            SELECT id,
+                   TO_CHAR (tally_start_date, 'yyyy-mm-dd') tally_start_date,
+                   TO_CHAR (tally_end_date, 'yyyy-mm-dd') tally_end_date,
+                   bill_amount,
+                   (NVL (
+                        CASE
+                            WHEN (SELECT MIN (id) FROM tbl_credit_bill WHERE id > c.id AND user_id = c.user_id) IS NOT NULL
+                                THEN (
+                                    SELECT SUM (
+                                         CASE
+                                            WHEN tran_amount > 0 THEN 0
+                                            ELSE tran_amount
+                                         END)
+                                    FROM tbl_credit_bill_detail b
+                                    WHERE bill_id = (SELECT MIN (id) FROM tbl_credit_bill WHERE id > c.id AND user_id = c.user_id)
+                                        AND user_id = c.user_id AND tran_type IN ('2', '3', '4'))
+                            ELSE (SELECT SUM (tran_amount) FROM tbl_credit_bill_detail b WHERE bill_id IS NULL AND user_id = c.user_id AND tran_type IN ('2', '3', '4'))
+                        END, 0)
+                   ) repayment_amount,
+                   (
+                    SELECT CASE
+                              WHEN TO_NUMBER (TO_CHAR (c.create_date, 'dd')) >= TO_NUMBER (VALUE)
+                              THEN TO_CHAR (ADD_MONTHS (c.create_date, 1), 'yyyy-mm')||'-'||LPAD (VALUE, 2, '0')
+                              ELSE TO_CHAR (c.create_date, 'yyyy-mm')||'-'||LPAD(VALUE, 2, '0')
+                           END
+                    FROM tbl_sys_param_config WHERE key = 'repayment_day'
+                   ) repayment_date
+              FROM tbl_credit_bill c
+             WHERE id = #{id,jdbcType=INTEGER}
+         )
+	</select>
+	<!-- 账单交易明细 -->
+	<select id="queryBillDetailList" parameterType="java.util.Map" resultType="java.util.Map">
+		select id,
+			   bill_id,
+		       tran_number,
+			   to_char(tran_date,'yyyy-mm-dd hh24:mi:ss') tran_date,
+			   tran_amount,
+			   tran_type,
+			   case when tran_type = '1' then '消费'
+                    when tran_type = '2' then '上期结余'
+                    when tran_type = '3' then '还款'
+                else '退款' end tran_types
+		  from tbl_credit_bill_detail
+		 where bill_id = #{id,jdbcType=INTEGER}
+		 order by tran_date desc
+	</select>
+	<!-- 结算单数量 -->
+	<select id="querySettlementSituationCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+	    from (
+	        select a.order_number,
+                   to_char(max(a.create_date),'yyyy-mm-dd hh24:mi:ss') create_date,
+                   to_char(max(a.liquidation_date),'yyyy-mm-dd hh24:mi:ss') liquidation_date,
+                   nvl(sum(a.settlement_amount),0) settlement_amount,
+                   nvl(sum(case when a.settlement_amount <![CDATA[ > ]]> a.settled_amount then a.settlement_amount - a.settled_amount else 0 end),0) stay_settlement_amount,
+                   case when min(a.settlement_state) = '2' then '已结算' else '待结算' end  settlement_state
+            from tbl_buss_settlement_info a
+            where is_delete = '0' and a.order_number in (select tran_number from tbl_credit_bill_detail where bill_id = #{id,jdbcType=INTEGER})
+            group by a.order_number
+        )
+	</select>
+	<!-- 结算单列表  -->
+	<select id="querySettlementSituationList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+            select info.*, rownum num from (
+				select a.order_number,
+		               to_char(max(a.create_date),'yyyy-mm-dd hh24:mi:ss') create_date,
+		               to_char(max(a.liquidation_date),'yyyy-mm-dd hh24:mi:ss') liquidation_date,
+		               nvl(sum(a.settlement_amount),0) settlement_amount,
+		               nvl(sum(case when a.settlement_state = '2' then 0 else case when a.settlement_amount  >  a.settled_amount then a.settlement_amount - a.settled_amount else 0 end end), 0) stay_settlement_amount,
+		               case when min(a.settlement_state) = '2' then '已结算' else '待结算' end  settlement_state
+		        from tbl_buss_settlement_info a
+		        where is_delete = '0' and a.order_number in (select tran_number from tbl_credit_bill_detail where bill_id = #{id,jdbcType=INTEGER})
+		        group by a.order_number
+	            order by create_date desc) info
+            where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where num &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 结算情况-->
+	<select id="querySettlementSituation" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT
+		    (
+                SELECT NVL (SUM (settlement_amount), 0) FROM tbl_buss_settlement_info
+                WHERE IS_DELETE = '0' AND order_number IN (SELECT tran_number FROM tbl_credit_bill_detail WHERE TRAN_TYPE = '1' AND bill_id = #{id,jdbcType=INTEGER})
+            ) total_settlement_amount,
+            (
+                SELECT NVL(SUM (CASE WHEN settlement_amount > settled_amount THEN settlement_amount - settled_amount ELSE 0 END),0)
+                FROM tbl_buss_settlement_info
+                WHERE IS_DELETE = '0' AND settlement_state = '1'
+                    AND order_number IN (SELECT tran_number FROM tbl_credit_bill_detail WHERE TRAN_TYPE = '1' AND bill_id = #{id,jdbcType=INTEGER})
+            ) unsettled_amount,
+            (
+                SELECT NVL (SUM (settlement_amount), 0) FROM tbl_buss_settlement_info
+                WHERE IS_DELETE = '0' AND settlement_state = '3'
+                    AND order_number IN (SELECT tran_number FROM tbl_credit_bill_detail WHERE TRAN_TYPE = '1' AND bill_id = #{id,jdbcType=INTEGER})
+            ) unrepayment_amount,
+            CASE WHEN (
+                SELECT MIN (bill_id) FROM tbl_buss_settlement_info a, tbl_credit_bill_detail b
+                WHERE a.order_number = b.tran_number AND a.settlement_state = '3' AND b.bill_id IS NOT NULL
+                    AND b.tran_type = '1' AND b.user_id = (SELECT user_id FROM tbl_credit_bill WHERE id = #{id,jdbcType=INTEGER})) = #{id,jdbcType=INTEGER}
+                THEN (SELECT SETTLEMENT_BALANCE FROM TBL_USER_SETTLEMENT_BALANCE WHERE user_id = (SELECT user_id FROM tbl_credit_bill WHERE id = #{id,jdbcType=INTEGER}))
+                ELSE 0
+            END settled_balance,
+            (
+                (
+				 SELECT NVL (SUM (settlement_amount), 0) FROM tbl_buss_settlement_info
+				 WHERE IS_DELETE = '0' AND settlement_state = '2'
+					 AND order_number IN (SELECT tran_number FROM tbl_credit_bill_detail WHERE TRAN_TYPE = '1' AND bill_id = #{id,jdbcType=INTEGER})
+				 )
+				 +
+				 (
+				 SELECT NVL(SUM (settled_amount),0)
+				 FROM tbl_buss_settlement_info
+				 WHERE IS_DELETE = '0' AND settlement_state = '1'
+					 AND order_number IN (SELECT tran_number FROM tbl_credit_bill_detail WHERE TRAN_TYPE = '1' AND bill_id = #{id,jdbcType=INTEGER})
+				 )
+            ) done_settlement_amount
+        FROM DUAL
+	</select>
+	<!-- 查询还款金额 -->
+	<select id="queryRepaymentAmountById" parameterType="java.util.Map" resultType="string">
+		select   (select nvl (sum (tran_amount), 0)
+            from tbl_credit_bill_detail
+           where     tran_type in ('2', '3')
+                 and user_id = #{user_id,jdbcType=INTEGER}
+                 and bill_id = #{id,jdbcType=INTEGER})
+		+ (select nvl(min(bill_amount),0) from TBL_CREDIT_BILL where id = (select max(id) from TBL_CREDIT_BILL where id &lt; #{id,jdbcType=INTEGER} and user_id = #{user_id,jdbcType=INTEGER}))
+       + case
+            when (select count (1)
+                    from tbl_credit_bill_detail
+                   where user_id = #{user_id,jdbcType=INTEGER} 
+                     and bill_id = #{next_bill_id,jdbcType=VARCHAR}) > 0
+            then
+               (select nvl (sum (tran_amount), 0)
+                  from tbl_credit_bill_detail
+                 where     user_id = #{user_id,jdbcType=INTEGER}
+                       and tran_type = '3'
+                       and bill_id = #{next_bill_id,jdbcType=VARCHAR})
+            else
+               (select nvl (sum (tran_amount), 0)
+                  from tbl_credit_bill_detail
+                 where     user_id = #{user_id,jdbcType=INTEGER}
+                       and tran_type = '3'
+                       and bill_id is null
+                       and posting_type = '2')
+        end repayment_amount
+  		from dual
+	</select>
+	<!-- 查询下期账单的年、月 -->
+	<select id="queryNextYearAndMonth" parameterType="java.util.Map" resultType="java.util.Map">
+		select case when month = 12 then to_number(year)+1 else to_number(year) end year,
+                case when month = 12 then MONTH-11 else month+1 end month
+           from tbl_credit_bill where id = #{id,jdbcType=INTEGER}
+	</select>
+	<!-- 查询下期账单ID -->
+	<select id="queryNextBillId" parameterType="java.util.Map" resultType="string">
+		select id as next_bill_id from tbl_credit_bill 
+		 where user_id = #{user_id,jdbcType=INTEGER} 
+		   and year = #{year,jdbcType=VARCHAR} 
+		   and month = #{month,jdbcType=INTEGER}
+	</select>
+	<!-- 查询运费，代发费 -->
+	<select id="queryOrderShareMoney" parameterType="java.util.Map" resultType="java.util.Map">
+		select df_money,logistics_money 
+		  from tbl_order_info 
+		 where order_number = #{order_number,jdbcType=VARCHAR}
+	</select>
+	<!-- 查询结算明细列表 -->
+	<select id="querySettlementDetailsList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+            select info.*, rownum num from (
+                SELECT SETTLEMENT_USER_ID,
+                    case BANK_ACCOUNT_TYPE
+                        when '1' then (SELECT company_name FROM tbl_stationed_user_info WHERE id = a.SETTLEMENT_USER_ID)
+                        when '2' then (select value from tbl_sys_param_config where key = 'platform_company_name')
+                        when '3' then (select value from tbl_sys_param_config where key = 'storage_company_name')
+                    end stationed_name,
+                    remark,
+                    settlement_amount,
+                    settlement_number
+                FROM v_buss_settlement a
+                WHERE order_number = #{order_number,jdbcType=VARCHAR}
+                order by a.BANK_ACCOUNT_TYPE,remark) info
+            where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where num &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 查询结算明细数量 -->
+	<select id="querySettlementDetailsCount" parameterType="java.util.Map" resultType="int">
+		SELECT count(1) FROM v_buss_settlement a WHERE order_number = #{order_number,jdbcType=VARCHAR}
+	</select>
+	<!-- 月结还款数量 -->
+	<select id="queryMonthlyRepaymentCount" parameterType="java.util.Map" resultType="int">
+		select count(1) from
+					 (  select nvl (a.credit_money, 0) credit_money,
+				               nvl (a.credit_money_balance, 0) credit_money_balance,
+				               case when (select nvl (sum (tran_amount), 0) 
+						       			    from tbl_credit_bill_detail 
+						       			   where user_id = a.user_id and bill_id is null
+				                   			 and tran_type = '3' and posting_type = '2')*-1 > nvl(b.bill_amount,0) 
+				                    then (select nvl (sum (tran_amount), 0)
+							                from tbl_credit_bill_detail
+							               where user_id = a.user_id and bill_id is null and posting_type = '2') + nvl(b.bill_amount,0)
+							        else (select nvl (sum (tran_amount), 0)
+				                  			from tbl_credit_bill_detail
+				                 		   where user_id = a.user_id and bill_id is null
+				                 			 and tran_type = '1' and posting_type = '2') 
+				                     end tran_amount,
+				               nvl(b.bill_amount,0) bill_amount,
+               				   nvl(b.should_repayment_amount,0) should_repayment_amount,
+				               b.repayment_date,
+				               (select login_name from tbl_user_info where id = a.user_id) login_name, 
+				               (select user_manage_name from tbl_user_info where id = a.user_id) user_manage_name,
+				               a.user_id,
+				               b.bill_date
+				          from tbl_bank_account a
+				               left join
+				               (select b1.id,
+				                       b1.bill_amount,
+				                       b1.user_id,
+										(select b1.bill_amount + nvl(sum(tran_amount),0) tran_amount from tbl_credit_bill_detail c where bill_id is null and user_id = b1.user_id and tran_type in ('2','3','4') and not exists (
+										select 1 from tbl_credit_bill_detail d,tbl_order_return_info r
+										where d.tran_number = r.return_number and d.bill_id is null and tran_type = '4' and d.user_id = c.user_id and d.tran_number = c.tran_number
+										and exists (select 1 from tbl_credit_bill_detail where bill_id is null and tran_type = '1' and user_id = d.user_id and tran_number = r.order_number)
+										)) should_repayment_amount,
+										(select case when to_number(to_char(b1.create_date,'dd')) >= to_number(value)
+										then to_char(add_months(b1.create_date,1),'yyyy-mm')||'-'||lpad(value,2,'0')
+										else to_char(b1.create_date,'yyyy-mm')||'-'||lpad(value,2,'0') end from tbl_sys_param_config where key = 'repayment_day') repayment_date,
+				                          b1.year||'年'||b1.month||'月' as bill_date
+				                  from tbl_credit_bill b1,(select user_id,max(id) as id from tbl_credit_bill group by user_id) b2
+                                          where  b1.id = b2.id
+                                             and b1.user_id = b2.user_id) b
+				                  on a.user_id = b.user_id
+				                 where (a.credit_money > 0 or a.CREDIT_MONEY_BALANCE>0) and a.user_id in (select id from tbl_user_info where user_type in (1,2,3,4))) info
+			   <where>
+		           <if test="login_name !=null and login_name !=''">
+		           		and info.login_name like concat(concat('%', #{login_name,jdbcType=VARCHAR}),'%')
+		           </if>
+	           	   <if test="user_manage_name !=null and user_manage_name !=''">
+		           		and info.user_manage_name like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%')
+		           </if>
+	           </where>
+	</select>
+	<!-- 月结还款列表 -->
+	<select id="queryMonthlyRepaymentList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+            select a.*, rownum num from (
+            	select info.* from
+					 (  select nvl (a.credit_money, 0) credit_money,
+				               nvl (a.credit_money_balance, 0) credit_money_balance,
+				               case when (select nvl (sum (tran_amount), 0) 
+						       			    from tbl_credit_bill_detail 
+						       			   where user_id = a.user_id and bill_id is null
+				                   			 and tran_type = '3' and posting_type = '2')*-1 > nvl(b.bill_amount,0) 
+				                    then (select nvl (sum (tran_amount), 0)
+							                from tbl_credit_bill_detail
+							               where user_id = a.user_id and bill_id is null and posting_type = '2') + nvl(b.bill_amount,0)
+							        else (select nvl (sum (tran_amount), 0)
+				                  			from tbl_credit_bill_detail
+				                 		   where user_id = a.user_id and bill_id is null
+				                 			 and tran_type = '1' and posting_type = '2') 
+				                     end tran_amount,
+				               nvl(b.bill_amount,0) bill_amount,
+               				   nvl(b.should_repayment_amount,0) should_repayment_amount,
+				               b.repayment_date,
+				               (select login_name from tbl_user_info where id = a.user_id) login_name, 
+				               (select user_manage_name from tbl_user_info where id = a.user_id) user_manage_name,
+				               a.user_id,
+				               b.bill_date
+				          from tbl_bank_account a
+				               left join
+				               (select b1.id,
+				                       b1.bill_amount,
+				                       b1.user_id,
+										(select b1.bill_amount + nvl(sum(tran_amount),0) tran_amount from tbl_credit_bill_detail c where bill_id is null and user_id = b1.user_id and tran_type in ('2','3','4') and not exists (
+										select 1 from tbl_credit_bill_detail d,tbl_order_return_info r
+										where d.tran_number = r.return_number and d.bill_id is null and tran_type = '4' and d.user_id = c.user_id and d.tran_number = c.tran_number
+										and exists (select 1 from tbl_credit_bill_detail where bill_id is null and tran_type = '1' and user_id = d.user_id and tran_number = r.order_number)
+										)) should_repayment_amount,
+										(select case when to_number(to_char(b1.create_date,'dd')) >= to_number(value)
+										then to_char(add_months(b1.create_date,1),'yyyy-mm')||'-'||lpad(value,2,'0')
+										else to_char(b1.create_date,'yyyy-mm')||'-'||lpad(value,2,'0') end from tbl_sys_param_config where key = 'repayment_day') repayment_date,
+				                          b1.year||'年'||b1.month||'月' as bill_date
+				                  from tbl_credit_bill b1,(select user_id,max(id) as id from tbl_credit_bill group by user_id) b2
+                                          where  b1.id = b2.id
+                                             and b1.user_id = b2.user_id) b
+				                  on a.user_id = b.user_id
+				                 where (a.credit_money > 0 or a.CREDIT_MONEY_BALANCE>0) and a.user_id in (select id from tbl_user_info where user_type in (1,2,3,4))) info
+		           <where>
+			           <if test="login_name !=null and login_name !=''">
+			           		and info.login_name like concat(concat('%', #{login_name,jdbcType=VARCHAR}),'%')
+			           </if>
+		           	   <if test="user_manage_name !=null and user_manage_name !=''">
+			           		and info.user_manage_name like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%')
+			           </if>
+		           </where>
+		           ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where num &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 充值还款 -->
+	<insert id="insertCreditRepaymentApply" parameterType="java.util.Map">
+		insert into tbl_credit_repayment_apply
+			(
+			 id,
+			 login_name,
+			 user_manage_name,
+			 bill_date,
+			 bill_amount,
+			 user_id,
+			 voucher_img_url,
+			 create_user_id,
+			 state,
+			 tran_logno
+			) 
+			values
+			(
+			 seq_credit_repayment_apply.nextval,
+			 #{login_name,jdbcType=VARCHAR},
+			 #{user_manage_name,jdbcType=VARCHAR},
+			 #{bill_date,jdbcType=VARCHAR},
+			 #{bill_amount,jdbcType=INTEGER},
+			 #{user_id,jdbcType=INTEGER},
+			 #{voucher_img_url,jdbcType=VARCHAR},
+			 #{public_user_id,jdbcType=INTEGER},
+			 '1',
+			 GETTHIRDLOGNUMBER('1')
+			)
+	</insert>
+	<!-- 还款记录数量 -->
+	<select id="queryMonthlyRepaymentHistoryCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_credit_repayment_apply
+		 where user_id = #{user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 还款记录列表 -->
+	<select id="queryMonthlyRepaymentHistoryList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+            select a.*, rownum num from (
+				select login_name,
+					   user_manage_name,
+					   bill_date,
+					   bill_amount,
+					   (select user_realname from tbl_sys_user_info where id = create_user_id) create_user_name,
+					   to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+					   state,
+					   (select user_realname from tbl_sys_user_info where id = approval_user_id) approval_user_name,
+					   to_char(approval_date,'yyyy-mm-dd hh24:mi:ss') approval_date,
+					   rejected_reason
+				  from tbl_credit_repayment_apply
+				 where user_id = #{user_id,jdbcType=INTEGER}
+				 order by state asc,create_date desc
+		   ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where num &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 月结还款审批数量 -->
+	<select id="queryMonthlyRepaymentApprovalCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_credit_repayment_apply
+		 <where>
+			 user_id in (select id from tbl_user_info where user_type in (1,2,3,4))
+		 	<if test="login_name != null and login_name != ''">
+		 		and login_name like concat(concat('%', #{login_name,jdbcType=VARCHAR}),'%')
+		 	</if>
+		 	<if test="user_manage_name != null and user_manage_name != ''">
+	            and user_manage_name like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%')
+	        </if>
+            <if test="begin_date!=null and begin_date!=''">
+        		and create_date &gt;= to_date(#{begin_date},'yyyy-mm-dd hh24:mi:ss')
+            </if>
+            <if test="end_date!=null and end_date!=''">
+           		and create_date &lt;= to_date(#{end_date},'yyyy-mm-dd hh24:mi:ss')
+            </if>
+		 	<if test="state != null and state != ''">
+            	and state in 
+            	<foreach item="item" collection="state" open="(" separator="," close=")">
+    	 			#{item,jdbcType=CHAR}
+    	 		</foreach>
+            </if>
+		 </where>
+	</select>
+	<!-- 月结还款审批列表 -->
+	<select id="queryMonthlyRepaymentApprovalList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+            select a.*, rownum num from (
+				select id,
+				       login_name,
+					   user_manage_name,
+					   bill_date,
+					   bill_amount,
+					   (select user_realname from tbl_sys_user_info where id = create_user_id) create_user_name,
+					   to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+					   state,
+					   (select user_realname from tbl_sys_user_info where id = approval_user_id) approval_user_name,
+					   to_char(approval_date,'yyyy-mm-dd hh24:mi:ss') approval_date,
+					   rejected_reason
+				  from tbl_credit_repayment_apply
+				 <where>
+					 user_id in (select id from tbl_user_info where user_type in (1,2,3,4))
+				 	<if test="login_name != null and login_name != ''">
+				 		and login_name like concat(concat('%', #{login_name,jdbcType=VARCHAR}),'%')
+				 	</if>
+				 	<if test="user_manage_name != null and user_manage_name != ''">
+			            and user_manage_name like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%')
+			        </if>
+		            <if test="begin_date!=null and begin_date!=''">
+		        		and create_date &gt;= to_date(#{begin_date},'yyyy-mm-dd hh24:mi:ss')
+		            </if>
+		            <if test="end_date!=null and end_date!=''">
+		           		and create_date &lt;= to_date(#{end_date},'yyyy-mm-dd hh24:mi:ss')
+		            </if>
+				 	<if test="state != null and state != ''">
+		            	and state in 
+		            	<foreach item="item" collection="state" open="(" separator="," close=")">
+		    	 			#{item,jdbcType=CHAR}
+		    	 		</foreach>
+		            </if>
+				 </where>
+				 order by state asc,create_date desc
+		 ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where num &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 月结还款审批详情 -->
+	<select id="queryMonthlyRepaymentApprovalDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select login_name,
+		       user_manage_name,
+		       bill_date,
+			   bill_amount,
+			   user_id,
+			   (select user_realname from tbl_sys_user_info where id = create_user_id) create_user_name,
+			   to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+			   voucher_img_url,
+			   tran_logno
+		  from tbl_credit_repayment_apply
+		 where id = #{id,jdbcType=INTEGER}
+	</select>
+	<!-- 月结还款审批 -->
+	<update id="updateMonthlyRepaymentApproval" parameterType="java.util.Map">
+		update tbl_credit_repayment_apply
+		   set state = #{state,jdbcType=CHAR},
+		   	   approval_user_id = #{public_user_id,jdbcType=INTEGER},
+		   	   <if test="rejected_reason != null and rejected_reason != ''">
+		   		rejected_reason = #{rejected_reason,jdbcType=VARCHAR},
+		   	   </if>
+		   	   approval_date = sysdate
+  		 where id = #{id,jdbcType=INTEGER}
+	</update>
+	<!-- 新增还款记录 -->
+	<insert id="insertCreditBillDetail" parameterType="java.util.Map">
+		insert into tbl_credit_bill_detail(
+		    id,
+			tran_type,
+			tran_number,
+			tran_date,
+			tran_amount,
+			posting_type,
+			posting_date,
+			user_id,
+			remark
+			) values
+			(
+			seq_credit_bill_detail.nextval,
+			'3',
+			#{trade_number,jdbcType=VARCHAR},
+			sysdate,
+			'-'||#{tran_amount,jdbcType=DOUBLE},
+			'2',
+			sysdate,
+			#{user_id,jdbcType=INTEGER},
+			'账单还款'
+			)
+	</insert>
+	<!-- 新增退款记录 -->
+	<insert id="insertCreditBillDetailOfReturn" parameterType="java.util.Map">
+		insert into tbl_credit_bill_detail(
+		    id,
+			tran_type,
+			tran_number,
+			tran_date,
+			tran_amount,
+			posting_type,
+			posting_date,
+			user_id,
+			remark
+		) values
+		(
+			seq_credit_bill_detail.nextval,
+			'4',
+			#{trade_number,jdbcType=VARCHAR},
+			sysdate,
+			'-'||#{tran_amount,jdbcType=DOUBLE},
+			'2',
+			sysdate,
+			#{user_id,jdbcType=INTEGER},
+			#{remark,jdbcType=VARCHAR}
+		)
+	</insert>
+	<!-- 更新账单还款信息 -->
+	<update id="updateCreditBill" parameterType="java.util.Map">
+		update tbl_credit_bill
+		   set repayment_state = (case when (repayment_amount+#{tran_amount,jdbcType=INTEGER}) >= bill_amount then '3' else '2' end),
+		       repayment_amount = (case when (repayment_amount+#{tran_amount,jdbcType=INTEGER}) >= bill_amount then bill_amount else (repayment_amount+#{tran_amount,jdbcType=INTEGER}) end),
+		       repayment_date = sysdate,
+		       settlement_balance = #{settlement_balance,jdbcType=INTEGER}
+		 where id=#{bill_id,jdbcType=INTEGER}
+	</update>
+	
+	<!-- 生成付款交易号 -->
+	<select id="createTradeNumber" parameterType="java.util.Map" resultType="java.lang.String">
+		select getAutoNumber('HK') trade_number from dual
+	</select>
+	<!-- 查询会员银行子账号 -->
+	<select id="queryBankAccountByUserId" parameterType="java.util.Map" resultType="java.lang.String">
+		select bank_account from tbl_bank_account where user_id = #{user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 是否已登记 -->
+	<select id="queryRegisterState" parameterType="java.util.Map" resultType="int">
+		select count(1) from tbl_credit_repayment_apply 
+		 where register_state = '1'
+		   and id = #{id,jdbcType=INTEGER}
+	</select>
+	<!-- 查询会员还款信息 -->
+	<select id="queryUserRepaymentInfo" parameterType="java.util.Map" resultType="java.util.Map">
+		select user_manage_mobilephone as mobile,
+		       openid
+	      from tbl_user_info
+		 where id = #{user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 获取本期账单 -->
+	<select id="queryCurrentBill" parameterType="java.util.Map" resultType="java.util.Map">
+		select id,bill_number,bill_amount,repayment_amount,repayment_state
+		from tbl_credit_bill where id = (select max(id) from tbl_credit_bill where user_id = #{user_id,jdbcType=INTEGER})
+	</select>
+	<!-- 查询订单付款金额 -->
+	<select id="queryOrderPaymentMoney" parameterType="java.util.Map" resultType="java.util.Map">
+		select order_number,payment_money from tbl_order_info t1 
+    	where user_name = #{user_id,jdbcType=VARCHAR} and exists (
+            select 1 from tbl_buss_settlement_info t2 
+            where t2.order_number = t1.order_number and t2.settlement_group = '2' and t2.settlement_state = '3'
+        )
+   		order by payment_date
+	</select>
+	<!-- 获取订单结算金额 add by wanghai -->
+	<select id="queryOrderSettlementAmount" parameterType="java.util.Map" resultType="java.util.Map">
+		select order_number, settlement_amount from (
+			select order_number,sum(settlement_amount) settlement_amount, min(create_date) create_date from tbl_buss_settlement_info s
+			where exists (select 1 from tbl_order_info o where o.order_number = s.order_number and user_name = #{user_id,jdbcType=VARCHAR})
+			and IS_DELETE = '0' and  settlement_group = '2' and settlement_state = '3'
+			group by order_number
+		) a order by create_date
+	</select>
+	<!-- 更新待结算单信息 -->
+	<update id="updateBussSettlementInfo" parameterType="java.util.Map">
+		update tbl_buss_settlement_info set settlement_state = '1',pay_number = #{user_id,jdbcType=VARCHAR}
+	     where settlement_state = '3' and order_number = #{order_number,jdbcType=VARCHAR}
+	</update>
+	<!-- 更新发货待结算单信息 -->
+	<update id="updateBussSettlementShipmentsInfo" parameterType="java.util.Map">
+		update TBL_BUSS_SETTLEMENT_SHIPMENTS set settlement_state = '1',pay_number = #{user_id,jdbcType=VARCHAR}
+		where settlement_state = '3' and order_number = #{order_number,jdbcType=VARCHAR}
+	</update>
+	<!-- 更新发货待结算单信息 -->
+	<update id="updateFeeSettlementShipmentsInfo" parameterType="java.util.Map">
+		update TBL_FEE_SETTLEMENT_SHIPMENTS set settlement_state = '1',pay_number = #{user_id,jdbcType=VARCHAR}
+		where settlement_state = '3' and order_number = #{order_number,jdbcType=VARCHAR}
+	</update>
+	<!-- 用户账户信息 -->
+	<select id="queryBankAccount" parameterType="java.util.Map" resultType="java.util.Map">
+		select a.account_balance,
+		       a.credit_money,
+		       a.credit_money_balance,
+		       a.credit_money_use,
+		       a.account_balance_checkcode,
+		       a.credit_checkcode,
+		       b.referee_user_realname,
+		       b.market_supervision_user_realna,
+		       b.store_id
+		  from tbl_bank_account a, tbl_user_info b
+		 where user_id = #{user_id,jdbcType=INTEGER} and a.user_id = b.id
+	</select>
+	<!-- 生成还款记录 -->
+	<insert id="insertUserAccountRecord" parameterType="java.util.Map">
+		insert into tbl_user_account_record(id,record_number, record_item_number,record_channel,record_type,remark,
+	       create_date, collect_user_name, collect_user_manager_name,
+	       accountants_subject_id, accountants_subject_name,
+	       parent_acc_subject_id, parent_acc_subject_name,
+	       money, surplus_money, state, docket_number, create_user, user_name,
+	       turnover_number,check_user_name,check_user_business_name,check_date,
+	       voucher_img_url,ywjl_user_name,ywy_user_name,md_id,credit_balance)
+   		values(seq_user_account_record.nextval,#{trade_number,jdbcType=VARCHAR}||'3',1,'转账还款','收款', '授信账单还款',
+	       sysdate,#{user_name,jdbcType=VARCHAR},#{user_manager_name,jdbcType=VARCHAR},
+	       '3131TK','童库',
+	       '3131','转账还款',
+	       #{tran_amount,jdbcType=INTEGER},#{account_balance,jdbcType=INTEGER},'已审核',#{trade_number,jdbcType=VARCHAR},#{user_name,jdbcType=VARCHAR},#{user_name,jdbcType=VARCHAR},
+	       #{trade_number,jdbcType=VARCHAR},#{public_user_id,jdbcType=INTEGER},#{public_user_realname,jdbcType=VARCHAR},sysdate,
+	       #{voucher_img_url,jdbcType=VARCHAR},#{market_supervision_user_realna,jdbcType=VARCHAR},#{referee_user_realname,jdbcType=VARCHAR},#{store_id,jdbcType=INTEGER},
+	       (SELECT nvl(credit_money_balance, 0) + #{tran_amount,jdbcType=INTEGER} from TBL_BANK_ACCOUNT where USER_ID = #{public_user_id,jdbcType=VARCHAR}))
+	</insert>
+	<!-- 获取用户KEY -->
+	<select id="queryUserKey" parameterType="java.util.Map" resultType="string">
+		select getUserKey(#{user_id,jdbcType=VARCHAR},'old','1') from dual
+	</select>
+	<!-- 获取授信校验码 -->
+	<select id="queryCreateCode" parameterType="java.util.Map" resultType="string">
+		select getCheck_Code(#{user_id,jdbcType=VARCHAR},#{credit_money_balance,jdbcType=INTEGER},#{user_key,jdbcType=VARCHAR}) from dual
+	</select>
+	<!-- 更新登记状态 -->
+	<update id="updateRegisterState" parameterType="java.util.Map">
+		update tbl_credit_repayment_apply
+		   set register_state = '2'
+  		 where id = #{id,jdbcType=INTEGER}
+	</update>
+	<!-- 更新用户授信余额 -->
+	<update id="updateUserAccountInfo" parameterType="java.util.Map">
+		update tbl_bank_account set
+			credit_money_use = nvl(credit_money_use, 0) - #{tran_amount,jdbcType=INTEGER},
+			credit_money_balance = nvl(credit_money_balance, 0) + #{tran_amount,jdbcType=INTEGER}
+		where user_id = #{user_id, jdbcType=INTEGER}
+	</update>
+	<!-- 更新用户账户校验码 -->
+    <update id="updateUserAccountCheckCode" parameterType="java.util.Map">
+        <![CDATA[
+			call PRO_UPDATE_USER_ACCOUNT_CODE(#{user_id,mode=IN,jdbcType=VARCHAR})
+			]]>
+    </update>
+    <!-- 查询用户结算金额 -->
+    <select id="querySettlementBalance" parameterType="java.util.Map" resultType="string">
+    	select settlement_balance 
+    	  from tbl_user_settlement_balance where user_id=#{user_id,jdbcType=INTEGER}
+    </select>
+    <!-- 更新用户结算金额 -->
+    <update id="updateSettlementBalance" parameterType="java.util.Map">
+    	update tbl_user_settlement_balance
+    	   set settlement_balance = #{settlement_balance,jdbcType=INTEGER}
+    	 where user_id=#{user_id,jdbcType=INTEGER}
+    </update>
+    <!-- 新增用户结算金额 -->
+    <insert id="insertSettlementBalance" parameterType="java.util.Map">
+    	insert into tbl_user_settlement_balance(
+    		user_id,
+    		settlement_balance
+    	)
+    	values
+    	(
+    		#{user_id,jdbcType=INTEGER},
+    		#{settlement_balance,jdbcType=INTEGER}
+    	)
+    </insert>
+    <!-- 审核数据是否待审核 -->
+    <select id="queryMonthlyRepaymentById" parameterType="java.util.Map" resultType="int">
+    	select count(1) from tbl_credit_repayment_apply
+		 where state ='1' and id = #{id,jdbcType=INTEGER}
+    </select>
+	<!-- 查询用户欠款金额 -->
+	<select id="queryUserDebtAmount" parameterType="long" resultType="java.lang.Double">
+		select debt_amount from TBL_USER_DEBT where user_id = #{user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 更新用户欠款金额 -->
+	<update id="updateUserDebtAmount" parameterType="java.util.Map">
+		update TBL_USER_DEBT set debt_amount = debt_amount - #{tran_amount,jdbcType=INTEGER},update_date = sysdate
+		where user_id = #{user_id,jdbcType=INTEGER}
+	</update>
+</mapper>

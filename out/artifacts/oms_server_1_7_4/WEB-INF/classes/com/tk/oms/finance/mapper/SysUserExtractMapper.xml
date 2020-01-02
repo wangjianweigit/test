@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 系统用户申请提现操作DAO -->
+<mapper namespace="com.tk.oms.finance.dao.SysUserExtractDao">
+	<sql id="all_colum">
+		uer.ID,
+		uer.APPLY_NUMBER,
+		uer.BANK_ID,
+		to_char(uer.APPLY_DATE,'yyyy-mm-dd hh24:mi:ss') APPLY_DATE,
+		uer.APPLY_USER_ID,
+		uer.EXTRACT_MONEY,
+		uer.PHONE,
+		uer.REMARK,
+		uer.STATE,
+		uer.AUDIT_USER_ID,
+		to_char(uer.AUDIT_DATE,'yyyy-mm-dd hh24:mi:ss') AUDIT_DATE,
+		uer.REJECT_REASON,
+		uer.IS_DELETE,
+		uer.PLAYMONEY_VOUCHER_URL
+	</sql>
+    <!--分页获取系统用户提现申请单列表-->
+    <select id="queryListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select a.*,rownum rn from (
+            	   SELECT 
+            	   <include refid="all_colum"></include>,
+                   sui1.USER_NAME,
+                   sui1.USER_REALNAME,
+                   uer.BIND_TYPE,
+                   uer.BANK_CARD,
+                   uer.BANK_NAME,
+                   (select USER_REALNAME from tbl_sys_user_info sui where sui.id = uer.AUDIT_USER_ID) AUDIT_USER_REALNAME          
+                   FROM
+                   TBL_SYS_USER_EXTRACT_RECORD uer
+                   LEFT JOIN TBL_SYS_USER_INFO sui1 ON uer.APPLY_USER_ID = sui1.id
+                   WHERE uer.IS_DELETE = '1'
+                    	 <if test="state!=null and state.size()>0">
+					    	and uer.state in 
+					    	 <foreach item="s" collection="state" open="(" separator="," close=")">
+					    	 		#{s,jdbcType=INTEGER}
+					    	 </foreach>
+					     </if>
+					      <if test="apply_number!=null and apply_number!=''">
+						    	 and uer.apply_number like concat(concat('%', #{apply_number,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="login_name!=null and login_name!=''">
+						    	 and sui1.login_name like concat(concat('%', #{login_name,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="user_manage_name!=null and user_manage_name!=''">
+						    	 and sui1.user_manage_name like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="phone!=null and phone!=''">
+						    	 and uer.phone like concat(concat('%', #{phone,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="bank_card!=null and bank_card!=''">
+						    	 and uer.bank_card like concat(concat('%', #{bank_card,jdbcType=VARCHAR}),'%')
+						  </if>
+			      ORDER BY uer.APPLY_DATE DESC
+            ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--获取系统用户提现申请总数-->
+    <select id="queryListForCount" parameterType="java.util.Map" resultType="int">
+         		   SELECT 
+            	   count(1)
+                   FROM
+                   TBL_SYS_USER_EXTRACT_RECORD uer
+                   LEFT JOIN TBL_SYS_USER_INFO sui1 ON uer.APPLY_USER_ID = sui1.id 
+                   WHERE uer.IS_DELETE = '1'
+                    	 <if test="state!=null and state.size()>0">
+					    	and uer.state in 
+					    	 <foreach item="s" collection="state" open="(" separator="," close=")">
+					    	 		#{s,jdbcType=INTEGER}
+					    	 </foreach>
+					     </if>
+					      <if test="apply_number!=null and apply_number!=''">
+						    	 and uer.apply_number like concat(concat('%', #{apply_number,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="user_name !=null and user_name !=''">
+						    	 and sui1.user_name like concat(concat('%', #{user_name,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="user_realname !=null and user_realname !=''">
+						    	 and sui1.user_realname like concat(concat('%', #{user_realname,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="phone!=null and phone!=''">
+						    	 and uer.phone like concat(concat('%', #{phone,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="bank_card!=null and bank_card!=''">
+						    	 and uer.bank_card like concat(concat('%', #{bank_card,jdbcType=VARCHAR}),'%')
+						  </if>
+    </select>
+    <!-- 根据ID查询会员提现申请记录 -->
+    <select id="queryById" parameterType="long" resultType="java.util.Map">
+      	   	   SELECT 
+            	   <include refid="all_colum"></include>,
+                   sui1.USER_NAME,
+                   sui1.USER_REALNAME,
+                   uer.BIND_TYPE,
+                   uer.BANK_CARD,
+                   uer.BANK_NAME,
+                   (select USER_REALNAME from tbl_sys_user_info sui where sui.id = uer.AUDIT_USER_ID) AUDIT_USER_REALNAME
+                   FROM
+                   TBL_SYS_USER_EXTRACT_RECORD uer
+                   LEFT JOIN TBL_SYS_USER_INFO sui1 ON uer.APPLY_USER_ID = sui1.id
+                   WHERE uer.IS_DELETE = '1' AND uer.id = #{id,jdbcType=INTEGER}
+    </select>
+    <!-- 对用户提现操作记录进行审批 -->
+    <update id="approval" parameterType="java.util.Map">
+    	UPDATE TBL_SYS_USER_EXTRACT_RECORD uer SET
+    	uer.STATE = #{state,jdbcType=VARCHAR},
+    	uer.AUDIT_USER_ID =  #{public_user_id,jdbcType=INTEGER},
+    	uer.AUDIT_DATE =   sysdate,
+    	uer.PLAYMONEY_VOUCHER_URL = #{voucher_img_url,jdbcType=VARCHAR},
+    	uer.REJECT_REASON =  #{reject_reason,jdbcType=VARCHAR}
+        WHERE uer.IS_DELETE = '1' AND uer.id = #{id,jdbcType=INTEGER}
+    </update>
+    <!-- 系统用户银行卡信息 -->
+    <select id="querySysUserBankInfo" parameterType="java.util.Map" resultType="java.util.Map">
+    	 select id,
+				user_id,
+				bank_card,
+				bank_code,
+				create_date,
+				bind_date,
+				unbind_date,
+				bind_state,
+				bind_type 
+		   from tbl_sys_bank_card 
+		  where is_delete = '1'
+			and user_id = #{public_user_id,jdbcType=INTEGER} 
+			and bank_card = #{bank_card,jdbcType=VARCHAR}
+    </select>
+    <!-- 新增系统用户提现记录 -->
+    <insert id="insertSysUserExtractRecord" parameterType="java.util.Map">
+    	<selectKey keyProperty="id" resultType="long" order="BEFORE">
+			select seq_sys_user_extract_record.nextval from dual
+			</selectKey>
+			insert into tbl_sys_user_extract_record (
+										 id,
+	                                     apply_number,
+	                                     bank_id,
+	                                     apply_date,
+	                                     apply_user_id,
+	                                     extract_money,
+	                                     phone,
+	                                     remark,
+	                                     state,
+	                                     is_delete,
+	                                     bind_type,
+										 bank_card,
+										 bank_name)
+	             select
+                 #{id,jdbcType=INTEGER},
+	             GETAUTONUMBER('TX'),
+	             #{bank_id,jdbcType=INTEGER},
+	              sysdate,
+	             #{user_id,jdbcType=INTEGER},
+	             #{extract_money,jdbcType=FLOAT},
+	             #{phone,jdbcType=VARCHAR},
+	             #{remark,jdbcType=VARCHAR},
+	             '1',
+	             '1',
+                 sbc.bind_type,
+                 sbc.bank_card,
+                 (case sbc.bind_type 
+                 when '1' then db.bank_name
+                 when '2' then dcb.bank_name
+                 end) bank_name
+                 from tbl_sys_bank_card sbc
+                 left join tbl_dic_bank db on sbc.bank_code = db.bank_code
+                 left join tbl_dic_cnaps_bank dcb on sbc.bank_code = dcb.bank_no
+                 where sbc.id = #{bank_id,jdbcType=INTEGER}
+    </insert>
+    <!-- 查询系统用户账号信息 -->
+    <select id="querySysBankAccountInfo" parameterType="java.util.Map" resultType="java.util.Map">
+    	select nvl(t1.account_balance,0) account_balance, account_balance_checkcode
+         from tbl_sys_bank_account t1
+        where t1.user_id = #{user_id,jdbcType=INTEGER} for update
+    </select>
+    <!-- 获取用户key -->
+    <select id="getUserKey" parameterType="java.util.Map" resultType="string">
+    	select getUserKey(#{user_id,jdbcType=VARCHAR},#{c_user_type,jdbcType=VARCHAR},'6') from dual
+    </select>
+    <!-- 获取余额校验码 -->
+    <select id="getCheck_Code" parameterType="java.util.Map" resultType="string">
+    	select getCheck_Code(#{user_id,jdbcType=VARCHAR},#{account_balance,jdbcType=INTEGER},#{c_user_key,jdbcType=VARCHAR}) from dual
+    </select>
+    <!-- 生产个人收支记录 -->
+    <insert id="insertSysAccountRecord" parameterType="java.util.Map">
+    	insert into tbl_sys_account_record
+    		(
+    			id,
+    			record_number,
+    			record_channel,
+    			record_type,
+    			remark,
+    			collect_user_id,
+    			collect_user_manager_name,
+    			money,
+    			surplus_money,
+    			docket_type,
+    			docket_number,
+    			docket_user_id,
+    			create_date
+    		) values (
+    			seq_sys_account_record.nextVal,
+    			getautonumber('XD'),
+    			'佣金',
+    			2,
+    			#{remark,jdbcType=VARCHAR},
+    			#{user_id,jdbcType=INTEGER},
+    			#{user_realname,jdbcType=VARCHAR},
+    			'-'||#{extract_money,jdbcType=INTEGER},
+    			(#{account_balance,jdbcType=INTEGER}-#{extract_money,jdbcType=INTEGER}),
+    			'提现',
+    			getAutoNumber('DJH'),
+    			#{user_id,jdbcType=INTEGER},
+    			sysdate
+    		)
+    </insert>
+    <!-- 更新账户余额 -->
+    <update id="updateSysBankAccountBalance" parameterType="java.util.Map">
+    	update tbl_sys_bank_account 
+    	   set account_balance=account_balance-#{extract_money,jdbcType=INTEGER},
+    	   	   account_balance_checkcode=getCheck_Code(#{user_id,jdbcType=VARCHAR},(#{account_balance,jdbcType=INTEGER}-#{extract_money,jdbcType=INTEGER}),#{c_user_key,jdbcType=VARCHAR})
+         where user_id = #{user_id,jdbcType=INTEGER}
+    </update>
+    <!-- 更新账户账户key-->
+    <update id="updateSysUserCacheKey" parameterType="java.util.Map">
+    	update tbl_sys_cache_key 
+    	   set cache_key = #{c_user_key,jdbcType=VARCHAR},
+    	       create_time=sysdate 
+    	 where user_name = #{user_id,jdbcType=VARCHAR}
+    </update>
+</mapper>

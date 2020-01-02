@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+        
+<mapper namespace="com.tk.oms.basicinfo.dao.IssuingGradeDao">
+    <sql id="all_column">
+            id,
+            grade_name,
+            piece_cost,
+            remark,
+            create_user_id,
+            create_date,
+            is_default,
+            sort_id,
+            'true' as save_flag
+    </sql>
+    <!-- 查询代发等级列表 -->
+    <select id="queryList" parameterType="java.util.Map" resultType="java.util.Map">
+        select *
+        from (select a.*, rownum num
+        from (
+        select <include refid="all_column"/>
+        from tbl_issuing_grade
+        order by sort_id desc
+        ) a
+        WHERE ROWNUM  &lt; = #{end_rownum,jdbcType=INTEGER})
+        WHERE num &gt;#{start_rownum,jdbcType=INTEGER}
+    </select>
+    <!-- 查询代发等级数量 -->
+    <select id="countIssuingGrade" parameterType="java.util.Map" resultType="int">
+        select count(1)
+        from TBL_ISSUING_GRADE
+    </select>
+
+    <!--通过等级名称获取代发等级数量-->
+    <select id="queryIssuingGradeCountByName" parameterType="java.util.Map" resultType="int">
+        select
+            count(1)
+        from
+            tbl_issuing_grade
+        where
+            grade_name = #{grade_name,jdbcType=VARCHAR}
+        <if test="id != null and id != 0">
+            and id != #{id,jdbcType=INTEGER}
+        </if>
+    </select>
+
+    <!--通过代发等级ID获取平台会员的数量-->
+    <select id="queryUserCountByGradeId" parameterType="java.util.Map" resultType="int">
+        SELECT COUNT (1) FROM TBL_USER_INFO WHERE ISSUING_GRADE_ID = #{id,jdbcType=INTEGER}
+    </select>
+    <!-- 新增代发等级 -->
+    <insert id="insertIssuingGrade" parameterType="java.util.Map">
+        <selectKey keyProperty="id" resultType="int" order="BEFORE">
+            select seq_issuing_grade.nextval from dual
+        </selectKey>
+        insert into tbl_issuing_grade(
+            id,
+            grade_name,
+            piece_cost,
+            create_date,
+            create_user_id,
+            remark,
+            sort_id
+        ) VALUES
+        (
+            #{id,jdbcType=INTEGER},
+            #{grade_name,jdbcType=VARCHAR},
+            #{piece_cost,jdbcType=INTEGER},
+            sysdate,
+            #{public_user_id,jdbcType=INTEGER},
+            #{remark,jdbcType=VARCHAR},
+            #{id,jdbcType=INTEGER}
+        )
+    </insert>
+
+    <!--新增默认代发等级-->
+    <insert id="insertDefaultIssuingGrade" parameterType="java.util.Map">
+        insert into tbl_issuing_grade(
+            id,
+            grade_name,
+            piece_cost,
+            create_date,
+            create_user_id,
+            is_default,
+            remark,
+            sort_id
+        ) values (
+            1,
+            #{grade_name,jdbcType=VARCHAR},
+            #{piece_cost,jdbcType=INTEGER},
+            sysdate,
+            #{public_user_id,jdbcType=INTEGER},
+            '1',
+            #{remark,jdbcType=VARCHAR},
+            999999999999
+        )
+    </insert>
+    <!-- 删除代发等级 -->
+    <delete id="deleteIssuingGrade" parameterType="java.util.Map">
+        delete from TBL_ISSUING_GRADE where id = #{id,jdbcType=INTEGER}
+    </delete>
+    <!-- 更新代发等级 -->
+    <update id="updateIssuingGrade" parameterType="java.util.Map">
+        update TBL_ISSUING_GRADE
+        <set>
+            <if test="grade_name != null and grade_name != ''">
+                grade_name = #{grade_name,jdbcType=VARCHAR},
+            </if>
+            <if test="piece_cost != null and piece_cost != ''">
+                piece_cost = #{piece_cost,jdbcType=INTEGER},
+            </if>
+            <if test="remark != null and remark != ''">
+                remark = #{remark,jdbcType=VARCHAR}
+            </if>
+        </set>
+        where id = #{id,jdbcType=INTEGER}
+    </update>
+    <!-- 排序代发等级 -->
+    <update id="sortIssuingGrade" parameterType="java.util.Map">
+        update tbl_issuing_grade
+        set sort_id =
+        (
+          case when id = #{fromId,jdbcType=INTEGER} then
+            (select sort_id from TBL_ISSUING_GRADE where id = #{toId,jdbcType=INTEGER})
+          when id = #{toId,jdbcType=INTEGER} THEN
+            (select sort_id from TBL_ISSUING_GRADE where id = #{fromId,jdbcType=INTEGER})
+          end
+        )
+        where id = #{fromId,jdbcType=INTEGER} or id = #{toId,jdbcType=INTEGER}
+    </update>
+    
+    
+    <!-- 获取全部代发等级 -->
+    <select id="queryIssuingGradeAll" resultType="java.util.Map" resultMap="issuingGradeAllListMap">
+        select
+        <include refid="all_column"/>
+        from TBL_ISSUING_GRADE
+        order by sort_id desc
+    </select>
+    <resultMap id="issuingGradeAllListMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="grade_name" property="option"/>
+    </resultMap>
+</mapper>

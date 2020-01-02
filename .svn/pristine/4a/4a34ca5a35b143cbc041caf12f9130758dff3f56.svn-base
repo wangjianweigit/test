@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.product.dao.ProductParamDao">
+    <sql id="all_column">
+      id,
+      product_type_id,
+      parameter_name,
+      parameter_type,
+      parameter_values,
+      required_flag,
+      to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+      is_display,
+      sort_id
+    </sql>
+    <sql id="product_param_all_column">
+      id,
+      product_type_id,
+      (select type_name from tbl_dic_product_type t where t.id = product_type_id and rownum =1) type_name,
+      parameter_name,
+      parameter_type,
+      parameter_values,
+      required_flag,
+      to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+      is_display,
+      sort_id
+    </sql>
+   	<!-- 商品参数基本信息通用查询条件 -->
+	<sql id="product_param_where_record">
+		<where>
+			<if test="product_type_id !=null and  product_type_id!=''">
+				product_type_id = #{product_type_id}
+			</if>
+			<if test="parameter_name !=null and  parameter_name!=''">
+			    and parameter_name like concat(concat('%', #{parameter_name,jdbcType=VARCHAR}),'%')
+			</if>
+			<if test="parameter_type !=null and  parameter_type!=''">
+				and parameter_type = #{parameter_type}
+			</if>
+			<if test="parameter_values !=null and  parameter_values!=''">
+				and parameter_values = #{parameter_values}
+			</if>
+			<if test="id !=null and  id!=''">
+				and id = #{id}
+			</if>
+			<if test="is_display !=null and  is_display!=''">
+				and is_display = #{is_display}
+			</if>	
+			<if test="required_flag !=null and  required_flag!=''">
+				and required_flag = #{required_flag}
+			</if>				
+		</where>
+	</sql>
+	<!-- 查询商品参数基本信息 根据所属类型 -->
+    <select id="queryListByType" parameterType="String" resultType="java.util.Map">
+        select <include refid="all_column"/>
+        from tbl_dic_product_parameter
+        where product_type_id = #{product_type_id}
+        order by sort_id desc
+    </select>
+ 
+    <!-- 查询商品参数列表 -->
+	<select id="queryProductParamList" parameterType="java.util.Map" resultType="java.util.Map">
+	select * from (select t.*,rownum rn from (select <include refid="product_param_all_column" />
+			from tbl_dic_product_parameter  <include refid="product_param_where_record" /> order by sort_id desc) t 
+			where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+	where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	
+	 <!-- 查询商品参数数量 -->
+	<select id="queryProductParamCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		from tbl_dic_product_parameter 
+		<include refid="product_param_where_record" />
+	</select>
+	
+	<!-- 新增商品参数  -->
+	<insert id="insert" parameterType="java.util.Map" >
+		insert into tbl_dic_product_parameter
+			(id,
+		     product_type_id,
+		     parameter_name,
+		     parameter_type,
+		     parameter_values,
+		     required_flag,
+		     create_date,
+		     is_display,
+		     create_user_id,
+		     sort_id
+			) 
+		values(
+			seq_product_parameter.nextval,
+			#{product_type_id,jdbcType=VARCHAR},
+			#{parameter_name,jdbcType=VARCHAR},
+			#{parameter_type,jdbcType=VARCHAR},
+			#{parameter_values,jdbcType=VARCHAR},
+			#{required_flag,jdbcType=CHAR},
+			sysdate,
+			#{is_display,jdbcType=CHAR},
+			#{create_user_id,jdbcType=INTEGER},
+			(select nvl(max(sort_id),0) + 1 from tbl_dic_product_parameter)
+		)
+	</insert>
+	
+	<!-- 更新商品参数 -->
+	<update id="update" parameterType="java.util.Map" >
+		update tbl_dic_product_parameter 
+		<set>
+			<if test="product_type_id!=null and product_type_id!=''">product_type_id=#{product_type_id,jdbcType=INTEGER},</if>
+			<if test="parameter_name!=null and parameter_name!=''">parameter_name=#{parameter_name,jdbcType=VARCHAR},</if>
+			<if test="parameter_type!=null and parameter_type!=''">parameter_type=#{parameter_type,jdbcType=VARCHAR},</if>
+			<if test="parameter_values!=null and parameter_values!=''">parameter_values=#{parameter_values,jdbcType=VARCHAR},</if>
+			<if test="required_flag!=null and required_flag!=''">required_flag=#{required_flag,jdbcType=CHAR},</if>
+			<if test="is_display!=null and is_display!=''">is_display=#{is_display,jdbcType=CHAR},</if>
+			create_date=sysdate
+		</set>	
+		where id=#{id,jdbcType=INTEGER}
+	</update>
+	
+	<!--商品参数删除-->
+	<delete id="delete" parameterType="java.util.Map" >
+		delete from tbl_dic_product_parameter
+		where id=#{id,jdbcType=INTEGER}
+	</delete> 
+	<!-- 参数名称是否重复 -->
+	<select id="isExist" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_dic_product_parameter
+		 where parameter_name=#{parameter_name,jdbcType=VARCHAR}
+		 and product_type_id=#{product_type_id,jdbcType=INTEGER}
+		 	<if test="id!=null and id!=0">
+		 		and id!=#{id,jdbcType=INTEGER}
+		 	</if>
+	</select>
+	<!-- 跟分类ID查询商品参数信息 -->
+	<select id="queryProductParamInfo" parameterType="java.util.Map" resultType="java.util.Map">
+		select <include refid="all_column"/>
+		  from tbl_dic_product_parameter
+		 where product_type_id in(select t1.id
+								      from tbl_dic_product_type t1
+								start with t1.id = (select id
+								                      from (select *
+								                              from tbl_dic_product_type t2
+								                            start with t2.id = #{product_type_id,jdbcType=INTEGER}
+								                            connect by prior t2.parent_id = t2.id)
+								                     where parent_id = 0)
+								connect by t1.parent_id = prior t1.id)
+	</select>
+	<resultMap type="java.util.Map" id="resultDetailMap">
+		 <result column="id" property="id"/>
+         <result column="product_type_id" property="product_type_id"/>
+         <result column="parameter_type" property="parameter_type"/>
+         <result column="parameter_name" property="parameter_name"/>
+         <result column="product_type_id" property="product_type_id"/>
+         <result column="parameter_values" property="parameter_values"/>
+         <result column="required_flag" property="required_flag"/>
+         <result column="is_display" property="is_display"/>
+	</resultMap>
+	<!-- 商品参数详情 -->
+	<select id="queryById" parameterType="long" resultType="java.util.Map" resultMap="resultDetailMap">
+		select <include refid="all_column"/>
+		  from tbl_dic_product_parameter
+		 where id = #{id,jdbcType=INTEGER}
+	</select>
+	<!-- 更新排序 -->
+	<update id="updateSort" parameterType="java.util.Map">
+		update tbl_dic_product_parameter
+		   <set>
+		   	<if test="sort_id!=null">
+				sort_id = #{sort_id,jdbcType=INTEGER}
+			</if>
+			<if test="type == 'top'">
+				sort_id = (select max(sort_id) + 1 from tbl_dic_product_parameter )
+			</if>
+			<if test="type == 'bottom'">
+				sort_id = (select min(sort_id) - 1 from tbl_dic_product_parameter)
+			</if>
+		   </set> 
+		 where id = #{id,jdbcType=INTEGER}
+	</update>
+	<!-- 查询参数是否存在关联商品 -->
+	<select id="queryProductParamRelevance" parameterType="java.util.Map" resultType="int">
+			  select (select count (1)
+	            from tbl_product_params_apply
+	           where parameter_id = a.id)
+	       + (select count (1)
+	            from tbl_product_params_info
+	           where parameter_id = a.id)
+	          count
+			  from tbl_dic_product_parameter a
+			 where a.id = #{id,jdbcType=INTEGER}
+	</select>
+</mapper>

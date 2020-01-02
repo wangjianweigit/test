@@ -1,0 +1,579 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tk.analysis.transaction.dao.TransactionAnalysisDao">
+							<!-- #################        交易概况         ################ -->
+	<!-- 交易总览-访客数 -->
+	<select id="r_queryVisitorCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(distinct t.member_key)
+		  from fact_user_log t,dim_date dt
+		 where t.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+	</select>
+	<!-- 交易总览-下单买家数、下单金额 -->
+	<select id="r_queryPurchaseNumberMoney" parameterType="java.util.Map" resultType="java.util.Map">
+		select count(distinct t.member_key) purchase_number,nvl(sum(t.product_money),0) order_money
+		  from fact_order t,dim_date dt
+		 where t.create_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>
+	</select>
+	<!-- 交易总览-支付买家数、支付金额 -->
+	<select id="r_queryPayPurchaseNumberMoney" parameterType="java.util.Map" resultType="java.util.Map">
+		select count(distinct t.member_key) purchase_number,nvl(sum(t.payment_money-t.pre_earnest_money),0) payment_money
+		  from fact_order t,dim_date dt
+		 where t.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>
+	</select>
+	<!-- 交易总览-预订支付的首款 -->
+	<select id="r_queryPreFirstMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t.earnest_money),0)
+		  from fact_pre_order t,dim_date dt
+		 where t.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>
+	</select>
+	<!-- 交易趋势-访客数 -->
+	<select id="r_queryTrend_VisitorCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(distinct t.member_key)
+		  from fact_user_log_product t,dim_date dt
+		 where t.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t.product_key)
+		   </if>
+	</select>
+	<!-- 交易趋势-支付金额 -->
+	<select id="r_queryTrend_AllPayMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t.product_money),0)
+		  from fact_order_product_sku t,dim_date dt
+		 where t.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t.product_key)
+		   </if>
+	</select>
+	<!-- 交易趋势-支付买家数 -->
+	<select id="r_queryTrend_PayPurchaseNumber" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(distinct t.member_key)
+		  from fact_order_product_sku t,dim_date dt
+		 where t.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t.product_key)
+		   </if>
+	</select>
+	<!-- 交易趋势-订单笔数 -->
+	<select id="r_queryTrend_OrderCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(distinct t.order_key)
+		  from fact_order_product_sku t,dim_date dt
+		 where t.create_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t.product_key)
+		   </if>
+	</select>
+	<!-- 交易趋势-订单商品数 -->
+	<select id="r_queryTrend_OrderProductCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t.product_count),0)
+		  from fact_order_product_sku t,dim_date dt
+		 where t.create_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t.product_key)
+		   </if>
+	</select>
+	<!-- 交易趋势-成功退款金额 -->
+	<select id="r_queryTrend_ReturnMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t.product_money),0)
+		  from fact_aso_refund_product t,dim_date dt
+		 where t.aso_refund_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+  		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+  		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t.product_key)
+		   </if>
+	</select>
+	<!-- 交易趋势-下单买家数 -->
+	<select id="r_queryTrend_PurchaseNumber" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(distinct t.member_key)
+		  from fact_order_product_sku t,dim_date dt
+		 where t.create_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t.product_key)
+		   </if>
+	</select>
+	<!-- 交易趋势-访客数 折线图<天> -->
+	<select id="r_queryTrend_VisitorCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_full||':00' create_date,count(distinct a.member_key) visitor_count
+		  from
+		(select t.log_time_key,t.member_key
+		  from fact_user_log_product t,dim_date dt
+		 where t.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t.product_key)
+		   </if>) a,dim_time dt
+		   where a.log_time_key = dt.time_key
+           group by dt.hours24_full
+           order by dt.hours24_full
+	</select>
+	<!-- 交易趋势-下单买家数、订单笔数和订单商品数 折线图<天> -->
+	<select id="r_queryTrend_PurchaseNumberCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_full||':00' create_date,count(distinct a.member_key) purchase_number,count(distinct a.order_key) order_count,nvl(sum(a.product_count),0) product_count
+		  from
+		(select t.create_date_time_key,t.member_key,t.order_key,t.product_count
+		  from fact_order_product_sku t,dim_date dt
+		 where t.create_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t.product_key)
+		   </if>) a,dim_time dt
+		   where a.create_date_time_key = dt.time_key
+           group by dt.hours24_full
+           order by dt.hours24_full
+	</select>
+	<!-- 交易趋势-支付买家数、支付金额 折线图<天> -->
+	<select id="r_queryTrend_PayPurchaseNumberMoneyD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_full||':00' create_date,count(distinct a.member_key) purchase_number,nvl(sum(a.product_money),0) payment_money
+		  from
+		(select t.payment_date_time_key,t.member_key,t.product_money
+		  from fact_order_product_sku t,dim_date dt
+		 where t.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t.product_key)
+		   </if>) a,dim_time dt
+		   where a.payment_date_time_key = dt.time_key
+           group by dt.hours24_full
+           order by dt.hours24_full
+	</select>
+	<!-- 交易趋势-成功退款金额 折线图<天> -->
+	<select id="r_queryTrend_ReturnMoneyD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_full||':00' create_date,nvl(sum(a.product_money),0) return_money
+		  from
+		(select t.aso_refund_date_time_key,t.product_money
+		  from fact_aso_refund_product t,dim_date dt
+		 where t.aso_refund_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t.product_key)
+		   </if>) a,dim_time dt
+		   where a.aso_refund_date_time_key = dt.time_key
+           group by dt.hours24_full
+           order by dt.hours24_full
+	</select>
+	<!-- 交易趋势-访客数 折线图 -->
+	<select id="r_queryTrend_VisitorCount_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select to_char(dt.date_value,'yyyy-mm-dd') create_date,count(distinct t.member_key) visitor_count
+		  from fact_user_log_product t,dim_date dt
+		 where t.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t.product_key)
+		   </if>
+		   group by to_char(dt.date_value,'yyyy-mm-dd')
+	</select>
+	<!-- 交易趋势-下单买家数、订单笔数和订单商品数 折线图 -->
+	<select id="r_queryTrend_PurchaseNumberCount_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select to_char(dt.date_value,'yyyy-mm-dd') create_date,count(distinct t.member_key) purchase_number,count(distinct t.order_key) order_count,nvl(sum(t.product_count),0) product_count
+		  from fact_order_product_sku t,dim_date dt
+		 where t.create_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t.product_key)
+		   </if>
+		   group by to_char(dt.date_value,'yyyy-mm-dd')
+	</select>
+	<!-- 交易趋势-支付买家数、支付金额 折线图 -->
+	<select id="r_queryTrend_PayPurchaseNumberMoney_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select to_char(dt.date_value,'yyyy-mm-dd') create_date,count(distinct t.member_key) purchase_number,nvl(sum(t.product_money),0) payment_money
+		  from fact_order_product_sku t,dim_date dt
+		 where t.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t.product_key)
+		   </if>
+		   group by to_char(dt.date_value,'yyyy-mm-dd')
+	</select>
+	<!-- 交易趋势-成功退款金额 折线图 -->
+	<select id="r_queryTrend_ReturnMoney_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select to_char(dt.date_value,'yyyy-mm-dd') create_date,nvl(sum(t.product_money),0) return_money
+		  from fact_aso_refund_product t,dim_date dt
+		 where t.aso_refund_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="brand_id !=null and brand_id !=0">
+		   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t.product_key)
+		   </if>
+		   group by to_char(dt.date_value,'yyyy-mm-dd')
+	</select>
+							<!-- #################        交易构成         ################ -->
+	<!-- 终端列表 -->
+	<select id="r_queryTerminalList" parameterType="java.util.Map" resultType="java.util.Map">
+		select access_terminal_id,
+				case when access_terminal_os is null then access_terminal_name
+				else access_terminal_name||'('||access_terminal_os||')' end access_terminal_name
+		  from dim_access_terminal	
+		 order by access_terminal_id
+	</select>
+	<!-- 终端构成-访客数 -->
+	<select id="r_queryTerminal_VisitorCount" parameterType="java.util.Map" resultType="java.util.Map">
+			select t1.access_terminal_id,count(distinct t.member_key) visitor_count
+			  from fact_user_log t,dim_access_terminal t1,dim_date dt
+			 where t.access_terminal_key = t1.access_terminal_key
+			   and t.log_date_key = dt.date_key
+	           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			   group by t1.access_terminal_id
+	</select>
+	<!-- 终端构成-支付买家数、支付金额、支付商品数 -->
+	<select id="r_queryTerminal_PurchaseNumberMoneyCount" parameterType="java.util.Map" resultType="java.util.Map">
+		select a.order_source,count(distinct a.member_key) purchase_number,nvl(sum(a.payment_money-a.pre_earnest_money),0) payment_money,nvl(sum(a.product_count),0) sale_count
+		  from
+			(select decode(t1.order_source,1,2,2,1,3,1,4,32,5,31,6,31) order_source,t.member_key,t.payment_money,t.pre_earnest_money,t.product_count
+			  from fact_order t,dim_order t1,dim_date dt
+			 where t.order_key = t1.order_key
+			   and t.payment_date_key = dt.date_key
+	           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')) a
+			   group by a.order_source
+	</select>
+	<!-- 终端构成-预订支付的首款 -->
+	<select id="r_queryTerminal_PreFirstMoney" parameterType="java.util.Map" resultType="java.util.Map">
+		select a.order_source,nvl(sum(a.earnest_money),0) pre_first_money
+		  from	
+			(select decode(t1.order_source,1,2,2,1,3,1,4,32,5,31) order_source,t.earnest_money
+			  from fact_pre_order t,dim_pre_order t1,dim_date dt
+			 where t.order_key = t1.order_key
+			   and t.payment_date_key = dt.date_key
+	           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')) a
+			   group by a.order_source
+	</select>
+	<!-- 商品分类列表 -->
+	<select id="queryProductTypeList" parameterType="java.util.Map" resultType="java.util.Map">
+		select id,
+			   type_name
+		  from tbl_dic_product_type
+		 where parent_id = 0
+		 order by sortid desc
+	</select>
+	<!-- 商品类目构成 -->
+	<select id="r_queryProductClassifyFrom" parameterType="java.util.Map" resultType="java.util.Map">
+		select t.id,
+			   t.type_name,
+			   nvl(t1.visitor_count,0) visitor_count,
+			   nvl(t2.purchase_number,0) purchase_number,
+			   nvl(t2.sale_count,0) sale_count,
+			   nvl(t2.payment_money,0) payment_money
+		  from (<foreach collection="list" item="item" separator="union all">
+			  		select #{item.ID} id,
+			  			   #{item.TYPE_NAME} type_name
+			  		  from dual
+			  	</foreach>) t
+		  left join (select t1.product_first_classify,count(distinct t.member_key) visitor_count
+			  from fact_user_log_product t,dim_product t1,dim_date dt
+			 where t.product_key = t1.product_key
+			   and t.log_date_key = dt.date_key
+	           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			   group by t1.product_first_classify) t1 on t1.product_first_classify = t.id
+		  left join (select t1.product_first_classify,count(distinct t.member_key) purchase_number,nvl(sum(t.product_count),0) sale_count,nvl(sum(t.product_money),0) payment_money
+			  from fact_order_product_sku t,dim_product t1,dim_date dt
+			 where t.product_key = t1.product_key
+			   and t.payment_date_key = dt.date_key
+	           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			   group by t1.product_first_classify) t2 on t2.product_first_classify = t.id
+	</select>
+	<!-- 品牌列表 -->
+	<select id="queryBrandList" parameterType="java.util.Map" resultType="java.util.Map">
+		select id,
+			   brand_name,
+			   logo
+		  from tbl_dic_product_brand	
+		 where state = 2
+		 order by sortid desc
+	</select>
+	<!-- 品牌构成-访客数 -->
+	<select id="r_queryBrand_VisitorCount" parameterType="java.util.Map" resultType="java.util.Map">
+		select t1.brand_id,count(distinct t.member_key) visitor_count
+		  from fact_user_log_product t,dim_product t1,dim_date dt
+		 where t.product_key = t1.product_key
+		   and t.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and t1.brand_id is not null
+		   group by t1.brand_id
+	</select>
+	<!-- 品牌构成-支付买家数、支付金额、支付商品数 -->
+	<select id="r_queryBrand_PurchaseNumberMoneyCount" parameterType="java.util.Map" resultType="java.util.Map">
+		select t1.brand_id,count(distinct t.member_key) purchase_number,nvl(sum(t.product_money),0) payment_money,nvl(sum(t.product_count),0) sale_count
+		  from fact_order_product_sku t,dim_product t1,dim_date dt
+		 where t.product_key = t1.product_key
+		   and t.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and t1.brand_id is not null
+		   group by t1.brand_id
+	</select>
+	<!-- 品牌构成-所有品牌的支付总金额 -->
+	<select id="r_queryBrand_AllPayMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t.product_money),0) payment_money
+		  from fact_order_product_sku t,dim_date dt
+		 where t.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and exists (select 1 from dim_product where product_key = t.product_key)
+	</select>
+	<!-- 数据趋势-访客数 折线图 -->
+	<select id="r_queryDataTrend_VisitorCount_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		<choose>
+			<when test="access_terminal_id != null and access_terminal_id != ''">
+				select to_char(dt.date_value,'yyyy-mm-dd') create_date,count(distinct t.member_key) visitor_count
+				  from fact_user_log t,dim_date dt
+				 where t.log_date_key = dt.date_key
+		           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+				   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+				   and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+				   group by to_char(dt.date_value,'yyyy-mm-dd')
+			</when>
+			<otherwise>
+				select to_char(dt.date_value,'yyyy-mm-dd') create_date,count(distinct t.member_key) visitor_count
+				  from fact_user_log_product t,dim_date dt
+				 where t.log_date_key = dt.date_key
+		           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+				   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+				   <if test="brand_id !=null and brand_id !=0">
+				   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t.product_key)
+				   </if>
+				   <if test="product_first_classify !=null and product_first_classify !=0">
+				    and exists (select 1 from dim_product where product_first_classify = #{product_first_classify,jdbcType=INTEGER} and product_key = t.product_key)
+				   </if>
+				   <if test="product_second_classify !=null and product_second_classify !=0">
+				    and exists (select 1 from dim_product where product_second_classify = #{product_second_classify,jdbcType=INTEGER} and product_key = t.product_key)
+				   </if>
+				   group by to_char(dt.date_value,'yyyy-mm-dd')
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 数据趋势-支付买家数、支付金额、支付商品数和支付订单数 折线图 -->
+	<select id="r_queryDataTrend_PayPurchaseNumberMoneyCount_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		<choose>
+			<when test="access_terminal_id != null and access_terminal_id != ''">
+				select to_char(dt.date_value,'yyyy-mm-dd') create_date,count(distinct t.member_key) purchase_number,nvl(sum(t.payment_money-t.pre_earnest_money),0) payment_money,nvl(sum(t.product_count),0) sale_count,
+					   count(distinct t.order_key) order_count
+				  from fact_order t,dim_date dt
+				 where t.payment_date_key = dt.date_key
+		           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+				   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+				   and exists (select 1 from dim_order where order_source = #{order_source,jdbcType=INTEGER} and order_key = t.order_key)
+				   group by to_char(dt.date_value,'yyyy-mm-dd')
+			</when>
+			<otherwise>
+				select to_char(dt.date_value,'yyyy-mm-dd') create_date,count(distinct t.member_key) purchase_number,nvl(sum(t.product_money),0) payment_money,nvl(sum(t.product_count),0) sale_count,
+				  	   count(distinct t.order_key) order_count
+				  from fact_order_product_sku t,dim_date dt
+				 where t.payment_date_key = dt.date_key
+		           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+				   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+				   <if test="brand_id !=null and brand_id !=0">
+				   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t.product_key)
+				   </if>
+				   <if test="product_first_classify !=null and product_first_classify !=0">
+				    and exists (select 1 from dim_product where product_first_classify = #{product_first_classify,jdbcType=INTEGER} and product_key = t.product_key)
+				   </if>
+				   <if test="product_second_classify !=null and product_second_classify !=0">
+				    and exists (select 1 from dim_product where product_second_classify = #{product_second_classify,jdbcType=INTEGER} and product_key = t.product_key)
+				   </if>
+				   group by to_char(dt.date_value,'yyyy-mm-dd')
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 数据趋势-预订支付的首款 折线图 -->
+	<select id="r_queryDataTrend_PreFirstMoney_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select to_char(dt.date_value,'yyyy-mm-dd') create_date,nvl(sum(t.earnest_money),0) pre_first_money
+		  from fact_pre_order t,dim_date dt
+		 where t.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and exists (select 1 from dim_pre_order where order_source = #{order_source,jdbcType=INTEGER} and order_key = t.order_key)
+		   group by to_char(dt.date_value,'yyyy-mm-dd')
+	</select>
+	<!-- 数据趋势-访客数 折线图<天> -->
+	<select id="r_queryDataTrend_VisitorCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		<choose>
+			<when test="access_terminal_id != null and access_terminal_id != ''">
+				select dt.hours24_full||':00' create_date,count(distinct a.member_key) visitor_count
+				  from
+				(select t.log_time_key,t.member_key
+				  from fact_user_log t,dim_date dt
+				 where t.log_date_key = dt.date_key
+		           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+				   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+				   and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)) a,dim_time dt
+				   where a.log_time_key = dt.time_key
+		           group by dt.hours24_full
+		           order by dt.hours24_full
+				   
+			</when>
+			<otherwise>
+				select dt.hours24_full||':00' create_date,count(distinct a.member_key) visitor_count
+				  from
+				(select t.log_time_key,t.member_key
+				  from fact_user_log_product t,dim_date dt
+				 where t.log_date_key = dt.date_key
+		           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+				   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+				   <if test="brand_id !=null and brand_id !=0">
+				   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t.product_key)
+				   </if>
+				   <if test="product_first_classify !=null and product_first_classify !=0">
+				    and exists (select 1 from dim_product where product_first_classify = #{product_first_classify,jdbcType=INTEGER} and product_key = t.product_key)
+				   </if>
+				   <if test="product_second_classify !=null and product_second_classify !=0">
+				    and exists (select 1 from dim_product where product_second_classify = #{product_second_classify,jdbcType=INTEGER} and product_key = t.product_key)
+				   </if>) a,dim_time dt
+				   where a.log_time_key = dt.time_key
+		           group by dt.hours24_full
+		           order by dt.hours24_full
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 数据趋势-支付买家数、支付金额、支付商品数和支付订单数 折线图<天> -->
+	<select id="r_queryDataTrend_PayPurchaseNumberMoneyCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		<choose>
+			<when test="access_terminal_id != null and access_terminal_id != ''">
+				select dt.hours24_full||':00' create_date,count(distinct a.member_key) purchase_number,nvl(sum(a.payment_money-a.pre_earnest_money),0) payment_money,nvl(sum(a.product_count),0) sale_count,
+					   count(distinct a.order_key) order_count
+				  from
+				(select t.payment_date_time_key,t.member_key,t.payment_money,t.pre_earnest_money,t.product_count,t.order_key
+				  from fact_order t,dim_date dt
+				 where t.payment_date_key = dt.date_key
+		           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+				   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+				   and exists (select 1 from dim_order where order_source = #{order_source,jdbcType=INTEGER} and order_key = t.order_key)) a,dim_time dt
+				   where a.payment_date_time_key = dt.time_key
+		           group by dt.hours24_full
+		           order by dt.hours24_full
+			</when>
+			<otherwise>
+				select dt.hours24_full||':00' create_date,count(distinct a.member_key) purchase_number,nvl(sum(a.product_money),0) payment_money,nvl(sum(a.product_count),0) sale_count,
+				  	   count(distinct a.order_key) order_count
+				  from
+				(select t.payment_date_time_key,t.member_key,t.product_money,t.product_count,t.order_key
+				  from fact_order_product_sku t,dim_date dt
+				 where t.payment_date_key = dt.date_key
+		           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+				   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+				   <if test="brand_id !=null and brand_id !=0">
+				   	and exists (select 1 from dim_product where brand_id = #{brand_id,jdbcType=INTEGER} and product_key = t.product_key)
+				   </if>
+				   <if test="product_first_classify !=null and product_first_classify !=0">
+				    and exists (select 1 from dim_product where product_first_classify = #{product_first_classify,jdbcType=INTEGER} and product_key = t.product_key)
+				   </if>
+				   <if test="product_second_classify !=null and product_second_classify !=0">
+				    and exists (select 1 from dim_product where product_second_classify = #{product_second_classify,jdbcType=INTEGER} and product_key = t.product_key)
+				   </if>) a,dim_time dt
+				   where a.payment_date_time_key = dt.time_key
+		           group by dt.hours24_full
+		           order by dt.hours24_full
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 数据趋势-预订支付的首款 折线图<天> -->
+	<select id="r_queryDataTrend_PreFirstMoneyD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_full||':00' create_date,nvl(sum(a.earnest_money),0) pre_first_money
+		  from
+		(select t.payment_date_time_key,t.earnest_money
+		  from fact_pre_order t,dim_date dt
+		 where t.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and exists (select 1 from dim_pre_order where order_source = #{order_source,jdbcType=INTEGER} and order_key = t.order_key)) a,dim_time dt
+		   where a.payment_date_time_key = dt.time_key
+           group by dt.hours24_full
+           order by dt.hours24_full
+	</select>
+	<!-- 终端下拉框 -->
+	<resultMap type="java.util.Map" id="terminalSelectMap">
+		<result column="access_terminal_id" property="id"/>
+        <result column="access_terminal_name" property="name"/>
+	</resultMap>
+	<select id="r_queryTerminalSelect" parameterType="java.util.Map" resultMap="terminalSelectMap">
+		select access_terminal_id,
+				case when access_terminal_os is null then access_terminal_name
+				else access_terminal_name||'('||access_terminal_os||')' end access_terminal_name
+		  from dim_access_terminal	
+		 order by access_terminal_id
+	</select>
+	<!-- 品牌下拉框 -->
+	<resultMap type="java.util.Map" id="brandSelectMap">
+		<result column="id" property="id"/>
+        <result column="brand_name" property="name"/>
+	</resultMap>
+	<select id="queryBrandSelect" parameterType="java.util.Map" resultMap="brandSelectMap">
+		select id,
+			   brand_name
+		  from tbl_dic_product_brand	
+		 where state = 2
+		 order by sortid desc
+	</select>
+	
+</mapper>

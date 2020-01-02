@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.marketing.dao.SaleActivityDao">
+	<sql id="all_column">
+			TSAI.ACTIVITY_ID,
+			TSAI.PRODUCT_TYPE,
+			TSAI.CUSTOM_DISCOUNT_FLAG,
+			TSAI.ACTIVITY_SERVICE_DISCOUNT * 10 AS ACTIVITY_SERVICE_DISCOUNT,
+			TSAI.ACTIVITY_MAX_DISCOUNT * 10 AS ACTIVITY_MAX_DISCOUNT,
+			TSAI.ACTIVITY_MIN_DISCOUNT * 10 AS ACTIVITY_MIN_DISCOUNT,
+			TSAI.ACTIVITY_DISCOUNT * 10 AS ACTIVITY_DISCOUNT,
+			TSAI.IS_ADD,
+			TSAI.LOCKED_STOCK,
+			TSAI.ACTIVITY_QUIT_FLAG,
+			TSAI.TAG_COLOR,
+			TSAI.TAG_NAME,
+			TSAI.APPLY_PRODUCT_LIMIT_AMOUNT,
+			TSAI.TAG_LEVEL,
+			TSAI.TAG_ADVANCE_IMG,
+			TSAI.TAG_ACTIVITY_IMG,
+			TSAI.BACKGROUND_IMG_DISPLAY,
+			TSAI.TAG_IMG_PC,
+			TSAI.TAG_IMG_WX,
+			TSAI.SCENE_TYPE,
+			TSAI.SCENE_IMG_URL,
+			TSAI.RECOMMEN_HOME
+	</sql>
+	
+	<!-- 获取促销活动-限时折扣详情 -->
+    <select id="querySaleActivityDetail" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT <include refid="all_column"/> 
+		  FROM TBL_SALE_ACTIVITY_INFO TSAI
+		<where>
+				1=1
+			<if test="id != null and id != 0 ">
+				AND	TSAI.ACTIVITY_ID = #{id,jdbcType=INTEGER}
+			</if>
+		</where> 
+	</select>
+
+	<!-- 插入限时折扣活动信息 -->
+    <insert id="insertSaleActivity" parameterType="java.util.HashMap">
+    	INSERT INTO TBL_SALE_ACTIVITY_INFO(
+    	ACTIVITY_ID,
+    	PRODUCT_TYPE,
+    	CUSTOM_DISCOUNT_FLAG,
+    	ACTIVITY_SERVICE_DISCOUNT,
+    	ACTIVITY_MAX_DISCOUNT,
+    	ACTIVITY_MIN_DISCOUNT,
+    	ACTIVITY_DISCOUNT,
+    	IS_ADD,
+    	LOCKED_STOCK,
+    	ACTIVITY_QUIT_FLAG,
+    	TAG_COLOR,
+    	SCENE_TYPE,
+		SCENE_IMG_URL,
+    	TAG_NAME,APPLY_PRODUCT_LIMIT_AMOUNT,TAG_LEVEL,TAG_ADVANCE_IMG,TAG_ACTIVITY_IMG,BACKGROUND_IMG_DISPLAY,TAG_IMG_WX,TAG_IMG_PC,RECOMMEN_HOME)
+    	VALUES(
+    	#{ACTIVITY_ID,jdbcType=INTEGER},
+    	#{PRODUCT_TYPE,jdbcType=VARCHAR},
+    	#{CUSTOM_DISCOUNT_FLAG,jdbcType=VARCHAR},
+    	#{ACTIVITY_SERVICE_DISCOUNT,jdbcType=DOUBLE},
+    	#{ACTIVITY_MAX_DISCOUNT,jdbcType=DOUBLE},
+    		   #{ACTIVITY_MIN_DISCOUNT,jdbcType=DOUBLE},
+    		   #{ACTIVITY_DISCOUNT,jdbcType=DOUBLE},
+    		   #{IS_ADD,jdbcType=VARCHAR},
+    		   #{LOCKED_STOCK,jdbcType=VARCHAR},
+    		   #{ACTIVITY_QUIT_FLAG,jdbcType=VARCHAR},
+    		   #{TAG_COLOR,jdbcType=VARCHAR},
+    		  	#{SCENE_TYPE,jdbcType=INTEGER},
+    		   #{SCENE_IMG_URL,jdbcType=VARCHAR},
+    		   #{TAG_NAME,jdbcType=VARCHAR},
+    		   #{APPLY_PRODUCT_LIMIT_AMOUNT,jdbcType=INTEGER},
+    		   #{TAG_LEVEL,jdbcType=VARCHAR},
+    		   #{TAG_ADVANCE_IMG,jdbcType=VARCHAR},#{TAG_ACTIVITY_IMG,jdbcType=VARCHAR},#{BACKGROUND_IMG_DISPLAY,jdbcType=VARCHAR},#{TAG_IMG_WX,jdbcType=VARCHAR},#{TAG_IMG_PC,jdbcType=VARCHAR}, #{recommen_home,jdbcType=INTEGER})
+	</insert>
+	
+	<!-- 更新限时折扣活动信息 -->
+    <update id="updateSaleActivity" parameterType="java.util.HashMap">
+    	UPDATE  TBL_SALE_ACTIVITY_INFO
+    	   SET  
+    	   		<if test="PRODUCT_TYPE!=NULL and PRODUCT_TYPE!=''">
+    	   			PRODUCT_TYPE = #{PRODUCT_TYPE,jdbcType=VARCHAR},
+    	   		</if>
+    	   		<if test='CUSTOM_DISCOUNT_FLAG != null and CUSTOM_DISCOUNT_FLAG == "1" '>
+    	   			ACTIVITY_DISCOUNT = #{ACTIVITY_DISCOUNT,jdbcType=DOUBLE},
+    	   			ACTIVITY_MAX_DISCOUNT = NULL,
+    	   			ACTIVITY_MIN_DISCOUNT = NULL,
+    	   		</if>
+    	   		<if test='CUSTOM_DISCOUNT_FLAG != null and CUSTOM_DISCOUNT_FLAG == "2" '>
+    	   			ACTIVITY_DISCOUNT = NULL,
+    	   			ACTIVITY_MAX_DISCOUNT = #{ACTIVITY_MAX_DISCOUNT,jdbcType=DOUBLE},
+    	   			ACTIVITY_MIN_DISCOUNT = #{ACTIVITY_MIN_DISCOUNT,jdbcType=DOUBLE},
+    	   		</if>
+    	   		<if test='BACKGROUND_IMG_DISPLAY != null and BACKGROUND_IMG_DISPLAY == "1" '>
+    	   			TAG_ADVANCE_IMG = #{TAG_ADVANCE_IMG,jdbcType=VARCHAR},
+    	   			TAG_ACTIVITY_IMG = #{TAG_ACTIVITY_IMG,jdbcType=VARCHAR},
+    	   		</if>
+    	   		<if test='BACKGROUND_IMG_DISPLAY != null and BACKGROUND_IMG_DISPLAY == "2" '>
+    	   			TAG_ADVANCE_IMG = NULL,
+    	   			TAG_ACTIVITY_IMG = NULL,
+    	   		</if>
+    	   		<if test='TAG_LEVEL != null and TAG_LEVEL == "1" '>
+    	   			TAG_IMG_WX = #{TAG_IMG_WX,jdbcType=VARCHAR},
+    	   			TAG_IMG_PC = #{TAG_IMG_PC,jdbcType=VARCHAR},
+    	   		</if>
+    	   		<if test='TAG_LEVEL != null and TAG_LEVEL != "1" '>
+    	   			TAG_IMG_WX = NULL,
+    	   			TAG_IMG_PC = NULL,
+    	   		</if>
+    	   		CUSTOM_DISCOUNT_FLAG = #{CUSTOM_DISCOUNT_FLAG,jdbcType=VARCHAR},
+    	   		ACTIVITY_SERVICE_DISCOUNT = #{ACTIVITY_SERVICE_DISCOUNT,jdbcType=DOUBLE},
+    	   		IS_ADD = #{IS_ADD,jdbcType=VARCHAR},
+    	   		LOCKED_STOCK = #{LOCKED_STOCK,jdbcType=VARCHAR},
+    	   		ACTIVITY_QUIT_FLAG = #{ACTIVITY_QUIT_FLAG,jdbcType=VARCHAR},
+    	   		TAG_COLOR = #{TAG_COLOR,jdbcType=VARCHAR},
+    	   		TAG_NAME = #{TAG_NAME,jdbcType=VARCHAR},
+    	   		APPLY_PRODUCT_LIMIT_AMOUNT = #{APPLY_PRODUCT_LIMIT_AMOUNT,jdbcType=INTEGER},
+    	   		TAG_LEVEL = #{TAG_LEVEL,jdbcType=VARCHAR},
+				SCENE_TYPE = #{SCENE_TYPE,jdbcType=INTEGER},
+				SCENE_IMG_URL = #{SCENE_IMG_URL,jdbcType=VARCHAR},
+    	   		BACKGROUND_IMG_DISPLAY = #{BACKGROUND_IMG_DISPLAY,jdbcType=VARCHAR},
+                RECOMMEN_HOME = #{recommen_home,jdbcType=INTEGER}
+    	WHERE ACTIVITY_ID = #{ID,jdbcType=INTEGER}
+	</update>
+
+	<!--更新是否推荐至首页状态-->
+	<update id="updateSaleActivityRecommen" parameterType="java.util.Map">
+		update tbl_sale_activity_info set recommen_home = #{recommen_home,jdbcType=INTEGER} where activity_id = #{activity_id,jdbcType=INTEGER}
+	</update>
+	
+	<!-- 更新限时折扣活动信息 -->
+    <update id="updateSaleActivityDecorate" parameterType="java.util.HashMap">
+    	UPDATE  TBL_SALE_ACTIVITY_INFO
+    	   SET  TAG_LEVEL = #{TAG_LEVEL,jdbcType=VARCHAR},
+				SCENE_TYPE = #{SCENE_TYPE,jdbcType=INTEGER},
+				SCENE_IMG_URL = #{SCENE_IMG_URL,jdbcType=VARCHAR},
+    	   		<if test='BACKGROUND_IMG_DISPLAY != null and BACKGROUND_IMG_DISPLAY == "1" '>
+    	   			TAG_ADVANCE_IMG = #{TAG_ADVANCE_IMG,jdbcType=VARCHAR},
+    	   			TAG_ACTIVITY_IMG = #{TAG_ACTIVITY_IMG,jdbcType=VARCHAR},
+    	   		</if>
+    	   		<if test='BACKGROUND_IMG_DISPLAY != null and BACKGROUND_IMG_DISPLAY == "2" '>
+    	   			TAG_ADVANCE_IMG = NULL,
+    	   			TAG_ACTIVITY_IMG = NULL,
+    	   		</if>
+    	   		<if test='TAG_LEVEL != null and TAG_LEVEL == "1" '>
+    	   			TAG_IMG_WX = #{TAG_IMG_WX,jdbcType=VARCHAR},
+    	   			TAG_IMG_PC = #{TAG_IMG_PC,jdbcType=VARCHAR},
+    	   		</if>
+    	   		<if test='TAG_LEVEL != null and TAG_LEVEL != "1" '>
+    	   			TAG_IMG_WX = NULL,
+    	   			TAG_IMG_PC = NULL,
+    	   		</if>
+    	   		TAG_COLOR = #{TAG_COLOR,jdbcType=VARCHAR},
+    	   		TAG_NAME = #{TAG_NAME,jdbcType=VARCHAR},
+    	   		BACKGROUND_IMG_DISPLAY = #{BACKGROUND_IMG_DISPLAY,jdbcType=VARCHAR},
+                RECOMMEN_HOME = #{recommen_home,jdbcType=INTEGER}
+    	WHERE ACTIVITY_ID = #{ID,jdbcType=INTEGER}
+	</update>
+	
+	<delete id="deleteSaleActivity" parameterType="java.util.HashMap">
+		DELETE FROM TBL_SALE_ACTIVITY_INFO TSAI WHERE TSAI.ACTIVITY_ID = #{id,jdbcType=VARCHAR}
+	</delete>
+</mapper>

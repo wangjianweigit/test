@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tk.oms.member.dao.DistributorManageDao">
+    
+    <!--查询经销商列表数据-->
+    <select id="queryDistributorList" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select a.*, rownum as ranking from (
+                select
+                    tui.id,tui.login_name, tui.user_manage_name, tui.user_manage_mobilephone,
+                    (select user_realname from tbl_sys_user_info where id = tui.market_supervision_user_id) ywjl_user_name,
+                    (select user_realname from tbl_sys_user_info where id = tui.referee_user_id) ywy_user_name,
+                    (select store_name from tbl_store_info where id = tui.store_id) md_name,
+                    (select name from tbl_dic_region where id = tui.user_company_address_province) province_name,
+                    (select name from tbl_dic_region where id = tui.user_company_address_city) city_name,
+                    (select name from tbl_dic_region where id = tui.user_company_address_county) county_name,
+                    (select name from tbl_site_info where id = tui.site_id) site_name,
+                    tui.service_rate, 
+                    tui.user_company_address_deails,
+                    tui.is_pos, tui.is_wechat,
+                    to_char(tui.distributor_date,'yyyy-mm-dd hh24:mi:ss')  as  distributor_date
+                from
+                    tbl_user_info tui
+                where
+                    tui.distribution_state = 1
+                <if test="login_name!=null and login_name!=''">
+                    and trim(tui.login_name) = #{login_name,jdbcType=VARCHAR}
+                </if>
+                <if test="user_manage_name!=null and user_manage_name!=''">
+                    and trim(tui.user_manage_name) = #{user_manage_name,jdbcType=VARCHAR}
+                </if>
+                <if test="ywjl_user_id != null and ywjl_user_id != '' ">
+                    and	tui.market_supervision_user_id = #{ywjl_user_id,jdbcType=VARCHAR}
+                </if>
+                <if test="md_id != null and md_id != 0 ">
+                    and	tui.store_id = #{md_id,jdbcType=INTEGER}
+                </if>
+                <if test="ywy_user_id != null and ywy_user_id != '' ">
+                    and	tui.referee_user_id = #{ywy_user_id,jdbcType=VARCHAR}
+                </if>
+                <if test="user_manage_mobilephone!=null and user_manage_mobilephone!=''">
+                    and tui.user_manage_mobilephone = #{user_manage_mobilephone, jdbcType=VARCHAR}
+                </if>
+                <if test="site_id != null and site_id!=''">
+                    and tui.site_id =#{site_id,jdbcType=INTEGER}
+                </if>
+                <if test="province != null and province!=''">
+                    and tui.user_company_address_province = #{province,jdbcType=INTEGER}
+                </if>
+                <if test="city != null and city!=''">
+                    and tui.user_company_address_city = #{city,jdbcType=INTEGER}
+                </if>
+                <if test="area != null and area!=''">
+                    and tui.user_company_address_county = #{area,jdbcType=INTEGER}
+                </if>
+                <if test="is_pos != null and is_pos!=''">
+                    and tui.is_pos = #{is_pos,jdbcType=CHAR}
+                </if>
+                <if test="is_wechat != null and is_wechat != ''">
+                    and tui.is_wechat = #{is_wechat,jdbcType=CHAR}
+                </if>
+                order by tui.distributor_date desc nulls last,tui.id
+            ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where ranking &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+    
+    
+    <!--查询经销商下拉框-->
+    <select id="queryDistributorOption" resultType="java.util.Map" resultMap="distributorListMap">
+        select
+            id,user_manage_name
+        from
+            tbl_user_info tui
+        where
+            tui.distribution_state = 1
+    </select>
+    
+    <resultMap id="distributorListMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="user_manage_name" property="option"/>
+    </resultMap>
+
+    <!--查询经销商列表总数量-->
+    <select id="queryDistributorCount" parameterType="java.util.Map" resultType="int">
+        select
+            count(1)
+        from
+            tbl_user_info tui
+        where
+            tui.distribution_state = 1
+        <if test="login_name!=null and login_name!=''">
+            and trim(tui.login_name) = #{login_name,jdbcType=VARCHAR}
+        </if>
+        <if test="user_manage_name!=null and user_manage_name!=''">
+            and trim(tui.user_manage_name) = #{user_manage_name,jdbcType=VARCHAR}
+        </if>
+        <if test="ywjl_user_id != null and ywjl_user_id != ''">
+            and	tui.market_supervision_user_id = #{ywjl_user_id,jdbcType=VARCHAR}
+        </if>
+        <if test="md_id != null and md_id != 0 ">
+            and	tui.store_id = #{md_id,jdbcType=INTEGER}
+        </if>
+        <if test="ywy_user_id != null and ywy_user_id != ''">
+            and	tui.referee_user_id = #{ywy_user_id,jdbcType=VARCHAR}
+        </if>
+        <if test="user_manage_mobilephone!=null and user_manage_mobilephone!=''">
+            and tui.user_manage_mobilephone = #{user_manage_mobilephone, jdbcType=VARCHAR}
+        </if>
+        <if test="site_id != null and site_id!=''">
+            and tui.site_id =#{site_id,jdbcType=INTEGER}
+        </if>
+        <if test="province != null and province!=''">
+            and tui.user_company_address_province = #{province,jdbcType=INTEGER}
+        </if>
+        <if test="city != null and city!=''">
+            and tui.user_company_address_city = #{city,jdbcType=INTEGER}
+        </if>
+        <if test="area != null and area!=''">
+            and tui.user_company_address_county = #{area,jdbcType=INTEGER}
+        </if>
+        <if test="is_pos != null and is_pos!=''">
+            and tui.is_pos = #{is_pos,jdbcType=CHAR}
+        </if>
+        <if test="is_wechat != null and is_wechat != ''">
+            and tui.is_wechat = #{is_wechat,jdbcType=CHAR}
+        </if>
+    </select>
+
+    <!--通过用户ID更新分销状态-->
+    <update id="updateDistributionStateById" parameterType="java.util.Map">
+        update
+            tbl_user_info
+        <set>
+            distribution_state = #{distribution_state,jdbcType=INTEGER},
+            <if test="distribution_state == 1">
+                distributor_date = sysdate
+            </if>
+            <if test="distribution_state == 0">
+                distributor_date = null, is_pos = '0', is_wechat = '0', service_rate = 0
+            </if>
+        </set>
+        where id = #{id,jdbcType=INTEGER}
+    </update>
+
+    <!--通过用户ID更新服务费率-->
+    <update id="updateServiceRateById" parameterType="java.util.Map">
+        update tbl_user_info set service_rate = #{service_rate,jdbcType=FLOAT} where id = #{id,jdbcType=INTEGER}
+    </update>
+
+    <!--更新经销商权限-->
+    <update id="updateAuthorityForDistribution" parameterType="java.util.Map">
+        update
+            tbl_user_info
+        <set>
+            <if test="is_pos != null and is_pos != ''">
+                is_pos = #{is_pos,jdbcType=CHAR}
+            </if>
+            <if test="is_wechat != null and is_wechat != ''">
+                is_wechat = #{is_wechat,jdbcType=CHAR}
+            </if>
+        </set>
+        where
+            id = #{id,jdbcType=INTEGER}
+    </update>
+
+    <!--通过用户ID获取用户信息-->
+    <select id="queryUserById" parameterType="java.util.Map" resultType="java.util.Map">
+        select login_name,user_manage_name from tbl_user_info where id = #{id,jdbcType=INTEGER}
+    </select>
+
+    <select id="queryUserByAccount" parameterType="java.util.List" resultType="java.util.Map">
+        select
+            tui.id,tui.user_manage_name,
+            (select user_realname from tbl_sys_user_info where id = tui.market_supervision_user_id) ywjl_user_name,
+            (select user_realname from tbl_sys_user_info where id = tui.referee_user_id) ywy_user_name,
+            (select store_name from tbl_store_info where id = tui.store_id) md_name,
+            (select name from tbl_dic_region where id = tui.user_company_address_province) province_name,
+            (select name from tbl_dic_region where id = tui.user_company_address_city) city_name,
+            (select name from tbl_site_info where id = tui.site_id) site_name
+        from tbl_user_info tui
+        where tui.distribution_state = 1 and tui.id in
+        <foreach collection="list" open="(" close=")" item="item" index="index" separator=",">
+            #{item.ACCOUNT,jdbcType=INTEGER}
+        </foreach>
+    </select>
+
+    <!--查询经销商列表数据-->
+    <select id="queryDistributorListNoPage" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            tui.id,tui.login_name, tui.user_manage_name, tui.user_manage_mobilephone,
+            (select user_realname from tbl_sys_user_info where id = tui.market_supervision_user_id) ywjl_user_name,
+            (select user_realname from tbl_sys_user_info where id = tui.referee_user_id) ywy_user_name,
+            (select store_name from tbl_store_info where id = tui.store_id) md_name,
+            (select name from tbl_dic_region where id = tui.user_company_address_province) province_name,
+            (select name from tbl_dic_region where id = tui.user_company_address_city) city_name,
+            (select name from tbl_dic_region where id = tui.user_company_address_county) county_name,
+            (select name from tbl_site_info where id = tui.site_id) site_name,
+            tui.service_rate,
+            tui.user_company_address_deails,
+            tui.is_pos, tui.is_wechat,
+            to_char(tui.distributor_date,'yyyy-mm-dd hh24:mi:ss')  as  distributor_date
+        from tbl_user_info tui
+        where
+            tui.distribution_state = 1
+        <if test="ywjl_user_id != null and ywjl_user_id != '' ">
+            and	tui.market_supervision_user_id = #{ywjl_user_id,jdbcType=VARCHAR}
+        </if>
+        <if test="md_id != null and md_id != 0 ">
+            and	tui.store_id = #{md_id,jdbcType=INTEGER}
+        </if>
+        <if test="ywy_user_id != null and ywy_user_id != '' ">
+            and	tui.referee_user_id = #{ywy_user_id,jdbcType=VARCHAR}
+        </if>
+        <if test="SITE_ID != null and SITE_ID!=''">
+            and tui.site_id =#{SITE_ID,jdbcType=INTEGER}
+        </if>
+        order by tui.distributor_date desc nulls last,tui.id
+    </select>
+
+
+
+</mapper>

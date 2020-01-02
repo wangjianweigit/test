@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.finance.dao.OrderProductPriceDao">
+    <sql id="where_case">
+        <where>
+            <if test="order_number != null and order_number != ''">
+                and ops.order_number = #{order_number, jdbcType=VARCHAR}
+            </if>
+            <if test="user_name != null and user_name != ''">
+                and osp.user_name = #{user_name, jdbcType=VARCHAR}
+            </if>
+            <if test="stationed_id != null and stationed_id != 0">
+                and exists( select 1 from tbl_stationed_user_info sui where sui.id = osp.stationed_user_id and sui.id = #{stationed_id, jdbcType=VARCHAR})
+            </if>
+            <if test="product_itemnumber != null and product_itemnumber != ''">
+                and ops.product_itemnumber = #{product_itemnumber, jdbcType=VARCHAR}
+            </if>
+            <if test="activity_name != null and activity_name != ''">
+                and osp.activity_name like concat('%',concat(#{activity_name, jdbcType=VARCHAR},'%'))
+            </if>
+            <if test="start_date != '' and start_date != null">
+                and ops.order_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+            </if>
+            <if test="end_date != '' and end_date != null">
+                and ops.order_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+            </if>
+        </where>
+    </sql>
+
+
+    <!--分页获取订单商品价格明细-->
+    <select id="queryDetailListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+        select temp.*,
+            (select odr.divide_money from tbl_order_divide_record odr where temp.order_number = odr.order_number and temp.product_sku = odr.product_sku and odr.divide_type = 1) as product_fee,
+            (select odr.divide_money from tbl_order_divide_record odr where temp.order_number = odr.order_number and temp.product_sku = odr.product_sku and odr.divide_type = 2) as area_fee,
+            (select odr.divide_money from tbl_order_divide_record odr where temp.order_number = odr.order_number and temp.product_sku = odr.product_sku and odr.divide_type = 5) as pay_fee,
+            (select odr.divide_money from tbl_order_divide_record odr where temp.order_number = odr.order_number and temp.product_sku = odr.product_sku and odr.divide_type = 3) as storage_fee,
+            (select company_name from tbl_stationed_user_info sui where sui.id = temp.stationed_user_id) stationed_user_name,
+            (select login_name from tbl_user_info t where t.user_name = temp.user_name and rownum &lt;= 1) as login_name
+        from (
+            select a.*,rownum rn from (
+                select ops.order_number, osp.user_name,
+                    osp.stationed_user_id,ops.product_itemnumber, ops.product_color, ops.codenumber,
+                    osp.product_sale_price, osp.product_default_price,
+                    osp.activity_id, osp.activity_name, osp.activity_discount, osp.user_grade,
+                    osp.user_discount, osp.ts_discount,osp.product_price_cost,
+                    to_char(ops.order_date,'yyyy-mm-dd hh24:mi:ss')  as  order_date,
+                    ops.product_sku, osp.id order_specs_price_id, ops.product_unit_price product_price, ops.product_total_discount_money/ops.count discount_money
+                from tbl_order_specs_price osp
+                inner join tbl_order_product_sku ops on osp.order_number = ops.order_number and osp.product_color = ops.product_color and osp.product_specs = ops.product_specs
+                <include refid="where_case"/>
+                order by ops.order_date desc, ops.order_number, ops.product_itemnumber, ops.product_color, ops.codenumber
+            ) a
+            where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) temp
+        where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--分页获取订单商品价格明细-->
+    <select id="queryDetailListForCount" parameterType="java.util.Map" resultType="int">
+        select count(1)
+        from tbl_order_specs_price osp
+        inner join tbl_order_product_sku ops on osp.order_number = ops.order_number and osp.product_color = ops.product_color and osp.product_specs = ops.product_specs
+        <include refid="where_case"/>
+    </select>
+
+    <select id="queryProcess" parameterType="long" resultType="java.util.Map">
+        select process_remark
+        from tbl_order_specs_price
+        where id = #{order_specs_price_id, jdbcType=INTEGER}
+    </select>
+</mapper>

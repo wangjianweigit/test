@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.decoration.dao.DecoratePageDetailDao">
+    <sql id="all_column">
+          ID,
+		  PAGE_ID,
+		  PAGE_PARAM,
+		  PAGE_PARAM_VAL
+    </sql>
+     <!-- 页面详细信息JSON 封装 -->
+	<resultMap type="java.util.Map" id="resultMap">
+        <result property="PAGE_PARAM" column="PAGE_PARAM" jdbcType="CLOB" javaType = "java.lang.String"/>
+        <result property="PAGE_PARAM_VAL" column="PAGE_PARAM_VAL" jdbcType="CLOB" javaType = "java.lang.String"/>
+    </resultMap>
+    <!--查询根据页面ID页面详细信息JSON -->
+    <select id="queryDetail" parameterType="long"  resultMap="resultMap">
+        select
+        <include refid="all_column"></include>
+        from TBL_DECORATE_PAGE_DETAIL WHERE PAGE_ID = #{page_id,jdbcType=INTEGER}
+        and rownum &lt;=1
+    </select>
+   
+   <!-- 新增或者更新活动商品页面详情中的参数值 -->
+    <update id="insertOrUpdate" parameterType="java.util.HashMap">
+    	merge into TBL_DECORATE_PAGE_DETAIL c1
+        using
+        (
+                    select                  
+			            #{page_id,jdbcType=INTEGER} page_id,
+			            #{page_param,jdbcType=INTEGER} page_param,
+			            #{page_param_val,jdbcType=VARCHAR} page_param_val
+                    from dual           
+        ) t1
+        on (c1.page_id = t1.page_id)
+        when matched then
+          update set
+            c1.page_param_val = t1.page_param_val
+        when not matched then
+        insert(
+            id,
+		  	page_id,
+			page_param,
+			page_param_val
+        )
+        values (
+            SEQ_DECORATE_PAGE_DETAIL.nextval,
+            t1.page_id,
+            t1.page_param,
+            t1.page_param_val
+        )
+	</update>
+</mapper>

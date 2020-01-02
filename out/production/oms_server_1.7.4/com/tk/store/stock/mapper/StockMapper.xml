@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.store.stock.dao.StockDao">
+	<!-- 查询商家ID -->
+	<select id="queryAgentId" parameterType="java.util.Map" resultType="string">
+		select id
+		  from tbl_user_info
+		 where user_state = 1
+		   and partner_user_id = #{region_id,jdbcType=INTEGER}
+	</select>
+	<resultMap type="java.util.Map" id="storeSelectMap">
+		<result column="agent_store_id" property="id"/>
+		<result column="store_name" property="option"/>
+	</resultMap>
+	<!-- 新零售门店ID -->
+	<select id="storeSelect" parameterType="java.util.Map" resultMap="storeSelectMap">
+		select agent_store_id,store_name
+	      from tbl_store_user_manage t
+			where approval_state = 1
+			  and exists (
+				select 1 from tbl_user_info tui
+				  where t.user_id = tui.id
+				    and tui.user_state = 1
+				 	and partner_user_id = #{partner_user_id,jdbcType=INTEGER})
+				 	and agent_store_id is not null
+	</select>
+	<!-- 查询调拨任务数量 -->
+	<select id="queryStoreAllotTaskCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_store_allot_task t
+		 where type = 2
+		   and exists (
+		 	select 1 from tbl_store_user_manage t1
+		 	 where id = t.out_store_id
+		 	   and exists (
+		 	   select 1 from tbl_user_info where 
+		 	   id = t1.user_id
+		 	   and user_state = 1
+		 	   and partner_user_id = #{region_id,jdbcType=INTEGER}
+		 	   )
+		 )
+	</select>
+	<!-- 查询调拨任务列表 -->
+	<select id="queryStoreAllotTaskListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+		select  e.*,
+				(select store_name from tbl_store_user_manage where id=e.out_store_id) as store_name
+    	  from (select y.*,rownum as rn
+				  from (select id,
+				  			   out_store_id
+				  		  from tbl_store_allot_task t
+				  		 where type = 2
+				  		   and exists (
+								 	select 1 from tbl_store_user_manage t1
+								 	 where id = t.out_store_id
+								 	   and exists (
+								 	   select 1 from tbl_user_info where 
+								 	   id = t1.user_id
+								 	   and user_state = 1
+								 	   and partner_user_id = #{region_id,jdbcType=INTEGER}
+								 	   )
+								 )
+					    order by t.create_date desc) y
+		 		 where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) e
+		 where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 调拨任务商品数量 -->
+	<select id="queryStoreAllotTaskProductCount" parameterType="java.util.Map" resultType="int">
+		select count(1) from tbl_store_allot_task_detail where task_id = #{task_id,jdbcType=INTEGER}
+	</select>
+	<!-- 调拨任务商品列表 -->
+	<select id="queryStoreAllotTaskProductListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+		select e.*,
+			   (select brand_name from tbl_dic_product_brand tdpb where tdpb.id = e.brand_id)  as brand,
+			   (select type_name from tbl_dic_product_type tdpt where tdpt.id = e.product_type_id)  as product_type,
+    		   (select name from tbl_dic_product_season tdps where tdps.id = e.season_id)  as season
+    	  from (select y.*,rownum as rn
+				  from (select t.id,
+				  			   t.itemnumber,
+							   t1.brand_id,
+							   t1.product_type_id,
+							   t1.season_id,
+							   t1.year,
+							   t1.product_img_url
+						  from tbl_store_allot_task_detail t,tbl_product_info t1
+						 where task_id = #{task_id,jdbcType=INTEGER}
+						   and t.itemnumber = t1.itemnumber(+)) y
+		 		 where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) e
+		 where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	
+	<!--新增调拨单主表信息-->
+	<insert id="insertStoreAllotTask" parameterType="java.util.Map" >
+		<selectKey keyProperty="id" resultType="int" order="BEFORE"> 
+        	SELECT seq_store_allot_task.nextval FROM DUAL
+    	</selectKey>
+		insert into tbl_store_allot_task
+			(id,
+			out_store_id,
+			create_date,
+			create_user_id,
+			type
+			) 
+		values(
+			#{id,jdbcType=INTEGER},
+			#{out_store_id,jdbcType=INTEGER},
+			sysdate,
+			#{public_user_id,jdbcType=INTEGER},
+			2
+		)
+	</insert>
+	
+	<!--新增调拨单详情表信息-->
+	<insert id="insertStoreAllotTaskDetail" parameterType="java.util.Map" >
+		insert into tbl_store_allot_task_detail
+			(id,
+			task_id,
+			itemnumber,
+			create_date,
+			create_user_id
+			) 
+		values(
+			seq_store_allot_task_detail.nextval,
+			#{task_id,jdbcType=INTEGER},
+			#{itemnumber,jdbcType=VARCHAR},
+			sysdate,
+			#{public_user_id,jdbcType=INTEGER}
+		)
+	</insert>
+	<!-- 调拨任务信息 -->
+	<select id="queryStoreAllotTaskInfo" parameterType="java.util.Map" resultType="java.util.Map">
+		select id
+		  from tbl_store_allot_task t
+		 where out_store_id = #{out_store_id,jdbcType=INTEGER}
+		   and exists (
+					 	select 1 from tbl_store_user_manage t1
+					 	 where id = t.out_store_id
+					 	   and exists (
+					 	   select 1 from tbl_user_info where 
+					 	   id = t1.user_id
+					 	   and user_state = 1
+					 	   and partner_user_id = #{region_id,jdbcType=INTEGER}
+					 	   )
+					 )
+	</select>
+	<!-- 调拨任务商品是否存在 -->
+	<select id="queryTaskProductIsExists" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_store_allot_task_detail
+		 where task_id = #{task_id,jdbcType=INTEGER}
+		   and itemnumber = #{itemnumber,jdbcType=VARCHAR}
+	</select>
+	<!-- 获取门店ID -->
+	<select id="queryStoreId" parameterType="java.util.Map" resultType="string">
+		select id from tbl_store_user_manage where agent_store_id = #{agent_store_id,jdbcType=INTEGER}
+	</select>
+	
+</mapper>

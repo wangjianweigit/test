@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.order.dao.OrderUnusualDao">
+	<!-- 查询异常订单列表总数 -->
+	<select id="queryOrderUnusualCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+				 from tbl_order_info toi 
+				 	  left join (select order_number,sum(total_send_count) total_send_count from tbl_order_product_sku group by order_number) t1 on t1.order_number = toi.order_number
+				 where exists (select 1 from tbl_order_product top where toi.order_number=top.order_number
+				                and exists(select 1 from tbl_product_info tpi where top.itemnumber=tpi.itemnumber and tpi.stop_outstock_state = 1))
+				   and toi.product_count > t1.total_send_count
+				   and toi.order_state != 6
+            	<if test="order_number != null and order_number != ''">
+		            and toi.order_number = #{order_number,jdbcType=VARCHAR}
+		        </if>
+		        <if test="login_name != null and login_name != ''">
+	         				and exists(select 1 from tbl_user_info tui where tui.user_name=toi.user_name and tui.login_name=#{login_name,jdbcType=VARCHAR})
+		        </if>
+	            <if test="state != null and state != ''">
+	            	and toi.order_number in(select order_number from (
+												select distinct order_number,nvl((select state from tbl_order_unusual where order_number=top.order_number),1) state from tbl_order_product top
+												where exists(select 1 from tbl_product_info tpi where top.itemnumber=tpi.itemnumber and tpi.stop_outstock_state = 1))
+												where state in<foreach item="item" collection="state" open="(" separator="," close=")">
+												    	 		   #{item,jdbcType=INTEGER}
+												    	 	  </foreach>)
+	            </if>
+	            <if test="public_user_type != null and public_user_type == 2">
+		            and exists (select 1 from tbl_sys_user_store tsus where tsus.store_id = toi.md_id and tsus.user_id = #{public_user_id,jdbcType=INTEGER})
+		        </if>
+		        <if test="public_user_type != null and public_user_type == 3">
+		            and toi.ywy_user_name = #{public_user_name,jdbcType=VARCHAR}
+		        </if>
+		        <if test="public_user_type != null and public_user_type == 4">
+		            and toi.ywjl_user_name = #{public_user_name,jdbcType=VARCHAR}
+		        </if>
+		        <if test="public_user_type != null and public_user_type == 5">
+		            and exists(select 1 from tbl_store_info tsi where tsi.id = toi.md_id and tsi.shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER})
+		        </if>
+		        <if test="public_user_type != null and public_user_type == 6">
+		            and exists(select 1 from tbl_store_user_rel tsui where tsui.store_id = toi.md_id and tsui.user_id = #{public_user_id,jdbcType=INTEGER})
+		        </if>
+		        <if test="public_user_type != null and public_user_type == 9">
+		            and EXISTS(SELECT 1 
+		                         FROM TBL_SYS_USER_INFO TSUI
+		                        WHERE TSUI.USER_TYPE = 4
+		            				  AND TSUI.ORGANIZATION_ID IN (
+										  	SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+										  	START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER} CONNECT BY PRIOR ID = PARENT_ID
+							              )
+							          AND TSUI.USER_NAME = TOI.YWJL_USER_NAME)
+		        </if>
+	</select>
+	
+	<!-- 查询异常订单列表 -->
+	<select id="queryOrderUnusualList" parameterType="java.util.Map" resultType="java.util.Map">
+			select t.*,
+				   (select user_manage_name from tbl_user_info tui where tui.user_name=t.user_name) user_manage_name,
+				   (select user_manage_mobilephone from tbl_user_info tui where tui.user_name=t.user_name) user_manage_mobilephone,
+				   (select product_count from tbl_order_info toi where toi.order_number=t.order_number) product_count,
+				   (select remark from tbl_order_unusual tou where tou.order_number=t.order_number) as remark
+		        from (select a.*, rownum num
+		        		from (select *
+		                from (select toi.*,
+									(select login_name from tbl_user_info where user_name=toi.user_name) login_name,
+									nvl((select state from tbl_order_unusual tou where tou.order_number=toi.order_number),1) as state,
+									nvl(t1.total_send_count,0) total_send_count
+									 from tbl_order_info toi 
+									 	  left join (select order_number,sum(total_send_count) total_send_count from tbl_order_product_sku group by order_number) t1 on t1.order_number = toi.order_number
+									 where exists (select 1 from tbl_order_product top where toi.order_number=top.order_number
+									                and exists(select 1 from tbl_product_info tpi where top.itemnumber=tpi.itemnumber and tpi.stop_outstock_state = 1))
+									   and toi.product_count > t1.total_send_count
+									   and toi.order_state != 6
+		                            <if test="order_number != null and order_number != ''">
+							            and toi.order_number = #{order_number,jdbcType=VARCHAR}
+							        </if>
+							        <if test="login_name != null and login_name != ''">
+			            				and exists(select 1 from tbl_user_info tui where tui.user_name=toi.user_name and tui.login_name=#{login_name,jdbcType=VARCHAR})
+							        </if>
+						            <if test="state != null and state != ''">
+						            	and toi.order_number in(select order_number from (
+																	select distinct order_number,nvl((select state from tbl_order_unusual where order_number=top.order_number),1) state from tbl_order_product top
+																	where exists(select 1 from tbl_product_info tpi where top.itemnumber=tpi.itemnumber and tpi.stop_outstock_state = 1))
+																	where state in<foreach item="item" collection="state" open="(" separator="," close=")">
+																	    	 		   #{item,jdbcType=INTEGER}
+																	    	 	  </foreach>)
+						            </if>
+						            <if test="public_user_type != null and public_user_type == 2">
+							            and exists (select 1 from tbl_sys_user_store tsus where tsus.store_id = toi.md_id and tsus.user_id = #{public_user_id,jdbcType=INTEGER})
+							        </if>
+							        <if test="public_user_type != null and public_user_type == 3">
+							            and toi.ywy_user_name = #{public_user_name,jdbcType=VARCHAR}
+							        </if>
+							        <if test="public_user_type != null and public_user_type == 4">
+							            and toi.ywjl_user_name = #{public_user_name,jdbcType=VARCHAR}
+							        </if>
+							        <if test="public_user_type != null and public_user_type == 5">
+							            and exists(select 1 from tbl_store_info tsi where tsi.id = toi.md_id and tsi.shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER})
+							        </if>
+							        <if test="public_user_type != null and public_user_type == 6">
+							            and exists(select 1 from tbl_store_user_rel tsui where tsui.store_id = toi.md_id and tsui.user_id = #{public_user_id,jdbcType=INTEGER})
+							        </if>
+							        <if test="public_user_type != null and public_user_type == 9">
+							            and EXISTS(SELECT 1 
+							                         FROM TBL_SYS_USER_INFO TSUI
+							                        WHERE TSUI.USER_TYPE = 4
+							            				  AND TSUI.ORGANIZATION_ID IN (
+															  	SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+															  	START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER} CONNECT BY PRIOR ID = PARENT_ID
+												              )
+												          AND TSUI.USER_NAME = TOI.YWJL_USER_NAME)
+							        </if>)
+							        order by state,create_date) a
+	                 where rownum &lt;= #{end_rownum,jdbcType=INTEGER})t
+	         where num &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	
+	<!-- 获取订单商品SKU信息列表 -->
+    <select id="queryOrderProductSkuList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT  TOPS.ID,
+				TOPS.ORDER_NUMBER,
+				TOPS.ORDER_ITEM_NUMBER,
+				TOPS.CODENUMBER,
+				TOPS.COUNT,
+				TOPS.PRODUCT_UNIT_PRICE,
+				TOPS.PRODUCT_TOTAL_MONEY,
+				TOPS.PRODUCT_OLD_UNIT_PRICE,
+				TOPS.PRODUCT_TOTAL_DISCOUNT_MONEY,
+				TOPS.USER_NAME,
+				TO_CHAR(TOPS.ORDER_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  ORDER_DATE,
+				TOPS.PRODUCT_SKU,
+				TOPS.PRODUCT_SKU_NAME,
+				TOPS.PRODUCT_ITEMNUMBER,
+				TOPS.PRODUCT_COLOR,
+				TOPS.PRODUCT_OUT_COUNT,
+				TOPS.PRODUCT_SURE_COUNT,
+				TOPS.PRODUCT_CONFIGURE_STATE,
+				TOPS.PRODUCT_LACK_COUNT,
+				TOPS.PRODUCT_SPECS,
+				TOPS.PRODUCT_OLDSALE_PRIZE,
+				TOPS.TOTAL_SEND_COUNT,
+				TOPS.WAREHOUSE_ID,
+				(SELECT TPI.STOP_OUTSTOCK_STATE FROM TBL_PRODUCT_INFO TPI WHERE TPI.ITEMNUMBER=TOPS.PRODUCT_ITEMNUMBER) IS_OUTSTOCK,
+			    (SELECT TPI.PRODUCT_IMG_URL FROM TBL_PRODUCT_INFO TPI WHERE TPI.ITEMNUMBER = TOPS.PRODUCT_ITEMNUMBER) AS PRODUCT_IMG_URL,
+			    (SELECT TPI.PRODUCT_NAME FROM TBL_PRODUCT_INFO TPI WHERE TPI.ITEMNUMBER = TOPS.PRODUCT_ITEMNUMBER) AS PRODUCT_NAME,
+			    (SELECT ORIGINAL_PRODUCT_ITEMNUMBER FROM TBL_CUSTOM_PRODUCT_REL TCPR WHERE TCPR.CUSTOM_PRODUCT_ITEMNUMBER = TOPS.PRODUCT_ITEMNUMBER) AS PRODUCT_OLD_ITEMNUMBER
+		  FROM TBL_ORDER_PRODUCT_SKU TOPS
+		<where>
+			    1=1
+			  <if test="order_number != null and order_number != '' ">
+				AND	TOPS.ORDER_NUMBER = #{order_number,jdbcType=VARCHAR}
+			  </if>
+		</where>
+		ORDER BY TOPS.PRODUCT_ITEMNUMBER,TOPS.PRODUCT_COLOR,TOPS.CODENUMBER ASC
+	</select>
+	
+	<!--新增活更新异常订单-->
+    <update id="addOrUpdateOrderUnusual">
+        merge into tbl_order_unusual c1 using
+        (
+            select
+              #{order_number,jdbcType=VARCHAR} order_number,
+              #{state,jdbcType=INTEGER} state,
+              #{remark,jdbcType=VARCHAR} remark,
+              sysdate as create_date,
+              #{public_user_id,jdbcType=INTEGER} create_user_id
+            from dual  
+        ) t1 on (c1.order_number = t1.order_number)
+        when matched then
+            update set
+                c1.state = t1.state,
+                c1.remark = t1.remark
+        when not matched then
+            insert (
+                id,
+                order_number,
+                state,
+                remark,
+                create_date,
+                create_user_id
+            ) values (
+                seq_order_unusual.nextval,
+                t1.order_number,
+                t1.state,
+                t1.remark,
+                t1.create_date,
+                t1.create_user_id
+            )
+    </update>
+    
+    <!-- 获取订单商品SKU信息列表 -->
+    <select id="orderUnusualRemarkDetail" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT  ORDER_NUMBER,
+    			STATE,
+    			REMARK
+		  FROM TBL_ORDER_UNUSUAL TOU
+		<where>
+			    1=1
+			  <if test="order_number != null and order_number != '' ">
+				AND	TOU.ORDER_NUMBER = #{order_number,jdbcType=VARCHAR}
+			  </if>
+		</where>
+	</select>
+</mapper>

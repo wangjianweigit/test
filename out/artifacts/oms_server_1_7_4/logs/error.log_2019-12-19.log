@@ -1,0 +1,6 @@
+2019-12-19 11:26:24 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-12-19 11:26:26 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-12-19 11:26:27 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-12-19 11:26:28 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-12-19 14:32:16 ERROR [com.tk.oms.finance.service.RetailExtractService] 
+2019-12-19 14:33:09 ERROR [com.tk.oms.finance.service.RetailExtractService] 

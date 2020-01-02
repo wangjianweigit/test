@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.attesttreas.dao.AttesttreasDao">
+	<sql id="baseColumn">
+		id,
+		tran_type,
+		user_id,
+		bank_account,
+		tran_amount,
+		order_number,
+		thirdlogno
+	</sql>
+	<!-- 添加见证宝请求超时异常记录 -->
+	<insert id="insertAttesttreasTimeout" parameterType="java.util.Map">
+		<selectKey keyProperty="id" resultType="long" order="BEFORE">
+			select seq_attesttreas_timeout.nextval from dual
+		</selectKey>
+
+		insert into TBL_ATTESTTREAS_TIMEOUT(<include refid="baseColumn"/>)
+		VALUES (
+			#{id,jdbcType=INTEGER},
+			#{tran_type,jdbcType=INTEGER},
+			#{user_id,jdbcType=INTEGER},
+			#{bank_account,jdbcType=VARCHAR},
+			#{tran_amount,jdbcType=INTEGER},
+			#{order_number,jdbcType=VARCHAR},
+			#{thirdLogNo,jdbcType=VARCHAR}
+		)
+	</insert>
+	<!-- 获取见证宝请求编号 -->
+	<select id="getThiredLogNo" resultType="java.lang.String">
+		select GETTHIRDLOGNUMBER('A') from dual
+	</select>
+</mapper>

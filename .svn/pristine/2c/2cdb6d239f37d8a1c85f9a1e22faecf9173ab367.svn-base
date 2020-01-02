@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.finance.dao.PlatformDeliveryDao">
+
+    <!--查询电商平台发货订单列表-->
+    <select id="queryPlatformDeliveryOrderList" parameterType="java.util.Map" resultType="java.util.Map">
+        select temp.*,nvl(ops.product_old_unit_price,0) product_old_unit_price from (
+            select a.*,rownum rn from (
+                select
+                    bd.product_unique_code,
+                    ei.logistics_number,
+                    to_char(soe.place_order_date,'YYYY-MM-DD HH24:MI:SS') place_order_date,
+                    soe.order_number,
+                    nvl(soe.logistics_money,0) logistics_money,
+                    nvl(soe.df_money,0) df_money,
+                    so.so_id taobao_order_number,
+                    soe.logistics_company_name,
+                    so.shop_name,
+                    nvl(so.pay_amount,0) pay_amount
+                from
+                    ${jdbc_user}.tbl_box_detail bd
+                left join ${jdbc_user}.tbl_encasement_info ei on bd.box_number = ei.box_number
+                left join tbl_saas_order_edit soe on ei.order_number_platform = soe.order_number
+                left join tbl_saas_order so on so.id = soe.order_id
+                where
+                    soe.order_state = 2
+                    and exists(select 1 from ${jdbc_user}.tbl_invoice_info ii where ei.invoice_number = ii.invoice_number and ii.deliver_state = '2')
+                    <if test="shop_name != null and shop_name != ''">
+                        and so.shop_name = #{shop_name,jdbcType=VARCHAR}
+                    </if>
+                    <if test="taobao_order_number != null and taobao_order_number != ''">
+                        and so.so_id  = #{taobao_order_number,jdbcType=VARCHAR}
+                    </if>
+                    <if test="order_number != null and order_number != ''">
+                        and soe.order_number = #{order_number,jdbcType=VARCHAR}
+                    </if>
+                    <if test="start_time != null and start_time != ''">
+                        and soe.place_order_date &gt;= to_date(#{start_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+                    </if>
+                    <if test="end_time != null and end_time != ''">
+                        and soe.place_order_date &lt;= to_date(#{end_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+                    </if>
+                order by soe.place_order_date desc,bd.product_unique_code
+            ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) temp
+        left join ${jdbc_user}.tbl_product_unique_info pui on temp.product_unique_code = pui.product_unique_code
+        left join tbl_order_product_sku ops on ops.product_sku = pui.product_sku and temp.order_number = ops.order_number
+        where rn &gt; #{start_rownum,jdbcType=INTEGER} order by temp.place_order_date desc,temp.product_unique_code
+    </select>
+
+    <!--查询电商平台发货订单总数量-->
+    <select id="queryPlatformDeliveryOrderCount" parameterType="java.util.Map" resultType="int">
+        select
+            count(1)
+        from
+            ${jdbc_user}.tbl_box_detail bd
+        left join ${jdbc_user}.tbl_encasement_info ei on bd.box_number = ei.box_number
+        left join tbl_saas_order_edit soe on ei.order_number_platform = soe.order_number
+        left join tbl_saas_order so on so.id = soe.order_id
+        where
+            soe.order_state = 2
+            and exists(select 1 from ${jdbc_user}.tbl_invoice_info ii where ei.invoice_number = ii.invoice_number and ii.deliver_state = '2')
+            <if test="shop_name != null and shop_name != ''">
+                and so.shop_name = #{shop_name,jdbcType=VARCHAR}
+            </if>
+            <if test="taobao_order_number != null and taobao_order_number != ''">
+                and so.so_id  = #{taobao_order_number,jdbcType=VARCHAR}
+            </if>
+            <if test="order_number != null and order_number != ''">
+                and soe.order_number = #{order_number,jdbcType=VARCHAR}
+            </if>
+            <if test="start_time != null and start_time != ''">
+                and soe.place_order_date &gt;= to_date(#{start_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+            </if>
+            <if test="end_time != null and end_time != ''">
+                and soe.place_order_date &lt;= to_date(#{end_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+            </if>
+    </select>
+</mapper>

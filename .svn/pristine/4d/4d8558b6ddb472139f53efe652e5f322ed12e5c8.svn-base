@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.sys.dao.SiteDelayTemplateDao">
+
+	<!-- 通用区域模板列表查询条件 -->
+	<sql id="currency_select_condition">
+		<where>
+			temp.stationed_user_id is null and temp.is_delete = '1'
+			<if test="templet_name != null and templet_name != ''">
+				and temp.templet_name like '%'||#{templet_name,jdbcType=VARCHAR}||'%'
+			</if>
+			<if test="start_time != null and start_time != ''">
+				and temp.create_date &gt; to_date(#{start_time},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+			<if test="end_time != null and end_time != ''">
+				and temp.create_date &lt; to_date(#{end_time},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+			<if test="state != null and state != ''">
+				and temp.state = #{state,jdbcType=CHAR}
+			</if>
+		</where>
+	</sql>
+
+	<!--保存站点延后时间模板信息-->
+	<insert id="insert" parameterType="java.util.Map">
+		<selectKey keyProperty="id" resultType="int" order="BEFORE">
+			select seq_site_delay_template.nextval from DUAL
+		</selectKey>
+		insert into tbl_site_delay_template(
+            id,
+		    templet_name,
+		    default_flag,
+		    state,
+		    remark,
+		    create_date,
+		    create_user_id
+		) values (
+		    #{id,jdbcType=INTEGER},
+		    #{templet_name,jdbcType=VARCHAR},
+		    2,
+		    '2',
+		    #{remark,jdbcType=VARCHAR},
+		    sysdate,
+		    #{public_user_id,jdbcType=INTEGER}
+		)
+	</insert>
+
+	<!--批量添加站点延后时间-->
+	<insert id="batchInsert" parameterType="java.util.List">
+		insert into tbl_site_delay_site_rel
+		select a.* from(
+		<foreach collection="list" item="item" index="index" separator="UNION">
+			select
+			    #{item.TEMPLET_ID,jdbcType=INTEGER} templet_id,
+			    #{item.SITE_ID,jdbcType=INTEGER} site_id,
+			    #{item.DELAY_DAYS,jdbcType=INTEGER} delay_days
+			from
+			    dual
+		</foreach>
+		) a
+	</insert>
+
+	<!--查询站点延后时间模板总数-->
+	<select id="queryForCount" parameterType="java.util.Map" resultType="int">
+		select count(temp.id) from tbl_site_delay_template temp <include refid="currency_select_condition"/>
+	</select>
+
+	<!--查询站点延后时间模板列表信息-->
+	<select id="queryForPage" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+		    select t1.*,rownum rn from (
+		        select
+		            id,
+		            templet_name,
+		            default_flag,
+		            state,
+		            remark,
+		            to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+		            (select user_realname from tbl_sys_user_info where id = temp.create_user_id) create_login_name
+		        from tbl_site_delay_template temp <include refid="currency_select_condition"/> order by create_date desc
+		    ) t1 where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+		) where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+
+	<!--判定是否存在相同模板名称-->
+	<select id="isExistTemplateName" parameterType="java.util.Map" resultType="int">
+		select
+		    count(id)
+		from
+		    tbl_site_delay_template
+		where
+		    templet_name = #{templet_name,jdbcType=VARCHAR}
+		    and is_delete = '1'
+		<if test="id != null and id != 0">
+			and id != #{id,jdbcType=INTEGER}
+		</if>
+	</select>
+
+	<!--获取默认区域模板基本信息-->
+	<select id="queryDefaultTemplate" parameterType="long" resultType="java.util.Map">
+		select * from tbl_site_delay_template info
+		where info.default_flag = 1 and is_delete = '1'
+	</select>
+
+	<!--查询所有站点,仅返回启用状态的站点，songwangwen 20170522-->
+	<select id="querySiteInfo" resultType="java.util.Map">
+        select id,name
+        from tbl_site_info
+        where state = '2' and platform_type=1
+        order by create_date
+	</select>
+
+	<!--通过ID获取模板信息-->
+	<select id="queryById" parameterType="long" resultType="java.util.Map">
+		select
+		    templet_name,
+		    default_flag,
+		    remark,
+		    is_delete
+		from
+		    tbl_site_delay_template
+		where
+		    id = #{id,jdbcType=INTEGER}
+	</select>
+
+	<!--通过模板ID查询站点延后时间-->
+	<select id="querySiteDelayById" parameterType="long" resultType="java.util.Map">
+		select
+		    a.id,
+		    a.name,
+		    b.*
+		from
+		    tbl_site_info a
+		left join (
+		    select
+		        templet_id,
+		        delay_days,
+		        site_id
+		    from
+		        tbl_site_delay_site_rel
+		    where templet_id = #{templet_id,jdbcType=INTEGER}
+		) b on a.id = b.site_id where a.state = '2' and a.platform_type=1 order by a.create_date
+	</select>
+
+	<!--编辑站点延后时间模板-->
+	<update id="update" parameterType="java.util.Map">
+		update tbl_site_delay_template temp
+		<set>
+			<if test="templet_name != null and templet_name != ''">
+			    temp.templet_name = #{templet_name,jdbcType=VARCHAR},
+			</if>
+			<if test="remark != null and remark != ''">
+			    temp.remark = #{remark,jdbcType=VARCHAR}
+			</if>
+		</set>
+		where temp.id = #{id,jdbcType=INTEGER}
+	</update>
+
+	<!--设置默认站点延后时间模板-->
+	<update id="updateDefaultTemplate" parameterType="java.util.Map">
+		update tbl_site_delay_template temp
+		    set temp.default_flag = 1 where temp.id = #{id,jdbcType=INTEGER}
+	</update>
+
+	<!--设置站点延后时间模板停用和启用-->
+	<update id="updateTemplateState" parameterType="java.util.Map">
+		update tbl_site_delay_template temp
+		    set temp.state = #{state,jdbcType=CHAR} where temp.id = #{id,jdbcType=INTEGER}
+	</update>
+
+	<!--删除站点延后时间模板-->
+	<update id="deleteById" parameterType="long">
+		update tbl_site_delay_template set is_delete = 2 where id = #{id,jdbcType=INTEGER}
+	</update>
+
+	<!--删除站点延后时间配置-->
+	<delete id="deleteSiteDelay" parameterType="java.util.Map">
+        delete from tbl_site_delay_site_rel where templet_id = #{id,jdbcType=INTEGER}
+	</delete>
+	
+	<!-- 查询站点延后显示时间模板下拉框列表-->
+	<select id="querySiteDelayTempletList" resultType="java.util.Map" resultMap="siteDelayTempletMap">
+		select id,templet_name from TBL_SITE_DELAY_TEMPLATE
+		WHERE IS_DELETE = '1' AND STATE = '2' AND STATIONED_USER_ID IS NULL
+	</select>
+	<resultMap id="siteDelayTempletMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="templet_name" property="option"/>
+    </resultMap>
+	
+	<!-- 查询站点模板详情 -->
+	<select id="querySiteDelayTempletDetail" resultType="java.util.Map">
+		select TEMPLET_ID,SITE_ID,DELAY_DAYS
+		from TBL_SITE_DELAY_SITE_REL
+		where DELAY_DAYS is not null
+		and  TEMPLET_ID  =#{templet_id,jdbcType=INTEGER}
+	</select>
+	
+	<!-- 删除未设置显示时间的数据 -->
+     <delete id="deleteNotin" parameterType="java.util.Map">
+   		delete from TBL_SITE_PRODUCT_DELAY 
+   		where product_id = #{product_id,jdbcType=INTEGER}
+   		and site_id not in 
+		<foreach collection="list" open="(" close=")" item="item" index="index" separator=",">
+			#{item.site_id,jdbcType=INTEGER}
+		</foreach>
+     </delete>
+     
+     
+     <!-- 批量插入或更新 -->
+	<update id="batchInsertOrUpdate" parameterType="java.util.Map">
+       merge into TBL_SITE_PRODUCT_DELAY c1
+        using
+        (
+        	select
+				'' as stationed_user_id,
+				#{product_id,jdbcType=INTEGER} as product_id,
+				site_id,
+				delay_days
+			from (
+			<foreach collection="list" open="(" close=")" item="item" index="index" separator="union all">
+				select
+				#{item.site_id,jdbcType=INTEGER} as site_id,
+				#{item.delay_days,jdbcType=INTEGER} as delay_days
+				from dual
+			</foreach>
+			)
+        ) t1
+        on (c1.product_id = t1.product_id and c1.site_id=t1.site_id)
+        when matched then
+          update set
+            c1.delay_days = (case when t1.delay_days is null then c1.delay_days else t1.delay_days end )
+        when not matched then
+        insert
+        (
+        	stationed_user_id,
+			product_id,
+			site_id,
+			delay_days
+        )
+        values
+        (
+			t1.stationed_user_id,
+			t1.product_id,
+			t1.site_id,
+			t1.delay_days
+        )
+    </update>
+    
+    <!-- 删除站点设置时间信息 -->
+     <delete id="delete" parameterType="java.util.Map">
+   		delete from TBL_SITE_PRODUCT_DELAY 
+   		where product_id = #{product_id,jdbcType=INTEGER}
+     </delete>
+
+	<!-- 获取某个商品的站点延后显示时间 -->
+    <select id="queryProductSiteDelay" parameterType="java.util.Map" resultType="java.util.Map">
+    	SELECT STATIONED_USER_ID,
+			SITE_ID,
+			PRODUCT_ID,
+			WEIGHTING,
+			TEMP_WEIGHTING,
+			DELAY_DAYS
+    	FROM TBL_SITE_PRODUCT_DELAY
+    	WHERE  product_id = #{product_id,jdbcType=INTEGER}
+    </select>
+</mapper>

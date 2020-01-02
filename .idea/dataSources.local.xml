@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="dataSourceStorageLocal">
+    <data-source name="oracle.jdbc.driver.OracleData Source - jdbc:oracle:thin:@16.16.16.188:1521:orcl" uuid="34fec19d-19db-49af-847a-5efd7b4249a7">
+      <database-info product="Oracle" version="Oracle Database 11g Release 11.1.0.0.0 - Production" jdbc-version="10.2" driver-name="Oracle JDBC driver" driver-version="10.2.0.1.0" dbms="ORACLE" exact-version="11.1.0.0.0" exact-driver-version="10.2">
+        <extra-name-characters>$#</extra-name-characters>
+        <identifier-quote-string>&quot;</identifier-quote-string>
+      </database-info>
+      <case-sensitivity plain-identifiers="upper" quoted-identifiers="exact" />
+      <secret-storage>master_key</secret-storage>
+      <user-name>tkvip_new</user-name>
+      <introspection-schemas>*:@,PUBLIC</introspection-schemas>
+    </data-source>
+  </component>
+</project>

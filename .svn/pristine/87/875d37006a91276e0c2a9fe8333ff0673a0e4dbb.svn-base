@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tk.oms.decoration.dao.NavigationDao">
+
+    <!--添加导航-->
+    <insert id="insert" parameterType="java.util.Map">
+        <selectKey keyProperty="id" resultType="int" order="BEFORE">
+            select seq_decorate_nav.nextval from dual
+        </selectKey>
+        insert into tbl_decorate_nav(
+            id,
+            name,
+            tag_name,
+            tag_color,
+            site_id,
+            url_type,
+            page_id,
+            url,
+            sort_id,
+            create_date,
+            create_user_id,
+            template_id,
+            user_group_id,
+            menu_img_url
+        ) values (
+            #{id,jdbcType=INTEGER},
+            #{name,jdbcType=VARCHAR},
+            #{tag_name,jdbcType=VARCHAR},
+            #{tag_color,jdbcType=VARCHAR},
+            #{public_user_site_id,jdbcType=INTEGER},
+            #{url_type,jdbcType=CHAR},
+            #{page_id,jdbcType=INTEGER},
+            #{url,jdbcType=VARCHAR},
+            #{id,jdbcType=INTEGER},
+            sysdate,
+            #{public_user_id,jdbcType=INTEGER},
+            #{template_id,jdbcType=INTEGER},
+            #{user_group_id,jdbcType=INTEGER},
+            #{menu_img_url,jdbcType=VARCHAR}
+        )
+    </insert>
+
+    <!--分页获取导航列表-->
+    <select id="queryListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+           SELECT N.ID,
+           N.PAGE_ID,
+           N.NAME,
+           N.URL_TYPE,
+           N.URL,
+           N.TAG_NAME,
+           N.TAG_COLOR,
+           dp.HOME_PAGE_FLAG,
+           case when n.user_group_id = 0 then '不限' else ug.name end user_group_name,
+           n.MENU_IMG_URL
+          FROM tbl_decorate_nav n 
+          left join tbl_decorate_page dp on n.PAGE_ID = dp.id
+          left join tbl_user_group ug on n.user_group_id = ug.id
+         WHERE n.template_id = #{template_id,jdbcType=INTEGER}
+         and n.site_id = #{public_user_site_id,jdbcType=INTEGER}
+         order by n.sort_id desc
+    </select>
+
+    <!--获取导航总数-->
+    <select id="queryListForCount" parameterType="java.util.Map" resultType="int">
+        select count(id) from tbl_decorate_nav
+    </select>
+
+    <!--通过ID获取导航-->
+    <select id="queryById" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            id,
+            name,
+            tag_name,
+            tag_color,
+            url_type,
+            page_id,
+            url,
+            sort_id,
+            user_group_id,
+            menu_img_url
+        from
+            tbl_decorate_nav
+        where
+            id = #{id,jdbcType=INTEGER}
+    </select>
+
+    <!--更新导航-->
+    <update id="update" parameterType="java.util.Map">
+        update
+            tbl_decorate_nav
+        <set>
+            <if test="NAME != null and NAME != ''">
+                name = #{NAME,jdbcType=VARCHAR},
+            </if>
+            <if test="URL_TYPE != null and URL_TYPE != ''">
+                url_type = #{URL_TYPE,jdbcType=CHAR},
+            </if>
+            <if test="URL != null and URL != ''">
+                url = #{URL,jdbcType=VARCHAR},
+            </if>
+            <if test="PAGE_ID != null and PAGE_ID != 0">
+                page_id = #{PAGE_ID,jdbcType=VARCHAR},
+            </if>
+            <if test="USER_GROUP_ID != null">
+                user_group_id = #{USER_GROUP_ID,jdbcType=INTEGER},
+            </if>
+            <if test="MENU_IMG_URL != null">
+                menu_img_url = #{MENU_IMG_URL,jdbcType=INTEGER},
+            </if>
+            tag_name = #{TAG_NAME,jdbcType=VARCHAR},tag_color = #{TAG_COLOR,jdbcType=VARCHAR}
+        </set>
+        where
+            id = #{id,jdbcType=INTEGER}
+    </update>
+
+    <!--删除导航-->
+    <delete id="deleted" parameterType="java.util.Map">
+        delete from tbl_decorate_nav where id = #{id,jdbcType=INTEGER}
+    </delete>
+
+    <!--导航排序-->
+    <update id="updateNavSort" parameterType="java.util.Map">
+        update
+            tbl_decorate_nav
+        set sort_id =(
+            case when id = #{fromId,jdbcType=INTEGER} then (select sort_id from tbl_decorate_nav where id = #{toId,jdbcType=INTEGER})
+                when id = #{toId,jdbcType=INTEGER} then (select sort_id from tbl_decorate_nav where id = #{fromId,jdbcType=INTEGER}) end
+        ) where id = #{fromId,jdbcType=INTEGER} or id = #{toId,jdbcType=INTEGER}
+    </update>
+
+    <!--获取页面列表-->
+    <select id="queryPageList" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            id,
+            page_name,
+            page_type
+        from
+            tbl_decorate_page
+            where
+            is_delete = '1'
+            and template_id = #{template_id,jdbcType=INTEGER}
+            and site_id = #{public_user_site_id,jdbcType=INTEGER}
+            <if test="page_state!=null and page_state!=''">
+            	and page_state = #{page_state,jdbcType=VARCHAR}
+            </if>
+    </select>
+
+    <resultMap id="allDrumbeatingMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="img_url" property="img_url"/>
+        <result column="img_x_value" property="img_x_value"/>
+        <result column="img_y_value" property="img_y_value"/>
+        <result column="img_href" property="img_href"/>
+        <result column="state" property="state"/>
+    </resultMap>
+    <!--获取导航广告详情-->
+    <select id="queryNavDrumbeatingDetail" parameterType="java.util.Map" resultMap="allDrumbeatingMap">
+        select
+            ha.id,
+            ha.img_url,
+            ha.img_x_value,
+            ha.img_y_value,
+            ha.img_href,
+            ha.state
+        from
+            tbl_header_advertisement ha
+        where
+            site_id = #{public_user_site_id,jdbcType=INTEGER}
+            and template_id = #{template_id,jdbcType=INTEGER}
+    </select>
+
+    <!--添加导航广告-->
+    <insert id="addNavDrumbeating" parameterType="java.util.Map">
+        <selectKey keyProperty="id" resultType="int" order="BEFORE">
+            select seq_header_advertisement.nextval from dual
+        </selectKey>
+        insert into tbl_header_advertisement(
+            id,
+            site_id,
+            template_id,
+            img_url,
+            img_x_value,
+            img_y_value,
+            img_href,
+            state,
+            create_user_id,
+            create_date
+        ) values (
+            #{id,jdbcType=INTEGER},
+            #{public_user_site_id,jdbcType=INTEGER},
+            #{template_id,jdbcType=INTEGER},
+            #{img_url,jdbcType=VARCHAR},
+            #{img_x_value,jdbcType=INTEGER},
+            #{img_y_value,jdbcType=INTEGER},
+            #{img_href,jdbcType=VARCHAR},
+            #{state,jdbcType=CHAR},
+            #{public_user_id,jdbcType=INTEGER},
+            sysdate
+        )
+    </insert>
+
+    <!--更新导航广告-->
+    <update id="updateNavDrumbeating" parameterType="java.util.Map">
+        update
+            tbl_header_advertisement
+        <set>
+            <if test="img_url != null and img_url != ''">
+                img_url = #{img_url,jdbcType=VARCHAR},
+            </if>
+            <if test="img_x_value != null">
+                img_x_value = #{img_x_value,jdbcType=INTEGER},
+            </if>
+            <if test="img_y_value != null">
+                img_y_value = #{img_y_value,jdbcType=INTEGER},
+            </if>
+            <if test="img_href != null and img_href != ''">
+                img_href = #{img_href,jdbcType=VARCHAR},
+            </if>
+            <if test="state != null and state != ''">
+                state = #{state,jdbcType=CHAR}
+            </if>
+        </set>
+        where
+            site_id = #{public_user_site_id,jdbcType=INTEGER}
+            and template_id = #{template_id,jdbcType=INTEGER}
+    </update>
+</mapper>

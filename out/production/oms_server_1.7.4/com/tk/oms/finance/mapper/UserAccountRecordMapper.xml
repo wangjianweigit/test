@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 用户收支记录表操作 -->
+<mapper namespace="com.tk.oms.finance.dao.UserAccountRecordDao">
+	<!-- 插入现金充值的用户收支记录信息 -->
+	<insert id="insertUserRecordByCharge" parameterType="java.util.Map">
+		INSERT INTO TBL_USER_ACCOUNT_RECORD (
+					   ID,
+                       RECORD_NUMBER,
+                       RECORD_ITEM_NUMBER,
+                       RECORD_CHANNEL,
+                       RECORD_TYPE,
+                       REMARK,
+                       CREATE_DATE,
+                       COLLECT_USER_NAME,
+                       COLLECT_USER_MANAGER_NAME,
+                       ACCOUNTANTS_SUBJECT_ID,
+                       ACCOUNTANTS_SUBJECT_NAME,
+                       PARENT_ACC_SUBJECT_ID,
+                       PARENT_ACC_SUBJECT_NAME,
+                       MONEY,
+                       surplus_money,
+                       DOCKET_NUMBER,
+                       CREATE_USER,
+                       USER_NAME,
+                       CHECK_USER_NAME,
+                       CHECK_USER_BUSINESS_NAME,
+                       CHECK_DATE,
+                       TURNOVER_NUMBER,
+                       YWJL_USER_NAME,
+                       YWY_USER_NAME,
+                       MD_ID,
+                       XDR_USER_TYPE,
+                       XDR_USER_NAME,
+                       STATE,
+                       CREDIT_BALANCE
+                       )
+        SELECT 
+				SEQ_USER_ACCOUNT_RECORD.nextval AS ID,
+				GETAUTONUMBER('SZ') AS RECORD_NUMBER,
+				1 AS RECORD_ITEM_NUMBER,
+				'现金充值' RECORD_CHANNEL,
+				'收款' RECORD_TYPE,
+				tucr.REMARK,
+				sysdate as CREATE_DATE,
+				tucr.COLLECT_USER_NAME,
+				tucr.COLLECT_USER_MANAGER_NAME,
+				tucr.ACCOUNTANTS_SUBJECT_ID,
+				tucr.ACCOUNTANTS_SUBJECT_NAME,
+				tucr.PARENT_ACC_SUBJECT_ID,
+				tucr.PARENT_ACC_SUBJECT_NAME,
+				tucr.MONEY,
+				nvl(ba.account_balance,0),
+				tucr.RECORD_NUMBER as DOCKET_NUMBER,
+				#{public_user_name,jdbcType=VARCHAR} as CREATE_USER,
+				tucr.COLLECT_USER_NAME as USER_NAME,
+				#{public_user_name,jdbcType=VARCHAR}  CHECK_USER_NAME,
+				#{public_user_realname,jdbcType=VARCHAR}  CHECK_USER_BUSINESS_NAME,
+				sysdate as CHECK_DATE, 
+				tucr.RECORD_NUMBER as TURNOVER_NUMBER,
+				tucr.YWJL_USER_NAME,
+				tucr.YWY_USER_NAME,
+				tucr.MD_ID,
+				tucr.AGENCY_USER_TYPE as XDR_USER_TYPE,
+				(select USER_NAME from TBL_SYS_USER_INFO tsui where tsui.id = tucr.AGENCY_USER_ID) as XDR_USER_NAME,
+				'已审核',
+				nvl(ba.credit_money_balance, 0)
+				FROM TBL_USER_CHARGE_RECORD tucr ,TBL_USER_INFO tui
+				left join tbl_bank_account ba on tui.id = ba.user_id
+				WHERE tucr.ID = #{id,jdbcType=INTEGER} and tucr.COLLECT_USER_NAME = tui.user_name
+	</insert>
+	
+	<!-- 会员提现驳回后，增加充值的收支记录 -->
+	<insert id="insertUserRecordByExtractReject" parameterType="java.util.Map">
+		INSERT INTO TBL_USER_ACCOUNT_RECORD (
+					   ID,
+                       RECORD_NUMBER,
+                       RECORD_ITEM_NUMBER,
+                       RECORD_CHANNEL,
+                       RECORD_TYPE,
+                       REMARK,
+                       CREATE_DATE,
+                       COLLECT_USER_NAME,
+                       COLLECT_USER_MANAGER_NAME,
+                       ACCOUNTANTS_SUBJECT_ID,
+                       ACCOUNTANTS_SUBJECT_NAME,
+                       PARENT_ACC_SUBJECT_ID,
+                       PARENT_ACC_SUBJECT_NAME,
+                       MONEY,
+                       surplus_money,
+                       STATE,
+                       DOCKET_NUMBER,
+                       CREATE_USER,
+                       USER_NAME,
+                       CHECK_USER_NAME,
+                       CHECK_USER_BUSINESS_NAME,
+                       CHECK_DATE,
+                       TURNOVER_NUMBER,
+                       YWJL_USER_NAME,
+                       YWY_USER_NAME,
+                       MD_ID,
+                       XDR_USER_TYPE,
+                       XDR_USER_NAME,
+                       CREDIT_BALANCE
+                       )
+        SELECT 
+				SEQ_USER_ACCOUNT_RECORD.nextval AS ID,
+				GETAUTONUMBER('SZ') AS RECORD_NUMBER,
+				1 AS RECORD_ITEM_NUMBER,
+				'余额' RECORD_CHANNEL,
+				'收款' RECORD_TYPE,
+				'余额提现财务审核驳回反充,驳回原因：'||#{reject_reason,jdbcType=VARCHAR} REMARK,
+				sysdate as CREATE_DATE,
+				tuar.COLLECT_USER_NAME,
+				tuar.COLLECT_USER_MANAGER_NAME,
+				'1001CZ' ACCOUNTANTS_SUBJECT_ID,
+				'充值' ACCOUNTANTS_SUBJECT_NAME,
+				1001 PARENT_ACC_SUBJECT_ID,
+				'现金' PARENT_ACC_SUBJECT_NAME,
+				tuar.MONEY,
+				nvl(ba.account_balance,0),
+				tuar.STATE,
+				tuar.DOCKET_NUMBER,
+				#{public_user_name,jdbcType=VARCHAR} as CREATE_USER,
+				tuar.COLLECT_USER_NAME as USER_NAME,
+				#{public_user_name,jdbcType=VARCHAR}  CHECK_USER_NAME,
+				#{public_user_realname,jdbcType=VARCHAR}  CHECK_USER_BUSINESS_NAME,
+				sysdate as CHECK_DATE, 
+				tuar.TURNOVER_NUMBER,
+				tuar.YWJL_USER_NAME,
+				tuar.YWY_USER_NAME,
+				tuar.MD_ID,
+				tuar.XDR_USER_TYPE,
+				tuar.XDR_USER_NAME,
+				nvl(ba.credit_money_balance, 0)
+				FROM TBL_USER_ACCOUNT_RECORD tuar,TBL_USER_INFO tui
+				 left join TBL_BANK_ACCOUNT ba on tui.id = ba.user_id
+				 WHERE tuar.TURNOVER_NUMBER =
+				(select APPLY_NUMBER from TBL_USER_EXTRACT_RECORD where id = #{id,jdbcType=INTEGER}) and tuar.COLLECT_USER_NAME = tui.user_name
+	</insert>
+	<!-- 入驻商提现驳回后，增加充值的收支记录 -->
+	<insert id="insertStationRecordByExtractReject" parameterType="java.util.Map">
+		insert into tbl_stationed_in_exp_record(
+            id,
+            stationed_user_id,
+            record_number,
+            record_channel,
+            record_type,
+            REMARK,
+            money,
+            surplus_money,
+            turnover_type,
+            turnover_number,
+            create_date,
+            account_id,
+            account_flag
+        )
+        SELECT 
+			SEQ_STATIONED_IN_EXP_RECORD.nextval AS ID,
+			tsier.stationed_user_id,
+			GETAUTONUMBER('SZ') AS RECORD_NUMBER,
+			'余额' RECORD_CHANNEL,
+			'收款' RECORD_TYPE,
+			'余额提现财务审核驳回反充,驳回原因：'||#{reject_reason,jdbcType=VARCHAR} REMARK,
+			tsier.MONEY,
+			<if test="account_flag == 0">
+				(select nvl(account_balance,0) from TBL_BANK_ACCOUNT where user_id = tsier.stationed_user_id),
+			</if>
+			<if test="account_flag != 0">
+				(select nvl(account_balance,0) from TBL_PVTP_BANK_ACCOUNT where user_id = tsier.stationed_user_id),
+			</if>
+			tsier.turnover_type,
+			tsier.turnover_number,
+			sysdate as CREATE_DATE,
+			tsier.account_id,
+			tsier.account_flag
+		FROM tbl_stationed_in_exp_record tsier
+			WHERE tsier.turnover_number = (select WITHDRAWAL_NUMBER from TBL_STATIONED_WITHDRAWAL_APPLY where id = #{id,jdbcType=INTEGER})
+	</insert>
+	<!-- 会员还款历史欠款金额转到入驻商余额 -->
+	<insert id="insertStationRecordByUserRepayment" parameterType="java.util.Map">
+		insert into tbl_stationed_in_exp_record(
+			id,
+			stationed_user_id,
+			record_number,
+			record_channel,
+			record_type,
+			REMARK,
+			money,
+			surplus_money,
+			turnover_type,
+			turnover_number,
+			create_date,
+			account_id,
+			account_flag
+		)
+		select
+			SEQ_STATIONED_IN_EXP_RECORD.nextval AS ID,
+			#{public_user_stationed_user_id,jdbcType=INTEGER},
+			GETAUTONUMBER('SZ') AS RECORD_NUMBER,
+			'余额' RECORD_CHANNEL,
+			'收款' RECORD_TYPE,
+			'会员月结历史欠款还款' REMARK,
+			#{tran_amount,jdbcType=INTEGER},
+			nvl(account_balance,0),
+			'结算',
+			#{turnover_number,jdbcType=VARCHAR},
+			sysdate as CREATE_DATE,
+			id account_id,
+			0 account_flag
+		FROM TBL_BANK_ACCOUNT where user_id = #{public_user_stationed_user_id,jdbcType=INTEGER}
+	</insert>
+	<!-- 插入 入驻商资金流水记录-->
+    <insert id="insertStationedCapitalLogs" parameterType="java.util.Map">
+    	<selectKey keyProperty="id" resultType="int" order="BEFORE">
+            select SEQ_STATIONED_CAPITAL_LOGS.nextval from dual
+        </selectKey>
+    	insert into TBL_STATIONED_CAPITAL_LOGS(
+		    ID,
+		    LOG_NUMBER,
+		    TURNOVER_NUMBER,
+		    LOG_TYPE,
+		    TRAN_AMOUNT,
+		    ACCOUNT_BALANCE,
+		    DEPOSIT_BALANCE,
+		    UNLIQUIDATED_BALANCE,
+		    CREATE_DATE,
+		    RECORD_CHANNEL,
+		    STATIONED_USER_ID,
+		    account_id,
+		    account_flag
+		) VALUES (
+		    #{id,jdbcType=INTEGER},
+            GETAUTONUMBERSHORT(15),
+            #{turnover_number,jdbcType=VARCHAR},
+            #{log_type,jdbcType=VARCHAR},
+            #{tran_amount,jdbcType=FLOAT},
+            #{account_balance,jdbcType=FLOAT},
+            #{deposit_balance,jdbcType=FLOAT},
+            #{unliquidated_balance,jdbcType=FLOAT},
+            sysdate,
+            #{record_channel,jdbcType=VARCHAR},
+            #{public_user_stationed_user_id,jdbcType=INTEGER},
+            #{account_id,jdbcType=INTEGER},
+            #{account_flag,jdbcType=INTEGER}
+		)
+    </insert>
+	<!-- 会员定金退还，增加充值的收支记录 -->
+	<insert id="insertUserRecordByEarnest" parameterType="java.util.Map">
+		INSERT INTO tbl_user_account_record
+		(id, record_number, record_item_number, record_channel, record_type, remark,
+		create_date, collect_user_name, collect_user_manager_name, accountants_subject_id, accountants_subject_name,
+		parent_acc_subject_id, parent_acc_subject_name, money, surplus_money, count, state,
+		user_name,turnover_number,docket_number,YWJL_USER_NAME,YWY_USER_NAME,MD_ID,CREDIT_BALANCE)
+		select seq_user_account_record.NEXTVAL,getautonumber('TK'),'1',#{record_channel,jdbcType=VARCHAR},'收款','定金退还，终止预售单号：'||#{order_number,jdbcType=VARCHAR},
+		sysdate,ui.id,ui.user_manage_name,'1001CZ','充值',
+		'1001',#{record_channel,jdbcType=VARCHAR},#{return_money,jdbcType=INTEGER},nvl(ba.account_balance,0), 0,'已审核',
+		ui.id,#{return_number,jdbcType=VARCHAR},#{return_number,jdbcType=VARCHAR},
+		(select a.user_name from tbl_sys_user_info a where a.id = ui.market_supervision_user_id),
+		(select a.user_name from tbl_sys_user_info a where a.id = ui.referee_user_id),ui.store_id,
+		nvl(ba.credit_money_balance, 0)
+		from TBL_USER_INFO ui,TBL_BANK_ACCOUNT ba
+		where ui.id = ba.user_id and ui.id = #{user_id, jdbcType=INTEGER}
+	</insert>
+	<!-- 会员提现驳回后，增加充值的收支记录【联营】 -->
+	<insert id="insertStoreRecordByExtractReject" parameterType="java.util.Map">
+		INSERT INTO TBL_STORE_ACCOUNT_RECORD (
+					   id,
+                       record_number,
+                       record_channel,
+                       record_type,
+                       remark,
+                       collect_user_id,
+                       collect_user_manager_name,
+                       collect_store_name,
+				 	   collect_user_partner_id,
+                       money,
+                       surplus_money,
+                       docket_number,
+				 	   docket_type,
+                       create_date
+                       )
+        SELECT 
+				seq_store_account_record.nextval AS ID,
+				getautonumber('SZ') AS record_number,
+				'佣金' record_channel,
+				1 record_type,
+				'佣金提现财务审核驳回反充,驳回原因：'||#{reject_reason,jdbcType=VARCHAR} remark,
+				tuar.collect_user_id,
+				tuar.collect_user_manager_name,
+				tuar.collect_store_name,
+				tuar.collect_user_partner_id,
+				tuar.money,
+				nvl(ba.account_balance,0),
+				tuar.docket_number,
+				'充值',
+				sysdate as create_date
+				from tbl_store_account_record tuar,tbl_user_info tui
+				 left join tbl_store_bank_account ba on tui.id = ba.user_id
+				 where tuar.docket_number =
+				(select apply_number from tbl_store_extract_record where id = #{id,jdbcType=INTEGER}) and tuar.collect_user_id = tui.id
+	</insert>
+</mapper>

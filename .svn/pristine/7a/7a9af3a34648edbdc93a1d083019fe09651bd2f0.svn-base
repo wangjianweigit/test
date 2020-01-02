@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:rabbit="http://www.springframework.org/schema/rabbit"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/rabbit
+        http://www.springframework.org/schema/rabbit/spring-rabbit.xsd">
+
+	<!--定义queue -->
+	<rabbit:queue name="esb.product.prize.tag.update" durable="true" auto-delete="false" exclusive="false" declared-by="connectAdmin" />
+
+	<!--定义direct exchange, 绑定queue -->
+	<rabbit:direct-exchange name="esb.product.exchange" durable="true" auto-delete="false" declared-by="connectAdmin">
+		<rabbit:bindings>
+			<rabbit:binding queue="esb.product.prize.tag.update" key="esb.product.prize.tag.update"></rabbit:binding>
+		</rabbit:bindings>
+	</rabbit:direct-exchange>
+
+	<!--配置RabbitTemplate -->
+	<rabbit:template id="rabbitTemplate" connection-factory="connectionFactory" exchange="esb.product.exchange" channel-transacted="true" />
+
+	<!-- 财务记账消息 -->
+	<!--定义queue -->
+	<rabbit:queue name="esb.finance.payment.record" declared-by="connectAdmin">
+		<rabbit:queue-arguments>
+			<entry key="x-dead-letter-exchange" value="esb.retry.exchange"/>
+			<entry key="x-dead-letter-routing-key" value="esb.finance.payment.record.retry"/>
+		</rabbit:queue-arguments>
+	</rabbit:queue>
+	<!-- 清分退款明细队列 -->
+	<rabbit:queue name="esb.liquidation.order.return" declared-by="connectAdmin">
+		<rabbit:queue-arguments>
+			<entry key="x-dead-letter-exchange" value="esb.retry.exchange"/>
+			<entry key="x-dead-letter-routing-key" value="esb.liquidation.order.return.retry"/>
+		</rabbit:queue-arguments>
+	</rabbit:queue>
+	<!-- 待清分明细队列 -->
+	<rabbit:queue name="esb.liquidation.order.settle" declared-by="connectAdmin">
+		<rabbit:queue-arguments>
+			<entry key="x-dead-letter-exchange" value="esb.retry.exchange"/>
+			<entry key="x-dead-letter-routing-key" value="esb.liquidation.order.settle.retry"/>
+		</rabbit:queue-arguments>
+	</rabbit:queue>
+
+	<!--定义direct exchange, 绑定queue -->
+	<rabbit:direct-exchange name="esb.sys.exchange" durable="true" auto-delete="false" declared-by="connectAdmin">
+		<rabbit:bindings>
+			<rabbit:binding queue="esb.finance.payment.record" key="esb.finance.payment.record"></rabbit:binding>
+			<rabbit:binding queue="esb.liquidation.order.return" key="esb.liquidation.order.return"></rabbit:binding>
+			<rabbit:binding queue="esb.liquidation.order.settle" key="esb.liquidation.order.settle"></rabbit:binding>
+		</rabbit:bindings>
+	</rabbit:direct-exchange>
+
+	<!--配置RabbitTemplate -->
+	<rabbit:template id="esbRabbitTemplate" connection-factory="connectionFactory" exchange="esb.sys.exchange" channel-transacted="true" />
+
+	<!-- 死信队列 -->
+	<rabbit:queue name="esb.liquidation.order.return.retry">
+		<rabbit:queue-arguments>
+			<entry key="x-dead-letter-exchange" value="esb.sys.exchange"/>
+			<entry key="x-dead-letter-routing-key" value="esb.liquidation.order.return"/>
+			<entry key="x-message-ttl" value="5000" value-type="java.lang.Long"/>
+		</rabbit:queue-arguments>
+	</rabbit:queue>
+	<rabbit:queue name="esb.finance.payment.record.retry">
+		<rabbit:queue-arguments>
+			<entry key="x-dead-letter-exchange" value="esb.sys.exchange"/>
+			<entry key="x-dead-letter-routing-key" value="esb.finance.payment.record"/>
+			<entry key="x-message-ttl" value="5000" value-type="java.lang.Long"/>
+		</rabbit:queue-arguments>
+	</rabbit:queue>
+
+	<rabbit:direct-exchange name="esb.retry.exchange" declared-by="connectAdmin">
+		<rabbit:bindings>
+			<rabbit:binding queue="esb.liquidation.order.return.retry" key="esb.liquidation.order.return.retry"></rabbit:binding>
+			<rabbit:binding queue="esb.finance.payment.record.retry" key="esb.finance.payment.record.retry"/>
+		</rabbit:bindings>
+	</rabbit:direct-exchange>
+</beans>

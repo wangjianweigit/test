@@ -1,0 +1,594 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.marketing.dao.ActivityProductDao">
+	<sql id="all_column">
+			TAP.ID,
+			TAP.STATIONED_USER_ID,
+			TAP.ACTIVITY_ID,
+			TAP.PRODUCT_ITEMNUMBER,
+			TAP.ACTIVITY_DISCOUNT,
+			TO_CHAR(TAP.CREATE_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  CREATE_DATE,
+			TAP.CREATE_USER_ID,
+			TAP.SORT_ID,
+			TO_CHAR(TAP.ACTIVITY_START_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  ACTIVITY_START_DATE,
+			TO_CHAR(TAP.ACTIVITY_END_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  ACTIVITY_END_DATE
+	</sql>
+	
+	<sql id="all_column_apply">
+			TAPA.ID,
+			TAPA.ACTIVITY_ID,
+			TAPA.STATIONED_USER_ID,
+			TAPA.PRODUCT_ITEMNUMBER,
+			TAPA.ACTIVITY_DISCOUNT,
+			TO_CHAR(TAPA.CREATE_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  CREATE_DATE,
+			TAPA.CREATE_USER_ID,
+			TAPA.STATE,
+			TAPA.APPROVAL_USER_ID,
+			TO_CHAR(TAPA.APPROVAL_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  APPROVAL_DATE,
+			TAPA.APPROVAL_REMARK,
+			TO_CHAR(TAPA.ACTIVITY_START_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  ACTIVITY_START_DATE,
+			TO_CHAR(TAPA.ACTIVITY_END_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  ACTIVITY_END_DATE
+	</sql>
+	
+	<!-- 获取参与促销活动商品列表 -->
+    <select id="queryActivityProductList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT  A.*,
+    			(SELECT COMPANY_NAME FROM TBL_STATIONED_USER_INFO TSUI WHERE TSUI.ID = A.STATIONED_USER_ID)  AS STATIONED_USER_NAME,
+    			(SELECT PRODUCT_NAME FROM TBL_PRODUCT_INFO TPI WHERE TPI.ITEMNUMBER = A.PRODUCT_ITEMNUMBER) AS PRODUCT_NAME,
+    			(SELECT SUM(TSAS.LOCKED_STOCK_AMOUNT) FROM TBL_SALE_ACTIVITY_SKU TSAS WHERE TSAS.PRODUCT_ITEMNUMBER = A.PRODUCT_ITEMNUMBER) AS LOCKED_STOCK_AMOUNT,
+				(getsaleprice_adoptcost(a.product_itemnumber,to_number(min_QUOTE_RANGE))||'-'||getsaleprice_adoptcost(a.product_itemnumber,to_number(max_QUOTE_RANGE))) QUOTE_RANGE,
+				getProduct_OldHdPrice_Qj(A.PRODUCT_ITEMNUMBER,A.ACTIVITY_DISCOUNT,A.ACTIVITY_SERVICE_DISCOUNT) QUOTE_RANGE_DISCOUNT,
+				(
+				select dpt.type from tbl_dic_product_type dpt, tbl_product_info pi where dpt.id = pi.PRODUCT_TYPE_ID and pi.itemnumber =  A.PRODUCT_ITEMNUMBER
+				) dic_product_type
+    	  FROM (SELECT T.*,ROWNUM AS RN
+				  FROM (SELECT <include refid="all_column"/>,
+				  			NVL(TAP.PRODUCT_IMG_URL,pi.PRODUCT_IMG_URL) PRODUCT_IMG_URL,
+				  			TAP.PC_WATERMARK_IMG_URL,
+				  			TAP.MOBILE_WATERMARK_IMG_URL,
+							(SELECT TSAI.ACTIVITY_SERVICE_DISCOUNT FROM TBL_ACTIVITY_DETAIL TSAI WHERE TSAI.ACTIVITY_ID = TAP.ACTIVITY_ID) ACTIVITY_SERVICE_DISCOUNT,
+							(select nvl(min(f.product_prize_cost),0)from tbl_product_sku f where f.product_group='尺码' and f.product_itemnumber = TAP.product_itemnumber) as min_QUOTE_RANGE,
+							(select nvl(max(f.product_prize_cost),0) from tbl_product_sku f where f.product_group='尺码' and f.product_itemnumber = TAP.product_itemnumber) as max_QUOTE_RANGE
+				  		  FROM TBL_ACTIVITY_PRODUCT TAP
+               			  LEFT JOIN TBL_PRODUCT_INFO pi ON TAP.PRODUCT_ITEMNUMBER = pi.ITEMNUMBER
+					    <where>
+							   1=1
+							<if test="activity_id != null and activity_id != '' ">
+							    AND	TAP.ACTIVITY_ID = #{activity_id,jdbcType=INTEGER}
+							</if>
+							<if test="stationed_user_id != null and stationed_user_id != '' ">
+							    AND	TAP.STATIONED_USER_ID = #{stationed_user_id,jdbcType=INTEGER}
+							</if>
+							<if test="stationed_user_realname != null and stationed_user_realname != '' ">
+							    AND	EXISTS(SELECT 1 FROM TBL_STATIONED_USER_INFO TSUI WHERE TSUI.ID = TAP.STATIONED_USER_ID AND TSUI.COMPANY_NAME LIKE '%'||#{stationed_user_realname,jdbcType=VARCHAR}||'%')
+							</if>
+							<if test="product_itemnumber != null and product_itemnumber != '' ">
+							    AND	TAP.PRODUCT_ITEMNUMBER = #{product_itemnumber,jdbcType=VARCHAR}
+							</if>
+					    </where>
+					    ORDER BY TAP.SORT_ID DESC) T
+		 		 WHERE ROWNUM &lt;= #{end_rownum,jdbcType=INTEGER}) A
+		 WHERE RN &gt; #{start_rownum,jdbcType=INTEGER} 
+	</select>
+	
+	<!-- 获取参与促销活动商品总数 -->
+    <select id="queryActivityProductCount" parameterType="java.util.HashMap" resultType="int">
+    	SELECT count(1) 
+		  FROM TBL_ACTIVITY_PRODUCT TAP
+		<where>
+			   1=1
+			<if test="activity_id != null and activity_id != '' ">
+			   AND	TAP.ACTIVITY_ID = #{activity_id,jdbcType=INTEGER}
+			</if>
+			<if test="stationed_user_id != null and stationed_user_id != '' ">
+			   AND	TAP.STATIONED_USER_ID = #{stationed_user_id,jdbcType=INTEGER}
+			</if>
+			<if test="stationed_user_realname != null and stationed_user_realname != '' ">
+				AND	EXISTS(SELECT 1 FROM TBL_STATIONED_USER_INFO TSUI WHERE TSUI.ID = TAP.STATIONED_USER_ID AND TSUI.COMPANY_NAME LIKE '%'||#{stationed_user_realname,jdbcType=VARCHAR}||'%')
+			</if>
+			<if test="product_itemnumber != null and product_itemnumber != '' ">
+				AND	TAP.PRODUCT_ITEMNUMBER = #{product_itemnumber,jdbcType=VARCHAR}
+			</if>
+		</where>
+	</select>
+
+	<!-- 获取参与促销活动的待审批商品列表 -->
+    <select id="queryPendingApprovalActivityProductList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT  A.*,
+    			(SELECT COMPANY_NAME FROM TBL_STATIONED_USER_INFO TSUI WHERE TSUI.ID = A.STATIONED_USER_ID)  AS STATIONED_USER_NAME,
+    			(SELECT PRODUCT_NAME FROM TBL_PRODUCT_INFO TPI WHERE TPI.ITEMNUMBER = A.PRODUCT_ITEMNUMBER) AS PRODUCT_NAME,
+    			(SELECT TSUI.USER_REALNAME FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.ID = A.APPROVAL_USER_ID) AS APPROVAL_USER_REALNAME,
+    			(SELECT SUM(TSASA.LOCKED_STOCK_AMOUNT) FROM TBL_SALE_ACTIVITY_SKU_APPLY TSASA WHERE TSASA.PRODUCT_ITEMNUMBER = A.PRODUCT_ITEMNUMBER) AS LOCKED_STOCK_AMOUNT,
+				(getsaleprice_adoptcost(a.product_itemnumber,to_number(min_QUOTE_RANGE))||'-'||getsaleprice_adoptcost(a.product_itemnumber,to_number(max_QUOTE_RANGE))) QUOTE_RANGE,
+			    getProduct_OldHdPrice_Qj(A.PRODUCT_ITEMNUMBER,A.ACTIVITY_DISCOUNT,A.ACTIVITY_SERVICE_DISCOUNT) AS QUOTE_RANGE_DISCOUNT,
+			    (SELECT TSUI.USER_REALNAME FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.ID = A.APPROVAL_USER_ID) AS APPROVAL_USER_NAME,
+			    (
+					select dpt.type from tbl_dic_product_type dpt, tbl_product_info pi where dpt.id = pi.PRODUCT_TYPE_ID and pi.itemnumber =  A.PRODUCT_ITEMNUMBER
+				) dic_product_type
+    	  FROM (SELECT T.*,ROWNUM AS RN
+				  FROM (SELECT <include refid="all_column_apply"/>,
+				                NVL(TAPA.PRODUCT_IMG_URL,pi.PRODUCT_IMG_URL) PRODUCT_IMG_URL,
+								(SELECT TSAI.ACTIVITY_SERVICE_DISCOUNT FROM TBL_ACTIVITY_DETAIL TSAI WHERE TSAI.ACTIVITY_ID = TAPA.ACTIVITY_ID) ACTIVITY_SERVICE_DISCOUNT,
+								(CASE WHEN TAPA.ACTIVITY_START_DATE &gt; SYSDATE THEN 1
+								WHEN (TAPA.ACTIVITY_START_DATE &lt;= SYSDATE AND TAPA.ACTIVITY_END_DATE &gt;=SYSDATE) THEN 2
+								WHEN TAPA.ACTIVITY_END_DATE &lt; SYSDATE THEN 3
+								ELSE 0 END) START_STATE,
+							(select nvl(min(f.product_prize_cost),0)from tbl_product_sku f where f.product_group='尺码' and f.product_itemnumber = tapa.product_itemnumber) as min_QUOTE_RANGE,
+							(select nvl(max(f.product_prize_cost),0) from tbl_product_sku f where f.product_group='尺码' and f.product_itemnumber = tapa.product_itemnumber) as max_QUOTE_RANGE
+				  		  FROM TBL_ACTIVITY_PRODUCT_APPLY TAPA
+				  		  LEFT JOIN TBL_PRODUCT_INFO pi ON TAPA.PRODUCT_ITEMNUMBER = pi.ITEMNUMBER
+					    <where>
+							    1=1
+							    AND TAPA.STATE IN('2','3','4')
+							    AND TAPA.IS_DELETE = '1'
+							<if test="states != null">
+								AND TAPA.STATE IN
+				                <foreach item="item" collection="states" open="(" separator="," close=")">
+									#{item}
+								</foreach>
+							</if>
+							<if test="activity_id != null and activity_id != '' ">
+							   AND	TAPA.ACTIVITY_ID = #{activity_id,jdbcType=INTEGER}
+							</if>
+							<if test="stationed_user_realname != null and stationed_user_realname != '' ">
+								AND	EXISTS(SELECT 1 FROM TBL_STATIONED_USER_INFO TSUI WHERE TSUI.ID = TAPA.STATIONED_USER_ID AND TSUI.COMPANY_NAME LIKE '%'||#{stationed_user_realname,jdbcType=VARCHAR}||'%')
+							</if>
+							<if test="product_itemnumber != null and product_itemnumber != '' ">
+								AND	TAPA.PRODUCT_ITEMNUMBER = #{product_itemnumber,jdbcType=VARCHAR}
+							</if>
+					    </where>) T
+		 		 WHERE ROWNUM &lt;= #{end_rownum,jdbcType=INTEGER}) A
+		 WHERE RN &gt; #{start_rownum,jdbcType=INTEGER} 
+	</select>
+	
+	<!-- 获取参与促销活动的待审批商品总数 -->
+    <select id="queryPendingApprovalActivityProductCount" parameterType="java.util.HashMap" resultType="int">
+    	SELECT count(1) 
+		  FROM TBL_ACTIVITY_PRODUCT_APPLY TAPA
+		<where>
+			   1=1
+			   AND TAPA.STATE IN('2','3','4')
+			   AND TAPA.IS_DELETE = '1'
+			<if test="states != null">
+				AND TAPA.STATE IN
+				<foreach item="item" collection="states" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+			</if>
+			<if test="activity_id != null and activity_id != '' ">
+			   AND	TAPA.ACTIVITY_ID = #{activity_id,jdbcType=INTEGER}
+			</if>
+			<if test="stationed_user_realname != null and stationed_user_realname != '' ">
+				AND	EXISTS(SELECT 1 FROM TBL_STATIONED_USER_INFO TSUI WHERE TSUI.ID = TAPA.STATIONED_USER_ID AND TSUI.COMPANY_NAME LIKE '%'||#{stationed_user_realname,jdbcType=VARCHAR}||'%')
+			</if>
+			<if test="product_itemnumber != null and product_itemnumber != '' ">
+				AND	TAPA.PRODUCT_ITEMNUMBER = #{product_itemnumber,jdbcType=VARCHAR}
+			</if>
+		</where>
+	</select>
+
+	<!-- 根据活动商品ID查询商品阶梯优惠信息 -->
+	<select id="listProductLadderDiscountById" parameterType="java.lang.Long" resultType="java.util.HashMap">
+		select
+			ps.activity_product_id,
+			ps.product_itemnumber,
+			ps.product_spec,
+			ps.min_count,
+			getsaleprice_adoptcost(ps.product_itemnumber,ps.prize) as prize
+		from tbl_activity_product_specprize ps
+		where ps.activity_product_id in
+		<foreach collection="list" open="(" close=")" item="item" index="index" separator=",">
+			#{item.ID,jdbcType=INTEGER}
+		</foreach>
+		order by product_spec,min_count asc
+	</select>
+
+	<!-- 获取参与促销活动的待审批商品详情 -->
+    <select id="queryPendingApprovalActivityProductDetail" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT <include refid="all_column_apply"/>,
+    	NVL(TAPA.PRODUCT_IMG_URL,pi.PRODUCT_IMG_URL) PRODUCT_IMG_URL,
+		(select activity_name from tbl_activity_info ai where ai.id = tapa.activity_id) activity_name
+		FROM TBL_ACTIVITY_PRODUCT_APPLY TAPA
+		LEFT JOIN TBL_PRODUCT_INFO pi ON TAPA.PRODUCT_ITEMNUMBER = pi.ITEMNUMBER
+		<where>
+				1=1
+			<if test="id != null and id != 0 ">
+				AND	TAPA.ID = #{id,jdbcType=INTEGER}
+			</if>
+		</where> 
+	</select>
+		
+	<!-- 更新参与促销活动的商品待审批状态 -->
+    <update id="updatePendingApprovalActivityProductState" parameterType="java.util.HashMap">
+    	UPDATE  TBL_ACTIVITY_PRODUCT_APPLY TAPA 
+    	   SET  TAPA.STATE = #{state,jdbcType=VARCHAR},
+    	   TAPA.APPROVAL_DATE = SYSDATE,
+    	   TAPA.APPROVAL_USER_ID = #{public_user_id,jdbcType=INTEGER},
+    	   TAPA.APPROVAL_REMARK =  #{approval_remark,jdbcType=VARCHAR}
+    	 WHERE	TAPA.ID = #{id,jdbcType=INTEGER}
+	</update>
+	
+	<!-- 获取参与活动的商品sku列表 -->
+	<select id="queryActivityProductSkuList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT  TSAS.ACTIVITY_ID,
+				TSAS.PRODUCT_ITEMNUMBER,
+				TSAS.PRODUCT_SKU,
+				TSAS.WAREHOUSE_ID,
+				TSAS.LOCKED_STOCK_AMOUNT,
+				TPS.PRODUCT_COLOR,
+				TPS.PRODUCT_SPECS,
+				TPS.PRODUCT_GROUP_MEMBER
+		  FROM TBL_SALE_ACTIVITY_SKU TSAS,TBL_PRODUCT_SKU TPS
+		<where>
+				TSAS.ACTIVITY_ID = #{activity_id,jdbcType=INTEGER}
+			AND TSAS.PRODUCT_ITEMNUMBER = #{product_itemnumber,jdbcType=VARCHAR}
+			AND TSAS.PRODUCT_SKU = TPS.ID
+			AND TPS.PRODUCT_GROUP = '尺码'
+		</where>
+		ORDER BY TPS.PRODUCT_COLOR,TPS.PRODUCT_GROUP_MEMBER  
+	</select>
+	
+	<!-- 获取参与活动的待审批商品sku列表 -->
+	<select id="queryPendingApprovalActivityProductSkuList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT  TSASA.ACTIVITY_ID,
+				TSASA.PRODUCT_ITEMNUMBER,
+				TSASA.PRODUCT_SKU,
+				TSASA.WAREHOUSE_ID,
+				TSASA.LOCKED_STOCK_AMOUNT,
+				TPS.PRODUCT_COLOR,
+				TPS.PRODUCT_SPECS,
+				TPS.PRODUCT_GROUP_MEMBER
+		  FROM TBL_SALE_ACTIVITY_SKU_APPLY TSASA,TBL_PRODUCT_SKU TPS
+		<where>
+				TSASA.ACTIVITY_ID = #{activity_id,jdbcType=INTEGER}
+			AND TSASA.PRODUCT_ITEMNUMBER = #{product_itemnumber,jdbcType=VARCHAR}
+			AND TSASA.PRODUCT_SKU = TPS.ID
+			AND TPS.PRODUCT_GROUP = '尺码'
+		</where>
+		ORDER BY TPS.PRODUCT_COLOR,TPS.PRODUCT_GROUP_MEMBER 
+	</select>
+	
+	<!-- 获取活动商品sku库存列表-->
+	<select id="queryActivityProductSkuStockList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT  TPS.ID, 
+    			TPS.PRODUCT_ITEMNUMBER, 
+    			TPS.PRODUCT_COLOR, 
+    			TPS.PRODUCT_SPECS, 
+    			TPS.PRODUCT_GROUP_MEMBER, 
+    			NVL(TPSS.LOCKED_STOCK_AMOUNT, 0) AS LOCKED_STOCK_AMOUNT
+		  FROM TBL_PRODUCT_SKU TPS, 
+		       (SELECT TPSS.PRODUCT_SKU, 
+		       		   SUM(CASE WHEN TPSS.PRODUCT_TOTAL_COUNT - TPSS.PRODUCT_ORDER_OCCUPY_COUNT &lt;=0 THEN 0 ELSE 
+                          TPSS.PRODUCT_TOTAL_COUNT - TPSS.PRODUCT_ORDER_OCCUPY_COUNT END) AS LOCKED_STOCK_AMOUNT
+		           FROM TBL_PRODUCT_SKU_STOCK TPSS
+		          GROUP BY TPSS.PRODUCT_SKU) TPSS
+		 WHERE TPS.PRODUCT_ITEMNUMBER = #{product_itemnumber,jdbcType=VARCHAR}
+		       AND TPS.ID = TPSS.PRODUCT_SKU(+)
+		       AND TPS.PRODUCT_GROUP = '尺码'
+		 ORDER BY TPS.PRODUCT_COLOR,TPS.PRODUCT_GROUP_MEMBER ASC
+	</select>
+	
+	<!-- 更新活动商品表从待审批商品表 -->
+    <update id="updateActivityProductFromPendingApprovalActivityProduct" parameterType="java.util.HashMap">
+		MERGE INTO TBL_ACTIVITY_PRODUCT tap 
+        USING (
+            select apa.*,tpi.product_img_url main_product_img_url from TBL_ACTIVITY_PRODUCT_APPLY apa
+            inner join TBL_PRODUCT_INFO tpi on apa.product_itemnumber = tpi.itemnumber
+        ) tapa ON (tap.id = tapa.id)
+        WHEN MATCHED THEN
+            UPDATE SET tap.product_itemnumber = tapa.product_itemnumber,
+                       tap.product_img_url = tapa.product_img_url,
+                       tap.activity_discount = tapa.activity_discount,
+                       tap.product_description = tapa.product_description,
+                       tap.activity_start_date = tapa.activity_start_date,
+                       tap.activity_end_date = tapa.activity_end_date,
+                       tap.plan_delivery_date = tapa.plan_delivery_date
+            WHERE  tapa.id = #{id,jdbcType=INTEGER}
+        WHEN NOT MATCHED THEN
+            INSERT(
+                id,stationed_user_id,activity_id,product_itemnumber,product_img_url,
+                activity_discount,create_date,create_user_id,product_description,
+                activity_start_date,activity_end_date,plan_delivery_date,
+                pc_watermark_img_url,mobile_watermark_img_url
+            ) 
+            VALUES(
+                tapa.id,tapa.stationed_user_id,tapa.activity_id,tapa.product_itemnumber,
+                tapa.product_img_url,tapa.activity_discount,tapa.create_date,tapa.create_user_id,tapa.product_description,
+                tapa.activity_start_date,tapa.activity_end_date,tapa.plan_delivery_date,
+                NVL(tapa.product_img_url,tapa.main_product_img_url), NVL(tapa.product_img_url,tapa.main_product_img_url)
+            ) 
+            where  tapa.id = #{id,jdbcType=INTEGER}
+	</update>
+	
+	<!-- 更新活动商品表从待审批商品表sku -->
+    <update id="updateActivityProductSkuFromPendingApprovalActivityProductSku" parameterType="java.util.HashMap">
+    	MERGE INTO TBL_SALE_ACTIVITY_SKU TSAS USING TBL_SALE_ACTIVITY_SKU_APPLY TSASA ON (TSAS.ACTIVITY_ID = TSASA.ACTIVITY_ID 
+    			   AND TSAS.PRODUCT_ITEMNUMBER = TSASA.PRODUCT_ITEMNUMBER AND TSAS.PRODUCT_SKU = TSASA.PRODUCT_SKU AND TSAS.WAREHOUSE_ID = TSASA.WAREHOUSE_ID)
+		WHEN MATCHED THEN
+			UPDATE SET TSAS.LOCKED_STOCK_AMOUNT = TSASA.LOCKED_STOCK_AMOUNT
+			WHERE  TSASA.ACTIVITY_ID = #{activity_id,jdbcType=INTEGER} AND TSASA.PRODUCT_ITEMNUMBER = #{product_itemnumber,jdbcType=VARCHAR}
+		WHEN NOT MATCHED THEN
+			INSERT(ACTIVITY_ID,PRODUCT_ITEMNUMBER,PRODUCT_SKU,WAREHOUSE_ID,LOCKED_STOCK_AMOUNT) 
+			VALUES(TSASA.ACTIVITY_ID,TSASA.PRODUCT_ITEMNUMBER,TSASA.PRODUCT_SKU,TSASA.WAREHOUSE_ID,TSASA.LOCKED_STOCK_AMOUNT) 
+			WHERE  TSASA.ACTIVITY_ID = #{activity_id,jdbcType=INTEGER} AND TSASA.PRODUCT_ITEMNUMBER = #{product_itemnumber,jdbcType=VARCHAR}
+	</update>
+	
+	<!-- 更新活动商品表从待审批商品表 -->
+    <update id="updateActivityProductSortId" parameterType="java.util.List">
+    	MERGE INTO TBL_ACTIVITY_PRODUCT TAP USING (
+    			<foreach collection="list" item="item" index="index" separator="union all">
+					select #{item.activity_id,jdbcType=INTEGER} AS activity_id,
+						   #{item.product_itemnumber,jdbcType=VARCHAR} AS product_itemnumber,
+						   #{item.sort_id,jdbcType=INTEGER} AS sort_id
+					  from dual
+			    </foreach>
+    		) TAP1 ON (TAP.ACTIVITY_ID = TAP1.ACTIVITY_ID 
+    			   AND TAP.PRODUCT_ITEMNUMBER = TAP1.PRODUCT_ITEMNUMBER)
+		WHEN MATCHED THEN
+			UPDATE SET TAP.SORT_ID = TAP1.SORT_ID
+	</update>
+	
+	<!--活动商品强制退出删除活动商品sku -->
+    <update id="deleteActivityProductSku" parameterType="java.util.HashMap">
+    	DELETE FROM TBL_SALE_ACTIVITY_SKU TSAS
+    	 WHERE	EXISTS (SELECT 1 
+    	   				  FROM TBL_ACTIVITY_PRODUCT TAP 
+    	   				 WHERE TAP.ACTIVITY_ID = TSAS.ACTIVITY_ID
+    	   				 	   AND TAP.PRODUCT_ITEMNUMBER = TSAS.PRODUCT_ITEMNUMBER
+			    	 		   AND TAP.ID IN
+					    	  	   <foreach collection="activity_product_ids" item="id" open="(" close=")" separator=",">
+									 #{id}
+							       </foreach>)
+	</update>
+	
+	<!--活动商品强制退出删除活动商品sku申请 -->
+    <update id="deleteActivityProductSkuApply" parameterType="java.util.HashMap">
+    	DELETE FROM TBL_SALE_ACTIVITY_SKU_APPLY TSASA
+    	 WHERE	EXISTS (SELECT 1 
+    	   				  FROM TBL_ACTIVITY_PRODUCT_APPLY TAPA 
+    	   				 WHERE TAPA.ACTIVITY_ID = TSASA.ACTIVITY_ID
+    	   				 	   AND TAPA.PRODUCT_ITEMNUMBER = TSASA.PRODUCT_ITEMNUMBER
+			    	 		   AND TAPA.ID IN
+					    	  	   <foreach collection="activity_product_ids" item="id" open="(" close=")" separator=",">
+									 #{id}
+							       </foreach>)
+	</update>
+	
+	<!--活动商品强制退出删除活动商品 -->
+    <update id="deleteActivityProduct" parameterType="java.util.HashMap">
+    	DELETE FROM TBL_ACTIVITY_PRODUCT TAP
+    	 WHERE TAP.ID IN
+    	  	   <foreach collection="activity_product_ids" item="id" open="(" close=")" separator=",">
+				 #{id}
+		       </foreach>
+	</update>
+	
+	<!--活动商品强制退出删除活动商品申请 -->
+    <update id="deleteActivityProductApply" parameterType="java.util.HashMap">
+    	UPDATE TBL_ACTIVITY_PRODUCT_APPLY TAPA
+    	   SET TAPA.IS_DELETE = '3'
+    	 WHERE TAPA.ID IN
+    	  	   <foreach collection="activity_product_ids" item="id" open="(" close=")" separator=",">
+				 #{id}
+		       </foreach>
+	</update>
+	
+	<!-- 活动对应入驻商报名商品数量是否超过活动允许数量限制 -->
+    <select id="checkActivityProductCount" parameterType="java.util.HashMap" resultType="int">
+		SELECT
+			NVL((
+				SELECT TSAI.APPLY_PRODUCT_LIMIT_AMOUNT
+				FROM TBL_ACTIVITY_DETAIL TSAI
+				WHERE EXISTS (
+					SELECT 1
+					FROM TBL_ACTIVITY_PRODUCT_APPLY TAPA
+					WHERE TAPA.ACTIVITY_ID = TSAI.ACTIVITY_ID AND TAPA.ID = #{id,jdbcType=INTEGER}
+				)
+			),0)
+		   - (
+				SELECT COUNT (1)
+				FROM TBL_ACTIVITY_PRODUCT TAP
+				WHERE EXISTS (
+					SELECT 1
+					FROM TBL_ACTIVITY_PRODUCT_APPLY TAPA
+					WHERE TAPA.ACTIVITY_ID = TAP.ACTIVITY_ID
+						AND TAPA.STATIONED_USER_ID = TAP.STATIONED_USER_ID AND TAPA.ID = #{id,jdbcType=INTEGER}
+				)
+			)
+		FROM DUAL
+	</select>
+	
+	<!--  校验活动报名时间是否已截止 -->
+    <select id="checkActivityApplyDateCount" parameterType="java.util.HashMap" resultType="int">
+    	SELECT COUNT(1) 
+    	  FROM TBL_ACTIVITY_INFO TAI
+    	 WHERE EXISTS(SELECT 1 
+    	       			FROM TBL_ACTIVITY_PRODUCT_APPLY TAPA 
+    	       		   WHERE TAPA.ACTIVITY_ID = TAI.ID 
+    	       			     AND TAPA.ID = #{id,jdbcType=INTEGER}
+    	       			     AND TAPA.CREATE_DATE &gt;= TAI.APPLY_BEGIN_DATE
+    	       			     AND TAPA.CREATE_DATE &lt;= TAI.APPLY_END_DATE)
+	</select>
+
+	<!--更新预售活动商品sku表从待审批商品sku表-->
+	<update id="updatePreSellActivitySkuFromApprovalActivityProductSku" parameterType="java.util.HashMap">
+		merge into tbl_presell_activity_sku pas
+		using
+			tbl_presell_activity_sku_apply pasa
+		on (pas.activity_id = pasa.activity_id and pas.product_itemnumber = pasa.product_itemnumber and pas.product_sku = pasa.product_sku)
+		when matched then
+			update set pas.presell_stock_amount = pasa.presell_stock_amount
+				where pasa.activity_id = #{activity_id,jdbcType=INTEGER} and pasa.product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+		when not matched then
+		insert(
+			activity_id,
+			product_itemnumber,
+			product_sku,
+			presell_stock_amount
+		) values(
+			pasa.activity_id,
+			pasa.product_itemnumber,
+			pasa.product_sku,
+			pasa.presell_stock_amount
+		) where pasa.activity_id = #{activity_id,jdbcType=INTEGER} and pasa.product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+	</update>
+	
+	<!-- 查询待审批商品数据列表 -->
+    <select id="queryActivityProductApplyList" parameterType="java.util.Map" resultType="java.util.Map">
+    	SELECT <include refid="all_column_apply"/>,
+		  NVL(TAPA.PRODUCT_IMG_URL,pi.PRODUCT_IMG_URL) PRODUCT_IMG_URL
+		  FROM TBL_ACTIVITY_PRODUCT_APPLY TAPA
+		  LEFT JOIN TBL_PRODUCT_INFO pi ON TAPA.PRODUCT_ITEMNUMBER = pi.ITEMNUMBER
+		 WHERE TAPA.id in
+			<foreach collection="ids" item="id" open="(" close=")" separator=",">
+				#{id,jdbcType=VARCHAR}
+			</foreach>
+	</select>
+	<!-- 批量更新待审批状态 -->
+	<update id="batchUpdateActivityProductApplyState" parameterType="java.util.Map">
+    	UPDATE  TBL_ACTIVITY_PRODUCT_APPLY TAPA 
+    	   SET  TAPA.STATE = #{state,jdbcType=VARCHAR},
+    	   <if test="approval_remark != null and approval_remark != ''">
+    	   TAPA.APPROVAL_REMARK =  #{approval_remark,jdbcType=VARCHAR},
+    	   </if>
+    	   TAPA.APPROVAL_DATE = SYSDATE,
+    	   TAPA.APPROVAL_USER_ID = #{public_user_id,jdbcType=INTEGER}
+    	 WHERE	TAPA.ID in
+    	 	<foreach collection="ids" item="id" open="(" close=")" separator=",">
+				#{id,jdbcType=VARCHAR}
+			</foreach>
+	</update>
+
+	<select id="queryIsExistProductByState" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		from TBL_ACTIVITY_PRODUCT_APPLY TAPA
+		where 1=1
+			<if test="id != null and id != 0" >
+				and TAPA.id = #{id, jdbcType=INTEGER}
+			</if>
+			<if test="state != null and state == 'is_end'">
+				and TAPA.ACTIVITY_END_DATE &lt; SYSDATE
+			</if>
+	</select>
+	<!-- 查询单个商品参加活动的原价、活动价 -->
+	<select id="getActivityProductPrice" parameterType="java.util.Map" resultType="java.util.Map">
+        select 
+        temp.*,
+        (case when ceil(nvl((to_number(original_price) - to_number(activity_price)),0)) > (nvl((to_number(original_price) - to_number(activity_price)),0)) then
+            to_char(nvl((to_number(original_price) - to_number(activity_price)),0),'fm999999990.99') 
+        else
+            to_char(nvl((to_number(original_price) - to_number(activity_price)),0))
+        end) reduced_price
+        from (
+            select 
+            ap.product_itemnumber,
+            ap.pc_template_id,
+            ap.mobile_template_id,
+            ap.product_img_url activity_product_img_url,
+            pi.product_img_url product_main_img_url,
+            NVL(getProduct_OriginalPrice(ap.product_itemnumber),0) original_price,
+            NVL(getProduct_HdPrice(ap.id),0) activity_price
+            from
+            TBL_ACTIVITY_PRODUCT ap
+            INNER JOIN TBL_PRODUCT_INFO pi on ap.product_itemnumber = pi.itemnumber
+            where ap.id = #{activity_product_id,jdbcType=INTEGER}
+        ) temp
+	</select>
+	<!-- 查询多个商品参加活动的原价、活动价 -->
+	<select id="queryActivityProductPriceList" parameterType="java.util.Map" resultType="java.util.Map">
+        select 
+        temp.*,
+        (case when ceil(nvl((to_number(original_price) - to_number(activity_price)),0)) > (nvl((to_number(original_price) - to_number(activity_price)),0)) then
+            to_char(nvl((to_number(original_price) - to_number(activity_price)),0),'fm999999990.99') 
+        else
+            to_char(nvl((to_number(original_price) - to_number(activity_price)),0))
+        end) reduced_price
+        from (
+            select 
+            ap.id,
+            ap.product_itemnumber,
+            ap.pc_template_id,
+            ap.mobile_template_id,
+            NVL(ap.product_img_url,'') product_img_url,
+            NVL(ap.product_img_url,pi.product_img_url) activity_product_img_url,
+            NVL(getProduct_OriginalPrice(ap.product_itemnumber),0) original_price,
+            NVL(getProduct_HdPrice(ap.id),0) activity_price
+            from
+            TBL_ACTIVITY_PRODUCT ap
+            INNER JOIN TBL_PRODUCT_INFO pi on ap.product_itemnumber = pi.itemnumber
+            where ap.id in
+            <foreach collection="activity_product_ids" item="item" open="(" close=")" separator=",">
+				 #{item,jdbcType=INTEGER}
+			</foreach>
+        ) temp
+	</select>
+	<!-- 获取活动商品图片水印模板列表 -->
+	<select id="queryActivityProductImgTemplateList" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT 
+		   ID,
+	       TEMPLATE_TYPE,
+	       BACKGROUND_IMG_URL,
+	       PREVIEW_IMG_URL,
+	       WATERMARK_IMAGE_JSON,
+	       WATERMARK_TEXT_JSON
+  		FROM  
+		TBL_WATERMARK_TEMPLATE_INFO
+		where template_type = 1
+	</select>
+	<!-- 根据ID获取活动商品图片水印模板 -->
+	<select id="getActivityProductImgTemplateById" parameterType="long" resultType="java.util.Map">
+		SELECT 
+		   ID,
+	       TEMPLATE_TYPE,
+	       BACKGROUND_IMG_URL,
+	       PREVIEW_IMG_URL,
+	       WATERMARK_IMAGE_JSON,
+	       WATERMARK_TEXT_JSON
+  		FROM  
+		TBL_WATERMARK_TEMPLATE_INFO
+		where id = #{id,jdbcType=INTEGER}
+	</select>
+	<!--更新活动商品表中的活动商品申请表信息 -->
+    <update id="updateActivityProductImgApply" parameterType="java.util.HashMap">
+    	UPDATE TBL_ACTIVITY_PRODUCT_APPLY TAPA
+    	   SET
+    	   <choose>
+        		<when test="product_img_url!=null and product_img_url!=''">
+		         	TAPA.product_img_url = #{product_img_url,jdbcType=VARCHAR}
+        		</when>
+        		<otherwise>
+		         	TAPA.product_img_url = null
+        		</otherwise>
+        	</choose>
+    	WHERE TAPA.ID  = #{activity_product_id,jdbcType=INTEGER}
+	</update>
+	<!--更新活动商品表中的活动商品审批表信息 -->
+    <update id="updateActivityProductImg" parameterType="java.util.HashMap">
+    	update tbl_activity_product tap
+        <set>
+        	<if test="pc_watermark_img_url!=null and pc_watermark_img_url!=''">
+		         tap.pc_watermark_img_url = #{pc_watermark_img_url,jdbcType=VARCHAR},
+        	</if>
+        	<if test="mobile_watermark_img_url!=null and mobile_watermark_img_url!=''">
+		         tap.mobile_watermark_img_url = #{mobile_watermark_img_url,jdbcType=VARCHAR},
+        	</if>
+        	<if test="pc_template_id!=null">
+		         tap.pc_template_id = #{pc_template_id,jdbcType=INTEGER},
+        	</if>
+        	<if test="mobile_template_id!=null">
+		         tap.mobile_template_id = #{mobile_template_id,jdbcType=INTEGER},
+        	</if>
+        	<choose>
+        		<when test="product_img_url!=null and product_img_url!=''">
+		         	tap.product_img_url = #{product_img_url,jdbcType=VARCHAR}
+        		</when>
+        		<otherwise>
+		         	tap.product_img_url = null
+        		</otherwise>
+        	</choose>
+        </set>
+        where tap.id = #{activity_product_id,jdbcType=INTEGER}
+	</update>
+</mapper>

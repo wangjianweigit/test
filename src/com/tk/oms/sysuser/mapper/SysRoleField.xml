@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.sysuser.dao.SysRoleFieldDao">
+	
+	<!-- 新增角色相关字段节点 -->
+    <insert id="insert" parameterType="java.util.List">
+        insert into tbl_sys_role_field(id,role_id,field_id)
+        select seq_sys_role_field.nextval,#{role_id} role_id,field_id from (
+        <foreach collection="field_ids" open="(" close=")" item="item" separator="union all">
+            select
+            #{item.field_id,jdbcType=INTEGER} as field_id
+            from dual
+        </foreach>
+        )
+    </insert>
+    
+    <!-- 删除字段节点的相关关联信息 -->
+    <delete id="delete"  parameterType="java.util.HashMap">
+         delete from tbl_sys_role_field 
+         <where>
+         	<if test="role_id!=null and role_id!=0 ">
+                role_id = #{role_id,jdbcType=INTEGER}
+            </if>
+            <if test="field_id!=null and field_id!=0 ">
+                and field_id = #{field_id,jdbcType=INTEGER}
+            </if>
+         </where> 
+    </delete>
+    
+    <!-- 查询字段节点列表，如果有权限则选中 -->
+    <select id="queryList" resultType="com.tk.oms.sysuser.entity.SysField" parameterType="com.tk.oms.sysuser.entity.SysRoleField">
+         select a.id,a.field_name,level as parent_id ,nvl(c.role_id,0) checked from tbl_sys_field a,
+         (select field_id,role_id from tbl_sys_role_field where role_id = #{role_id,jdbcType=INTEGER}) c 
+         where  a.id = c.field_id(+) and a.is_delete=0 
+            start with parent_id=0 
+            connect by prior id = parent_id 
+            order siblings by a.sort_id asc
+    </select>
+</mapper>

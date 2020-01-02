@@ -1,0 +1,511 @@
+package com.tk.pvtp.stationed.service;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import com.tk.sys.util.*;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import com.tk.pvtp.stationed.dao.PvtpStationedDao;
+
+@Service("PvtpStationedService")
+public class PvtpStationedService {
+	private Log logger = LogFactory.getLog(this.getClass());
+	@Resource
+	private PvtpStationedDao pvtpStationedDao;
+	@Resource
+	private RabbitTemplate omsSysRabbitTemplate;
+	/**
+	 * 查询私有平台商家列表
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryPvtpStationedList(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			Map<String,Object> params = (Map<String,Object>)Transform.GetPacket(json, Map.class);
+			GridResult pageParamResult = PageUtil.handlePageParams(params);
+			if(pageParamResult!=null){
+				return pageParamResult;
+			}
+			if((!StringUtils.isEmpty(params.get("state")))&&params.get("state") instanceof String){
+				params.put("state",(params.get("state")+"").split(","));
+			}
+			int count=pvtpStationedDao.queryPvtpStationedCount(params);
+			List<Map<String,Object>> stationedList = pvtpStationedDao.queryPvtpStationedList(params);
+			if (stationedList != null && stationedList.size() > 0) {
+				gr.setState(true);
+				gr.setMessage("查询成功!");
+				gr.setObj(stationedList);
+				gr.setTotal(count);
+			} else {
+				gr.setState(true);
+				gr.setMessage("无数据");
+			}
+		} catch (Exception e) {
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+			logger.error(e);
+		}
+		return gr;
+	}
+	
+	/**
+	 * 私有商家相关服务费详情
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryStationedServiceRateDetail(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        }
+			if(paramMap.size() == 0) {
+	        	pr.setState(false);
+	        	pr.setMessage("参数缺失");
+	            return pr;
+	        }
+			if(StringUtils.isEmpty(paramMap.get("id"))) {
+	        	pr.setState(false);
+	        	pr.setMessage("缺失商家参数");
+	            return pr;
+	        }
+			//查询私有商家相关服务费详情
+			Map<String, Object> retMap = pvtpStationedDao.queryStationedServiceRateDetail(paramMap);
+			pr.setState(true);
+			pr.setMessage("查询成功");
+			pr.setObj(retMap);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			logger.error("查询失败：" + e.getMessage());
+		}
+		return pr;
+	}
+	
+	/**
+	 * 入驻商-私有商家服务费设置
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult editStationedServiceCharges(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			//请求参数处理
+	        String json = HttpUtil.getRequestInputStream(request);
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        }
+			if(paramMap.size() == 0) {
+	        	pr.setState(false);
+	        	pr.setMessage("参数缺失");
+	            return pr;
+	        }
+			if(StringUtils.isEmpty(paramMap.get("id"))){
+				pr.setState(false);
+            	pr.setMessage("缺少参数，入驻商ID不能为空");
+                return pr;
+			}
+			if(!StringUtils.isEmpty(paramMap.get("service_charges"))){
+				paramMap.put("service_charges", Double.parseDouble(paramMap.get("service_charges").toString())/100);
+			}else{
+				paramMap.remove("service_charges");
+			}
+			if(!StringUtils.isEmpty(paramMap.get("member_service_rate"))){
+				paramMap.put("member_service_rate", Double.parseDouble(paramMap.get("member_service_rate").toString())/100);
+			}else{
+				paramMap.remove("member_service_rate");
+			}
+			if(!StringUtils.isEmpty(paramMap.get("pay_service_rate"))){
+				paramMap.put("pay_service_rate", Double.parseDouble(paramMap.get("pay_service_rate").toString())/100);
+			}else{
+				paramMap.remove("pay_service_rate");
+			}
+			if(!StringUtils.isEmpty(paramMap.get("area_service_rate"))){
+				paramMap.put("area_service_rate", Double.parseDouble(paramMap.get("area_service_rate").toString())/100);
+			}else{
+				paramMap.remove("area_service_rate");
+			}
+			if(!StringUtils.isEmpty(paramMap.get("user_discount"))){
+				paramMap.put("user_discount", Double.parseDouble(paramMap.get("user_discount").toString())/100);
+			}else{
+				paramMap.remove("user_discount");
+			}
+			if(StringUtils.isEmpty(paramMap.get("df_template_id"))){
+				paramMap.remove("df_template_id");
+			}
+			//日志记录map
+			Map<String,Object> logMap=new HashMap<String,Object>();
+			//获取商家相关信息
+			Map<String,Object> stationedDetail=pvtpStationedDao.queryStationedDetail(paramMap);
+			//相关服务费配置处理
+			if(!StringUtils.isEmpty(paramMap.get("service_charges"))||!StringUtils.isEmpty(paramMap.get("member_service_rate"))
+					||!StringUtils.isEmpty(paramMap.get("pay_service_rate"))||!StringUtils.isEmpty(paramMap.get("area_service_rate"))){
+				pvtpStationedDao.updateStationedServiceRate(paramMap);
+				//记录日志
+        		logMap.put("USER_TYPE", 2);
+        		logMap.put("OPERATE_ID", 3);
+        		logMap.put("REMARK", "配置私有商家【相关服务费】");
+        		logMap.put("CREATE_USER_ID", paramMap.get("public_user_id"));
+        		logMap.put("USER_NAME", stationedDetail.get("USER_NAME"));
+        		logMap.put("USER_REALNAME", stationedDetail.get("COMPANY_NAME"));
+			}
+			//相关商品共享其他配置处理
+			if(!StringUtils.isEmpty(paramMap.get("user_discount"))||!StringUtils.isEmpty(paramMap.get("df_template_id"))){
+				pvtpStationedDao.updateStationedServiceRate(paramMap);
+				//记录私有商家商品共享配置日志
+        		logMap.put("USER_TYPE", 2);
+        		logMap.put("OPERATE_ID", 3);
+        		logMap.put("REMARK", "配置私有商家【商品共享配置】");
+        		logMap.put("CREATE_USER_ID", paramMap.get("public_user_id"));
+        		logMap.put("USER_NAME", stationedDetail.get("USER_NAME"));
+        		logMap.put("USER_REALNAME", stationedDetail.get("COMPANY_NAME"));
+			}
+			//插入日志
+			omsSysRabbitTemplate.convertAndSend(MqQueueKeyEnum.OMS_USER_SYS_LOG.getKey(), Jackson.writeObject2Json(logMap));
+			pr.setState(true);
+        	pr.setMessage("设置成功");
+			
+		} catch (Exception e) {
+			pr.setState(false);
+        	pr.setMessage(e.getMessage());
+        	logger.error("设置失败："+e.getMessage());
+        	throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+	
+	/**
+	 * 入驻商-私有商家仓储费设置
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult editStorageCharges(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        }
+			if(paramMap.size() == 0) {
+	        	pr.setState(false);
+	        	pr.setMessage("参数缺失");
+	            return pr;
+	        }
+			if(StringUtils.isEmpty(paramMap.get("id"))){
+				pr.setState(false);
+            	pr.setMessage("缺少参数，入驻商ID不能为空");
+                return pr;
+			}
+			List<Map<String, Object>> dataList=(List<Map<String, Object>>) paramMap.get("dataList");
+			for(Map<String, Object> map :dataList){
+				map.put("create_user_id", paramMap.get("public_user_id"));
+				map.put("stationed_user_id", paramMap.get("id"));
+			}
+			pvtpStationedDao.updateOrInsertStorageCharges(dataList);
+			//记录入驻配置仓储服务费日志
+			Map<String,Object> stationedDetail=pvtpStationedDao.queryStationedDetail(paramMap);
+    		Map<String,Object> logMap=new HashMap<String,Object>();
+    		logMap.put("USER_TYPE", 2);
+    		logMap.put("OPERATE_ID", 3);
+    		logMap.put("REMARK", "配置私有商家【仓储费】");
+    		logMap.put("CREATE_USER_ID", paramMap.get("public_user_id"));
+    		logMap.put("USER_NAME", stationedDetail.get("USER_NAME"));
+    		logMap.put("USER_REALNAME", stationedDetail.get("COMPANY_NAME"));
+			omsSysRabbitTemplate.convertAndSend(MqQueueKeyEnum.OMS_USER_SYS_LOG.getKey(), Jackson.writeObject2Json(logMap));
+			pr.setState(true);
+        	pr.setMessage("设置成功");
+		} catch (Exception e) {
+			pr.setState(false);
+        	pr.setMessage(e.getMessage());
+        	logger.error("设置失败："+e.getMessage());
+        	throw new RuntimeException(e.getMessage());
+		}	
+		return pr;
+	}
+	
+	/**
+	 * 查询入驻商-私有商家仓储费
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryStorageChargesList(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        }
+			if(paramMap.size() == 0) {
+	        	pr.setState(false);
+	        	pr.setMessage("参数缺失");
+	            return pr;
+	        }
+			List<Map<String, Object>> dataList = new ArrayList<Map<String, Object>>();
+			//商品类型
+			if("1".equals(paramMap.get("type"))){
+				dataList=pvtpStationedDao.queryStorageChargesList(paramMap);
+			}else{
+				dataList=pvtpStationedDao.queryStorageChargesTypeList(paramMap);
+			}
+			pr.setState(true);
+        	pr.setMessage("查询成功");
+        	pr.setObj(dataList);
+		} catch (Exception e) {
+			pr.setState(false);
+        	pr.setMessage(e.getMessage());
+        	logger.error("查询失败："+e.getMessage());
+		}	
+		return pr;
+	}
+	
+	/**
+	 * 私有商家保证金配置
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult editDepositMoney(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+        Map<String,Object> params = new HashMap<String, Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            //校验是否传入参数
+            if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            
+            params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            //校验id参数
+            if(!params.containsKey("id")||StringUtils.isEmpty(params.get("id"))) {
+            	pr.setState(false);
+            	pr.setMessage("入驻商ID为空");
+            	return pr;
+            }
+            //校验deposit_money参数
+            if(!params.containsKey("deposit_money")||StringUtils.isEmpty(params.get("deposit_money"))) {
+                pr.setState(false);
+                pr.setMessage("保证金金额为空");
+                return pr;
+            }
+
+            if(pvtpStationedDao.editDepositMoney(params) > 0) {
+            	//记录入驻商保证金配置日志
+            	Map<String, Object> map = pvtpStationedDao.queryStationedDetail(params);
+        		Map<String,Object> logMap=new HashMap<String,Object>();
+        		logMap.put("USER_TYPE", 2);
+        		logMap.put("OPERATE_ID", 3);
+        		logMap.put("REMARK", "配置私有商家【保证金配置】");
+        		logMap.put("CREATE_USER_ID", params.get("public_user_id"));
+        		logMap.put("USER_NAME", map.get("USER_NAME"));
+        		logMap.put("USER_REALNAME", map.get("COMPANY_NAME"));
+				omsSysRabbitTemplate.convertAndSend(MqQueueKeyEnum.OMS_USER_SYS_LOG.getKey(), Jackson.writeObject2Json(logMap));
+        		pr.setState(true);
+        		pr.setMessage("保证金配置成功");
+            } else {
+                pr.setState(false);
+        		pr.setMessage("保证金配置失败");
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+
+        return pr;
+	}
+	
+	/**
+	 * 查询私有商家保证金
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryDepositMoney(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        }
+			if(paramMap.size() == 0) {
+	        	pr.setState(false);
+	        	pr.setMessage("参数缺失");
+	            return pr;
+	        }
+			String deposit_money =pvtpStationedDao.queryDepositMoney(paramMap);
+			pr.setState(true);
+        	pr.setMessage("查询成功");
+        	pr.setObj(deposit_money);
+		} catch (Exception e) {
+			pr.setState(false);
+        	pr.setMessage(e.getMessage());
+        	logger.error("查询失败："+e.getMessage());
+		}	
+		return pr;
+	}
+	
+	/**
+	 * 查询保证金余额和账户余额
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryDepositMoneyBalance(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        }
+			if(paramMap.size() == 0) {
+	        	pr.setState(false);
+	        	pr.setMessage("参数缺失");
+	            return pr;
+	        }
+			Map<String, Object> retMap =pvtpStationedDao.queryBankAccountInfo(paramMap);
+			pr.setState(true);
+        	pr.setMessage("查询成功");
+        	pr.setObj(retMap);
+		} catch (Exception e) {
+			pr.setState(false);
+        	pr.setMessage(e.getMessage());
+        	logger.error("查询失败："+e.getMessage());
+		}	
+		return pr;
+	}
+	
+	/**
+	 * 是否启用订单自动审核
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult editState(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        }
+			if(paramMap.size() == 0) {
+            	pr.setState(false);
+            	pr.setMessage("参数缺失");
+                return pr;
+            }
+			if(StringUtils.isEmpty(paramMap.get("id"))){
+				pr.setState(false);
+            	pr.setMessage("缺少参数，入驻商ID不能为空");
+                return pr;
+			}
+			Map<String, Object> stationedMap = pvtpStationedDao.queryStationedDetail(paramMap);
+			Map<String, Object> serviceRateMap = pvtpStationedDao.queryStationedServiceRateDetail(paramMap);
+			//启用时增加支付服务费配置校验 
+			if("2".equals(paramMap.get("state"))) {
+				if(StringUtils.isEmpty(serviceRateMap.get("PAY_SERVICE_RATE"))) {
+					pr.setState(false);
+	            	pr.setMessage("启用失败：未配置支付服务费");
+	            	return pr;
+				}
+			}
+			if(pvtpStationedDao.updatePvtpStationed(paramMap)>0){
+				//记录入驻停用启用日志
+        		Map<String,Object> logMap=new HashMap<String,Object>();
+        		logMap.put("USER_TYPE", 2);
+        		logMap.put("OPERATE_ID", 3);
+        		logMap.put("REMARK", "配置私有商家【是否自动审核订单】");
+        		logMap.put("CREATE_USER_ID", paramMap.get("public_user_id"));
+        		logMap.put("USER_NAME", stationedMap.get("USER_NAME"));
+        		logMap.put("USER_REALNAME", stationedMap.get("COMPANY_NAME"));
+				omsSysRabbitTemplate.convertAndSend(MqQueueKeyEnum.OMS_USER_SYS_LOG.getKey(), Jackson.writeObject2Json(logMap));
+				pr.setState(true);
+            	pr.setMessage("更新成功");
+			}else{
+				pr.setState(false);
+            	pr.setMessage("更新失败");
+			}
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			logger.error("更新失败："+e.getMessage());
+			throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+
+	/**
+	 * 入驻商收支记录
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryInExpRecord(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        	PageUtil.handlePageParams(paramMap);
+	        }
+			if(paramMap.size() == 0) {
+            	gr.setState(false);
+            	gr.setMessage("参数缺失");
+                return gr;
+            }
+			//查询入驻商收支记录数量
+			int total = pvtpStationedDao.queryInExpRecordCount(paramMap);
+			//查询入驻商收支记录列表
+			List<Map<String, Object>> dataList = pvtpStationedDao.queryInExpRecordList(paramMap);
+			
+			if (dataList != null && dataList.size() > 0) {
+				gr.setState(true);
+				gr.setMessage("查询成功");
+				gr.setObj(dataList);
+				gr.setTotal(total);
+			} else {
+				gr.setState(true);
+				gr.setMessage("无数据");
+			}
+		} catch (Exception e) {
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+			logger.error("查询失败："+e.getMessage());
+		}
+		return gr;
+	}
+}

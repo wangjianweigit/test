@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.decoration.dao.SocialProductDao">
+	<!-- 查询社交首页商品列表 -->
+    <select id="querySocialProductList" parameterType="java.util.Map" resultType="java.util.Map">
+        select t.*,
+        	   (select itemnumber from tbl_product_info tpi where tpi.id=t.product_id) as product_itemnumber,
+        	   (select product_name from tbl_product_info tpi where tpi.id=t.product_id) as product_name,
+        	   (select product_img_url from tbl_product_info tpi where tpi.id=t.product_id) as product_img_url,
+        	   (select state from tbl_product_info tpi where tpi.id=t.product_id) as product_state,
+        	   (select product_count from tbl_product_info tpi where tpi.id=t.product_id) as product_count,
+        	   (select count(1) from tbl_product_images tpi where tpi.product_id=t.product_id and tpi.type=2) as if_have_video
+         from (
+            select s.*, rownum num from (
+                select
+                	id,
+                    product_id,
+                    state,
+                    display_way
+                from tbl_social_product tsm
+                where state = #{state,jdbcType=INTEGER}
+                <if test="product_type_id != null and product_type_id != '' ">
+                	and exists(select 1 from tbl_product_info tpi where tpi.id=tsm.product_id
+                		AND	(TPI.PRODUCT_TYPE_ID = #{product_type_id,jdbcType=INTEGER}
+						OR TPI.PRODUCT_TYPE_ID in (select id from tbl_dic_product_type t start with parent_id = #{product_type_id,jdbcType=INTEGER} connect by prior id=parent_id))
+                	)
+				</if>
+				<if test="product_itemnumber != null and product_itemnumber != '' ">
+                	and exists(select 1 from tbl_product_info tpi where tpi.id=tsm.product_id
+                		and tpi.itemnumber=#{product_itemnumber,jdbcType=VARCHAR}
+                	)
+				</if>
+				<if test="product_state != null and product_state != '' ">
+                	and exists(select 1 from tbl_product_info tpi where tpi.id=tsm.product_id
+                		and tpi.state=#{product_state,jdbcType=INTEGER}
+                	)
+				</if>
+                <choose>
+					<when test="state ==2">
+						 order by sort_value desc
+					</when>
+					<otherwise>
+						order by create_date desc
+					</otherwise>
+				</choose>
+        	) s where ROWNUM  &lt;= #{end_rownum,jdbcType=INTEGER}
+        )t where num &gt;#{start_rownum,jdbcType=INTEGER}
+    </select>
+    <!-- 查询社交首页商品列表总数 -->
+    <select id="querySocialProductCount" parameterType="java.util.Map" resultType="int">
+        select count(1)
+              from tbl_social_product tsm
+              where state = #{state,jdbcType=INTEGER}
+              <if test="product_type_id != null and product_type_id != '' ">
+              		and exists(select 1 from tbl_product_info tpi where tpi.id=tsm.product_id
+              			AND	(TPI.PRODUCT_TYPE_ID = #{product_type_id,jdbcType=INTEGER}
+						OR TPI.PRODUCT_TYPE_ID in (select id from tbl_dic_product_type t start with parent_id = #{product_type_id,jdbcType=INTEGER} connect by prior id=parent_id))
+              		)
+			  </if>
+			  <if test="product_itemnumber != null and product_itemnumber != '' ">
+		             and exists(select 1 from tbl_product_info tpi where tpi.id=tsm.product_id
+		              	 and tpi.itemnumber=#{product_itemnumber,jdbcType=VARCHAR}
+		              )
+			  </if>
+			  <if test="product_state != null and product_state != '' ">
+		             and exists(select 1 from tbl_product_info tpi where tpi.id=tsm.product_id
+		              	and tpi.state=#{product_state,jdbcType=INTEGER}
+		             )
+			  </if>
+    </select>
+    <!-- 社交首页商品发布-->
+    <update id="socialProductRelease" parameterType="java.util.Map">
+        update tbl_social_product tsp
+        	set state=#{state,jdbcType=INTEGER},
+        		display_way=#{display_way,jdbcType=INTEGER},
+				release_date=sysdate,
+			    release_user_id=#{public_user_id,jdbcType=INTEGER},
+			    remove_date='',
+			    remove_user_id='',
+			    sort_value=nvl((select max(sort_value) from tbl_social_product),0)+1
+        <where>
+			 tsp.product_id =#{product_id,jdbcType=INTEGER}
+        </where>
+    </update>
+    <!-- 社交首页商品移除-->
+    <update id="socialProductRemove" parameterType="java.util.Map">
+        update tbl_social_product tsp
+        	set state=#{state,jdbcType=INTEGER},
+        		remove_date=sysdate,
+				remove_user_id=#{public_user_id,jdbcType=INTEGER}
+        <where>
+        	<if test="product_id_list != null">
+				and tsp.product_id IN
+	                <foreach item="item" collection="product_id_list" open="(" separator="," close=")">
+						#{item}
+					</foreach>
+			</if>
+        </where>
+    </update>
+     <!-- 社交首页商品发布或删除-->
+    <update id="socialProductUpdateDisplayWay" parameterType="java.util.Map">
+        update tbl_social_product tsp
+        	set display_way=#{display_way,jdbcType=INTEGER}
+        <where>
+        	id=#{social_product_id,jdbcType=INTEGER}
+        </where>
+    </update>
+    <!-- 社交首页商品设置最大或最小排序值-->
+    <update id="updateMaxOrMinSortValue" parameterType="java.util.Map">
+        update tbl_social_product tsp
+        	<if test="type != null and type != '' and type=='top'">
+	           set sort_value =(select max(sort_value)+1 from tbl_social_product),
+	               sorted_flag = 1
+	        </if>
+	        <if test="type != null and type != '' and type=='bottom'">
+	           set sort_value =(select min(sort_value)-1 from tbl_social_product),
+	               sorted_flag = 1
+	        </if>
+        where id=#{social_product_id,jdbcType=INTEGER}
+    </update>
+    <!-- 查询当前商品排序值-->
+	<select id="queryProductSortValue"  parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT num, sort_value
+		  FROM (SELECT a.*, ROWNUM num
+		          FROM (  SELECT id,
+		                         product_id,
+		                         sort_value
+		                    FROM tbl_social_product
+		                    where state=2
+		                ORDER BY sort_value DESC) a
+		         )
+		 <where>
+			 <if test="social_product_id != null and social_product_id != ''">
+			 	id=#{social_product_id,jdbcType=INTEGER}
+			 </if>
+			 <if test="num != null and num != ''">
+			 	num=#{num,jdbcType=INTEGER}
+			 </if>
+		 </where>
+	</select>
+    <!-- 将当前商品排序值增加或减少-->
+    <update id="updateRiseOrDownSortValue" parameterType="java.util.Map">
+        update tbl_social_product 
+        	<if test="type != null and type != '' and type=='prev'">
+        		set sort_value =sort_value-1
+        			where state=2
+        		and sort_value&gt;#{sort_value,jdbcType=INTEGER}
+        		and sort_value&lt;=#{new_sort_value,jdbcType=INTEGER}
+        	</if>
+        	<if test="type != null and type != '' and type=='next'">
+        		set sort_value =sort_value+1
+        			where state=2
+        		and sort_value&gt;=#{new_sort_value,jdbcType=INTEGER}
+        		and sort_value&lt;#{sort_value,jdbcType=INTEGER}
+        	</if>
+    </update>
+    <!-- 更新商品排序值 -->
+    <update id="updateSortValue" parameterType="java.util.Map">
+        update tbl_social_product 
+	           set sort_value =#{new_sort_value,jdbcType=INTEGER},
+	               sorted_flag = 1
+        where state =2 and id=#{id,jdbcType=INTEGER}
+    </update>
+    <!-- 查询最大排名-->
+	<select id="queryProductMaxNum" resultType="int">
+		select count(1) from TBL_SOCIAL_PRODUCT where state=2
+	</select>
+	<!-- 校验当前商品是否都有视频 -->
+    <select id="checkedProductHaveVideo" parameterType="java.util.Map" resultType="string">
+        SELECT to_char(wm_concat(itemnumber)) product_itemnumber
+		  FROM tbl_product_info
+		 WHERE id IN (SELECT product_id
+		                FROM TBL_SOCIAL_PRODUCT tsp
+		               WHERE 1=1
+		               <if test="product_id_list != null and product_id_list.size()>0">
+							and tsp.product_id IN
+				                <foreach item="item" collection="product_id_list" open="(" separator="," close=")">
+									#{item}
+								</foreach>
+					   </if>
+		               AND NOT EXISTS
+		                        (SELECT 1
+		                           FROM TBL_PRODUCT_IMAGES pti
+		                          WHERE TYPE = 2
+		                          <if test="product_id_list != null and product_id_list.size()>0">
+										and pti.product_id IN
+							                <foreach item="item" collection="product_id_list" open="(" separator="," close=")">
+												#{item}
+											</foreach>
+									</if>
+		                          )
+		                )
+    </select>
+</mapper>

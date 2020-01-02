@@ -1,0 +1,813 @@
+package com.tk.oms.decoration.control;
+
+import com.tk.oms.decoration.service.DecoratePlatformService;
+import com.tk.oms.product.service.ProductService;
+import com.tk.sys.util.Packet;
+import com.tk.sys.util.ProcessResult;
+import com.tk.sys.util.Transform;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+/**
+ * 装修中心管理
+ * @author shif
+ */
+@Controller
+@RequestMapping("/decorate_platform")
+public class DecoratePlatformControl {
+
+    @Resource
+    private DecoratePlatformService decoratePlatformService;
+    @Resource
+    private ProductService productService;
+    /**
+     * @api {post} /{project_name}/decorate_platform/index  装修中心首页数据
+     
+     * @apiGroup decorate_platform
+     * @apiDescription  获取装修中心首页数据
+     * @apiVersion 0.0.1
+     *
+     * @apiParam {number}   template_id 装修模板id
+     *
+     * @apiSuccess {boolean}    state 接口获取数据是否成功.true:成功  false:失败
+     * 
+     * @apiSuccess {string}     message 接口返回信息
+     * @apiSuccess {object}   obj 返回数据
+     * 
+     * @apiSuccess {object[]} obj.sys_module_list 系统组件列表
+     * @apiSuccess {number} obj.sys_module_list.ID    主键ID，用作数据关联
+    * @apiSuccess {string} obj.sys_module_list.MODULE_NAME    组件名称,同一分组内不允许重名
+    * @apiSuccess {string} obj.sys_module_list.MODULE_ICON    组件图标
+    * @apiSuccess {number} obj.sys_module_list.MODULE_GROUP_ID    组件分组表TBL_DECORATE_MODULE_GROUP主键
+    * @apiSuccess {number} obj.sys_module_list.MODULE_DEFAULT_HEIGTH    组件默认高度，单位像素
+    * @apiSuccess {string} obj.sys_module_list.MODULE_WIDTH_TYPES      支持宽度，支持多个则以逗号分隔，可值如下：1920,1200,990,200 单位px
+    * @apiSuccess {number} obj.sys_module_list.MODULE_DIALOG_HEIGTH    组件编辑弹框高度
+    * @apiSuccess {number} obj.sys_module_list.MODULE_DIALOG_WIDTH    组件编辑弹框宽度
+    * @apiSuccess {string} obj.sys_module_list.MODULE_CONTENT    组件内容
+    * @apiSuccess {string} obj.sys_module_list.SUPPORT_FLAG    组件支持设备;1:PC，2:微信
+    * @apiSuccess {string} obj.sys_module_list.MODULE_EXTRA_CONFIG    界面扩展配置项，json格式，前端配置专用
+    * @apiSuccess {string} obj.sys_module_list.MODULE_STATE    组件状态- 1（停用）2（启用）
+    * @apiSuccess {string} obj.sys_module_list.CREATE_DATE    创建时间
+    * @apiSuccess {number} obj.sys_module_list.CREATE_USER_ID    创建人ID
+    * 
+    * @apiSuccess {object[]} obj.custom_module_list 自定义组件列表
+    * @apiSuccess {number} obj.custom_module_list.ID    主键ID，用作数据关联
+    * @apiSuccess {string} obj.custom_module_list.MODULE_NAME    组件名称,同一分组内不允许重名
+    * @apiSuccess {string} obj.custom_module_list.MODULE_ICON    组件图标
+    * @apiSuccess {number} obj.custom_module_list.MODULE_GROUP_ID    组件分组表TBL_DECORATE_MODULE_GROUP主键
+    * @apiSuccess {number} obj.custom_module_list.MODULE_DEFAULT_HEIGTH    组件默认高度，单位像素
+    * @apiSuccess {string} obj.custom_module_list.MODULE_WIDTH_TYPES    支持宽度，支持多个则以逗号分隔，可值如下：1920,1200,990,200 单位px
+    * @apiSuccess {number} obj.custom_module_list.MODULE_DIALOG_HEIGTH    组件编辑弹框高度
+    * @apiSuccess {number} obj.custom_module_list.MODULE_DIALOG_WIDTH    组件编辑弹框宽度
+    * @apiSuccess {string} obj.custom_module_list.MODULE_CONTENT    组件内容
+    * @apiSuccess {string} obj.custom_module_list.SUPPORT_FLAG    组件支持设备;1:PC，2:微信
+    * @apiSuccess {string} obj.custom_module_list.MODULE_EXTRA_CONFIG    界面扩展配置项，json格式，前端配置专用
+    * @apiSuccess {string} obj.custom_module_list.MODULE_STATE    组件状态- 1（停用）2（启用）
+    * @apiSuccess {string} obj.custom_module_list.CREATE_DATE    创建时间
+    * @apiSuccess {number} obj.custom_module_list.CREATE_USER_ID    创建人ID
+    * @apiSuccess {number} obj.custom_module_list.CREATE_USER_ID    创建人ID
+    * @apiSuccess {number} obj.home_page.ID    主键ID，用作数据关联
+    * 
+    * @apiSuccess {object} obj.home_page 首页
+    * @apiSuccess {number} obj.home_page.ID    主键ID，用作数据关联
+    * @apiSuccess {number} obj.home_page.SITE_ID    站点ID
+    * @apiSuccess {number} obj.home_page.TEMPLATE_ID    装修模板ID
+    * @apiSuccess {string} obj.home_page.PAGE_NAME    页面名称
+    * @apiSuccess {string} obj.home_page.PAGE_STATE     页面状态   1（停用）2（启用）
+    * @apiSuccess {string} obj.home_page.HOME_PAGE_FLAG    是否首页 1.普通页    2.首页     同时只允许一个首页
+    * @apiSuccess {string} obj.home_page.REMARK    备注信息
+    * @apiSuccess {string} obj.home_page.CREATE_DATE    创建时间
+    * @apiSuccess {number} obj.home_page.CREATE_USER_ID    创建人id
+    * 
+    * @apiSuccess {object[]} obj.home_page.layout_list 首页布局列表
+    * @apiSuccess {number} obj.home_page.layout_list.ID    主键
+    * @apiSuccess {number} obj.home_page.layout_list.PAGE_ID    页面ID
+    * @apiSuccess {string} obj.home_page.layout_list.LAYOUT_TYPE   0：通栏布局;1：单行布局;2：左窄右宽;3：左宽右窄
+    * @apiSuccess {number} obj.home_page.layout_list.SORT_ID    一个界面中的多个布局排序，数字小的靠前
+    * @apiSuccess {object[]} obj.home_page.layout_list.module_list  布局组件列表
+    * @apiSuccess {number} obj.home_page.layout_list.module_list.ID    主键ID，用作数据关联
+    * @apiSuccess {string} obj.home_page.layout_list.module_list.MODULE_NAME    组件名称,同一分组内不允许重名
+    * @apiSuccess {string} obj.home_page.layout_list.module_list.MODULE_ICON    组件图标
+    * @apiSuccess {number} obj.home_page.layout_list.module_list.MODULE_GROUP_ID    组件分组表TBL_DECORATE_MODULE_GROUP主键
+    * @apiSuccess {number} obj.home_page.layout_list.module_list.MODULE_DEFAULT_HEIGTH    组件默认高度，单位像素
+    * @apiSuccess {string} obj.home_page.layout_list.module_list.MODULE_WIDTH_TYPES    支持宽度，支持多个则以逗号分隔，可值如下：1920,1200,990,200 单位px
+    * @apiSuccess {number} obj.home_page.layout_list.module_list.MODULE_DIALOG_HEIGTH    组件编辑弹框高度
+    * @apiSuccess {number} obj.home_page.layout_list.module_list.MODULE_DIALOG_WIDTH    组件编辑弹框宽度
+    * @apiSuccess {string} obj.home_page.layout_list.module_list.MODULE_CONTENT    组件内容
+    * @apiSuccess {string} obj.home_page.layout_list.module_list.SUPPORT_FLAG    组件支持设备;1:PC，2:微信
+    * @apiSuccess {string} obj.home_page.layout_list.module_list.MODULE_EXTRA_CONFIG    界面扩展配置项，json格式，前端配置专用
+    * @apiSuccess {string} obj.home_page.layout_list.module_list.MODULE_STATE    组件状态- 1（停用）2（启用）
+    * @apiSuccess {string} obj.home_page.layout_list.module_list.CREATE_DATE    创建时间
+    * @apiSuccess {number} obj.home_page.layout_list.module_list.CREATE_USER_ID    创建人ID
+    * 
+    * @apiSuccess {object[]} obj.custom_page_list 自定义页列表
+    * @apiSuccess {number} obj.custom_page_list.ID    主键ID，用作数据关联
+    * @apiSuccess {number} obj.custom_page_list.SITE_ID    站点ID
+    * @apiSuccess {number} obj.custom_page_list.TEMPLATE_ID    装修模板ID
+    * @apiSuccess {string} obj.custom_page_list.PAGE_NAME    页面名称
+    * @apiSuccess {string} obj.custom_page_list.PAGE_STATE     页面状态   1（停用）2（启用）
+    * @apiSuccess {string} obj.custom_page_list.HOME_PAGE_FLAG    是否首页 1.普通页    2.首页     同时只允许一个首页
+    * @apiSuccess {string} obj.custom_page_list.REMARK    备注信息
+    * @apiSuccess {string} obj.custom_page_list.CREATE_DATE    创建时间
+    * @apiSuccess {number} obj.custom_page_list.CREATE_USER_ID    创建人id
+    */
+    @RequestMapping(value = "/index", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryDecoratePlatformIndex(HttpServletRequest request){
+        return Transform.GetResult(decoratePlatformService.queryDecoratePlatformIndex(request));
+    }
+    
+	/**
+	 * @api {post} /{project_name}/decorate_platform/module_list  装修控件列表
+	 * @apiGroup decorate_platform
+	 * @apiDescription 获取装修中心组件列表
+	 * @apiVersion 0.0.1
+	 * 
+	 * @apiParam {string} group_type 装修组件类型 ‘1’系统 ‘2’自定义
+	 * 
+	 * @apiSuccess {boolean} state 接口获取数据是否成功.true:成功 false:失败
+	 * @apiSuccess {string} message 接口返回信息
+	 * @apiSuccess {object[]} obj 返回数据
+	 * @apiSuccess {number} obj.ID 主键ID，用作数据关联
+	 * @apiSuccess {string} obj.MODULE_NAME 组件名称,同一分组内不允许重名
+	 * @apiSuccess {string} obj.MODULE_ICON 组件图标
+	 * @apiSuccess {string} obj.MODULE_CODE 组件编码
+	 * @apiSuccess {number} obj.MODULE_GROUP_ID 组件分组表TBL_DECORATE_MODULE_GROUP主键
+	 * @apiSuccess {number} obj.MODULE_DEFAULT_HEIGTH 组件默认高度，单位像素
+	 * @apiSuccess {string} obj.MODULE_WIDTH_TYPES 支持宽度，支持多个则以逗号分隔，可值如下：1920,1200,990,200 单位px
+	 * @apiSuccess {number} obj.MODULE_DIALOG_HEIGTH 组件编辑弹框高度
+	 * @apiSuccess {number} obj.MODULE_DIALOG_WIDTH 组件编辑弹框宽度
+	 * @apiSuccess {string} obj.MODULE_CONTENT 组件内容
+	 * @apiSuccess {string} obj.SUPPORT_FLAG 组件支持设备;1:PC，2:微信
+	 * @apiSuccess {string} obj.MODULE_EXTRA_CONFIG 界面扩展配置项，json格式，前端配置专用
+	 * @apiSuccess {string} obj.MODULE_STATE 组件状态- 1（停用）2（启用）
+	 * @apiSuccess {string} obj.CREATE_DATE 创建时间
+	 * @apiSuccess {number} obj.CREATE_USER_ID 创建人ID
+	 */
+	@RequestMapping(value = "/module_list", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet queryDecoratePlatformModuleList(HttpServletRequest request) {
+		return Transform.GetResult(decoratePlatformService.queryDecoratePlatformModuleList(request));
+	}
+	/**
+	 * @api {post} /{project_name}/decorate_platform/module_detail  装修控件详情
+	 * @apiGroup decorate_platform
+	 * @apiDescription 获取装修中心组件详情
+	 * @apiVersion 0.0.1
+	 * 
+	 * @apiParam {number} module_id 装修组件ID
+	 * 
+	 * @apiSuccess {boolean} state 接口获取数据是否成功.true:成功 false:失败
+	 * @apiSuccess {string} message 接口返回信息
+	 * @apiSuccess {object[]} obj 返回数据
+	 * @apiSuccess {number} obj.ID 主键ID，用作数据关联
+	 * @apiSuccess {string} obj.MODULE_NAME 组件名称,同一分组内不允许重名
+	 * @apiSuccess {string} obj.MODULE_ICON 组件图标
+	 * @apiSuccess {string} obj.MODULE_CODE 组件编码
+	 * @apiSuccess {number} obj.MODULE_GROUP_ID 组件分组表TBL_DECORATE_MODULE_GROUP主键
+	 * @apiSuccess {number} obj.MODULE_DEFAULT_HEIGTH 组件默认高度，单位像素
+	 * @apiSuccess {string} obj.MODULE_WIDTH_TYPES 支持宽度，支持多个则以逗号分隔，可值如下：1920,1200,990,200 单位px
+	 * @apiSuccess {number} obj.MODULE_DIALOG_HEIGTH 组件编辑弹框高度
+	 * @apiSuccess {number} obj.MODULE_DIALOG_WIDTH 组件编辑弹框宽度
+	 * @apiSuccess {string} obj.MODULE_CONTENT 组件内容
+	 * @apiSuccess {string} obj.SUPPORT_FLAG 组件支持设备;1:PC，2:微信
+	 * @apiSuccess {string} obj.MODULE_EXTRA_CONFIG 界面扩展配置项，json格式，前端配置专用
+	 * @apiSuccess {string} obj.MODULE_STATE 组件状态- 1（停用）2（启用）
+	 * @apiSuccess {string} obj.CREATE_DATE 创建时间
+	 * @apiSuccess {number} obj.CREATE_USER_ID 创建人ID
+	 */
+	@RequestMapping(value = "/module_detail", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet queryDecorateModuleDetail(HttpServletRequest request) {
+		return Transform.GetResult(decoratePlatformService.queryDecorateModuleDetail(request));
+	}
+    
+    /**
+     * @api {post} /{project_name}/decorate_platform/page_list 装修页面列表
+     
+     * @apiGroup decorate_platform
+     * @apiDescription  获取装修中心页面列表
+     * @apiVersion 0.0.1
+     *
+     * @apiParam {number}   template_id 装修模板
+     * @apiParam {string}   home_page_flag 首页标志【‘2’ 首页，‘1’ 普通页】
+     * 
+     * @apiSuccess {boolean}    state 接口获取数据是否成功.true:成功  false:失败
+     * @apiSuccess {string}     message 接口返回信息
+     * @apiSuccess {object[]}   obj 返回数据
+    * @apiSuccess {number} obj.ID    主键ID，用作数据关联
+    * @apiSuccess {number} obj.SITE_ID    站点ID
+    * @apiSuccess {number} obj.TEMPLATE_ID    装修模板ID
+    * @apiSuccess {string} obj.PAGE_NAME    页面名称
+    * @apiSuccess {string} obj.PAGE_STATE     页面状态   1（停用）2（启用）
+    * @apiSuccess {string} obj.HOME_PAGE_FLAG    是否首页 1.普通页    2.首页     同时只允许一个首页
+    * @apiSuccess {string} obj.REMARK    备注信息
+    * @apiSuccess {string} obj.CREATE_DATE    创建时间
+    * @apiSuccess {number} obj.CREATE_USER_ID    创建人id
+     * 
+     */
+    @RequestMapping(value = "/page_list", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryDecoratePlatformPageList(HttpServletRequest request){
+        return Transform.GetResult(decoratePlatformService.queryDecoratePlatformPageList(request));
+    }
+    
+	/**
+	 * @api {post} /{project_name}/decorate_platform/page_detail
+	 * 
+	 * @apiGroup decorate_platform
+	 * @apiDescription 获取装修中心页面详情【页面布局、布局组件】
+	 * @apiVersion 0.0.1
+	 * 
+	 * @apiParam {number} page_id 页面Id
+	 * 
+	 @apiSuccess {boolean} state 接口获取数据是否成功.true:成功 false:失败
+	 * @apiSuccess {string} message 接口返回信息
+	 * @apiSuccess {object[]} obj 返回数据
+	 * @apiSuccess {number} obj.LAYOUT_ID 一个装修页中的布局ID，唯一主键
+	 * @apiSuccess {number} obj.LAYOUT_TYPE 布局类型 0：通栏布局;1：单行布局;2：左窄右宽;3：左宽右窄；
+	 * @apiSuccess {number} obj.SORT_ID    一个界面内的布局排序字段，升序，数字小的靠前
+	 * @apiSuccess {number} obj.LAYOUT_COLUMN_ID  表示组件在布局中的列ID，数值1表示最左侧，数值越大越靠右
+	 * @apiSuccess {object[]} obj.MODULE_LIST 一个布局内的装修控件集合
+	 * @apiSuccess {number} obj.MODULE_LIST.LAYOUT_PAGE_MODULE_ID 布局中的控件记录ID，唯一主键
+	 * @apiSuccess {number} obj.MODULE_LIST.MODULE_ID 控件本身ID，控件主表主键
+	 * @apiSuccess {string} obj.MODULE_LIST.MODULE_NAME 控件名称
+	 * @apiSuccess {string} obj.MODULE_LIST.SORT_ID 布局内的控件排序字段，升序，数字小的靠前
+	 * @apiSuccess {string} obj.MODULE_BASE_CONF    组件基础配置项JSON,作为查询具体数据的参数
+	 * @apiSuccess {string} obj.MODULE_EXTEND_CONF  界面扩展配置项，json格式，前端配置专用
+	 */
+    @RequestMapping(value = "/page_detail", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryDecoratePlatformPageDetail(HttpServletRequest request){
+        return Transform.GetResult(decoratePlatformService.queryDecoratePlatformPageDetail(request));
+    }
+    
+	/**
+	 * @api {post} /{project_name}/decorate_platform/page_layout 页面布局信息
+	 * 
+	 * @apiGroup decorate_platform
+	 * @apiDescription 获取装修中心页面布局列表
+	 * @apiVersion 0.0.1
+	 * 
+	 * @apiParam {number} page_id 页面Id
+	 * 
+	 * @apiSuccess {boolean} state 接口获取数据是否成功.true:成功 false:失败
+	 * @apiSuccess {string} message 接口返回信息
+	 * @apiSuccess {object[]} obj 返回数据
+	 * @apiSuccess {number} obj.LAYOUT_ID 一个装修页中的布局ID，唯一主键
+	 * @apiSuccess {number} obj.LAYOUT_TYPE 布局类型 0：通栏布局;1：单行布局;2：左窄右宽;3：左宽右窄；
+	 * @apiSuccess {number} obj.SORT_ID    一个界面内的布局排序字段，升序，数字小的靠前
+	 * @apiSuccess {number} obj.LAYOUT_COLUMN_ID  表示组件在布局中的列ID，数值1表示最左侧，数值越大越靠右
+	 * @apiSuccess {object[]} obj.MODULE_LIST 一个布局内的装修控件集合
+	 * @apiSuccess {number} obj.MODULE_LIST.LAYOUT_PAGE_MODULE_ID 布局中的控件记录ID，唯一主键
+	 * @apiSuccess {number} obj.MODULE_LIST.MODULE_ID 控件本身ID，控件主表主键
+	 * @apiSuccess {string} obj.MODULE_LIST.MODULE_NAME 控件名称
+	 * @apiSuccess {string} obj.MODULE_LIST.SORT_ID 布局内的控件排序字段，升序，数字小的靠前
+	 * 
+	 */
+    @RequestMapping(value = "/page_layout", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryDecoratePlatformPageLayout(HttpServletRequest request){
+        return Transform.GetResult(decoratePlatformService.queryDecoratePlatformPageLayout(request));
+    }
+
+    /**
+     * @api {post} /{project_name}/decorate_platform/page_add  新增装修页面
+     
+     * @apiGroup decorate_platform
+     * @apiDescription 装修中心页面新增
+     * @apiVersion 0.0.1
+     *
+     * @apiParam {number}   template_id 	装修模板ID
+     * @apiParam {string}   page_name 		页面名称
+     * @apiParam {string}   layout_type		布局类型  0：通栏布局;1：单行布局;2：左窄右宽;3：左宽右窄
+     * @apiParam {string}   remark 页面备注
+     * 
+     * @apiSuccess {boolean}    state 接口获取数据是否成功.true:成功  false:失败
+     * @apiSuccess {string}     message 接口返回信息
+     * @apiSuccess {object}   obj 返回数据
+     * 
+     */
+    @RequestMapping(value = "/page_add", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet decoratePlatformPageAdd(HttpServletRequest request){
+    	ProcessResult pr = new ProcessResult();
+		try{
+			pr= decoratePlatformService.decoratePlatformPageAdd(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+       
+    }
+    /**
+     * @api {post} /{project_name}/decorate_platform/page_edit  编辑装修页面
+     
+     * @apiGroup decorate_platform
+     * @apiDescription 装修中心页面新增
+     * @apiVersion 0.0.1
+     *
+     * @apiParam {number}   page_id 					装修模板ID
+     * @apiParam {string}   [page_name] 				页面名称，传值则表示修改名称。
+     * @apiParam {string}   [page_state]				页面状态 ，传值则表示页面状态。  1.禁用   2,。启用
+     * @apiParam {string}   [is_delete] 				删除标志位，传值则表示删除界面
+     * @apiParam {string}   [page_background] 			页面背景信息，JSON字符串
+     * @apiParam {string}   [page_head_background] 		页面公共头部背景信息，JSON字符串
+     * @apiParam {string}   [aside_nav] 				侧边栏导航json
+     * @apiParam {string}   [bottom_nav] 				底部导航json
+     * @apiParam {string}   [top_nav] 					顶部导航json
+     * 
+     * @apiSuccess {boolean}    state 接口获取数据是否成功.true:成功  false:失败
+     * @apiSuccess {string}     message 接口返回信息
+     * @apiSuccess {object}   	obj 返回数据
+     * 
+     */
+    @RequestMapping(value = "/page_edit", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet decoratePlatformPageEdit(HttpServletRequest request){
+    	ProcessResult pr = new ProcessResult();
+    	try{
+    		pr= decoratePlatformService.decoratePlatformPageEdit(request);
+    	}catch(Exception e){
+    		pr.setMessage(e.getMessage());
+    		pr.setState(false);
+    	}
+    	return Transform.GetResult(pr); 
+    	
+    }
+    
+    /**
+     * @api {post} /{project_name}/decorate_platform/page_layout_add 新增页面布局
+     
+     * @apiGroup decorate_platform
+     * @apiDescription 装修中心页面布局新增
+     * @apiVersion 0.0.1
+     *
+     * @apiParam {number}   page_id 		页面id
+     * @apiParam {string}   layout_type		布局类型  0：通栏布局;1：单行布局;2：左窄右宽;3：左宽右窄
+     * 
+     * @apiSuccess {boolean}    state 新增结构.true:成功  false:失败
+     * @apiSuccess {string}     message 提示信息
+     * @apiSuccess {object[]}     obj 新增的布局信息
+     * @apiSuccess {number}       obj.ID   				布局ID
+     * @apiSuccess {number}       obj.PAGE_ID   		装修页面ID
+     * @apiSuccess {string} 	  obj.LAYOUT_TYPE    	布局类型 1：左窄右宽、2：左宽右窄；3：单行布局  4：通栏布局
+     * @apiSuccess {number}       obj.SORT_ID 			布局在页面内的排序字段，升序，数字越大越靠后
+     */
+    @RequestMapping(value = "/page_layout_add", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet decoratePlatformPageLayoutAdd(HttpServletRequest request){
+    	ProcessResult pr = new ProcessResult();
+		try{
+			pr= decoratePlatformService.decoratePlatformPageLayoutAdd(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+       
+    }
+    
+    /**
+     * @api {post} /{project_name}/decorate_platform/page_layout_delete 删除页面布局
+     
+     * @apiGroup decorate_platform
+     * @apiDescription 装修中心页面布局删除
+     * @apiVersion 0.0.1
+     *
+     * @apiParam {number}   	layout_id 页面布局Id
+     * 
+     * @apiSuccess {boolean}    state 是否删除成功.true:成功  false:失败
+     * @apiSuccess {string}     message 接口返回提示信息
+     * 
+     */
+    @RequestMapping(value = "/page_layout_delete", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet decoratePlatformPageLayoutDelete(HttpServletRequest request){
+    	ProcessResult pr = new ProcessResult();
+		try{
+			pr= decoratePlatformService.decoratePlatformPageLayoutDelete(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+       
+    }
+    
+    /**
+     * @api {post} /{project_name}/decorate_platform/page_layout_sort 页面布局排序
+     
+     * @apiGroup decorate_platform
+     * @apiDescription 装修中心页面布局排序
+     * @apiVersion 0.0.1
+     *
+     * @apiParam {number}   	layout_id 布局组件ID
+     * @apiParam {number}   	sort_id 新的排序位置
+     * 
+     * @apiSuccess {boolean}    state 排序是否成功.true:成功  false:失败
+     * @apiSuccess {string}     message 接口返回信息
+     * 
+     */
+    @RequestMapping(value = "/page_layout_sort", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet decoratePlatformPageLayoutSort(HttpServletRequest request){
+    	ProcessResult pr = new ProcessResult();
+		try{
+			pr= decoratePlatformService.decoratePlatformPageLayoutSort(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+       
+    }
+    
+    /**
+     * @api {post} /{project_name}/decorate_platform/page_layout_module_add 页面布局中添加组件
+     
+     * @apiGroup decorate_platform
+     * @apiDescription 装修中心页面布局中添加组件
+     * @apiVersion 0.0.1
+     *
+     * @apiParam {number}   page_id 页面ID
+     * @apiParam {number}   layout_id 页面布局id
+     * @apiParam {number}   module_id 页面布局组件id
+     * @apiParam {number}   layout_column_id 布局列表位置id 数字越小，距离左侧越近，最小数为1
+     * @apiParam {number}   SORT_ID 插入的新的布局组件排序位置
+     * 
+     * @apiSuccess {boolean}    state 接口获取数据是否成功.true:成功  false:失败
+     * @apiSuccess {string}     message 接口返回信息
+     * @apiSuccess {object[]}   obj 添加成功的控件记录信息
+     * @apiSuccess {number}     obj.ID 					页面布局中的控件记录主键ID
+     * @apiSuccess {number}     obj.PAGE_ID 			装修页面ID
+     * @apiSuccess {number}     obj.LAYOUT_ID 			装修页面中的布局ID
+     * @apiSuccess {number}     obj.LAYOUT_COLUMN_ID 	页面布局中的控件的位置信息，数字越大距离左侧越远，最小值为1
+     * @apiSuccess {number}     obj.SORT_ID 		页面布局中的控件的排序字段，升序，数字越大越靠后
+     * @apiSuccess {number}     obj.MODULE_ID 			添加成功的控件在控件表中的ID
+     * @apiSuccess {string}     obj.MODULE_NAME 		添加成功的控件在控件表中的控件名称
+     * 
+     */
+    @RequestMapping(value = "/page_layout_module_add", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet decoratePlatformPageLayoutModuleAdd(HttpServletRequest request){
+    	ProcessResult pr = new ProcessResult();
+		try{
+			pr= decoratePlatformService.decoratePlatformPageLayoutModuleAdd(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+    }
+    
+    /**
+     * @api {post} /{project_name}/decorate_platform/page_layout_module_delete 页面布局中删除组件
+      
+     * @apiGroup decorate_platform
+     * @apiDescription 装修中心页面布局组件删除
+     * @apiVersion 0.0.1
+     *
+     * @apiParam {number}   layout_module_id 布局组件Id
+     * 
+     * @apiSuccess {boolean}    state 接口获取数据是否成功.true:成功  false:失败
+     * @apiSuccess {string}     message 接口返回信息
+     * 
+     */
+    @RequestMapping(value = "/page_layout_module_delete", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet decoratePlatformPageLayoutModuleDelete(HttpServletRequest request){
+    	ProcessResult pr = new ProcessResult();
+		try{
+			pr= decoratePlatformService.decoratePlatformPageLayoutModuleDelete(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+    }
+    
+    /**
+     * @api {post} /{project_name}/decorate_platform/page_layout_module_edit  编辑装修组件内容
+     
+     * @apiGroup decorate_platform
+     * @apiDescription 装修中心页面布局组件编辑
+     * @apiVersion 0.0.1
+     *
+     * @apiParam {number}   layout_module_id    布局组件Id
+     * @apiParam {string}   [module_base_conf]   	组件基础配置项JSON,作为查询具体数据的参数
+     * @apiParam {string}   [module_extend_conf] 	界面扩展配置项，json格式，前端配置专用
+     * @apiParam {string}   [user_group_id] 	用户分组ID
+     *
+     * @apiSuccess {boolean}    state 接口获取数据是否成功.true:成功  false:失败
+     * @apiSuccess {string}     message 接口返回信息
+     * @apiSuccess {object}   obj 返回数据
+     * 
+     */
+    @RequestMapping(value = "/page_layout_module_edit", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet decoratePlatformPageLayoutModuleEdit(HttpServletRequest request){
+    	ProcessResult pr = new ProcessResult();
+		try{
+			pr= decoratePlatformService.decoratePlatformPageLayoutModuleEdit(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+    }
+    
+    /**
+     * @api {post} /{project_name}/decorate_platform/page_layout_module_sort  页面布局内的组件排序
+     
+     * @apiGroup decorate_platform
+     * @apiDescription 	装修中心页面布局组件排序
+     * @apiVersion 0.0.1
+     *
+     * @apiParam {number}   layout_module_id 布局组件ID
+     * @apiParam {number}   sort_id 新的排序位置
+     * 
+     * @apiSuccess {boolean}    state 接口获取数据是否成功.true:成功  false:失败
+     * @apiSuccess {string}     message 接口返回信息
+     * 
+     */
+    @RequestMapping(value = "/page_layout_module_sort", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet decoratePlatformPageLayoutModuleSort(HttpServletRequest request){
+    	ProcessResult pr = new ProcessResult();
+		try{
+			pr= decoratePlatformService.decoratePlatformPageLayoutModuleSort(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+    }
+    
+    /**
+	 * @api {post} /{project_name}/decorate_platform/product_list 查询商品列表
+	 * 
+	 * @apiGroup decorate_platform
+	 * @apiDescription 根据商品类型ID以及关键字查询商品列表
+	 * @apiVersion 0.0.1
+	 * 
+	 * @apiParam {number} site_id  站点ID，仅显示在当前站点可见的商品
+	 * @apiParam {number} pageIndex 初始页
+	 * @apiParam {number} pageSize 分页大小
+	 * @apiParam {number} [product_type_id] 商品分类ID
+	 * @apiParam {string} [keyword] 查询关键字，模糊匹配商品名称或者货号的
+	 * @apiParam {string} [state] 商品状态 （上架，下架，暂下架，待上架）
+	 *
+	 * @apiSuccess {boolean} state 接口获取数据是否成功.true:成功 false:失败
+	 * @apiSuccess {string} message 接口返回信息
+	 * @apiSuccess {obj[]} obj 商品列表集合
+	 * @apiSuccess {number} obj.ID 主键ID
+	 * @apiSuccess {number} obj.STATIONED_USER_ID 入驻商ID
+	 * @apiSuccess {number} obj.BRAND_ID 品牌ID
+	 * @apiSuccess {number} obj.PRODUCT_TYPE_ID 商品类别ID
+	 * @apiSuccess {string} obj.ITEMNUMBER 货号
+	 * @apiSuccess {string} obj.PRODUCT_NAME 商品名称,不允许重名
+	 * @apiSuccess {number} obj.YEAR 年份
+	 * @apiSuccess {string} obj.SEASON 季节
+	 * @apiSuccess {string} obj.SEX 性别（男童、女童、中性）
+	 * @apiSuccess {string} obj.CREATE_DATE 创建日期
+	 * @apiSuccess {number} obj.CREATE_USER_ID 创建人
+	 * @apiSuccess {string} obj.UPDATE_DATE 编辑日期
+	 * @apiSuccess {number} obj.UPDATE_USER_ID 编辑人ID
+	 * @apiSuccess {string} obj.APPROVAL_DATE 审批日期
+	 * @apiSuccess {number} obj.APPROVAL_USER_ID 审批人ID
+	 * @apiSuccess {string} obj.UNIT 计量单位
+	 * @apiSuccess {string} obj.PRODUCT_IMG_URL 商品主图路径
+	 * @apiSuccess {string} obj.PRODUCT_STATE 商品状态
+	 * @apiSuccess {number} obj.IS_OUTSTOCK 是否支持缺货订购（0：不支持，1：支持）
+	 * @apiSuccess {number} obj.IS_OUTSTOCK_DAY 备货周期
+	 * @apiSuccess {string} obj.PRODUCT_CONTENT 商品详情
+	 * @apiSuccess {string} obj.LAST_UP_DATE 上新日期
+	 * @apiSuccess {number} obj.UP_PERIOD 上新周期（默认5天）
+	 * @apiSuccess {string} obj.STATE 上架状态  
+	 * @apiSuccess {number} obj.DISTRICT_TEMPLET_ID 区域模板ID
+	 * @apiSuccess {string} obj.PRODUCT_PRIZE_COST  销售价格
+	 * 
+	 */
+    @RequestMapping(value = "/product_list", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryProductList(HttpServletRequest request){
+    	ProcessResult pr = new ProcessResult();
+		try{
+			pr= productService.queryProductListByKeyWord(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+    }
+    
+    
+    /**
+	 * @api {post} /{project_name}/decorate_platform/product_by_itemnumbers 根据商品货号获取商品信息
+	 * 
+	 * @apiGroup decorate_platform
+	 * @apiDescription 根据商品货号获取商品信息
+	 * @apiVersion 0.0.1
+	 * 
+	 * @apiParam {number} itemnumbers 商品货号集合,对个货号则以英文逗号分隔
+	 * 
+	 * @apiSuccess {boolean} state 接口获取数据是否成功.true:成功 false:失败
+	 * @apiSuccess {string} message 接口返回信息
+	 * @apiSuccess {obj[]} obj 商品列表集合
+	 * @apiSuccess {number} obj.ID 主键ID
+	 * @apiSuccess {number} obj.STATIONED_USER_ID 入驻商ID
+	 * @apiSuccess {number} obj.BRAND_ID 品牌ID
+	 * @apiSuccess {number} obj.PRODUCT_TYPE_ID 商品类别ID
+	 * @apiSuccess {string} obj.ITEMNUMBER 货号
+	 * @apiSuccess {string} obj.PRODUCT_NAME 商品名称,不允许重名
+	 * @apiSuccess {number} obj.YEAR 年份
+	 * @apiSuccess {string} obj.SEASON 季节
+	 * @apiSuccess {string} obj.SEX 性别（男童、女童、中性）
+	 * @apiSuccess {string} obj.CREATE_DATE 创建日期
+	 * @apiSuccess {number} obj.CREATE_USER_ID 创建人
+	 * @apiSuccess {string} obj.UPDATE_DATE 编辑日期
+	 * @apiSuccess {number} obj.UPDATE_USER_ID 编辑人ID
+	 * @apiSuccess {string} obj.APPROVAL_DATE 审批日期
+	 * @apiSuccess {number} obj.APPROVAL_USER_ID 审批人ID
+	 * @apiSuccess {string} obj.UNIT 计量单位
+	 * @apiSuccess {string} obj.PRODUCT_IMG_URL 商品主图路径
+	 * @apiSuccess {string} obj.PRODUCT_STATE 商品状态
+	 * @apiSuccess {number} obj.IS_OUTSTOCK 是否支持缺货订购（0：不支持，1：支持）
+	 * @apiSuccess {number} obj.IS_OUTSTOCK_DAY 备货周期
+	 * @apiSuccess {string} obj.PRODUCT_CONTENT 商品详情
+	 * @apiSuccess {string} obj.LAST_UP_DATE 上新日期
+	 * @apiSuccess {number} obj.UP_PERIOD 上新周期（默认5天）
+	 * @apiSuccess {string} obj.STATE 上架状态  
+	 * @apiSuccess {number} obj.DISTRICT_TEMPLET_ID 区域模板ID
+	 * @apiSuccess {string} obj.PRODUCT_PRIZE_COST  销售价格
+	 * 
+	 */
+    @RequestMapping(value = "/product_by_itemnumbers", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryProductByItemnumbers(HttpServletRequest request){
+    	ProcessResult pr = new ProcessResult();
+		try{
+			pr= productService.queryProductByItemnumbers(request);
+		}catch(Exception e){
+			pr.setMessage(e.getMessage());
+			pr.setState(false);
+		}
+		return Transform.GetResult(pr); 
+    }
+    /**
+     * @api {post} /{project_name}/decorate_platform/set_template_homepage  将一个装修页面设置为首页
+     * 
+     * @apiGroup decorate_platform
+     * @apiDescription 将一个装修模板设置为首页
+     * @apiVersion 0.0.1
+     * 
+     * @apiParam {number} page_id  装修页面ID
+     * 
+     * @apiSuccess {boolean} state 接口获取数据是否成功.true:成功 false:失败
+     * @apiSuccess {string} message 接口返回信息
+     * 
+     */
+    @RequestMapping(value = "/set_template_homepage", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet setTemplateHomepage(HttpServletRequest request){
+    	ProcessResult pr = new ProcessResult();
+    	try{
+    		pr= decoratePlatformService.setTemplateHomepage(request);
+    	}catch(Exception e){
+    		pr.setMessage(e.getMessage());
+    		pr.setState(false);
+    	}
+    	return Transform.GetResult(pr); 
+    }
+    /**
+     * @api {post} /{project_name}/decorate_platform/page_details 获取装修页面记录详情
+     * 
+     * @apiGroup decorate_platform
+     * @apiDescription 获取装修中心页面详情，主要为了获得页面的背景，头部背景信息
+     * @apiVersion 0.0.1
+     * 
+     * @apiParam {number} page_id   装修页面ID
+     * @apiParam {string} [type]  	需要获取的参数类型,不传递则获取全部信息，可选参数如下
+     * 								<p>1  : 获取PAGE_CONTENT，即发布后页面后,由布局表以及布局组建表信息组合得到的JSON</p>
+     * 								<p>2  : 获取PAGE_BACKGROUND，即页面背景信息，JSON字符串</p>
+     * 								<p>3  : 获取PAGE_HEAD_BACKGROUND，即页面公共头部背景信息，JSON字符串</p>
+     * 								<p>4  : 获取ASIDE_NAV，即侧导航json字符串</p>
+     * 								<p>5  : 获取BOTTOM_NAV，底部导航json字符串</p>
+     * 								<p>6  : 获取TOP_NAV，底部导航json字符串</p>
+     * @apiSuccess {boolean} state 接口获取数据是否成功.true:成功 false:失败
+     * @apiSuccess {string} message 接口返回信息
+     * @apiSuccess {obj[]} obj 装修页面详情
+     * @apiSuccess {number} obj.ID 					装修页面ID
+     * @apiSuccess {number}	obj.SITE_ID 			装修页面所属站点ID
+     * @apiSuccess {number}	obj.TEMPLATE_ID 		装修页面所属装修模板ID
+     * @apiSuccess {string}	obj.PAGE_NAME 			装修页面名称
+     * @apiSuccess {string}	obj.PAGE_NAME 			装修页面名称
+     * @apiSuccess {char}	obj.PAGE_STATE 			装修页面状态； 页面状态   1（停用）2（启用）
+     * @apiSuccess {char}	obj.HOME_PAGE_FLAG 		是否首页 1.普通页    2.首页   3.商品列表页  同时只允许一个首页
+     * @apiSuccess {string}	obj.REMARK 				备注信息
+     * @apiSuccess {string}	obj.CREATE_DATE 		创建时间 格式yyyy-MM-dd HH:mm:ss
+     * @apiSuccess {number}	obj.CREATE_USER_ID 		创建人ID
+     * @apiSuccess {string}	obj.UPDATE_DATE 		更新时间 格式yyyy-MM-dd HH:mm:ss
+     * @apiSuccess {number}	obj.UPDATE_USER_ID 		更新人ID
+     * @apiSuccess {string}	obj.CREATE_USER_REALNAME 		创建人姓名
+     * @apiSuccess {char}	obj.SUPPORT_FLAG 				页面支持设备;   1:PC，2:微信
+     * 
+     * @apiSuccess {string}	[obj.PAGE_CONTENT] 				页面信息JSON字符串
+     * @apiSuccess {string}	[obj.PAGE_BACKGROUND] 			页面背景信息，JSON字符串
+     * @apiSuccess {string}	[obj.PAGE_HEAD_BACKGROUND] 		页面公共头部背景信息，JSON字符串
+     * @apiSuccess {string}	[obj.ASIDE_NAV] 				页面侧导航json字符串
+     * @apiSuccess {string}	[obj.BOTTOM_NAV] 				页面底部导航json字符串
+     * @apiSuccess {string}	[obj.TOP_NAV] 					顶部导航json字符串
+     * 
+     */
+    @RequestMapping(value = "/page_details", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryPageDetailById(HttpServletRequest request){
+    	ProcessResult pr = new ProcessResult();
+    	try{
+    		pr= decoratePlatformService.queryPageDetailById(request);
+    	}catch(Exception e){
+    		pr.setMessage(e.getMessage());
+    		pr.setState(false);
+    	}
+    	return Transform.GetResult(pr); 
+    }
+    /**
+     * @api {post} /{project_name}/decorate_platform/page_json 获取商品列表页面的参数json
+     * 
+     * @apiGroup decorate_platform
+     * @apiDescription 获取商品列表页面的参数json
+     * @apiVersion 0.0.1
+     * 
+     * @apiParam {number} page_id  装修页面ID
+     * 
+     * @apiSuccess {boolean} state 接口获取数据是否成功.true:成功 false:失败
+     * @apiSuccess {string} message 接口返回信息
+     * 
+     */
+    @RequestMapping(value = "/page_json", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryPageDetailJSONById(HttpServletRequest request){
+    	ProcessResult pr = new ProcessResult();
+    	try{
+    		pr= decoratePlatformService.queryPageDetailJSONById(request);
+    	}catch(Exception e){
+    		pr.setMessage(e.getMessage());
+    		pr.setState(false);
+    	}
+    	return Transform.GetResult(pr); 
+    }
+
+	/**
+	 * @api {post} /{project_name}/decorate_platform/user_list 装修用户信息
+	 * @apiGroup decorate_platform
+	 * @apiName user_list
+	 * @apiDescription 通过站点获取有预览权限的用户列表
+	 * @apiVersion 0.0.1
+	 *
+	 * @apiParam {number} site_id  			        站点ID
+	 *
+	 * @apiSuccess {boolean} state                  接口获取数据是否成功.true:成功  false:失败
+	 * @apiSuccess {string} message                 接口返回信息.
+	 * @apiSuccess {Object[]} obj                   装修用户信息
+	 * @apiSuccess {number} obj.ID 				    用户ID
+	 * @apiSuccess {string} obj.LOGIN_NAME 	        用户名
+	 * @apiSuccess {string} obj.USER_MANAGE_NAME 	用户姓名
+	 */
+	@RequestMapping(value = "/user_list", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet queryDecorateUserListBySiteId(HttpServletRequest request) {
+		return Transform.GetResult(decoratePlatformService.queryDecorateUserListBySiteId(request));
+	}
+
+	/**
+	 * @api {post} /{project_name}/decorate_platform/preview_check 装修预览
+	 * @apiGroup decorate_platform
+	 * @apiName decorate_platform_preview_check
+	 * @apiDescription 装修预览
+	 * @apiVersion 0.0.1
+	 *
+	 * @apiParam {number} user_name  			    用户名（与user_id一样）
+	 * @apiParam {number} page_id  			        页面ID
+	 * @apiParam {number} type  			        预览类型（1:PC，2:微信）
+	 *
+	 * @apiSuccess {boolean} state                  接口获取数据是否成功.true:成功  false:失败
+	 * @apiSuccess {string} message                 接口返回信息.
+	 * @apiSuccess {Object[]} obj                   装修预览集合
+	 * @apiSuccess {Object[]} obj.user_name         用户名（与user_id一样）
+	 * @apiSuccess {Object[]} obj.page_id           页面ID
+	 * @apiSuccess {Object[]} obj.type              预览类型（1:PC，2:微信）
+	 */
+	@RequestMapping(value = "/preview_check", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet decoratePreviewCheck(HttpServletRequest request) {
+		return Transform.GetResult(decoratePlatformService.decoratePreviewCheck(request));
+	}
+}

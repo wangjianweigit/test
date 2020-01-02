@@ -1,0 +1,197 @@
+package com.tk.oms.analysis.service;
+
+import com.tk.oms.member.dao.DistributorManageDao;
+import com.tk.sys.config.EsbConfig;
+import com.tk.sys.util.*;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+import java.util.*;
+
+/**
+ * Copyright (c), 2018,  TongKu
+ * FileName : BasicSaleDataService
+ *
+ * @author: zhengfy
+ * @version: 1.00
+ * @date: 2018/9/6
+ */
+@Service("BasicSaleDataService")
+public class BasicSaleDataService {
+
+    @Resource
+    private DistributorManageDao distributorManageDao;
+    @Value("${retail_service_url}")
+    private String retail_service_url;//远程调用PHP新零售接口
+
+
+
+    /**
+     * 获取门店列表数据
+     * @param request
+     * @return
+     */
+    public ProcessResult queryStoreList(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        List<Map<String, Object>> list; //经销商列表
+        Map<String, Object> retMap = new HashMap<String, Object>();
+        Map<String, Object> paramsMap = new HashMap<String, Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            Map<String,Object> params = (Map<String,Object>)Transform.GetPacket(json, Map.class);
+            if(StringUtils.isEmpty(params.get("ACCOUNT"))) {
+                list = this.distributorManageDao.queryDistributorListNoPage(params);
+                if (list.size() == 0) {
+                    pr.setState(true);
+                    return pr;
+                } else {
+                    String account_ids = "";
+                    for (int i = 0; i < list.size(); i++) {
+                        if (i == list.size() - 1) {
+                            account_ids += list.get(i).get("ID");
+                        } else {
+                            account_ids += list.get(i).get("ID") + ",";
+                        }
+                    }
+
+                    paramsMap.put("ACCOUNT", account_ids.split(","));
+                }
+            } else {
+                paramsMap.put("ACCOUNT", params.get("ACCOUNT"));
+            }
+            Map<String, Object> storeMap= (Map<String, Object>) queryForPost(paramsMap,retail_service_url + "Order/storeList");
+            if (Boolean.parseBoolean(storeMap.get("state").toString())) {
+                if(!StringUtils.isEmpty(storeMap.get("obj"))) {
+                    retMap.put("store", storeMap.get("obj"));
+                }
+            } else {
+                pr.setMessage("获取门店列表失败");
+                pr.setState(false);
+                return pr;
+            }
+
+            Map<String, Object> staffMap= (Map<String, Object>) queryForPost(paramsMap,retail_service_url + "Order/staffList");
+            if (Boolean.parseBoolean(staffMap.get("state").toString())) {
+                if(!StringUtils.isEmpty(staffMap.get("obj"))) {
+                    retMap.put("staff", staffMap.get("obj"));
+                }
+            } else {
+                pr.setMessage("获取员工列表失败");
+                pr.setState(false);
+                return pr;
+            }
+            pr.setState(true);
+            pr.setMessage("获取数据成功");
+            pr.setObj(retMap);
+
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+    }
+
+    /**
+     * 获取销售基础数据列表
+     * @param request
+     * @return
+     */
+    public GridResult queryBasicSaleDataForPage(HttpServletRequest request) {
+        GridResult gr = new GridResult();
+        List<Map<String, Object>> list; //经销商列表
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            Map<String,Object> params = (Map<String,Object>)Transform.GetPacket(json, Map.class);
+            GridResult pageParamResult = PageUtil.handlePageParams(params);
+            if(pageParamResult!=null){
+                return pageParamResult;
+            }
+            params.put("index", params.get("pageIndex"));
+            if(StringUtils.isEmpty(params.get("ACCOUNT"))) {
+                list = this.distributorManageDao.queryDistributorListNoPage(params);
+                if (list.size() == 0) {
+                    gr.setState(true);
+                    return gr;
+                } else {
+                    String account_ids = "";
+                    for (int i = 0; i < list.size(); i++) {
+                        if (i == list.size() - 1) {
+                            account_ids += list.get(i).get("ID");
+                        } else {
+                            account_ids += list.get(i).get("ID") + ",";
+                        }
+                    }
+
+                    params.put("ACCOUNT", account_ids.split(","));
+                }
+            }
+            Map<String, Object> dataMap= (Map<String, Object>) queryForPost(params,retail_service_url + "Order/basicSaleData");
+
+            if (Boolean.parseBoolean(dataMap.get("state").toString())) {
+                gr.setState(true);
+                if(!StringUtils.isEmpty(dataMap.get("obj"))) {
+                    Map<String, Object> objMap = (Map<String, Object>) dataMap.get("obj");
+
+                    if(Integer.parseInt(objMap.get("total").toString()) == 0) {
+                        gr.setMessage("无数据");
+                        return gr;
+                    }
+
+                    List<Map<String, Object>> dataList = (List<Map<String,Object>>) objMap.get("data");
+                    List<Map<String, Object>> userList = distributorManageDao.queryUserByAccount(dataList);
+                    if(userList.size() > 0) {
+                        for (int j = 0; j < dataList.size(); j++) {
+                            for(int i = 0; i < userList.size(); i++) {
+                                if (userList.get(i).get("ID").toString().equals(dataList.get(j).get("ACCOUNT").toString())) {
+                                    dataList.get(j).put("YWJL_USER_NAME", userList.get(i).get("YWJL_USER_NAME"));
+                                    dataList.get(j).put("YWY_USER_NAME", userList.get(i).get("YWY_USER_NAME"));
+                                    dataList.get(j).put("MD_NAME", userList.get(i).get("MD_NAME"));
+                                    dataList.get(j).put("PROVINCE_NAME", userList.get(i).get("PROVINCE_NAME"));
+                                    dataList.get(j).put("CITY_NAME", userList.get(i).get("CITY_NAME"));
+                                    dataList.get(j).put("SITE_NAME", userList.get(i).get("SITE_NAME"));
+                                    dataList.get(j).put("USER_MANAGE_NAME", userList.get(i).get("USER_MANAGE_NAME"));
+                                    continue;
+                                }
+                            }
+                        }
+
+                        gr.setObj(dataList);
+                        gr.setMessage("获取销售基础数据成功");
+                        gr.setTotal(Integer.parseInt(objMap.get("total").toString()));
+                    }
+                }
+            } else {
+                gr.setMessage("获取销售基础数据失败");
+                gr.setState(false);
+            }
+        } catch (Exception e) {
+            gr.setState(false);
+            gr.setMessage(e.getMessage());
+        }
+        return gr;
+    }
+
+
+
+
+
+    public Object queryForPost(Map<String,Object> obj,String url) throws Exception{
+        String params = "";
+        if(obj != null){
+            Packet packet = Transform.GetResult(obj, EsbConfig.ERP_FORWARD_KEY_NAME);//加密数据
+            params = Jackson.writeObject2Json(packet);//对象转json、字符串
+        }
+        //发送至服务端
+        String json = HttpClientUtil.post(url, params,30000);
+        return Transform.GetPacketJzb(json,Map.class);
+    }
+
+
+
+}
+
+    
+    

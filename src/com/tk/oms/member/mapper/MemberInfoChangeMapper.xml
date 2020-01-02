@@ -1,0 +1,736 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.member.dao.MemberInfoChangeDao">
+    <!-- 查询用户资料变更审批列表 -->
+	<select id="queryMemberInfoApprovalList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+			select a.*,rownum num from (
+	              select
+	              	   tuic.id,
+	              	   tuic.user_id,
+	              	   tuic.approval_state,
+	              	   tuic.rejected_reason,
+	                   ui.login_name,
+	                   ui.user_manage_name,
+	                   ui.user_manage_mobilephone,
+	                   (select user_realname from tbl_sys_user_info where id=ui.referee_user_id) as referee_user_realname,
+	                   (select user_realname from tbl_sys_user_info where id=ui.market_supervision_user_id) as market_supervision_user_realna,
+	                   to_char(tuic.create_date,'yyyy-mm-dd hh24:mi:ss') as create_date
+	               from tbl_user_info_change tuic, tbl_user_info ui
+	               <where>
+	                   tuic.user_id = ui.user_name
+	                   and tuic.type=1
+	                   <if test="login_name!=null and login_name!='' ">
+	                       and ui.login_name like '%'||#{login_name,jdbcType=VARCHAR}||'%'
+	                   </if>
+	                   <if test="user_manage_name!=null and user_manage_name!='' ">
+	                       and ui.user_manage_name =#{user_manage_name,jdbcType=VARCHAR}
+	                   </if>
+	                   <if test="approval_state != null">
+							and tuic.approval_state IN
+				                <foreach item="item" collection="approval_state" open="(" separator="," close=")">
+									#{item}
+								</foreach>
+						</if>
+	                   <if test="public_user_type != null and public_user_type == 2">
+	                       and EXISTS (SELECT 1 FROM TBL_SYS_USER_STORE TSUS WHERE TSUS.STORE_ID = ui.STORE_ID AND TSUS.USER_ID = #{public_user_id,jdbcType=INTEGER})
+	                   </if>
+	                   <if test="public_user_type != null and public_user_type == 3">
+	                       and ui.referee_user_id = #{public_user_id,jdbcType=INTEGER}
+	                   </if>
+	                   <if test="public_user_type != null and public_user_type == 4">
+	                       and ui.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+	                   </if>
+	                   <if test="public_user_type != null and public_user_type == 5">
+	                       and EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID = ui.STORE_ID AND TSI.SHOPKEEPER_USER_ID = #{public_user_id,jdbcType=INTEGER})
+	                   </if>
+	                   <if test="public_user_type != null and public_user_type == 6">
+	                       and EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUI WHERE TSUI.STORE_ID = ui.STORE_ID AND TSUI.USER_ID = #{public_user_id,jdbcType=INTEGER})
+	                   </if>
+	                   <if test="public_user_type != null and public_user_type == 9">
+	                       and EXISTS(SELECT 1 FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.USER_TYPE = 4
+	                           AND TSUI.ORGANIZATION_ID IN (
+	                           SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+	                           START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER}
+	                           CONNECT BY PRIOR ID = PARENT_ID
+	                       )
+	                       AND TSUI.id = ui.market_supervision_user_id)
+	                   </if>
+	               </where>
+	               order by create_date desc
+	            )a where ROWNUM  &lt;= #{end_rownum,jdbcType=INTEGER}
+	      )where num &gt;#{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!-- 查询用户资料变更审批列表记录数 -->
+    <select id="queryMemberInfoApprovalCount" parameterType="java.util.Map" resultType="int">
+        select count(1)
+          from tbl_user_info_change tuic, tbl_user_info ui
+          <where>
+              tuic.user_id = ui.user_name
+              and tuic.type=1
+              <if test="login_name!=null and login_name!='' ">
+                  and ui.login_name like '%'||#{login_name,jdbcType=VARCHAR}||'%'
+              </if>
+              <if test="user_manage_name!=null and user_manage_name!='' ">
+                  and ui.user_manage_name =#{user_manage_name,jdbcType=VARCHAR}
+              </if>
+              <if test="approval_state != null">
+					and tuic.approval_state IN
+		              <foreach item="item" collection="approval_state" open="(" separator="," close=")">
+							#{item}
+					  </foreach>
+			  </if>
+              <if test="public_user_type != null and public_user_type == 2">
+                  and EXISTS (SELECT 1 FROM TBL_SYS_USER_STORE TSUS WHERE TSUS.STORE_ID = ui.STORE_ID AND TSUS.USER_ID = #{public_user_id,jdbcType=INTEGER})
+              </if>
+              <if test="public_user_type != null and public_user_type == 3">
+                  and ui.referee_user_id = #{public_user_id,jdbcType=INTEGER}
+              </if>
+              <if test="public_user_type != null and public_user_type == 4">
+                  and ui.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+              </if>
+              <if test="public_user_type != null and public_user_type == 5">
+                  and EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID = ui.STORE_ID AND TSI.SHOPKEEPER_USER_ID = #{public_user_id,jdbcType=INTEGER})
+              </if>
+              <if test="public_user_type != null and public_user_type == 6">
+                  and EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUI WHERE TSUI.STORE_ID = ui.STORE_ID AND TSUI.USER_ID = #{public_user_id,jdbcType=INTEGER})
+              </if>
+              <if test="public_user_type != null and public_user_type == 9">
+                  and EXISTS(SELECT 1 FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.USER_TYPE = 4
+                      AND TSUI.ORGANIZATION_ID IN (
+                      SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+                      START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER}
+                      CONNECT BY PRIOR ID = PARENT_ID
+                  )
+                  AND TSUI.id = ui.market_supervision_user_id)
+              </if>
+          </where>
+    </select>
+    
+    <!--根据用户ID查询用户变更信息-->
+	<select id="queryMemberInfoChangeById" parameterType="java.util.Map"  resultType="java.util.Map">
+		SELECT
+		  ID,
+		  USER_ID,           
+		  USER_MANAGE_TELEPHONE,                
+		  USER_MANAGE_WEIXIN,                         
+		  USER_MANAGE_QQ,                               
+		  USER_MANAGE_EMAIL,                          
+		  USER_MANAGE_CURRENT_ADDRESS,  
+		  USER_COMPANY_NAME,                       
+		  USER_COMPANY_CORPORATION,
+		  USER_COMPANY_COMMENT,         
+		  BUSINESS_LICENSE_NUMBER, 
+		  USER_BUSINESS_LICENCE_IMGURL,             
+		  SHOP_WEBSITE,                                    
+		  SHOP_NAME,                                      
+		  PLATFORM,                                            
+		  MAIN_CATEGORY,                                 
+		  SHOP_PHOTO,                                    
+		  APPROVAL_STATE,                                
+		  REJECTED_REASON,                                  
+		  TO_CHAR(CREATE_DATE,'yyyy-mm-dd hh24:mi:ss') AS CREATE_DATE 
+		FROM TBL_USER_INFO_CHANGE WHERE id = #{id,jdbcType=INTEGER}
+		AND TYPE=1
+	</select>
+	
+	<!--查询用户资料变更详情(待审和驳回状态)-->
+	<select id="queryMemberInfoChangeDetail" parameterType="java.util.Map"  resultType="java.util.Map">
+		SELECT
+		  	tui.id,
+			tui.user_name,
+			tui.login_name,
+			tui.user_pwd,
+			tui.user_state,
+			tui.user_resource,
+			tui.create_user_id,
+			to_char(tui.create_date,'yyyy-mm-dd hh24:mi:ss')  as  create_date,
+			tui.edit_user_id,
+			to_char(tui.edit_date,'yyyy-mm-dd hh24:mi:ss')  as  edit_date,
+			tui.approval_user_id,
+			to_char(tui.approval_date,'yyyy-mm-dd hh24:mi:ss')  as  approval_date,
+			tui.user_create_ip,
+			tui.user_login_count,
+			to_char(tui.user_last_login_date,'yyyy-mm-dd hh24:mi:ss')  as  user_last_login_date,
+			tui.user_last_login_ip,
+			tui.user_head_imgurl,
+			tui.user_manage_name,
+			tui.user_manage_sex,
+			tui.user_manage_cardid,
+			tui.user_manage_cardid_file1,
+			tui.user_manage_cardid_file2,
+			tui.user_manage_current_address as o_user_manage_current_address,
+			tui.user_manage_telephone as o_user_manage_telephone,
+			tui.user_manage_mobilephone,
+			tui.user_manage_weixin as o_user_manage_weixin,
+			tui.user_manage_qq as o_user_manage_qq,
+			tui.user_manage_email as o_user_manage_email,
+			tui.user_company_name as o_user_company_name,
+			tui.user_company_corporation as o_user_company_corporation,
+			tui.user_company_telephone as o_user_company_telephone,
+			tui.user_company_type,
+			case tui.user_company_type when 3 then '批发' when 4 then '网络营销' when 5 then '实体营销' when 6 then '其它' end user_company_type_name,
+			tui.user_company_address_max,
+			tui.user_company_address_province,
+			tui.user_company_address_city,
+			tui.user_company_address_county,
+			tui.user_company_address_deails,
+			tui.user_company_comment as o_user_company_comment,
+			tui.referee_user_id,
+			tui.referee_user_realname,
+			tui.market_supervision_user_id,
+			tui.market_supervision_user_realna,
+			tui.store_id,
+			tui.store_name,
+			tui.openid,
+			to_char(tui.last_update_time,'yyyy-mm-dd hh24:mi:ss')  as  last_update_time,
+			tui.distribution_state,
+			tui.issuing_grade_id,
+			tui.user_business_licence_imgurl,
+			tui.shop_website as o_shop_website,
+			tui.shop_name as o_shop_name,
+			tui.platform as o_platform,
+			tui.main_category as o_main_category,
+			tui.shop_photo as o_shop_photo,
+			to_char(tui.unbunding_date,'yyyy-mm-dd hh24:mi:ss')  as  unbunding_date,
+			tui.site_id,
+			tui.business_license_number as o_business_license_number,
+			tui.user_company_location_address,
+			tui.user_control_store_name, 
+			tui.user_store_address_province, 
+			tui.user_store_address_city,
+			tui.user_store_address_county, 
+			tui.user_store_address_deails,
+			tui.user_store_location_address,
+			tui.user_type,
+			tui.partner_user_id,
+			tui.partner_user_realna,
+			tui.supervisor_user_id,
+			tui.supervisor_user_realna,
+			tui.commission_rate,
+			tui.store_user_type,
+			tui.user_logistics_template_id,
+			tui.recommend_user_id,
+			(select name from tbl_dic_region where id = tui.user_company_address_province)
+          		||(select name from tbl_dic_region where id = tui.user_company_address_city )
+           		||(select name from tbl_dic_region where id = tui.user_company_address_county)
+           		||tui.user_company_address_deails as company_address,
+            (select name from tbl_dic_region where id = tui.user_store_address_province)
+          		||(select name from tbl_dic_region where id = tui.user_store_address_city )
+           		||(select name from tbl_dic_region where id = tui.user_store_address_county)
+           		||tui.user_store_address_deails as control_store_address,
+			tuic.user_manage_telephone,
+			tuic.user_manage_weixin,
+			tuic.user_manage_qq,
+			tuic.user_manage_email,
+			tuic.user_manage_current_address,
+			tuic.user_company_name,
+			tuic.user_company_corporation,
+			tuic.user_company_comment,
+			tuic.business_license_number,
+			tuic.shop_website,
+			tuic.shop_name,
+			tuic.platform,
+			tuic.main_category,
+			tuic.shop_photo
+		from tbl_user_info tui,tbl_user_info_change tuic
+		 where tui.user_name=tuic.user_id 
+		 and tuic.id= #{id,jdbcType=INTEGER}
+		 and tuic.type=1
+	</select>
+	
+	<!--查询用户资料变更详情(已审核状态)-->
+	<select id="queryMemberInfoChangeApprovalDetail" parameterType="java.util.Map"  resultType="java.util.Map">
+		SELECT
+		  	tui.id,
+			tui.user_name,
+			tui.login_name,
+			tui.user_pwd,
+			tui.user_state,
+			tui.user_resource,
+			tui.create_user_id,
+			to_char(tui.create_date,'yyyy-mm-dd hh24:mi:ss')  as  create_date,
+			tui.edit_user_id,
+			to_char(tui.edit_date,'yyyy-mm-dd hh24:mi:ss')  as  edit_date,
+			tui.approval_user_id,
+			to_char(tui.approval_date,'yyyy-mm-dd hh24:mi:ss')  as  approval_date,
+			tui.user_create_ip,
+			tui.user_login_count,
+			to_char(tui.user_last_login_date,'yyyy-mm-dd hh24:mi:ss')  as  user_last_login_date,
+			tui.user_last_login_ip,
+			tui.user_head_imgurl,
+			tui.user_manage_name,
+			tui.user_manage_sex,
+			tui.user_manage_cardid,
+			tui.user_manage_cardid_file1,
+			tui.user_manage_cardid_file2,
+			tui.user_manage_current_address,
+			tui.user_manage_telephone,
+			tui.user_manage_mobilephone,
+			tui.user_manage_weixin,
+			tui.user_manage_qq,
+			tui.user_manage_email,
+			tui.user_company_name,
+			tui.user_company_corporation,
+			tui.user_company_telephone,
+			tui.user_company_type,
+			case tui.user_company_type when 3 then '批发' when 4 then '网络营销' when 5 then '实体营销' when 6 then '其它' end user_company_type_name,
+			tui.user_company_address_max,
+			tui.user_company_address_province,
+			tui.user_company_address_city,
+			tui.user_company_address_county,
+			tui.user_company_address_deails,
+			tui.user_company_comment,
+			tui.referee_user_id,
+			tui.referee_user_realname,
+			tui.market_supervision_user_id,
+			tui.market_supervision_user_realna,
+			tui.store_id,
+			tui.store_name,
+			tui.openid,
+			to_char(tui.last_update_time,'yyyy-mm-dd hh24:mi:ss')  as  last_update_time,
+			tui.distribution_state,
+			tui.issuing_grade_id,
+			tui.user_business_licence_imgurl,
+			tui.shop_website,
+			tui.shop_name,
+			tui.platform,
+			tui.main_category,
+			tui.shop_photo,
+			to_char(tui.unbunding_date,'yyyy-mm-dd hh24:mi:ss')  as  unbunding_date,
+			tui.site_id,
+			tui.business_license_number,
+			tui.user_company_location_address,
+			tui.user_control_store_name, 
+			tui.user_store_address_province, 
+			tui.user_store_address_city,
+			tui.user_store_address_county, 
+			tui.user_store_address_deails,
+			tui.user_store_location_address,
+			tui.user_type,
+			tui.partner_user_id,
+			tui.partner_user_realna,
+			tui.supervisor_user_id,
+			tui.supervisor_user_realna,
+			tui.commission_rate,
+			tui.store_user_type,
+			tui.user_logistics_template_id,
+			tui.recommend_user_id,
+			(select name from tbl_dic_region where id = tui.user_company_address_province)
+          		||(select name from tbl_dic_region where id = tui.user_company_address_city )
+           		||(select name from tbl_dic_region where id = tui.user_company_address_county)
+           		||tui.user_company_address_deails as company_address,
+            (select name from tbl_dic_region where id = tui.user_store_address_province)
+          		||(select name from tbl_dic_region where id = tui.user_store_address_city )
+           		||(select name from tbl_dic_region where id = tui.user_store_address_county)
+           		||tui.user_store_address_deails as control_store_address,
+			tuic.user_manage_telephone as o_user_manage_telephone,
+			tuic.user_manage_weixin as o_user_manage_weixin,
+			tuic.user_manage_qq as o_user_manage_qq,
+			tuic.user_manage_email as o_user_manage_email,
+			tuic.user_manage_current_address as o_user_manage_current_address,
+			tuic.user_company_name as o_user_company_name,
+			tuic.user_company_corporation as o_user_company_corporation,
+			tuic.user_company_comment as o_user_company_comment,
+			tuic.business_license_number as o_business_license_number,
+			tuic.shop_website as o_shop_website,
+			tuic.shop_name as o_shop_name,
+			tuic.platform as o_platform,
+			tuic.main_category as o_main_category,
+			tuic.shop_photo as o_shop_photo
+		from tbl_user_info tui,tbl_user_info_change tuic
+		 where tui.user_name=tuic.user_id 
+		 and tuic.old_change_id= #{id,jdbcType=INTEGER}
+		 and tuic.type=2
+	</select>
+	
+	<!-- 存储原会员资料信息 -->
+    <insert id="insertOldMemberInfoChange" parameterType="java.util.Map">
+        INSERT INTO TBL_USER_INFO_CHANGE(
+            ID,
+            USER_ID,
+            USER_MANAGE_TELEPHONE,                
+	  		USER_MANAGE_WEIXIN,                         
+	  		USER_MANAGE_QQ,                               
+	  		USER_MANAGE_EMAIL,                          
+	  		USER_MANAGE_CURRENT_ADDRESS,  
+	  		USER_COMPANY_NAME,                       
+	  		USER_COMPANY_CORPORATION,  
+	  		USER_COMPANY_COMMENT,       
+	  		BUSINESS_LICENSE_NUMBER,  
+	  		USER_BUSINESS_LICENCE_IMGURL,            
+	  		SHOP_WEBSITE,                                    
+	  		SHOP_NAME,                                      
+	  		PLATFORM,                                            
+	  		MAIN_CATEGORY,                                 
+	  		SHOP_PHOTO,
+	  		TYPE,
+	  		old_change_id
+        )
+        select SEQ_USER_INFO_CHANGE.nextval,
+                  tui.ID USER_ID,           
+                  tui.USER_MANAGE_TELEPHONE,                
+                  tui.USER_MANAGE_WEIXIN,                         
+                  tui.USER_MANAGE_QQ,                               
+                  tui.USER_MANAGE_EMAIL,                          
+                  tui.USER_MANAGE_CURRENT_ADDRESS,  
+                  tui.USER_COMPANY_NAME,                       
+                  tui.USER_COMPANY_CORPORATION,  
+                  tui.USER_COMPANY_COMMENT,        
+                  tui.BUSINESS_LICENSE_NUMBER,
+                  tui.USER_BUSINESS_LICENCE_IMGURL,               
+                  tui.SHOP_WEBSITE,                                    
+                  tui.SHOP_NAME,                                      
+                  tui.PLATFORM,                                            
+                  tui.MAIN_CATEGORY,                                 
+                  tui.SHOP_PHOTO,
+                  2 TYPE,
+                  tuic.id
+         FROM TBL_USER_INFO tui ,TBL_USER_INFO_CHANGE tuic
+             where tui.user_name=tuic.user_id
+           and tuic.id IN
+		 <foreach item="item" collection="id" open="(" separator="," close=")">
+			#{item}
+	  	 </foreach>
+		                                 
+    </insert>
+    
+    <!-- 更新会员变更信息状态-->
+    <update id="updateMemberInfoChangeState" parameterType="java.util.Map">
+        update tbl_user_info_change
+        <set>
+            <if test="approval_state == 2">
+                <!-- 审批 -->
+                approval_state = 2,
+            </if>
+            <if test="approval_state == 3">
+                <!-- 驳回 -->
+                approval_state = 3,
+                rejected_reason = #{rejected_reason,jdbcType=VARCHAR},
+            </if>
+            approval_user_id = #{public_user_id,jdbcType=INTEGER},
+            approval_date = sysdate
+        </set>
+        where type=1 
+        	and id in
+        <foreach item="item" collection="id" open="(" separator="," close=")">
+			#{item}
+	  	</foreach>
+    </update>
+    
+    <!-- 查询会员业务处理列表 -->
+	<select id="queryMemberInfoBussinessDealList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+			select a.*,rownum num from (
+	              select
+	              	   tusc.id,
+	              	   tusc.user_id,
+	              	   tusc.state,
+	                   ui.login_name,
+	                   ui.user_manage_name,
+	                   ui.user_manage_mobilephone,
+	                   (select store_name from tbl_store_info where id=ui.store_id) as store_name,
+	                   (select store_name from tbl_store_info where id=tusc.change_store_id) as change_store_name,
+	                   tusc.remark,
+	                   (select user_realname from tbl_sys_user_info where id=ui.referee_user_id) as referee_user_realname,
+	                   (select user_realname from tbl_sys_user_info where id=ui.market_supervision_user_id) as market_supervision_user_realna,
+	                   to_char(tusc.create_date,'yyyy-mm-dd hh24:mi:ss') as create_date
+	               from tbl_user_store_change tusc, tbl_user_info ui
+	               <where>
+	                   tusc.user_id = ui.user_name
+	                   <if test="login_name!=null and login_name!='' ">
+	                       and ui.login_name like '%'||#{login_name,jdbcType=VARCHAR}||'%'
+	                   </if>
+	                   <if test="user_manage_name!=null and user_manage_name!='' ">
+	                       and ui.user_manage_name =#{user_manage_name,jdbcType=VARCHAR}
+	                   </if>
+	                   <if test="state != null">
+							and tusc.state IN
+				                <foreach item="item" collection="state" open="(" separator="," close=")">
+									#{item}
+								</foreach>
+						</if>
+	                   <if test="public_user_type != null and public_user_type == 2">
+	                       and EXISTS (SELECT 1 FROM TBL_SYS_USER_STORE TSUS WHERE TSUS.STORE_ID = ui.STORE_ID AND TSUS.USER_ID = #{public_user_id,jdbcType=INTEGER})
+	                   </if>
+	                   <if test="public_user_type != null and public_user_type == 3">
+	                       and ui.referee_user_id = #{public_user_id,jdbcType=INTEGER}
+	                   </if>
+	                   <if test="public_user_type != null and public_user_type == 4">
+	                       and ui.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+	                   </if>
+	                   <if test="public_user_type != null and public_user_type == 5">
+	                       and EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID = ui.STORE_ID AND TSI.SHOPKEEPER_USER_ID = #{public_user_id,jdbcType=INTEGER})
+	                   </if>
+	                   <if test="public_user_type != null and public_user_type == 6">
+	                       and EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUI WHERE TSUI.STORE_ID = ui.STORE_ID AND TSUI.USER_ID = #{public_user_id,jdbcType=INTEGER})
+	                   </if>
+	                   <if test="public_user_type != null and public_user_type == 9">
+	                       and EXISTS(SELECT 1 FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.USER_TYPE = 4
+	                           AND TSUI.ORGANIZATION_ID IN (
+	                           SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+	                           START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER}
+	                           CONNECT BY PRIOR ID = PARENT_ID
+	                       )
+	                       AND TSUI.id = ui.market_supervision_user_id)
+	                   </if>
+	               </where>
+	               order by create_date desc
+	            )a where ROWNUM  &lt;= #{end_rownum,jdbcType=INTEGER}
+	      )where num &gt;#{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!-- 查询会员业务处理列表记录数 -->
+    <select id="queryMemberInfoBussinessDealCount" parameterType="java.util.Map" resultType="int">
+        select	count(1)
+          from tbl_user_store_change tusc, tbl_user_info ui
+          <where>
+              tusc.user_id = ui.user_name
+              <if test="login_name!=null and login_name!='' ">
+                  and ui.login_name like '%'||#{login_name,jdbcType=VARCHAR}||'%'
+              </if>
+              <if test="user_manage_name!=null and user_manage_name!='' ">
+                  and ui.user_manage_name =#{user_manage_name,jdbcType=VARCHAR}
+              </if>
+              <if test="state != null">
+				  and tusc.state IN
+			              <foreach item="item" collection="state" open="(" separator="," close=")">
+								#{item}
+						  </foreach>
+			  </if>
+              <if test="public_user_type != null and public_user_type == 2">
+                  and EXISTS (SELECT 1 FROM TBL_SYS_USER_STORE TSUS WHERE TSUS.STORE_ID = ui.STORE_ID AND TSUS.USER_ID = #{public_user_id,jdbcType=INTEGER})
+              </if>
+              <if test="public_user_type != null and public_user_type == 3">
+                  and ui.referee_user_id = #{public_user_id,jdbcType=INTEGER}
+              </if>
+              <if test="public_user_type != null and public_user_type == 4">
+                  and ui.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+              </if>
+              <if test="public_user_type != null and public_user_type == 5">
+                  and EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID = ui.STORE_ID AND TSI.SHOPKEEPER_USER_ID = #{public_user_id,jdbcType=INTEGER})
+              </if>
+              <if test="public_user_type != null and public_user_type == 6">
+                  and EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUI WHERE TSUI.STORE_ID = ui.STORE_ID AND TSUI.USER_ID = #{public_user_id,jdbcType=INTEGER})
+              </if>
+              <if test="public_user_type != null and public_user_type == 9">
+                  and EXISTS(SELECT 1 FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.USER_TYPE = 4
+                      AND TSUI.ORGANIZATION_ID IN (
+                      SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+                      START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER}
+                      CONNECT BY PRIOR ID = PARENT_ID
+                  )
+                  AND TSUI.id = ui.market_supervision_user_id)
+              </if>
+          </where>
+    </select>
+    
+    <!--会员业务处理详情-->
+	<select id="queryBussinessDealDetailByUserId" parameterType="java.util.Map"  resultType="java.util.Map">
+		SELECT
+		  ID,
+		  USER_ID,           
+		  CHANGE_STORE_ID, 
+		  (SELECT STORE_NAME FROM TBL_STORE_INFO WHERE ID=TUSC.CHANGE_STORE_ID) AS CHANGE_STORE_NAME,               
+		  REMARK,                         
+		  STATE,                                 
+		  TO_CHAR(CREATE_DATE,'yyyy-mm-dd hh24:mi:ss') AS CREATE_DATE 
+		FROM TBL_USER_STORE_CHANGE TUSC WHERE id = #{id,jdbcType=INTEGER}
+	</select>
+	
+	<!-- 更新会员业务处理状态-->
+    <update id="updateMemberInfoBusinessDealState" parameterType="java.util.Map">
+        update tbl_user_store_change
+        <set>
+            state = #{state,jdbcType=INTEGER},
+            approval_user_id = #{public_user_id,jdbcType=INTEGER},
+            approval_date = sysdate
+        </set>
+        where id=#{id,jdbcType=INTEGER}
+    </update>
+    
+    <!-- 查询会员反馈管理列表-->
+	<select id="queryFeedbackManageList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+			select a.*,rownum num from (
+	              select
+	              	   tufb.id,
+	              	   tufb.user_id,
+	              	   tufb.state,
+	              	   tufb.type,
+	              	   tufb.content,
+	                   ui.login_name,
+	                   ui.user_manage_name,
+	                   ui.user_manage_mobilephone,
+	                   to_char(tufb.create_date,'yyyy-mm-dd hh24:mi:ss') as create_date
+	               from tbl_user_feed_back tufb, tbl_user_info ui
+	               <where>
+	                   tufb.user_id = ui.user_name
+	                   <if test="user_manage_name!=null and user_manage_name!='' ">
+	                       and ui.user_manage_name =#{user_manage_name,jdbcType=VARCHAR}
+	                   </if>
+	                   <if test="state != null">
+							and tufb.state IN
+				                <foreach item="item" collection="state" open="(" separator="," close=")">
+									#{item}
+								</foreach>
+						</if>
+	                   <if test="public_user_type != null and public_user_type == 2">
+	                       and EXISTS (SELECT 1 FROM TBL_SYS_USER_STORE TSUS WHERE TSUS.STORE_ID = ui.STORE_ID AND TSUS.USER_ID = #{public_user_id,jdbcType=INTEGER})
+	                   </if>
+	                   <if test="public_user_type != null and public_user_type == 3">
+	                       and ui.referee_user_id = #{public_user_id,jdbcType=INTEGER}
+	                   </if>
+	                   <if test="public_user_type != null and public_user_type == 4">
+	                       and ui.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+	                   </if>
+	                   <if test="public_user_type != null and public_user_type == 5">
+	                       and EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID = ui.STORE_ID AND TSI.SHOPKEEPER_USER_ID = #{public_user_id,jdbcType=INTEGER})
+	                   </if>
+	                   <if test="public_user_type != null and public_user_type == 6">
+	                       and EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUI WHERE TSUI.STORE_ID = ui.STORE_ID AND TSUI.USER_ID = #{public_user_id,jdbcType=INTEGER})
+	                   </if>
+	                   <if test="public_user_type != null and public_user_type == 9">
+	                       and EXISTS(SELECT 1 FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.USER_TYPE = 4
+	                           AND TSUI.ORGANIZATION_ID IN (
+	                           SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+	                           START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER}
+	                           CONNECT BY PRIOR ID = PARENT_ID
+	                       )
+	                       AND TSUI.id = ui.market_supervision_user_id)
+	                   </if>
+	               </where>
+	               order by create_date desc
+	            )a where ROWNUM  &lt;= #{end_rownum,jdbcType=INTEGER}
+	      )where num &gt;#{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!-- 查询会员业务处理列表记录数 -->
+    <select id="queryFeedbackManageCount" parameterType="java.util.Map" resultType="int">
+        select count(1)
+          from tbl_user_feed_back tufb, tbl_user_info ui
+          <where>
+              tufb.user_id = ui.user_name
+              <if test="user_manage_name!=null and user_manage_name!='' ">
+                  and ui.user_manage_name =#{user_manage_name,jdbcType=VARCHAR}
+              </if>
+              <if test="state != null">
+				   and tufb.state IN
+			              <foreach item="item" collection="state" open="(" separator="," close=")">
+						#{item}
+					</foreach>
+			  </if>
+              <if test="public_user_type != null and public_user_type == 2">
+                  and EXISTS (SELECT 1 FROM TBL_SYS_USER_STORE TSUS WHERE TSUS.STORE_ID = ui.STORE_ID AND TSUS.USER_ID = #{public_user_id,jdbcType=INTEGER})
+              </if>
+              <if test="public_user_type != null and public_user_type == 3">
+                  and ui.referee_user_id = #{public_user_id,jdbcType=INTEGER}
+              </if>
+              <if test="public_user_type != null and public_user_type == 4">
+                  and ui.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+              </if>
+              <if test="public_user_type != null and public_user_type == 5">
+                  and EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID = ui.STORE_ID AND TSI.SHOPKEEPER_USER_ID = #{public_user_id,jdbcType=INTEGER})
+              </if>
+              <if test="public_user_type != null and public_user_type == 6">
+                  and EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUI WHERE TSUI.STORE_ID = ui.STORE_ID AND TSUI.USER_ID = #{public_user_id,jdbcType=INTEGER})
+              </if>
+              <if test="public_user_type != null and public_user_type == 9">
+                  and EXISTS(SELECT 1 FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.USER_TYPE = 4
+                      AND TSUI.ORGANIZATION_ID IN (
+                      SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+                      START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER}
+                      CONNECT BY PRIOR ID = PARENT_ID
+                  )
+                  AND TSUI.id = ui.market_supervision_user_id)
+              </if>
+          </where>
+    </select>
+    
+    <!--会员反馈管理详情-->
+	<select id="queryFeedbackDetail" parameterType="java.util.Map"  resultType="java.util.Map">
+		SELECT
+		  ID,
+		  USER_ID,           
+		  TYPE, 
+		  DECODE(TYPE,1,'投诉',2,'建议') TYPE_NAME,
+		  STATE,               
+		  CONTENT,
+		  DEAL_SUGGEST,
+		  TO_CHAR(CREATE_DATE,'yyyy-mm-dd hh24:mi:ss') AS CREATE_DATE ,
+		  SUGGEST_IMG
+		FROM TBL_USER_FEED_BACK TUFB WHERE id = #{id,jdbcType=INTEGER}
+	</select>
+	
+	<!-- 会员反馈处理-->
+    <update id="updateMemberInfoFeedbackDealState" parameterType="java.util.Map">
+        update tbl_user_feed_back
+        <set>
+            state = #{state,jdbcType=INTEGER},
+            <if test="deal_suggest !=null and deal_suggest !='' ">
+                 deal_suggest =#{deal_suggest,jdbcType=VARCHAR},
+             </if>
+            approval_user_id = #{public_user_id,jdbcType=INTEGER},
+            approval_date = sysdate
+        </set>
+        where id=#{id,jdbcType=INTEGER}
+    </update>
+    
+    <!-- 更新会员主表信息-->
+    <update id="updateUserInfo" parameterType="java.util.Map">
+        UPDATE TBL_USER_INFO
+        <set>
+        	<if test="USER_MANAGE_TELEPHONE !=null and USER_MANAGE_TELEPHONE !='' ">
+                  USER_MANAGE_TELEPHONE = #{USER_MANAGE_TELEPHONE,jdbcType=VARCHAR},
+             </if>
+             <if test="USER_MANAGE_WEIXIN !=null and USER_MANAGE_WEIXIN !='' ">
+                  USER_MANAGE_WEIXIN = #{USER_MANAGE_WEIXIN,jdbcType=VARCHAR},
+             </if>
+             <if test="USER_MANAGE_QQ !=null and USER_MANAGE_QQ !='' ">
+                  USER_MANAGE_QQ = #{USER_MANAGE_QQ,jdbcType=VARCHAR},
+             </if>
+             <if test="USER_MANAGE_EMAIL !=null and USER_MANAGE_EMAIL !='' ">
+                  USER_MANAGE_EMAIL = #{USER_MANAGE_EMAIL,jdbcType=VARCHAR},
+             </if>
+             <if test="USER_MANAGE_CURRENT_ADDRESS !=null and USER_MANAGE_CURRENT_ADDRESS !='' ">
+                  USER_MANAGE_CURRENT_ADDRESS = #{USER_MANAGE_CURRENT_ADDRESS,jdbcType=VARCHAR},
+             </if>
+             <if test="USER_COMPANY_NAME !=null and USER_COMPANY_NAME !='' ">
+                  USER_COMPANY_NAME = #{USER_COMPANY_NAME,jdbcType=VARCHAR},
+             </if>
+             <if test="USER_COMPANY_CORPORATION !=null and USER_COMPANY_CORPORATION !='' ">
+                  USER_COMPANY_CORPORATION = #{USER_COMPANY_CORPORATION,jdbcType=VARCHAR},
+             </if>
+             <if test="USER_COMPANY_COMMENT !=null and USER_COMPANY_COMMENT !='' ">
+                  USER_COMPANY_COMMENT = #{USER_COMPANY_COMMENT,jdbcType=VARCHAR},
+             </if>
+             <if test="BUSINESS_LICENSE_NUMBER !=null and BUSINESS_LICENSE_NUMBER !='' ">
+                  BUSINESS_LICENSE_NUMBER = #{BUSINESS_LICENSE_NUMBER,jdbcType=VARCHAR},
+             </if>
+             <if test="USER_BUSINESS_LICENCE_IMGURL !=null and USER_BUSINESS_LICENCE_IMGURL !='' ">
+                  USER_BUSINESS_LICENCE_IMGURL = #{USER_BUSINESS_LICENCE_IMGURL,jdbcType=VARCHAR},
+             </if>
+             <if test="SHOP_WEBSITE !=null and SHOP_WEBSITE !='' ">
+                  SHOP_WEBSITE = #{SHOP_WEBSITE,jdbcType=VARCHAR},
+             </if>
+             <if test="SHOP_NAME !=null and SHOP_NAME !='' ">
+                  SHOP_NAME = #{SHOP_NAME,jdbcType=VARCHAR},
+             </if>
+             <if test="PLATFORM !=null and PLATFORM !='' ">
+                  PLATFORM = #{PLATFORM,jdbcType=VARCHAR},
+             </if>
+             <if test="MAIN_CATEGORY !=null and MAIN_CATEGORY !='' ">
+                  MAIN_CATEGORY = #{MAIN_CATEGORY,jdbcType=VARCHAR},
+             </if>
+              <if test="SHOP_PHOTO !=null and SHOP_PHOTO !='' ">
+                  SHOP_PHOTO = #{SHOP_PHOTO,jdbcType=VARCHAR},
+             </if>
+        </set>
+        WHERE id=#{USER_ID,jdbcType=INTEGER}
+    </update>
+    
+
+</mapper>

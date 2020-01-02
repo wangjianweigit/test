@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tk.oms.sys.dao.CacheInfoDao">
+
+    <!--分页查询缓存信息列表-->
+    <select id="queryListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select t.*,rownum as rn from (
+                select
+                    id,
+                    key cache_key,
+                    cache_name,
+                    cache_cycle,
+                    (select tsui.user_realname from tbl_sys_user_info tsui where update_id = tsui.id) user_realname,
+                    update_id,
+                    to_char(update_date,'YYYY-MM-DD HH24:MI:SS') update_date
+                from
+                    tbl_cache_info
+            ) t where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+	    where rn&gt;#{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--查询缓存信息总条数-->
+    <select id="queryListForCount" parameterType="java.util.Map" resultType="int">
+        select count(1) from tbl_cache_info
+    </select>
+
+    <update id="update" parameterType="java.util.Map">
+        update tbl_cache_info set update_id = #{public_user_id,jdbcType=INTEGER},update_date = sysdate where id = #{id,jdbcType=INTEGER}
+    </update>
+    
+    <!--根据key获取缓存信息-->
+    <select id="queryCacheInfoDetail" parameterType="java.util.Map" resultType="java.util.Map">
+        select id,
+	        key,
+	        cache_name,
+	        cache_cycle
+        from tbl_cache_info
+        where key=#{key,jdbcType=VARCHAR}
+    </select>
+</mapper>

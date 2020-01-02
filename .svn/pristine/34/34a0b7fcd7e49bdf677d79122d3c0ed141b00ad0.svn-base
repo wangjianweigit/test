@@ -1,0 +1,361 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.pvtp.product.dao.PvtpProductDao">
+	<sql id="all_column_product">
+			T1.ID,
+			T1.BRAND_ID,
+			T1.PRODUCT_TYPE_ID,
+			T1.ITEMNUMBER,
+			T1.PRODUCT_NAME,
+			T1.PRODUCT_SUBTITLE,
+			T1.YEAR,
+			T1.SEASON_ID,
+			T1.SEX,
+			TO_CHAR(T1.CREATE_DATE,'YYYY-MM-DD HH24:MI:SS') AS CREATE_DATE,
+			T1.CREATE_USER_ID,
+			TO_CHAR(T1.UPDATE_DATE,'YYYY-MM-DD HH24:MI:SS') AS UPDATE_DATE,
+			T1.UPDATE_USER_ID,
+			TO_CHAR(T1.APPROVAL_DATE,'YYYY-MM-DD HH24:MI:SS') AS APPROVAL_DATE,
+			T1.APPROVAL_USER_ID,
+			T1.UNIT,
+			T1.PRODUCT_IMG_URL,
+			T1.STATE,
+			T1.IS_OUTSTOCK,
+			TO_CHAR(T1.LAST_UP_DATE,'YYYY-MM-DD HH24:MI:SS') AS LAST_UP_DATE,
+			T1.UP_PERIOD,
+			T1.DISTRICT_TEMPLET_ID,
+			TO_CHAR(T1.SELL_STATE_DATE,'YYYY-MM-DD HH24:MI:SS') AS SELL_STATE_DATE
+	</sql>
+	<!-- 获取商品列表 -->
+    <select id="queryProductList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT  A.*,
+    		   (SELECT BRAND_NAME FROM TBL_DIC_PRODUCT_BRAND TDPB WHERE TDPB.ID = A.BRAND_ID)  AS BRAND,
+    		   (SELECT USER_CODE FROM TBL_STATIONED_USER_INFO TSUI WHERE TSUI.ID = A.STATIONED_USER_ID)  AS STATIONED_USER_CODE,
+    		   (SELECT COMPANY_NAME FROM TBL_STATIONED_USER_INFO TSUI WHERE TSUI.ID = A.STATIONED_USER_ID)  AS STATIONED_USER_NAME,
+    		   (SELECT TYPE_NAME FROM TBL_DIC_PRODUCT_TYPE TDPT WHERE TDPT.ID = A.PRODUCT_TYPE_ID)  AS PRODUCT_TYPE,
+    		   (SELECT NAME FROM TBL_DIC_PRODUCT_SEASON TDPS WHERE TDPS.ID = A.SEASON_ID)  AS SEASON
+    	  FROM (SELECT T.*,ROWNUM AS RN
+				  FROM (
+				SELECT *
+				  FROM (SELECT <include refid="all_column_product"/>,T2.PLATFORM_ID AS STATIONED_USER_ID,1 is_tk
+				  		  FROM TBL_PRODUCT_INFO T1 INNER JOIN TBL_PVTP_PRODUCT_INFO_REF T2 ON T1.ID = T2.PRODUCT_ID
+				  		 WHERE T2.ENABLED_FLAG = 1
+				  		   AND T1.IS_PRIVATE = 1
+				  		 UNION ALL
+				        SELECT <include refid="all_column_product"/>,T1.STATIONED_USER_ID,0 is_tk
+				  		  FROM TBL_PVTP_PRODUCT_INFO T1) TPI
+					    <where>
+							<if test="state != null">
+								AND TPI.STATE IN
+				                <foreach item="item" collection="state" open="(" separator="," close=")">
+									#{item}
+								</foreach>
+							</if>
+							<if test="is_tk != null and is_tk != ''">
+								AND TPI.IS_TK = #{is_tk,jdbcType=INTEGER}
+							</if>
+							<if test="itemnumber != null and itemnumber != '' ">
+							   AND	TPI.ITEMNUMBER like concat(concat('%', #{itemnumber,jdbcType=VARCHAR}),'%')
+							</if>
+							<if test="year != null and year != '' ">
+								AND	TPI.YEAR = #{year,jdbcType=INTEGER}
+							</if>
+							<if test="product_type_id != null and product_type_id != '' ">
+								AND	(TPI.PRODUCT_TYPE_ID = #{product_type_id,jdbcType=INTEGER}
+								OR TPI.PRODUCT_TYPE_ID in (select id from tbl_dic_product_type t start with parent_id = #{product_type_id,jdbcType=INTEGER} connect by prior id=parent_id))
+							</if>
+							<if test="brand_id != null and brand_id != '' ">
+								AND	TPI.BRAND_ID = #{brand_id,jdbcType=INTEGER}
+							</if>
+							<if test="season_id != null and season_id != '' ">
+								AND	TPI.SEASON_ID = #{season_id,jdbcType=INTEGER}
+							</if>
+							<if test="is_outstock != null and is_outstock != '' ">
+								AND	TPI.IS_OUTSTOCK = #{is_outstock,jdbcType=VARCHAR}
+							</if>
+							<if test="stationed_id != null and stationed_id != '' ">
+								AND TPI.STATIONED_USER_ID= #{stationed_id,jdbcType=INTEGER}
+							</if>
+							<if test="start_date != null and start_date != '' ">
+								AND	TPI.SELL_STATE_DATE &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+							</if>
+							<if test="end_date != null and end_date != '' ">
+								AND	TPI.SELL_STATE_DATE &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+							</if>
+							<if test="product_name != null and product_name !=''">
+								AND	TPI.PRODUCT_NAME = #{product_name,jdbcType=VARCHAR}
+							</if>
+					    </where>
+					    ORDER BY TPI.CREATE_DATE DESC) T
+		 		 WHERE ROWNUM &lt;= #{end_rownum,jdbcType=INTEGER}) A
+		 WHERE RN &gt; #{start_rownum,jdbcType=INTEGER} 
+	</select>
+	
+	<!-- 获取商品总数 -->
+    <select id="queryProductCount" parameterType="java.util.HashMap" resultType="int">
+    	SELECT count(1)
+		  FROM (SELECT <include refid="all_column_product"/>,T2.PLATFORM_ID AS STATIONED_USER_ID,1 is_tk
+		  		  FROM TBL_PRODUCT_INFO T1 INNER JOIN TBL_PVTP_PRODUCT_INFO_REF T2 ON T1.ID = T2.PRODUCT_ID
+		  		 WHERE T2.ENABLED_FLAG = 1
+		  		   AND T1.IS_PRIVATE = 1
+		  		 UNION ALL
+		        SELECT <include refid="all_column_product"/>,T1.STATIONED_USER_ID,0 is_tk
+		  		  FROM TBL_PVTP_PRODUCT_INFO T1) TPI
+			    <where>
+					<if test="state != null">
+						AND TPI.STATE IN
+		                <foreach item="item" collection="state" open="(" separator="," close=")">
+							#{item}
+						</foreach>
+					</if>
+					<if test="is_tk != null and is_tk != ''">
+						AND TPI.IS_TK = #{is_tk,jdbcType=INTEGER}
+					</if>
+					<if test="itemnumber != null and itemnumber != '' ">
+					   AND	TPI.ITEMNUMBER like concat(concat('%', #{itemnumber,jdbcType=VARCHAR}),'%')
+					</if>
+					<if test="year != null and year != '' ">
+						AND	TPI.YEAR = #{year,jdbcType=INTEGER}
+					</if>
+					<if test="product_type_id != null and product_type_id != '' ">
+						AND	(TPI.PRODUCT_TYPE_ID = #{product_type_id,jdbcType=INTEGER}
+						OR TPI.PRODUCT_TYPE_ID in (select id from tbl_dic_product_type t start with parent_id = #{product_type_id,jdbcType=INTEGER} connect by prior id=parent_id))
+					</if>
+					<if test="brand_id != null and brand_id != '' ">
+						AND	TPI.BRAND_ID = #{brand_id,jdbcType=INTEGER}
+					</if>
+					<if test="season_id != null and season_id != '' ">
+						AND	TPI.SEASON_ID = #{season_id,jdbcType=INTEGER}
+					</if>
+					<if test="is_outstock != null and is_outstock != '' ">
+						AND	TPI.IS_OUTSTOCK = #{is_outstock,jdbcType=VARCHAR}
+					</if>
+					<if test="stationed_id != null and stationed_id != '' ">
+						AND TPI.STATIONED_USER_ID= #{stationed_id,jdbcType=INTEGER}
+					</if>
+					<if test="start_date != null and start_date != '' ">
+						AND	TPI.SELL_STATE_DATE &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+					</if>
+					<if test="end_date != null and end_date != '' ">
+						AND	TPI.SELL_STATE_DATE &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+					</if>
+					<if test="product_name != null and product_name !=''">
+						AND	TPI.PRODUCT_NAME = #{product_name,jdbcType=VARCHAR}
+					</if>
+			    </where>
+	</select>
+	
+	<!-- 获取商品基本信息详情 -->
+    <select id="queryProductDetail" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT TPI.*,
+    		   (SELECT BRAND_NAME FROM TBL_DIC_PRODUCT_BRAND TDPB WHERE TDPB.ID = TPI.BRAND_ID)  AS BRAND,
+    		   (SELECT USER_CODE FROM TBL_STATIONED_USER_INFO TSUI WHERE TSUI.ID = TPI.STATIONED_USER_ID)  AS STATIONED_USER_CODE,
+    		   (SELECT COMPANY_NAME FROM TBL_STATIONED_USER_INFO TSUI WHERE TSUI.ID = TPI.STATIONED_USER_ID)  AS STATIONED_USER_NAME,
+    		   (SELECT TYPE_NAME FROM TBL_DIC_PRODUCT_TYPE TDPT WHERE TDPT.ID = TPI.PRODUCT_TYPE_ID)  AS PRODUCT_TYPE,
+    		   (SELECT NAME FROM TBL_DIC_PRODUCT_SEASON TDPS WHERE TDPS.ID = TPI.SEASON_ID)  AS SEASON,
+    		   (SELECT SPECS_GROUP_ID
+    		     FROM (SELECT ITEMNUMBER,SPECS_GROUP_ID FROM TBL_PRODUCT_INFO_APPLY
+    		     	   UNION
+    		     	   SELECT ITEMNUMBER,SPECS_GROUP_ID FROM TBL_PVTP_PRODUCT_INFO_APPLY) TPIA WHERE TPIA.ITEMNUMBER=TPI.ITEMNUMBER) SPECS_GROUP_ID,
+    		   (SELECT TYPE FROM TBL_DIC_PRODUCT_TYPE T WHERE T.ID= TPI.PRODUCT_TYPE_ID) AS PRODUCT_SPEC_TYPE
+		  FROM (SELECT <include refid="all_column_product"/>,T2.PLATFORM_ID AS STATIONED_USER_ID,to_char(t1.PRODUCT_CONTENT) PRODUCT_CONTENT
+		  		  FROM TBL_PRODUCT_INFO T1 INNER JOIN TBL_PVTP_PRODUCT_INFO_REF T2 ON T1.ID = T2.PRODUCT_ID
+		  		 WHERE T2.ENABLED_FLAG = 1
+		  		   AND T1.IS_PRIVATE = 1
+		  		 UNION ALL
+		        SELECT <include refid="all_column_product"/>,T1.STATIONED_USER_ID,to_char(t1.PRODUCT_CONTENT) PRODUCT_CONTENT
+		  		  FROM TBL_PVTP_PRODUCT_INFO T1) TPI
+		<where>
+				1=1
+			<if test="itemnumber != null and itemnumber != '' ">
+				AND	TPI.ITEMNUMBER = #{itemnumber,jdbcType=VARCHAR}
+			</if>
+			<if test="id != null and id != '' ">
+				AND	TPI.ID = #{id,jdbcType=INTEGER}
+			</if>
+		</where> 
+	</select>
+	
+	<!-- 获取商品参数信息列表 -->
+    <select id="queryProductParamsList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT TPPI.STATIONED_USER_ID,TPPI.PRODUCT_ITEMNUMBER,TPPI.PARAMETER_ID,TPPI.PARAMETER_VALUE,TDPP.PARAMETER_NAME 
+		  FROM (SELECT PARAMETER_ID,STATIONED_USER_ID,PRODUCT_ITEMNUMBER,PARAMETER_VALUE
+		          FROM TBL_PRODUCT_PARAMS_INFO
+		         UNION ALL
+		        SELECT PARAMETER_ID,STATIONED_USER_ID,PRODUCT_ITEMNUMBER,PARAMETER_VALUE
+		          FROM TBL_PVTP_PRODUCT_PARAMS_INFO) TPPI,TBL_DIC_PRODUCT_PARAMETER TDPP
+		<where>
+			    1=1
+			    AND TPPI.PARAMETER_ID = TDPP.ID
+			  <if test="itemnumber != null and itemnumber != '' ">
+				AND	TPPI.PRODUCT_ITEMNUMBER = #{itemnumber,jdbcType=VARCHAR}
+			  </if>
+		</where>
+		ORDER BY TDPP.SORT_ID DESC
+	</select>
+	
+	<!-- 获取商品sku信息列表 -->
+    <select id="queryProductSkuList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT TPS.*
+    	  FROM
+    	  (SELECT  T1.ID,
+				T1.STATIONED_USER_ID,
+				T1.PRODUCT_ITEMNUMBER,
+				T1.PARENT_ID,
+				T1.PRODUCT_GROUP,
+				T1.PRODUCT_GROUP_MEMBER,
+				T1.PRODUCT_COLOR_IMGURL,
+				T1.PRODUCT_PRIZE_TAG,
+				T1.PRODUCT_PRIZE_COST,
+				T1.PRODUCT_WEIGHT,
+				T1.PRODUCT_GBCODE,
+				T1.PRODUCT_SKU_NAME,
+				T1.PRODUCT_INLONG,
+				T1.PRODUCT_COLOR,
+				T1.PRODUCT_SPECS,
+				T1.STATE,
+				TO_CHAR(T1.SELL_STATE_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  SELL_STATE_DATE,
+				T1.SORT_ID
+		  FROM TBL_PRODUCT_SKU T1
+    	 UNION ALL
+    	SELECT  T1.ID,
+				T1.STATIONED_USER_ID,
+				T1.PRODUCT_ITEMNUMBER,
+				T1.PARENT_ID,
+				T1.PRODUCT_GROUP,
+				T1.PRODUCT_GROUP_MEMBER,
+				T1.PRODUCT_COLOR_IMGURL,
+				T1.PRODUCT_PRIZE_TAG,
+				T1.PRODUCT_PRIZE_COST,
+				T1.PRODUCT_WEIGHT,
+				T1.PRODUCT_GBCODE,
+				T1.PRODUCT_SKU_NAME,
+				T1.PRODUCT_INLONG,
+				T1.PRODUCT_COLOR,
+				T1.PRODUCT_SPECS,
+				T1.STATE,
+				TO_CHAR(T1.SELL_STATE_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  SELL_STATE_DATE,
+				T1.SORT_ID
+		  FROM TBL_PVTP_PRODUCT_SKU T1) TPS
+		<where>
+			    1=1
+			  <if test="itemnumber != null and itemnumber != '' ">
+				AND	TPS.PRODUCT_ITEMNUMBER = #{itemnumber,jdbcType=VARCHAR}
+			  </if>
+			  <if test="product_group != null and product_group != '' ">
+				AND	TPS.PRODUCT_GROUP = #{product_group,jdbcType=INTEGER}
+			  </if>
+		</where>
+		ORDER BY TPS.PRODUCT_COLOR,TPS.PRODUCT_SPECS,TPS.PRODUCT_GROUP_MEMBER 
+	</select>
+	
+	<!-- 获取商品图片信息列表 -->
+    <select id="queryProductImagesList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT  TPI.ID,TPI.PRODUCT_ID,TPI.PRODUCT_ITEMNUMBER,TPI.IMAGE_URL,TPI.CREATE_USER_ID,
+    			TO_CHAR(TPI.CREATE_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  CREATE_DATE,TPI.SORTID,TPI.IS_PRIMARY,TPI.TYPE
+		  FROM (SELECT ID,PRODUCT_ID,PRODUCT_ITEMNUMBER,IMAGE_URL,CREATE_USER_ID,CREATE_DATE,SORTID,IS_PRIMARY,TYPE
+		          FROM TBL_PRODUCT_IMAGES
+		         UNION ALL
+		        SELECT ID,PRODUCT_ID,PRODUCT_ITEMNUMBER,IMAGE_URL,CREATE_USER_ID,CREATE_DATE,SORTID,IS_PRIMARY,TYPE
+		          FROM TBL_PVTP_PRODUCT_IMAGES) TPI
+		<where>
+			    1=1
+			  <if test="id != null and id != 0 ">
+				AND	TPI.PRODUCT_ID = #{id,jdbcType=INTEGER}
+			  </if>
+		</where>
+		order by TYPE asc, IS_PRIMARY desc,sortid DESC
+	</select>
+	
+	<select id="queryProductWrapperList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+        select
+            pswi.id,
+            pswi.wrapper_code,
+            pswi.wrapper_name,
+            pswi.wrapper_long,
+            pswi.wrapper_wide,
+            pswi.wrapper_tall,
+            pswi.product_specs,
+            pswi.remark
+        from tbl_product_specs_wrapper_info pswi
+        join tbl_product_wrapper_ref_info pwri on pwri.wrapper_id = pswi.id
+            and pwri.product_specs = pswi.product_specs  and pswi.is_delete = 1 and pwri.is_delete = 1
+        where
+            <choose>
+                <when test="is_apply != null and is_apply == 1">
+                    exists (
+                        select 1
+                        from (select product_id,product_specs,product_itemnumber
+                                from tbl_product_sku_apply
+                               union
+                              select product_id,product_specs,product_itemnumber
+                                from tbl_pvtp_product_sku_apply) psa
+                        where  psa.product_id = #{id,jdbcType=INTEGER}
+                        and pswi.product_specs = psa.product_specs and  pwri.product_itemnumber = psa.product_itemnumber
+                    )
+                </when>
+                <otherwise>
+                    exists (
+                        select 1
+                        from (select product_itemnumber,product_specs
+                                from tbl_product_sku
+                               union all
+                              select product_itemnumber,product_specs
+                                from tbl_pvtp_product_sku) ps
+                        where ps.product_itemnumber = #{itemnumber,jdbcType=VARCHAR}
+                        and pswi.product_specs = ps.product_specs and  pwri.product_itemnumber = ps.product_itemnumber
+                    )
+                </otherwise>
+            </choose>
+    </select>
+    
+    <!-- 获取商品站点显示区域列表 -->
+    <select id="queryProductSiteDelayList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT  TSPD.STATIONED_USER_ID,TSPD.SITE_ID,TSPD.PRODUCT_ID,TSPD.WEIGHTING,TSPD.TEMP_WEIGHTING,TSPD.DELAY_DAYS,TSI.NAME AS SITE_NAME
+		  FROM TBL_SITE_PRODUCT_DELAY TSPD,TBL_SITE_INFO TSI
+		<where>
+			    1=1
+			    AND TSPD.SITE_ID = TSI.ID 
+			  <if test="id != null and id != 0 ">
+				AND	TSPD.PRODUCT_ID = #{id,jdbcType=INTEGER}
+			  </if>
+		</where>
+	</select>
+	
+	<!-- 获取商品站点显示区域列表 -->
+    <select id="queryProductRegionAreaList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT T.ID, T.PARENT_ID, T.NAME,
+		       CASE WHEN T.PARENT_ID != 0 and (SELECT COUNT(1)
+		                        FROM TBL_DIC_REGION T1
+		                       WHERE EXISTS (SELECT 1 FROM TBL_DISTRICT_TEMPLET_REL T2 WHERE T2.TEMPLATE_ID = #{district_templet_id,jdbcType=INTEGER} AND T2.REGION_ID = T1.PARENT_ID)
+		                             AND T1.ID = T.ID) > 0
+		        	THEN  1
+		         ELSE
+		          T.check_flag
+		       END AS check_flag
+		  FROM (SELECT A.*, nvl(b.template_id, 0) AS check_flag
+		           FROM (SELECT T.ID, 0 AS PARENT_ID, NAME
+		                    FROM TBL_DIC_REGION T
+		                   WHERE PARENT_ID IN
+		                         (SELECT ID FROM TBL_DIC_REGION WHERE PARENT_ID = 0)
+		                         AND T.IS_DISPLAY = 1
+		                  UNION
+		                  SELECT T.ID, PARENT_ID, NAME
+		                    FROM TBL_DIC_REGION T
+		                   WHERE PARENT_ID IN
+		                         (SELECT ID
+		                            FROM TBL_DIC_REGION
+		                           WHERE PARENT_ID IN
+		                                 (SELECT ID
+		                                    FROM TBL_DIC_REGION
+		                                   WHERE PARENT_ID = 0))
+		                         AND T.IS_DISPLAY = 1) A, (SELECT *
+		                    FROM TBL_DISTRICT_TEMPLET_REL
+		                   WHERE TEMPLATE_ID = #{district_templet_id,jdbcType=INTEGER}) B
+		          WHERE A.ID = B.REGION_ID(+)) T
+		 ORDER BY T.ID
+	</select>
+    
+</mapper>

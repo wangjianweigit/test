@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.basicinfo.dao.ArticleDao">
+    <sql id="all_column">
+    	id,
+    	name,
+    	state,
+    	sort_id
+    </sql>
+    <sql id="all_column_detail">
+    	id,
+    	article_info_id,
+    	name,
+    	content,
+    	state,
+    	sort_id
+    </sql>
+    <!-- 栏目列表 -->
+    <select id="queryProgramaList" resultType="java.util.Map">
+    	select <include refid="all_column"/>,
+    		   'true' save_flag
+    	  from tbl_article_info
+    	  order by sort_id desc
+    </select>
+    <!-- 单页列表 -->
+    <select id="queryCustomList" parameterType="java.util.Map" resultMap="resultArticleDetail">
+    	select id,
+			   article_info_id,
+			   name,
+			   state
+    	  from tbl_article_detail
+    	 where singlepage_type = '2'
+    	   and article_info_id = #{article_info_id,jdbcType=INTEGER}
+    	 order by sort_id desc
+    </select>
+    <!-- 单页名称是否重复 -->
+    <select id="queryCustomByName" parameterType="java.util.Map" resultType="int">
+    	select count(1)
+    	  from tbl_article_detail
+    	 where name = #{name,jdbcType=VARCHAR}
+    	   <if test="id !=null and id !=0">
+    	   	and id != #{id,jdbcType=INTEGER}
+    	   </if>
+    </select>
+    <!-- 新增单页  -->
+    <insert id="insertCustom" parameterType="java.util.Map">
+    	insert into tbl_article_detail
+    		(
+    		id,
+    		article_info_id,
+    		name,
+    		singlepage_type,
+    		content,
+    		sort_id,
+    		state,
+    		create_user_id
+    		) 
+    		values
+    		(
+    		seq_article_detail.nextval,
+    		#{article_info_id,jdbcType=INTEGER},
+    		#{name,jdbcType=VARCHAR},
+    		'2',
+    		#{content,jdbcType=CLOB},
+    		(select nvl(max(sort_id),0) + 1 from tbl_article_detail where singlepage_type = '2'),
+    		#{state,jdbcType=CHAR},
+    		#{public_user_id,jdbcType=VARCHAR}
+    		)
+    </insert>
+    <!-- 更新单页 -->
+    <update id="updateCustom" parameterType="java.util.Map">
+    	update tbl_article_detail
+    	   	<set>
+    	   		<if test="name !=null and name !=''">name = #{name,jdbcType=VARCHAR},</if>
+    	   		<if test="content !=null and content !=''">content = #{content,jdbcType=CLOB},</if>
+    	   		<if test="article_info_id !=null and article_info_id !=''">article_info_id = #{article_info_id,jdbcType=INTEGER},</if>
+    	   		<if test="state !=null and state !=''">state = #{state,jdbcType=CHAR}</if>
+    	   		<if test="sort_id!=null">sort_id = #{sort_id,jdbcType=INTEGER}</if>
+    	   	</set>
+    	 where id = #{id,jdbcType=INTEGER}
+    </update>
+    <!-- 查询单页排序ID -->
+    <select id="queryCustomById" parameterType="long" resultType="java.util.Map">
+    	select <include refid="all_column_detail"/> 
+    	  from tbl_article_detail 
+    	 where id = #{id,jdbcType=INTEGER}
+    </select>
+    
+   	<!-- 删除单页 -->
+   	<delete id="deleteCustom" parameterType="java.util.Map">
+   		delete from tbl_article_detail where id = #{id,jdbcType=INTEGER}
+   	</delete>
+    <!-- 栏目名称是否重复 -->
+    <select id="queryProgramaByName" parameterType="java.util.Map" resultType="int">
+    	select count(1)
+    	  from tbl_article_info
+    	 where name = #{name,jdbcType=VARCHAR}
+    	   <if test="id !=null and id !=0">
+    	   	and id != #{id,jdbcType=INTEGER}
+    	   </if>
+    </select>
+    <!-- 新增栏目 -->
+    <insert id="insertPrograma" parameterType="java.util.Map">
+    	<selectKey keyProperty="id" resultType="int" order="BEFORE">
+			select seq_article_info.nextval from dual
+		</selectKey>
+    	insert into tbl_article_info
+    	 	(
+    	 		id,
+    	 		name,
+    	 		state,
+    	 		sort_id,
+    	 		create_user_id
+    	 	)
+    	 	 values
+    	 	(
+    	 		#{id,jdbcType=INTEGER},
+    	 		#{name,jdbcType=VARCHAR},
+    			#{state,jdbcType=CHAR},
+    	 		(select nvl(max(sort_id),0) + 1 from tbl_article_info),
+    			#{public_user_id,jdbcType=VARCHAR}
+    	 	)
+    </insert>
+    <!-- 更新栏目 -->
+    <update id="updatePrograma" parameterType="java.util.Map">
+    	update tbl_article_info
+    	   <set>
+    	   		<if test="name !=null and name !=''">name = #{name,jdbcType=VARCHAR}</if>
+    	   		<if test="state !=null and state !=''">state = #{state,jdbcType=CHAR}</if>
+    	   		<if test="sort_id!=null">sort_id = #{sort_id,jdbcType=INTEGER}</if>
+    	   </set>
+    	 where id = #{id,jdbcType=INTEGER}
+    </update>
+    <!-- 查询栏目排序ID -->
+   	<select id="queryProgramaById" parameterType="long" resultType="java.util.Map">
+   		select <include refid="all_column"/>
+   		  from tbl_article_info
+   		 where id = #{id,jdbcType=INTEGER}
+   	</select>
+   	<!-- 是否存在关联单页 -->
+    <select id="queryCustomByArticleInfoId" parameterType="java.util.Map" resultType="int">
+    	select count(1)
+    	  from tbl_article_detail
+    	 where article_info_id = #{id,jdbcType=INTEGER}
+    </select>
+    <!-- 删除栏目 -->
+    <delete id="deletePrograma" parameterType="java.util.Map">
+    	delete from tbl_article_info where id = #{id,jdbcType=INTEGER}
+    </delete>
+    <!-- 栏目下拉框 -->
+    <resultMap type="java.util.Map" id="resultProgramaMap">
+    	 <result column="id" property="id"/>
+         <result column="name" property="option"/>
+    </resultMap>
+    <select id="queryProgramaCombobox" resultType="java.util.Map" resultMap="resultProgramaMap">
+    	select <include refid="all_column"/>
+   		  from tbl_article_info
+    </select>
+    <!-- 查询固定单页列表 -->
+    <select id="queryFixedList" resultType="java.util.Map" resultMap="resultArticleDetail">
+    	select <include refid="all_column_detail"/> 
+    	  from tbl_article_detail 
+    	 where singlepage_type = '1'
+    </select>
+    <!-- 查询单页详情 -->
+    <resultMap type="java.util.Map" id="resultArticleDetail">
+        <result column="name" property="name"/>
+        <result column="article_info_id" property="article_info_id"/>
+        <result column="content" property="content" jdbcType="CLOB" javaType = "string"/>
+        <result column="state" property="state"/>
+    </resultMap>
+    <select id="queryArticleDetail" parameterType="java.util.Map" resultType="java.util.Map" resultMap="resultArticleDetail">
+    	select <include refid="all_column_detail"/> 
+    	  from tbl_article_detail
+    	 where id = #{id,jdbcType=INTEGER}
+    	 <if test="singlepage_type !=null and singlepage_type != ''">
+    	 	and singlepage_type = #{singlepage_type,jdbcType=CHAR}
+    	 </if>
+    </select>
+</mapper>

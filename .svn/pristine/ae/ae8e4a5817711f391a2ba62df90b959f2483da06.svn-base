@@ -1,0 +1,811 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.sysuser.dao.SysUserInfoDao">
+	<sql id="all_column">
+		id,
+		user_name,
+		user_pwd,
+		user_realname,
+		user_type,
+		department,
+		phone,
+		state,
+		user_company_address_province,
+		user_company_address_city,
+		user_company_address_county,
+		user_company_address_max,
+		organization_id
+	</sql>
+
+	<!-- 根据用户名获取用户信息 -->
+	<select id="querySysUserInfoByUserName" parameterType="java.lang.String" resultType="com.tk.oms.sysuser.entity.SysUserInfo">
+		SELECT
+		<include refid="all_column"/>
+		FROM TBL_SYS_USER_INFO WHERE user_name = #{user_name,jdbcType=VARCHAR}
+	</select>
+	
+	<!-- 新增管理用户 -->
+    <insert id="insert"  parameterType="java.util.Map">
+    	<selectKey keyProperty="id" resultType="int" order="BEFORE"> 
+        	SELECT seq_sys_user_info.nextval FROM DUAL
+    	</selectKey>
+         insert into tbl_sys_user_info(
+             id,
+             user_name,
+             user_pwd,
+             user_realname,
+             user_type,
+             department,
+             phone,
+             state,
+             user_company_address_province,
+		     user_company_address_city,
+			 user_company_address_county,
+			 user_company_address_max,
+			 site_id,
+			 organization_id
+         ) VALUES
+         (
+             #{id,jdbcType=INTEGER},
+             #{user_name,jdbcType=VARCHAR},
+             #{user_pwd,jdbcType=VARCHAR},
+             #{user_realname,jdbcType=VARCHAR},
+             #{user_type,jdbcType=INTEGER},
+             #{department,jdbcType=VARCHAR},
+             #{phone,jdbcType=VARCHAR},
+             #{state,jdbcType=INTEGER},
+             #{province,jdbcType=INTEGER},
+		     #{city,jdbcType=INTEGER},
+		     #{area,jdbcType=INTEGER},
+		     #{user_company_address_max,jdbcType=INTEGER},
+		     #{site_id,jdbcType=INTEGER},
+		     #{organization_id,jdbcType=INTEGER}
+        )
+    </insert>
+    
+    <!-- 禁用启用管理用户 -->
+    <update id="update_state"  parameterType="java.util.Map">
+         update tbl_sys_user_info 
+         	<set>
+	           state = #{state,jdbcType=INTEGER}
+	       </set>
+         where user_name !='admin' and id = #{id,jdbcType=INTEGER}
+    </update>
+    
+    <!-- 管理用户密码重置 -->
+    <update id="update_pwd"  parameterType="java.util.Map">
+         update tbl_sys_user_info 
+         	<set>
+	           user_pwd = #{user_pwd,jdbcType=INTEGER}
+	       </set>
+         where id = #{id,jdbcType=INTEGER}
+    </update>
+
+	<!-- 更新管理用户 -->
+    <update id="update" parameterType="java.util.Map">
+        update tbl_sys_user_info
+       <set>
+           user_realname = #{user_realname,jdbcType=VARCHAR},
+           department = #{department,jdbcType=VARCHAR},
+           phone = #{phone,jdbcType=VARCHAR},
+           user_type = #{user_type,jdbcType=INTEGER},
+           state = #{state,jdbcType=INTEGER},
+           user_company_address_province = #{province,jdbcType=INTEGER},
+		   user_company_address_city = #{city,jdbcType=INTEGER},
+		   user_company_address_county = #{area,jdbcType=INTEGER},
+		   user_company_address_max = #{user_company_address_max,jdbcType=INTEGER},
+		   site_id = #{site_id,jdbcType=INTEGER},
+		   organization_id = #{organization_id,jdbcType=INTEGER}
+       </set>
+        where user_name !='admin' and id = #{id,jdbcType=INTEGER}
+    </update>
+
+	<!-- 根据条件查询管理用户列表 -->
+    <select id="queryList" resultType="com.tk.oms.sysuser.entity.SysUserInfo" parameterType="java.util.HashMap">
+        select * from (
+        select a.*,
+          ( select to_char(wm_concat(c.role_name)) from tbl_sys_user_role b,tbl_sys_role c where b.role_id = c.id and b.user_id = A.ID) roles, 
+          ( select to_char(wm_concat(c.store_name)) from tbl_sys_user_store b,tbl_store_info c where b.store_id = c.id and b.user_id = A.ID) stores,
+          ( select to_char(wm_concat(c.name)) from tbl_sys_user_site b,tbl_site_info c where b.site_id = c.id and b.user_id = A.ID) sites,
+          rownum rn from (
+            SELECT * from tbl_sys_user_info
+            <where>
+            		user_name !='admin' 
+            	<if test="user_name!=null and user_name!='' ">
+                    and user_name = #{user_name}
+                </if>
+                <if test="organization_id!=null and organization_id!='' ">
+                    and organization_id = #{organization_id}
+                </if>
+                <if test="user_realname!=null and user_realname!='' ">
+                    and user_realname like '%'||#{user_realname}||'%'
+                </if>
+                <if test="department!=null and department!='' ">
+                    and department like '%'||#{department}||'%'
+                </if>
+                <if test="phone!=null and phone!='' ">
+                    and phone like '%'||#{phone}||'%'
+                </if>
+                <if test="state != null">
+				   and state in
+				   <foreach item="item" collection="state" open="(" separator="," close=")">
+						#{item}
+				   </foreach>
+				</if>
+                <if test="user_type!=null and user_type!='' ">
+                    and user_type = #{user_type}
+                </if>
+            </where>
+            order by create_date desc
+        ) a where
+        rownum &lt;= #{end_rownum})
+        where rn &gt; #{start_rownum}
+    </select>
+
+	<!-- 根据条件查询管理用户数量 -->
+    <select id="queryCount" resultType="int" parameterType="java.util.HashMap">
+        SELECT
+        count(*)
+        from tbl_sys_user_info
+         <where>
+         			user_name !='admin' 
+            	<if test="user_name!=null and user_name!='' ">
+                    and user_name = #{user_name}
+                </if>
+                <if test="organization_id!=null and organization_id!='' ">
+                    and organization_id = #{organization_id}
+                </if>
+                <if test="user_realname!=null and user_realname!='' ">
+                    and user_realname like '%'||#{user_realname}||'%'
+                </if>
+                <if test="department!=null and department!='' ">
+                    and department like '%'||#{department}||'%'
+                </if>
+                <if test="phone!=null and phone!='' ">
+                    and phone like '%'||#{phone}||'%'
+                </if>
+                <if test="state != null">
+				   and state in
+				   <foreach item="item" collection="state" open="(" separator="," close=")">
+						#{item}
+				   </foreach>
+				</if>
+                <if test="user_type!=null and user_type!='' ">
+                    and user_type = #{user_type}
+                </if>
+            </where>
+    </select>
+
+	<!-- 查询管理用户详情 -->
+    <select id="queryById" resultType="com.tk.oms.sysuser.entity.SysUserInfo" parameterType="java.util.Map">
+            SELECT * from tbl_sys_user_info 
+            <where>
+                    user_name !='admin' and id = #{id}
+            </where>
+    </select>
+	<!-- 查询管理用户详情 -->
+    <select id="queryByUserId" resultType="com.tk.oms.sysuser.entity.SysUserInfo" parameterType="long">
+            SELECT * from tbl_sys_user_info where  id = #{id}
+    </select>
+    <!-- 查询管理用户详情 -->
+    <select id="queryBy" resultType="com.tk.oms.sysuser.entity.SysUserInfo" parameterType="java.util.Map">
+    	select * from tbl_sys_user_info 
+            <where>
+            		<if test="user_name!=null and user_name!='' ">
+                    	 user_name = #{user_name,jdbcType=VARCHAR}
+                	</if>
+            		<if test="id!=null and id!=0 ">
+                    	or id = #{id,,jdbcType=INTEGER}
+                	</if>
+            </where>
+    </select>
+    
+    <!-- 查询业务员或者业务经理或店长或营业员  （暂作废） -->
+	<select id="querytypeList" parameterType="java.util.Map" resultType="java.util.Map" resultMap="typeListMap">
+		select  id,user_name,state,user_type,user_realname,(user_name||'   '||user_realname)name
+		  from  tbl_sys_user_info sui
+		 where  sui.user_type=#{user_type,jdbcType=INTEGER}
+				and sui.state=2
+				<if test="user_name!=null and user_name!='' ">
+		            and sui.user_name like '%'||#{user_name}||'%'
+		        </if>
+		        <!--【通用查询下拉框】查询业务员信息（业务员门店指定，登录用户为所有） -->
+		        <if test="user_type==3 and ywy_store_id!=null and ywy_store_id!='' ">
+		            and exists(select 1 from tbl_store_user_rel t3 where store_id=#{ywy_store_id,jdbcType=INTEGER} and t3.type='3' and sui.id=t3.user_id)
+		        </if>
+		        <!--【通用查询下拉框】查询业务员信息（业务员指定，登录用户为业务员） -->
+		        <if test="user_type==3 and public_user_type==3">
+					and	exists (select 1 from tbl_store_user_rel tt3 where tt3.user_id=sui.id and tt3.user_id=#{public_user_id,jdbcType=INTEGER})
+				</if>
+				<!--【通用查询下拉框】查询业务员信息（业务员指定，登录用户为业务经理） -->
+				<if test="user_type==3 and public_user_type==4">
+					and	exists (select 1 from tbl_store_user_rel tt3 
+					             where tt3.user_id=sui.id 
+					              	   and tt3.type='3' 
+					                   and exists(select 1 from tbl_store_info tsi 
+					                               where tsi.manager_user_id = #{public_user_id,jdbcType=INTEGER} and tsi.id = tt3.store_id))
+				</if>
+				<!--【通用查询下拉框】查询业务员信息（业务员指定，登录用户为店长） -->
+				<if test="user_type==3 and public_user_type==5">
+					and	exists (select 1 from tbl_store_user_rel tt3 
+					             where tt3.user_id=sui.id 
+					              	   and tt3.type='3' 
+					                   and exists(select 1 from tbl_store_info tsi 
+					                               where tsi.shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER} and tsi.id = tt3.store_id))
+				</if>
+				<!--【通用查询下拉框】查询业务员信息（业务员指定，登录用户为营业员） -->
+				<if test="user_type==3 and public_user_type==6">
+					and	exists (select 1 from tbl_store_user_rel tt3 
+					             where tt3.user_id=sui.id 
+					              	   and tt3.type='3' 
+					                   and exists(select 1 from tbl_store_user_rel tsui 
+					                               where tsui.user_id = #{public_user_id,jdbcType=INTEGER} and tsui.store_id = tt3.store_id))
+				</if>
+				<!--【通用查询下拉框】查询业务经理（指定门店的业务经理，登录用户为所有）-->
+				<if test="user_type==4 and ywjl_store_id!=null and ywjl_store_id!='' ">
+		            and exists (select 1 from tbl_store_info t2 where id=#{ywjl_store_id,jdbcType=INTEGER} and t2.manager_user_id = sui.id)
+		        </if>
+		        <!--【通用查询下拉框】查询业务经理（指定合作商下面的所有业务经理）-->
+				<if test="user_type==4 and partner_user_id!=null and partner_user_id!='' ">
+		           and organization_id in(  select id from tbl_sys_organization_info where parent_id=(select organization_id from tbl_sys_user_info where id=#{partner_user_id,jdbcType=INTEGER}))
+		        </if>
+		        <!--【门店编辑】查询没有被本门店关联的店长和当前门店店长-->
+		        <if test="user_type==5 and dz_store_id!=null and dz_store_id!=''">
+		            and (not exists (select 1 from  tbl_store_info tsi where tsi.shopkeeper_user_id = sui.id)
+		            	 or exists(select 1 from tbl_store_info tsi where id=#{dz_store_id,jdbcType=INTEGER} and tsi.shopkeeper_user_id=sui.id))
+		        </if>
+		        <!--【门店编辑】查询没有被本门店关联的营业员和当前门店所有营业员-->
+		        <if test="user_type==6 and yyy_store_id!=null and yyy_store_id!=''">
+		            and (not exists (select 1 from  tbl_store_user_rel tsur where tsur.user_id = sui.id and tsur.type = 6 )
+		            	 or exists (select 1 from tbl_store_user_rel tusr1 where tusr1.user_id =sui.id and tusr1.store_id=#{yyy_store_id,jdbcType=INTEGER} and tusr1.type=6 )
+		   			)
+		        </if>
+		        <if test="public_user_type==9">
+					and sui.organization_id in (
+						select id from tbl_sys_organization_info where connect_by_isleaf=1
+						start with parent_id = #{public_user_organization_id,jdbcType=INTEGER} connect by prior id = parent_id
+					)
+				</if>
+		        <if test="user_realname !=null and user_realname !='' ">
+		            and sui.user_realname like '%'||#{user_realname}||'%'
+		        </if>
+	</select>
+	<resultMap id="typeListMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="name" property="option"/>
+    </resultMap>
+
+    <!-- 更新业务员验证码 -->
+    <update id="updateUserVerifyCode" parameterType="java.util.Map">
+        UPDATE TBL_SYS_USER_INFO
+        <set>
+            verification_code = #{verification_code,jdbcType=VARCHAR}
+        </set>
+        WHERE id = #{id,jdbcType=INTEGER}
+    </update>
+    
+    <!-- 查询公司所在地大区ID -->
+    <select id="queryBigAreaID" parameterType="long" resultType="long">
+            select nvl(sum(parent_id),0) parent_id from TBL_DIC_REGION 
+            <where>
+                     id = #{id,jdbcType=INTEGER}
+            </where>
+    </select>
+    
+    <!-- 查询用户关联的门店信息（业务经理、店长） -->
+    <select id="queryMd1ForUserId" parameterType="java.util.Map" resultType="java.util.Map">
+            select STORE_NAME from TBL_STORE_INFO 
+			<where>
+				<if test="user_type==4">
+ 					MANAGER_USER_ID = #{id,jdbcType=INTEGER} 
+				</if>
+				<if test="user_type==5">
+					SHOPKEEPER_USER_ID =  #{id,jdbcType=INTEGER}
+ 				</if>
+ 			</where>
+    </select>
+    
+    <!-- 查询用户关联的门店信息（营业员、业务员） -->
+    <select id="queryMd2ForUserId" parameterType="java.util.Map" resultType="java.util.Map">
+            select (select STORE_NAME from TBL_STORE_INFO where id = a.STORE_ID) STORE_NAME from TBL_STORE_USER_REL a 
+            <where>
+			 	user_id = #{id,jdbcType=INTEGER} 
+            	and type = #{user_type,jdbcType=INTEGER} 
+			</where>
+    </select>
+    
+    <!-- 查询用户关联的会员信息(待审核) -->
+    <select id="queryMember1ForUserId" parameterType="java.util.Map" resultType="java.util.Map">
+            select USER_MANAGE_NAME||'【'||LOGIN_NAME||'】' user_name from TBL_USER_INFO_APPLY 
+            <where>
+            	USER_STATE in (0,4) 
+            	<if test="user_type==3">
+            		and REFEREE_USER_ID = #{id,jdbcType=INTEGER}
+            	</if>
+            	<if test="user_type==4">
+            		and MARKET_SUPERVISION_USER_ID = #{id,jdbcType=INTEGER}
+            	</if>
+            </where>
+    </select>
+    
+    <!-- 查询用户关联的会员信息(已审核) -->
+    <select id="queryMember2ForUserId" parameterType="java.util.Map" resultType="java.util.Map">
+            select USER_MANAGE_NAME||'【'||LOGIN_NAME||'】' user_name from TBL_USER_INFO 
+            <where>
+            	USER_STATE in (1,2) 
+            	<if test="user_type==3">
+            		and REFEREE_USER_ID = #{id,jdbcType=INTEGER}
+            	</if>
+            	<if test="user_type==4">
+            		and MARKET_SUPERVISION_USER_ID = #{id,jdbcType=INTEGER}
+            	</if>
+            </where>
+    </select>
+    
+    <resultMap id="sysUserMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="user_name" property="value"/>
+        <result column="name" property="text"/>
+    </resultMap>
+    
+    <!-- 【通用下拉框】查询【业务经理】下拉 -->
+	<select id="querySysUserYwjlList" parameterType="java.util.Map" resultType="java.util.Map" resultMap="sysUserMap">
+		select  id,user_name,(user_name||'   '||user_realname) name
+		  from  tbl_sys_user_info sui
+		 	<where>  
+		 		sui.state=2
+				and sui.user_type = 4
+				<!-- 【通用】登录用户为【系统用户】,需要门店权限-->
+				<if test="public_user_type==2">
+					and exists (
+						select 1 from tbl_sys_user_store a,tbl_store_info b where a.store_id = b.id and b.manager_user_id = sui.id and a.user_id = #{public_user_id,jdbcType=INTEGER}
+					)
+				</if>
+		        <!-- 【通用】登录用户为【业务员】 -->
+		        <if test="public_user_type==3">
+					and	exists (select 1 from tbl_store_info si 
+					             where si.manager_user_id=sui.id 
+					                   and exists(select 1 from tbl_store_user_rel tsui 
+					                               where tsui.user_id = #{public_user_id,jdbcType=INTEGER} and tsui.store_id = si.id and type = 3))
+				</if>
+				<!-- 【通用】登录用户为【业务经理】 -->
+				<if test="public_user_type==4">
+					and sui.id = #{public_user_id,jdbcType=INTEGER}
+				</if>
+				<!-- 【通用】登录用户为【店长】 -->
+				<if test="public_user_type==5">
+					and	exists (select 1 from tbl_store_info tsi 
+					            where tsi.shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER} and sui.id = tsi.manager_user_id)
+				</if>
+				<!-- 【通用】登录用户为【营业员】-->
+				<if test="public_user_type==6">
+					and	exists (select 1 from tbl_store_info si 
+					             where si.manager_user_id=sui.id 
+					                   and exists(select 1 from tbl_store_user_rel tsui 
+					                               where tsui.user_id = #{public_user_id,jdbcType=INTEGER} and tsui.store_id = si.id and type = 6))
+				</if>
+				<!-- 【通用】登录用户为【销售管理】-->
+				<if test="public_user_type==9">
+					and sui.organization_id in (
+						select id from tbl_sys_organization_info where connect_by_isleaf=1
+						start with parent_id = #{public_user_organization_id,jdbcType=INTEGER} connect by prior id = parent_id
+					)
+					and user_type = 4
+				</if>
+			</where>
+	</select>
+	
+	<resultMap id="sysStoreMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="store_code" property="value"/>
+        <result column="store_name" property="text"/>
+    </resultMap>
+	
+	<!-- 【通用下拉框】查询【门店】下拉 -->
+    <select id="querySysStoreList"  resultType="java.util.Map" parameterType="java.util.Map" resultMap="sysStoreMap">
+		select 
+		id,
+		store_code,
+		store_name
+		from TBL_STORE_INFO tsi 
+		<where>
+			<!-- 【通用】登录用户为【系统用户】,需要门店权限-->
+			<if test="public_user_type == 2">
+				and exists (
+					select 1 from tbl_sys_user_store a where a.store_id = tsi.id and a.user_id = #{public_user_id,jdbcType=INTEGER}
+				)
+			</if>
+			<!-- 【通用】登录用户为【业务员】 -->
+			<if test="public_user_type == 3">
+				and exists (select 1 from tbl_store_user_rel tsui where tsui.store_id=tsi.id and type = 3 and tsui.user_id=#{public_user_id,jdbcType=INTEGER})
+			</if>
+			<!-- 【通用】登录用户为【业务经理】 -->
+			<if test="public_user_type == 4">
+				and tsi.manager_user_id=#{public_user_id,jdbcType=INTEGER}
+			</if>
+			<!-- 【通用】登录用户为【店长】 -->
+			<if test="public_user_type == 5">
+				and tsi.shopkeeper_user_id=#{public_user_id,jdbcType=INTEGER}
+			</if>
+			<!-- 【通用】登录用户为【营业员】-->
+			<if test="public_user_type == 6">
+				and exists (select 1 from tbl_store_user_rel tsui where tsui.store_id=tsi.id and type = 6 and tsui.user_id=#{public_user_id,jdbcType=INTEGER})
+			</if>
+			<!-- 【通用】登录用户为【销售管理】-->
+			<if test="public_user_type == 9">
+				and exists (
+					select 1 from tbl_sys_user_info b where organization_id in (
+						select id from tbl_sys_organization_info where connect_by_isleaf=1
+						start with parent_id = #{public_user_organization_id,jdbcType=INTEGER} connect by prior id = parent_id 
+					)
+					and b.user_type = 4
+					and tsi.manager_user_id = b.id
+				)
+			</if>
+			<!-- 【界面参数】【业务经理】 有参-->
+			<if test="page_select_ywjl_id != null and page_select_ywjl_id != 0">
+				and tsi.manager_user_id=#{page_select_ywjl_id,jdbcType=INTEGER}
+			</if>
+			<!-- 【界面参数】【业务经理】 无参 -->
+			<if test="page_select_ywjl_id == null or page_select_ywjl_id == 0">
+				and 1 != 1
+			</if>
+		</where>
+	</select>
+	
+	<!-- 【通用下拉框】查询【业务员】下拉 -->
+	<select id="querySysUserYwyList" parameterType="java.util.Map" resultType="java.util.Map" resultMap="sysUserMap">
+		select  id,user_name,(user_name||'   '||user_realname) name
+		  from  tbl_sys_user_info sui
+		 	<where>
+		 		sui.state=2
+				and sui.user_type = 3
+				<!-- 【通用】登录用户为【系统用户】,需要门店权限-->
+				<if test="public_user_type==2">
+					and exists (
+						select 1 from tbl_sys_user_store a,tbl_store_user_rel b where a.store_id = b.store_id and b.type=3 and sui.id = b.user_id and a.user_id = #{public_user_id,jdbcType=INTEGER}
+					)
+				</if>
+		        <!-- 【通用】登录用户为【业务员】 -->
+		        <if test="public_user_type==3">
+					and sui.id = #{public_user_id,jdbcType=INTEGER}
+				</if>
+				<!-- 【通用】登录用户为【业务经理】 -->
+				<if test="public_user_type==4">
+					and	exists (select 1 from tbl_store_user_rel tt3 
+					             where tt3.user_id=sui.id 
+					              	   and tt3.type='3' 
+					                   and exists(select 1 from tbl_store_info tsi 
+					                               where tsi.manager_user_id = #{public_user_id,jdbcType=INTEGER} and tsi.id = tt3.store_id))
+				</if>
+				<!-- 【通用】登录用户为【店长】 -->
+				<if test="public_user_type==5">
+					and	exists (select 1 from tbl_store_user_rel tt3 
+					             where tt3.user_id=sui.id 
+					              	   and tt3.type='3' 
+					                   and exists(select 1 from tbl_store_info tsi 
+					                               where tsi.shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER} and tsi.id = tt3.store_id))
+				</if>
+				<!-- 【通用】登录用户为【营业员】-->
+				<if test="public_user_type==6">
+					and	exists (select 1 from tbl_store_user_rel tt3 
+					             where tt3.user_id=sui.id 
+					              	   and tt3.type='3' 
+					                   and exists(select 1 from tbl_store_user_rel tsui 
+					                               where tsui.user_id = #{public_user_id,jdbcType=INTEGER} and tsui.store_id = tt3.store_id))
+				</if>
+				<!-- 【通用】登录用户为【销售管理】-->
+				<if test="public_user_type==9">
+				 	and exists (select 1 from tbl_store_user_rel tt3 
+					             where tt3.user_id=sui.id 
+					              	   and tt3.type='3' 
+					                   and exists(
+					                   		select 1 from tbl_store_info tsi where 
+					                   			exists
+						                   		(
+													select 1 from tbl_sys_user_info b where organization_id in (
+														select id from tbl_sys_organization_info where connect_by_isleaf=1
+														start with parent_id = #{public_user_organization_id,jdbcType=INTEGER} connect by prior id = parent_id 
+													)
+													and b.user_type = 4
+													and tsi.manager_user_id = b.id
+												)
+												and tsi.id = tt3.store_id
+										)
+								)
+				</if>
+				
+				<!-- 【界面参数】【门店】 有参-->
+				<if test="page_select_md_id != null and page_select_md_id != 0">
+					and	exists (select 1 from tbl_store_user_rel tsui where tsui.user_id = sui.id and tsui.store_id = #{page_select_md_id,jdbcType=INTEGER})
+				</if>
+				<!-- 【界面参数】【门店】 无参 -->
+				<if test="page_select_md_id == null or page_select_md_id == 0 ">
+					and 1 != 1
+				</if>
+			</where>	
+	</select>
+	
+	<!-- 【通用下拉框】查询【业务人员】（销售人员：业务经理、业务员、店长、营业员）下拉 -->
+	<select id="querySysUserYwryList" parameterType="java.util.Map" resultType="java.util.Map" resultMap="sysUserMap">
+		select  id,user_name,user_realname||'('||decode(sui.user_type,3,'业务员',4,'业务经理','5','店长','6','营业员')||')' name
+		  from  tbl_sys_user_info sui,
+		  		(select id as store_id,
+                        manager_user_id as user_id,
+                        4 as user_type
+                   from tbl_store_info
+                  where 1 = 1
+                  		<!-- 【界面参数】【门店】 有参-->
+						<if test="page_select_md_id != null and page_select_md_id != 0">
+						and	id = #{page_select_md_id,jdbcType=INTEGER}
+						</if>
+						<!-- 【界面参数】【门店】 无参 -->
+						<if test="page_select_md_id == null or page_select_md_id == 0 ">
+						and 1 != 1
+						</if>
+                 union
+                 select id as store_id,
+                        shopkeeper_user_id as user_id,
+                        5 as user_type
+                   from tbl_store_info
+                  where  1 = 1
+                  		<!-- 【界面参数】【门店】 有参-->
+						<if test="page_select_md_id != null and page_select_md_id != 0">
+						and	id = #{page_select_md_id,jdbcType=INTEGER}
+						</if>
+						<!-- 【界面参数】【门店】 无参 -->
+						<if test="page_select_md_id == null or page_select_md_id == 0 ">
+						and 1 != 1
+						</if>
+                 union
+                 select store_id, user_id, type as user_type
+                   from tbl_store_user_rel
+                   where 1 = 1
+                   		<!-- 【界面参数】【门店】 有参-->
+						<if test="page_select_md_id != null and page_select_md_id != 0">
+						and	store_id = #{page_select_md_id,jdbcType=INTEGER}
+						</if>
+						<!-- 【界面参数】【门店】 无参 -->
+						<if test="page_select_md_id == null or page_select_md_id == 0 ">
+						and 1 != 1
+						</if>
+                ) su
+		 	<where>
+		 		sui.state=2
+		 		and sui.user_type in(3,4,5,6)
+		 		and sui.id = su.user_id
+				<!-- 【通用】登录用户为【系统用户】,需要门店权限-->
+				<if test="public_user_type==2">
+					and exists (
+						select 1
+						  from tbl_sys_user_store a
+						 where a.user_id = #{public_user_id,jdbcType=INTEGER}
+						 	   and a.store_id = su.store_id
+					)
+				</if>
+		        <!-- 【通用】登录用户为【业务员】 -->
+		        <if test="public_user_type==3">
+		        	and sui.user_type in(3)
+					and sui.id = #{public_user_id,jdbcType=INTEGER}
+				</if>
+				<!-- 【通用】登录用户为【业务经理】 -->
+				<if test="public_user_type==4">
+					and	exists (select 1 
+								  from tbl_store_info tsi 
+					             where tsi.manager_user_id = #{public_user_id,jdbcType=INTEGER} 
+					                   and tsi.id = su.store_id)
+				</if>
+				<!-- 【通用】登录用户为【店长】 -->
+				<if test="public_user_type==5">
+					and sui.user_type in(3,5,6)
+					and	exists (select 1 
+					              from tbl_store_info tsi 
+					             where tsi.shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER} 
+					                   and tsi.id = su.store_id)
+				</if>
+				<!-- 【通用】登录用户为【营业员】-->
+				<if test="public_user_type==6">
+					and sui.user_type in(3,5,6)
+					and	exists (select 1 
+					              from tbl_store_user_rel tsui 
+					             where tsui.user_id = #{public_user_id,jdbcType=INTEGER} 
+					                   and tsui.store_id = su.store_id)
+				</if>
+				<!-- 【通用】登录用户为【销售管理】-->
+				<if test="public_user_type==9">
+				 	and exists (select 1 
+				 	              from tbl_store_info tsi 
+				 	             where exists( select 1 
+				 	                             from tbl_sys_user_info b 
+				 	                            where organization_id in(
+												           select id 
+												             from tbl_sys_organization_info 
+												            where connect_by_isleaf=1
+												            start with parent_id = #{public_user_organization_id,jdbcType=INTEGER} 
+												            connect by prior id = parent_id)
+										              and b.user_type = 4
+										              and b.id = tsi.manager_user_id
+									   )
+									   and tsi.id = su.store_id
+						)
+				</if>
+			</where>	
+	</select>
+	
+	<!-- 查询用户默认登录验证码 -->
+    <select id="queryLoginVerifyCode" resultType="string">
+    	select verify_code from tbl_verify_code where type='login'
+    </select>
+    
+    
+    <!-- 更新用户ip -->
+    <update id="updateUserIp"  parameterType="java.util.Map">
+         update tbl_sys_user_info 
+         	<set>
+	           user_ip = #{user_ip,jdbcType=VARCHAR}
+	       </set>
+         where id= #{id,jdbcType=INTEGER}
+    </update>
+    
+    <!--白名单列表-->
+	<select id="queryWhiteIpList" resultType="java.lang.String" parameterType="java.lang.String">
+		select user_ip from tbl_sys_user_info where user_name=#{user_name,jdbcType=VARCHAR}
+	</select>
+	
+	<!--创建系统用户帐号信息-->
+	<insert id="insertSysBankAccount" parameterType="java.util.Map">
+		insert into tbl_sys_bank_account
+		(
+			id,
+			user_id,
+			account_balance,
+			account_balance_checkcode,
+			create_date
+		)
+		values
+		(
+			seq_sys_bank_account.nextval,
+			#{user_id,jdbcType=INTEGER},
+			0,
+			#{account_balance_checkcode,jdbcType=VARCHAR},
+			sysdate
+		)
+	</insert>
+	
+	<insert id ="insertSysUserCacheKey" parameterType ="java.util.Map">
+		insert into TBL_SYS_CACHE_KEY (user_name,cache_key,create_time)
+		values (
+			#{user_name,jdbcType=VARCHAR},
+			#{cache_key,jdbcType=VARCHAR},
+			sysdate
+		)
+	</insert>
+	
+	<!--获取当前业务经理 、当前门店下业务员、业务经理、店长、营业员数据-->
+	<select id="querySysUserList" resultMap="sysUserOption" parameterType="java.util.Map">
+		select shopkeeper_user_id as user_id,
+		       (select user_realname from tbl_sys_user_info where id = shopkeeper_user_id) as user_realname
+		  from tbl_store_info
+		 where manager_user_id = #{ywjl_user_id,jdbcType=INTEGER} AND id = #{store_id,jdbcType=INTEGER}
+		union all
+		select id as user_id, 
+			   user_realname
+		  from tbl_sys_user_info
+		 where id = #{ywjl_user_id,jdbcType=INTEGER}
+		union all
+		select (select id from tbl_sys_user_info where id = tsur.user_id) as user_id,
+		       (select user_realname from tbl_sys_user_info where id = tsur.user_id) as user_realname
+		  from tbl_store_user_rel tsur
+		 where store_id =#{store_id,jdbcType=INTEGER} and type = 3
+		union all
+		select (select id from tbl_sys_user_info where id = tsur.user_id) as user_id,
+		       (select user_realname from tbl_sys_user_info where id = tsur.user_id) as user_realname
+		  from tbl_store_user_rel tsur
+		 where store_id =#{store_id,jdbcType=INTEGER} and type = 6
+	</select>
+	<resultMap id="sysUserOption" type="java.util.Map">
+        <result column="user_id" property="id"/>
+        <result column="user_realname" property="option"/>
+    </resultMap>
+
+	<!--获取用户OA系统登录OpenId-->
+	<select id="getSysUserOAOpenIdById" resultType="java.lang.String">
+		SELECT oa_open_id FROM TBL_USER_AUTHOR WHERE user_id = #{userId, jdbcType=INTEGER}
+	</select>
+    
+    <!--查询指定门店下的【业务员、业务经理、店长、营业员】-->
+	<select id="querySalersList" resultType="java.util.Map" parameterType="java.util.Map">
+		select * from (
+			select id as user_id,
+				  user_realname,
+				  user_type
+				 from tbl_sys_user_info where id=(select manager_user_id from tbl_store_info where id=#{store_id,jdbcType=INTEGER})
+			union all
+			select shopkeeper_user_id as user_id,
+	               (select user_realname from tbl_sys_user_info where id = shopkeeper_user_id) as user_realname,
+	               (select user_type from tbl_sys_user_info where id = shopkeeper_user_id) as user_type
+	          from tbl_store_info
+	         where  id = #{store_id,jdbcType=INTEGER}
+	        union all
+	        select (select id from tbl_sys_user_info where id = tsur.user_id) as user_id,
+	               (select user_realname from tbl_sys_user_info where id = tsur.user_id) as user_realname,
+	               (select user_type from tbl_sys_user_info where id = tsur.user_id) as user_type
+	          from tbl_store_user_rel tsur
+	         where store_id =#{store_id,jdbcType=INTEGER} and type = 3
+	        union all
+	        select (select id from tbl_sys_user_info where id = tsur.user_id) as user_id,
+	               (select user_realname from tbl_sys_user_info where id = tsur.user_id) as user_realname,
+	               (select user_type from tbl_sys_user_info where id = tsur.user_id) as user_type
+	          from tbl_store_user_rel tsur
+	         where store_id =#{store_id,jdbcType=INTEGER} and type = 6)
+	         where user_id is not null
+         order by user_type
+	</select>
+	
+	 <!-- 按用户类型查询指定用户列表-->
+	<select id="queryUserList" resultType="java.util.Map" parameterType="java.util.Map" resultMap="userListMap">
+		select  id,user_name,(user_name||'   '||user_realname) name
+		  from  tbl_sys_user_info sui
+		 	where  
+		 		sui.state=2
+				and sui.user_type = #{user_type,jdbcType=INTEGER}
+			<if test="user_type==3">
+				and	not exists(select 1 from tbl_store_user_rel 
+									where user_id=sui.id and type=3
+									<if test="ywy_store_id !=null and ywy_store_id!=''">
+										and store_id&lt;&gt; #{ywy_store_id,jdbcType=INTEGER}
+									</if>
+									)
+			</if>
+			<if test="user_type==5">
+				and	not exists(select 1 from tbl_store_info 
+									where shopkeeper_user_id=sui.id
+									<if test="dz_store_id !=null and dz_store_id!=''">
+										and id&lt;&gt; #{dz_store_id,jdbcType=INTEGER}
+									</if>
+									)
+			</if>
+			<if test="user_type==6">
+				and	not exists(select 1 from tbl_store_user_rel 
+									where user_id=sui.id and type=6
+									<if test="yyy_store_id !=null and yyy_store_id!=''">
+										and store_id&lt;&gt; #{yyy_store_id,jdbcType=INTEGER}
+									</if>
+									)
+			</if>
+	</select>
+	<resultMap id="userListMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="name" property="option"/>
+    </resultMap>
+	<!--新建自定义系统用户帐户-->
+	<insert id="insertCustomUserAccount" parameterType="java.util.Map">
+		<selectKey keyProperty="id" resultType="int" order="BEFORE">
+			SELECT SEQ_SYS_USER_INFO.nextval FROM DUAL
+		</selectKey>
+		insert into TBL_SYS_USER_INFO(
+			id,
+			user_name,
+			user_realname,
+			phone,
+			state
+		) VALUES
+		(
+			#{id,jdbcType=INTEGER},
+			#{userName,jdbcType=VARCHAR},
+			#{userRealname,jdbcType=VARCHAR},
+			#{phone,jdbcType=VARCHAR},
+			2
+		)
+	</insert>
+	<!--获取推介人数据(推荐人可选范围：销售管理、业务经理、业务员、店长、营业员)-->
+	<select id="queryGroundPushList" resultMap="groundPushOption" parameterType="java.util.Map">
+		select id,user_realname||'('||decode(user_type,3,'业务员',4,'业务经理',5,'店长',6,'营业员',9,'销售管理')||')' user_realname from tbl_sys_user_info where user_type in(3,4,5,6,9)
+	</select>
+	<resultMap id="groundPushOption" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="user_realname" property="option"/>
+    </resultMap>
+</mapper>

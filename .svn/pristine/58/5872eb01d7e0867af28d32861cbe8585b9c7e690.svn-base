@@ -1,0 +1,92 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+ <head>
+    <meta http-equiv="content-type" content="text/html;charset=utf-8">
+    <title>测试界面</title>
+    <script src="http://apps.bdimg.com/libs/jquery/1.8.0/jquery.min.js"></script>
+    <script src="jquery.form.js"></script>
+    <script src="webtoolkit.md5.js"></script>
+    <script src="t.js"></script>
+    <style type="text/css">
+    	body
+		{
+			font-size:18px;
+		}
+    </style>
+    <script type="text/javascript">
+        // ################################ 常量定义 ################################
+        var BaseURL = "/";
+        var jmURL = BaseURL+"test/encryption";//加密url
+		var jm2URL = BaseURL+"test/decrypt";//解密url
+		/**
+		测试地址，注意,测试地址中的 / 使用两个下划线代替
+		**/
+        var DATA_MAP = {
+            fixed_module__detail: {
+                info: '固定模块详情',
+                data: '{"page_id":10003437,"module_code":"brand","group_sort":0,"site_id":"1"}'
+            },
+            fixed_module__edit: {
+                info: '固定模块配置',
+                data: '{"page_id":10003437,"module_code":"classify","group_sort":2,"site_id":"1","module_base_conf":{"links":[{"link_name":"1","link_url":"2#link#9506001"},{"link_name":"2","link_url":"5#link#1212"},{"link_name":"3","link_url":"2#link#0657005"}],"left_links":[{"img_url":"http://tkimg2-test.img-cn-hangzhou.aliyuncs.com/201711/20171109/cd52553944e8108e39ff.jpg","link_url":"2#link#0657998"}],"title":"23123","color":"#ff0000","count":"5","left_count":"1","right_select_type":"1","right_recommend_type":"1","right_product_type_id":"295","right_activity_id":"","right_sort":"overall asc","right_count":"4","bottom_count":"3","right_products":[{"product_itemnumber":"0646006","title":"33"},{"product_itemnumber":"0646007","title":"44"}],"bottom_products":[{"product_itemnumber":"0646003","title":"1","selling":"2"},{"product_itemnumber":"0646005","title":"3","selling":"4"}]}}'
+            },
+            fixed_module__data: {
+                info: '固定模块数据',
+                data: '{"page_id":"10003437","module_code":"update_product","group_sort":0,"site_id":"1"}'
+            },
+            fixed_module__like_data: {
+                info: '猜你喜欢商品数据',
+                data: '{"page_id":10003437,"pageIndex":"1","pageSize":10,"site_id":"1"}'
+            },
+            fixed_module__home_page__like_data: {
+                info: '猜你喜欢商品数据',
+                data: '{"page_id":10004507,"pageIndex":"1","pageSize":10,"site_id":"1"}'
+            },
+            fixed_module__remove: {
+                info: '删除固定模板',
+                data: '{"page_id":315,"module_code":"classify","group_sort":3}'
+            },
+            fixed_module__sort: {
+                info: '固定模板排序',
+                data: '{"page_id":315,"module_code":"classify","new_group_id":1,"old_group_id":0}'
+            },
+            fixed_module__count: {
+                info: '固定模板数量',
+                data: '{"page_id":315}'
+            },
+            fixed_module__activity_data: {
+                info: '固定模板数量',
+                data: '{"activity_id":402,"site_id":"1","pageIndex":"1","pageSize":10}'
+            },
+            fixed_module__order_list: {
+                info: '定制订单列表',
+                data: '{}'
+            }
+        };
+    </script>
+</head>
+<body>
+Action:
+<!-- 
+<input type="radio" name="action" value="http://localhost:8080/esb/" onclick="changeAction(this);" checked="checked"/>localhost
+<input type="radio" name="action" value="http://192.168.0.188:8080/esb/" onclick="changeAction(this);"/>188
+ -->
+<br/>
+<select id="action_select" onchange="h($('#action_select option:selected').attr('value'))" size="8"
+        style="width:40%;">
+</select><br/>
+访问URL:
+<input id="submit_url" onchange="h(this.value)" value=".action" style="width:35%;background-color:pink;height:30"><form id="htmlForm" name="htmlForm" action="" method="post">
+    data:<input type="button" value="提交" onclick="submit_function('data');"/>
+    <input type="button" onclick="javascript: $('#ret').val('');" value="清除"/><br/>
+    <textarea id="data" name="data" style="width:40%;height:100px;font-size: 15px;font-family:monaco" onchange="load_data('data')"></textarea>
+    <input id="req_h_data" type="hidden" value=""/>
+    <input id="res_h_data" type="hidden" value=""/>
+</form>
+<div style="position: fixed;top: 20px;right:30px;width:45%;overflow-y: auto;height:100%;background: #eee;">
+    response:<br/>
+    <span id="ret" style="font-size: 15px;font-family:monaco"></span>
+</div>
+<div id="data_view" style="position: fixed;top:350px;width:40%;overflow-y: auto;height: 400px;background: #eee;font-size: 15px;font-family:monaco"></div>
+</body>
+</html>

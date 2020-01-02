@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.store.finance.dao.AccountInfoDao">
+	<!-- 个人基本信息 -->
+	<select id="queryAccountInfoBasic" parameterType="java.util.Map" resultType="java.util.Map">
+		select user_name,
+			   user_realname,
+			   user_type,
+			   organization_id,
+			   (select organization_name from tbl_sys_organization_info where id = t.organization_id) organization_name,
+			   department,
+			   phone,
+			   state
+		  from tbl_sys_user_info t
+		 where id = #{public_user_id,jdbcType=INTEGER}
+		   and user_type = 9
+	</select>
+	<!-- 获取银行卡列表 -->
+	<select id="queryBankCardList" parameterType="java.util.Map" resultType="java.util.Map">
+		select id,
+		       bank_card,
+		       (select bank_name from tbl_dic_cnaps_bank where bank_no = t.bank_code) bank_name,
+		       owner_name,
+		       to_char(bind_date, 'yyyy-mm-dd hh24:mi:ss') bind_date
+		  from tbl_sys_bank_card t
+		 where is_delete = 1
+		   and user_id = #{public_user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 获取认证信息 -->
+	<select id="queryAuthenticationInfo" parameterType="java.util.Map" resultType="java.util.Map">
+		select user_real_name,
+			   user_manage_cardid,
+			   user_manage_cardid_img,
+			   state
+		  from tbl_bank_card_user_info 
+		 where user_id = #{user_id,jdbcType=INTEGER}
+		   and type = 3
+		   <if test="state != null and state !=''">
+		   and state = #{state,jdbcType=INTEGER}
+		   </if>
+	</select>
+	<!-- 查询银行卡信息 -->
+	<select id="queryBankCardDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select user_id,
+			   bank_card,
+			   bank_code,
+			   owner_name,
+			   bind_state,
+			   bind_type,
+			   bank_clscode
+		  from tbl_sys_bank_card 
+		 where is_delete = 1 
+		   <if test="id != null and id !=''">
+		   and id = #{id,jdbcType=INTEGER}
+		   </if>
+		   <if test="user_id != null and user_id !=''">
+		   and user_id = #{user_id,jdbcType=INTEGER}
+		   </if>
+		   <if test="bank_card != null and bank_card !=''">
+		   and bank_card = #{bank_card,jdbcType=VARCHAR}
+		   </if>
+	</select>
+	<!-- 解绑 -->
+	<delete id="unbind" parameterType="java.util.Map">
+		delete from tbl_sys_bank_card where id = #{id,jdbcType=INTEGER}
+	</delete>
+	<!-- 获取银行子账户 -->
+	<select id="queryBankAccountByUserId" parameterType="int" resultType="java.util.Map">
+		select user_id,
+			   bank_account,
+			   sub_merchant_id
+		  from tbl_sys_bank_account
+		 where user_id = #{user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 判断是否已绑定银行卡 -->
+	<select id="queryUserBankCardCount" parameterType="java.util.Map" resultType="int">
+		select count(1) 
+		  from tbl_sys_bank_card 
+		 where user_id = #{public_user_id,jdbcType=INTEGER}
+		   and is_delete='1'
+	</select>
+	
+	<!--通过bank_code获取银行信息（短信）-->
+	<select id="queryBankForNote" parameterType="java.util.Map" resultType="java.util.Map">
+	   select bank_name,
+              bank_clscode
+         from tbl_dic_cnaps_bank
+        where bank_no = #{bank_code,jdbcType=VARCHAR} and status = '1'
+	</select>
+	<!-- 添加银行卡 -->
+	<insert id="insert" parameterType="java.util.Map">
+		insert into tbl_sys_bank_card
+		(
+			id,
+			user_id,
+			bank_card,
+			bank_code,
+			owner_name,
+			bind_date,
+			bind_state,
+			default_flag,
+			create_user_id,
+			create_date,
+			bank_clscode,
+			bind_type,
+			is_delete,
+			mobile_phone
+		) values (
+			seq_sys_bank_card.nextVal,
+			#{public_user_id,jdbcType=INTEGER},
+			#{bank_card,jdbcType=VARCHAR},
+			#{bank_code,jdbcType=VARCHAR},
+			#{owner_name,jdbcType=VARCHAR},
+			sysdate,
+			'1',
+			'2',
+			#{public_user_id,jdbcType=INTEGER},
+			sysdate,
+			#{bank_clscode,jdbcType=VARCHAR},
+			'1',
+			'1',
+			#{mobile_phone,jdbcType=VARCHAR}
+		)
+	</insert>
+	
+	<!--通过bank_clscode获取银行信息-->
+    <select id="queryBankByClscode" parameterType="java.lang.String" resultType="java.util.Map">
+        select bank_name,
+        	   logo_url,
+        	   bank_code,
+        	   bank_clscode
+         from tbl_dic_bank
+        where bank_clscode = #{bank_clscode,jdbcType=VARCHAR} 
+          and is_display = '1'
+    </select>
+    
+    <!-- 增加认证信息 -->
+	<insert id="insertAuthenticationInfo" parameterType="java.util.Map" >
+		insert into tbl_bank_card_user_info(
+			id,
+			user_id,
+			user_real_name,
+			user_manage_cardid,
+			user_manage_cardid_img,
+			state,
+			type,
+			create_date
+		) values(
+			SEQ_BANK_CARD_USER_INFO.nextval,
+			#{public_user_id,jdbcType=INTEGER},
+			#{user_real_name,jdbcType=VARCHAR},
+			#{user_manage_cardid,jdbcType=VARCHAR},
+			#{user_manage_cardid_img,jdbcType=VARCHAR},
+			0,
+			3,
+			sysdate
+		)
+	</insert>
+	<!-- 更新认证信息 -->
+	<update id="updateAuthenticationInfo" parameterType="java.util.Map">
+		update tbl_bank_card_user_info
+		   set state = 0,
+		   	   user_real_name = #{user_real_name,jdbcType=VARCHAR},
+		   	   user_manage_cardid = #{user_manage_cardid,jdbcType=VARCHAR},
+		   	   user_manage_cardid_img = #{user_manage_cardid_img,jdbcType=VARCHAR},
+		   	   approval_user_id = '',
+		   	   approval_date = '',
+		   	   rejected_reason = ''
+		 where user_id = #{public_user_id,jdbcType=INTEGER}
+		   and type = 3	   
+	</update>
+	<!--判断当前身份证号是否重复-->
+	<select id="checkUserManageCardIdCount" parameterType="java.util.Map" resultType="int">
+		select count(1) 
+			from TBL_BANK_CARD_USER_INFO t 
+		where type=3 and user_manage_cardid=#{user_manage_cardid,jdbcType=VARCHAR}
+		and exists(select 1 from tbl_sys_user_info tt 
+						where tt.id=t.user_id and tt.user_type=#{user_type,jdbcType=INTEGER})
+		<if test="id != null and id != ''">
+			and id &lt;&gt; #{id,jdbcType=INTEGER}
+		</if>
+	</select>
+	
+</mapper>

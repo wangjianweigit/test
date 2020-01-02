@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tk.oms.sys.dao.AppVersionDao">
+
+    <!--分页查询App版本记录列表-->
+    <select id="listAppVersionForPage" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select t.*,rownum as rn from (
+                select
+                    id,
+                    Lower(system) system,
+                    version,
+                    version_code,
+                    project_version,
+                    is_enable,
+                    app_url,
+                    remark,
+                    app_type,
+                    state,
+                    to_char(create_date,'YYYY-MM-DD HH24:MI:SS') create_date,
+                    function_state
+                from tbl_app_version_info
+                where delete_flag = 0
+                <if test="version != null and version != ''">
+                    and version = #{version,jdbcType=VARCHAR}
+                </if>
+                <if test="app_type != null and app_type != ''">
+                    and app_type = #{app_type,jdbcType=INTEGER}
+                </if>
+                <if test="system != null and system != ''">
+                    and Lower(system) = #{system,jdbcType=VARCHAR}
+                </if>
+                <if test="is_enable != null and is_enable != ''">
+                    and is_enable = #{is_enable,jdbcType=INTEGER}
+                </if>
+                order by app_type desc,Lower(system) desc,version_code desc, version desc
+            ) t where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--查询App版本记录列表总数量-->
+    <select id="countAppVersionForPage" parameterType="java.util.Map" resultType="int">
+        select count(1) from tbl_app_version_info where delete_flag = 0
+        <if test="version != null and version != ''">
+            and version = #{version,jdbcType=VARCHAR}
+        </if>
+        <if test="app_type != null and app_type != ''">
+            and app_type = #{app_type,jdbcType=INTEGER}
+        </if>
+        <if test="system != null and system != ''">
+            and Lower(system) = #{system,jdbcType=VARCHAR}
+        </if>
+        <if test="is_enable != null and is_enable != ''">
+            and is_enable = #{is_enable,jdbcType=INTEGER}
+        </if>
+    </select>
+
+    <!--根据ID查询App版本-->
+    <resultMap type="java.util.Map" id="resultDetailMap">
+        <result column="id" property="id" />
+        <result column="system" property="system" />
+        <result column="version" property="version"/>
+        <result column="version_code" property="version_code"/>
+        <result column="app_url" property="app_url" />
+        <result column="remark" property="remark" />
+        <result column="app_type" property="app_type" />
+        <result column="project_version" property="project_version" />
+    </resultMap>
+    <select id="getAppVersionById" parameterType="java.lang.Long" resultMap="resultDetailMap">
+        select
+            id,
+            Lower(system) system,
+            version,
+            app_url,
+            remark,
+            version_code,
+            project_version,
+            app_type,
+            function_state
+        from tbl_app_version_info
+        where id = #{version_id,jdbcType=INTEGER} and delete_flag = 0
+    </select>
+
+    <!--根据版本号查询版本数量-->
+    <select id="countAppVersionByVersion" parameterType="java.util.Map" resultType="int">
+        select
+            count(1)
+        from tbl_app_version_info
+        where version = #{version,jdbcType=VARCHAR} and delete_flag = 0
+        and app_type = #{app_type,jdbcType=INTEGER} and system = #{system,jdbcType=VARCHAR}
+        <if test="version_id != null and version_id !=''">
+            and id != #{version_id,jdbcType=INTEGER}
+        </if>
+    </select>
+
+    <!--查询最大的版本代号-->
+    <select id="getMaxVersionCode" parameterType="java.util.Map" resultType="int">
+        select
+            nvl(max(version_code),0) version_code
+        from tbl_app_version_info
+        where delete_flag = 0
+        and app_type = #{app_type,jdbcType=INTEGER} and system = #{system,jdbcType=VARCHAR}
+        <if test="version_id != null and version_id !=''">
+            and id != #{version_id,jdbcType=INTEGER}
+        </if>
+    </select>
+
+    <!--新增App版本-->
+    <insert id="insertAppVersion" parameterType="java.util.Map">
+        insert into tbl_app_version_info(
+            id,
+            system,
+            app_type,
+            version,
+            version_code,
+            project_version,
+            app_url,
+            remark,
+            state,
+            is_enable,
+            create_date,
+            creater_id,
+            delete_flag
+        ) values (
+            seq_app_version_info.nextval,
+            #{system,jdbcType=VARCHAR},
+            #{app_type,jdbcType=INTEGER},
+            #{version,jdbcType=VARCHAR},
+            #{version_code,jdbcType=INTEGER},
+            #{project_version,jdbcType=VARCHAR},
+            #{app_url,jdbcType=VARCHAR},
+            #{remark,jdbcType=VARCHAR},
+            1,
+            2,
+            sysdate,
+            #{public_user_id,jdbcType=INTEGER},
+            0
+        )
+    </insert>
+
+    <!--更新App版本-->
+    <update id="updateAppVersion" parameterType="java.util.Map">
+        update tbl_app_version_info set
+        <if test="system != null and system != ''">
+            system = #{system,jdbcType=VARCHAR},
+        </if>
+        <if test="version != null and version != ''">
+            version = #{version,jdbcType=VARCHAR},
+        </if>
+        <if test="version_code != null and version_code != ''">
+            version_code = #{version_code,jdbcType=VARCHAR},
+        </if>
+        <if test="project_version != null and project_version != ''">
+            project_version = #{project_version,jdbcType=VARCHAR},
+        </if>
+        <if test="app_url != null and app_url != ''">
+            app_url = #{app_url,jdbcType=VARCHAR},
+        </if>
+        <if test="remark != null and remark != ''">
+            remark = #{remark,jdbcType=VARCHAR},
+        </if>
+        <if test="state != null and state != ''">
+            state = #{state,jdbcType=INTEGER},
+        </if>
+        <if test="is_enable != null and is_enable != ''">
+            is_enable = #{is_enable,jdbcType=INTEGER},
+        </if>
+        <if test="function_state != null and function_state != 0">
+            function_state = #{function_state,jdbcType=INTEGER},
+        </if>
+            update_date = sysdate,update_id = #{public_user_id,jdbcType=INTEGER}
+        where id = #{version_id,jdbcType=INTEGER} and delete_flag = 0
+    </update>
+
+    <!--删除App版本-->
+    <update id="deleteAppVersion" parameterType="java.lang.Long">
+        update tbl_app_version_info set
+            delete_flag = 1,
+            update_date = sysdate,
+            update_id = #{public_user_id,jdbcType=INTEGER}
+        where id = #{version_id,jdbcType=INTEGER} and delete_flag = 0
+    </update>
+</mapper>

@@ -1,0 +1,1490 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.returns.dao.ReturnsDao">
+	<sql id="all_column">
+			TORI.ID,
+			TORI.RETURN_NUMBER,
+			TORI.ORDER_NUMBER,
+			TORI.USER_NAME,
+			TORI.USER_MANAGE_NAME,
+			TORI.PRODUCT_MONEY,
+			TORI.PRODUCT_COUNT,
+			TORI.LOGISTICS_MONEY,
+			TORI.DF_MONEY,
+			TORI.RETURN_TOTAL_MONEY,
+			TORI.STATE,
+			TORI.RETURN_REMARK,
+			TORI.APPLY_TYPE,
+			TORI.APPLY_USER_NAME,
+			TORI.APPLY_USER_REALNAME,
+			TO_CHAR(TORI.CREATE_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  CREATE_DATE,
+			TORI.CHECK_USER_NAME,
+			TORI.CHECK_USER_REALNAME,
+			TO_CHAR(TORI.CHECK_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  CHECK_DATE,
+			TORI.CHECK_CANCLE_REASON,
+			TORI.MARK_REMARK
+	</sql>
+	<sql id="returnInfo_column">
+			tri.id,
+            tri.return_number,
+            nvl(tri.refund_product_money,0) refund_product_money,
+            tri.apply_state,
+            tri.create_user_name,
+            to_char(tri.create_date,'yyyy-mm-dd hh24:mi:ss')  as  create_date,
+            to_char(tri.return_product_confirm_date,'yyyy-mm-dd hh24:mi:ss')  as  return_product_confirm_date,
+            tri.check_user_name,
+            to_char(tri.check_date,'yyyy-mm-dd hh24:mi:ss')  as  check_date,
+            tri.check_cancel_reason,
+            nvl(tri.return_total_money,0) return_total_money,
+            tri.return_reason,
+            tri.return_remark,
+            tri.return_logistics_company,
+            tri.return_logistics_remark,
+            tri.return_logistics_number,
+            nvl(tri.buyer_freight_money,0) buyer_freight_money,
+            nvl(tri.seller_freight_money,0) seller_freight_money,
+            nvl(tri.compensate_money,0) compensate_money,
+            nvl(tri.debit_money,0) debit_money,
+            to_char(tri.return_logistics_create_date,'yyyy-mm-dd hh24:mi:ss') return_logistics_create_date,
+            to_char(tri.cancel_date,'yyyy-mm-dd hh24:mi:ss') cancel_date,
+            to_char(tri.confirm_receive_date,'yyyy-mm-dd hh24:mi:ss') confirm_receive_date,
+            to_char(tri.refund_date,'yyyy-mm-dd hh24:mi:ss') refund_date,
+            DECODE(tri.return_type,'1','政策退换货','2','品质退换货','3','样品退货') return_type,
+            tri.return_product_count,
+            tri.seller_freight_number,
+            tri.seller_freight_company,
+            tri.return_after_sale_name,
+            tri.return_after_sale_mobile,
+            tri.return_after_sale_address,
+            tri.partner_check_user_name,
+            to_char(tri.partner_check_date,'yyyy-mm-dd hh24:mi:ss') partner_check_date,
+            tri.partner_cancel_reason,
+            tri.create_user_type,
+            tri.partner_user_name
+	</sql>
+	<!-- 获取退货单列表 -->
+    <select id="queryReturnsList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT  A.*,
+    			(SELECT TOI.PAYMENT_MONEY FROM TBL_ORDER_INFO TOI WHERE TOI.ORDER_NUMBER = A.ORDER_NUMBER ) AS PAYMENT_MONEY,
+    			(SELECT LOGIN_NAME FROM TBL_USER_INFO WHERE USER_NAME = A.USER_NAME) AS LOGIN_NAME,
+    			(CASE A.APPLY_TYPE WHEN '1' THEN (SELECT LOGIN_NAME FROM TBL_USER_INFO T WHERE T.USER_NAME=A.USER_NAME)
+                                 WHEN '2' THEN APPLY_USER_NAME END) AS APPLY_USER_NAME_R  
+    	  FROM (SELECT T.*,ROWNUM AS RN
+				  FROM (SELECT <include refid="all_column"/>
+				  		  FROM TBL_ORDER_RETURN_INFO TORI
+					    <where>
+							   TORI.ORDER_TYPE = #{order_type,jdbcType=INTEGER}
+							   AND EXISTS(
+							   	   SELECT 1 FROM TBL_ORDER_INFO TOI 
+							   	   <where>
+							   	  		    1=1
+							   	  		    AND TOI.ORDER_NUMBER = TORI.ORDER_NUMBER
+							   	  		<if test="ywjl_user_name != null and ywjl_user_name != '' ">
+							    			AND	TOI.YWJL_USER_NAME = #{ywjl_user_name,jdbcType=VARCHAR}
+										</if>
+										<if test="md_id != null and md_id != 0 ">
+							    			AND	TOI.MD_ID = #{md_id,jdbcType=INTEGER}
+										</if>
+										<if test="ywy_user_name != null and ywy_user_name != '' ">
+							    			AND	TOI.YWY_USER_NAME = #{ywy_user_name,jdbcType=VARCHAR}
+										</if>
+							   	  		<if test="public_user_type != null and public_user_type == 2">
+					            			and EXISTS (SELECT 1 FROM TBL_SYS_USER_STORE TSUS WHERE TSUS.STORE_ID = TOI.MD_ID AND TSUS.USER_ID = #{public_user_id,jdbcType=INTEGER})
+					        			</if>
+					        			<if test="public_user_type != null and public_user_type == 3">
+					            			and TOI.YWY_USER_NAME = #{public_user_name,jdbcType=VARCHAR}
+					        			</if>
+					        			<if test="public_user_type != null and public_user_type == 4">
+					          			  and TOI.YWJL_USER_NAME = #{public_user_name,jdbcType=VARCHAR}
+					        			</if>
+					        			<if test="public_user_type != null and public_user_type == 5">
+					        			    and EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID = TOI.MD_ID AND TSI.SHOPKEEPER_USER_ID = #{public_user_id,jdbcType=INTEGER})
+					        			</if>
+					        			<if test="public_user_type != null and public_user_type == 6">
+					          				and EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUI WHERE TSUI.STORE_ID = TOI.MD_ID AND TSUI.USER_ID = #{public_user_id,jdbcType=INTEGER})
+					        			</if>
+					        			<if test="public_user_type != null and public_user_type == 9">
+					            			and EXISTS(SELECT 1
+					                         			 FROM TBL_SYS_USER_INFO TSUI
+					                        			WHERE TSUI.USER_TYPE = 4
+					            				  			  AND TSUI.ORGANIZATION_ID IN (
+													  			  SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+													  	          START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER} CONNECT BY PRIOR ID = PARENT_ID)
+										          		      AND TSUI.USER_NAME = TOI.YWJL_USER_NAME)
+					        			</if>
+							   	   </where>)
+							<if test="state != null">
+								AND TORI.STATE IN
+				                <foreach item="item" collection="state" open="(" separator="," close=")">
+									#{item}
+								</foreach>
+							</if>
+							<if test="order_number != null and order_number != '' ">
+							    AND	TORI.ORDER_NUMBER = #{order_number,jdbcType=VARCHAR}
+							</if>
+							<if test="return_number != null and return_number != '' ">
+							    AND	TORI.RETURN_NUMBER = #{return_number,jdbcType=VARCHAR}
+							</if>
+							<if test="apply_type != null and apply_type != '' ">
+							    AND	TORI.APPLY_TYPE = #{apply_type,jdbcType=CHAR}
+							</if>
+							<if test="start_date != null and start_date != '' ">
+							    AND	TORI.CREATE_DATE &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+							</if>
+							<if test="end_date != null and end_date != '' ">
+							    AND	TORI.CREATE_DATE &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+							</if>
+							<if test="login_name !=null and login_name !=''">
+								AND EXISTS(SELECT 1 FROM TBL_USER_INFO TUI WHERE TUI.USER_NAME = TORI.USER_NAME AND TUI.LOGIN_NAME = #{login_name,jdbcType=VARCHAR})
+							</if>
+					    </where>
+					    ORDER BY TORI.CREATE_DATE DESC) T
+		 		 WHERE ROWNUM &lt;= #{end_rownum,jdbcType=INTEGER}) A
+		 WHERE RN &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+
+	<!-- 获取退货单总数 -->
+    <select id="queryReturnsCount" parameterType="java.util.HashMap" resultType="int">
+    	SELECT COUNT(1)
+		  FROM TBL_ORDER_RETURN_INFO TORI
+		<where>
+			   TORI.ORDER_TYPE = #{order_type,jdbcType=INTEGER}
+			   AND EXISTS(
+				   SELECT 1 FROM TBL_ORDER_INFO TOI 
+				   <where>
+						    1=1
+						    and TOI.ORDER_NUMBER = TORI.ORDER_NUMBER
+						<if test="ywjl_user_name != null and ywjl_user_name != '' ">
+							AND	TOI.YWJL_USER_NAME = #{ywjl_user_name,jdbcType=VARCHAR}
+						</if>
+						<if test="md_id != null and md_id != 0 ">
+							AND	TOI.MD_ID = #{md_id,jdbcType=INTEGER}
+						</if>
+						<if test="ywy_user_name != null and ywy_user_name != '' ">
+							AND	TOI.YWY_USER_NAME = #{ywy_user_name,jdbcType=VARCHAR}
+						</if>
+						<if test="public_user_type != null and public_user_type == 2">
+					        and EXISTS (SELECT 1 FROM TBL_SYS_USER_STORE TSUS WHERE TSUS.STORE_ID = TOI.MD_ID AND TSUS.USER_ID = #{public_user_id,jdbcType=INTEGER})
+					    </if>
+					    <if test="public_user_type != null and public_user_type == 3">
+					        and TOI.YWY_USER_NAME = #{public_user_name,jdbcType=VARCHAR}
+					    </if>
+					    <if test="public_user_type != null and public_user_type == 4">
+					        and TOI.YWJL_USER_NAME = #{public_user_name,jdbcType=VARCHAR}
+					    </if>
+					    <if test="public_user_type != null and public_user_type == 5">
+					        and EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID = TOI.MD_ID AND TSI.SHOPKEEPER_USER_ID = #{public_user_id,jdbcType=INTEGER})
+					    </if>
+					    <if test="public_user_type != null and public_user_type == 6">
+					        and EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUI WHERE TSUI.STORE_ID = TOI.MD_ID AND TSUI.USER_ID = #{public_user_id,jdbcType=INTEGER})
+					    </if>
+					    <if test="public_user_type != null and public_user_type == 9">
+					        and EXISTS(SELECT 1 
+					                     FROM TBL_SYS_USER_INFO TSUI
+					                    WHERE TSUI.USER_TYPE = 4
+					            			  AND TSUI.ORGANIZATION_ID IN (
+												   SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+												   START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER} CONNECT BY PRIOR ID = PARENT_ID)
+										      AND TSUI.USER_NAME = TOI.YWJL_USER_NAME)
+					    </if>
+				   </where>)
+			<if test="state != null">
+			   AND TORI.STATE IN
+			   <foreach item="item" collection="state" open="(" separator="," close=")">
+					#{item}
+			   </foreach>
+		    </if>
+			<if test="order_number != null and order_number != '' ">
+				 AND TORI.ORDER_NUMBER = #{order_number,jdbcType=VARCHAR}
+			</if>
+			<if test="return_number != null and return_number != '' ">
+				 AND TORI.RETURN_NUMBER = #{return_number,jdbcType=VARCHAR}
+			</if>
+			<if test="apply_type != null and apply_type != '' ">
+			    AND	TORI.APPLY_TYPE = #{apply_type,jdbcType=CHAR}
+			</if>
+			<if test="start_date != null and start_date != '' ">
+			     AND TORI.CREATE_DATE &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+			<if test="end_date != null and end_date != '' ">
+			     AND TORI.CREATE_DATE &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+			<if test="login_name !=null and login_name !=''">
+				AND EXISTS(SELECT 1 FROM TBL_USER_INFO TUI WHERE TUI.USER_NAME = TORI.USER_NAME AND TUI.LOGIN_NAME = #{login_name,jdbcType=VARCHAR})
+			</if>
+		</where>
+	</select>
+	<!-- 获取退货单基本信息详情 -->
+    <select id="queryReturnsDetail" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT <include refid="all_column"/>
+		  FROM TBL_ORDER_RETURN_INFO TORI
+		<where>
+				1=1
+			<if test="return_number != null and return_number != '' ">
+			    AND	TORI.RETURN_NUMBER = #{return_number,jdbcType=VARCHAR}
+			</if>
+		</where>
+	</select>
+
+	<!-- 获取退货单商品信息列表 -->
+    <select id="queryReturnsProductList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT  TORP.ID,
+				TORP.RETURN_NUMBER,
+				TORP.ORDER_NUMBER,
+				TORP.CODENUMBER,
+				TORP.COUNT,
+				TORP.PRODUCT_UNIT_PRICE,
+				ROUND(TORP.PRODUCT_TOTAL_MONEY,2) AS PRODUCT_TOTAL_MONEY,
+				TORP.PRODUCT_OLD_UNIT_PRICE,
+				ROUND(TORP.PRODUCT_TOTAL_DISCOUNT_MONEY,2) AS PRODUCT_TOTAL_DISCOUNT_MONEY,
+				TORP.USER_NAME,
+				TO_CHAR(TORP.RETURN_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  RETURN_DATE,
+				TORP.PRODUCT_SKU,
+				TORP.PRODUCT_SKU_NAME,
+				TORP.PRODUCT_ITEMNUMBER,
+				TORP.PRODUCT_COLOR,
+				TORP.PRODUCT_SPECS,
+				TORP.PRODUCT_OLDSALE_PRIZE,
+				(SELECT TPI.PRODUCT_IMG_URL FROM TBL_PRODUCT_INFO TPI WHERE TPI.ITEMNUMBER = TORP.PRODUCT_ITEMNUMBER) AS PRODUCT_IMG_URL,
+			    (SELECT TPI.PRODUCT_NAME FROM TBL_PRODUCT_INFO TPI WHERE TPI.ITEMNUMBER = TORP.PRODUCT_ITEMNUMBER) AS PRODUCT_NAME
+		  FROM TBL_ORDER_RETURN_PRODUCT TORP
+		<where>
+			    1=1
+			  <if test="return_number != null and return_number != '' ">
+				AND	TORP.RETURN_NUMBER = #{return_number,jdbcType=VARCHAR}
+			  </if>
+		</where>
+		ORDER BY TORP.PRODUCT_ITEMNUMBER,TORP.PRODUCT_COLOR,TORP.CODENUMBER ASC
+	</select>
+
+	<!-- 获取订单 已退货商品列表 -->
+	<select id="queryReturnsedProductList" parameterType="java.util.Map"  resultType="java.util.Map">
+		  SELECT A.ORDER_NUMBER,
+		         A.CODENUMBER,
+		         A.PRODUCT_UNIT_PRICE,
+		         A.PRODUCT_OLD_UNIT_PRICE,
+		         A.USER_NAME,
+		         A.PRODUCT_SKU,
+		         A.PRODUCT_SKU_NAME,
+		         A.PRODUCT_ITEMNUMBER,
+		         A.PRODUCT_COLOR,
+		         A.PRODUCT_SPECS,
+		         A.COUNT,
+		         A.PRODUCT_TOTAL_MONEY,
+		         A.PRODUCT_TOTAL_DISCOUNT_MONEY,
+		         B.ITEMNUMBER,
+		         B.PRODUCT_IMG_URL,
+		         B.PRODUCT_NAME
+		    FROM (SELECT T.ORDER_NUMBER,
+		                   T.CODENUMBER,
+		                   T.PRODUCT_UNIT_PRICE,
+		                   T.PRODUCT_OLD_UNIT_PRICE,
+		                   T.USER_NAME,
+		                   T.PRODUCT_SKU,
+		                   T.PRODUCT_SKU_NAME,
+		                   T.PRODUCT_ITEMNUMBER,
+		                   T.PRODUCT_COLOR,
+		                   T.PRODUCT_SPECS,
+		                   SUM (T.COUNT) AS COUNT,
+		                   SUM (T.PRODUCT_TOTAL_MONEY) AS PRODUCT_TOTAL_MONEY,
+		                   SUM (T.PRODUCT_TOTAL_DISCOUNT_MONEY) AS PRODUCT_TOTAL_DISCOUNT_MONEY
+		              FROM TBL_ORDER_RETURN_PRODUCT T
+		             WHERE T.ORDER_NUMBER = #{order_number,jdbcType=VARCHAR}
+		             	   AND EXISTS(SELECT 1 FROM TBL_ORDER_RETURN_INFO T1 WHERE T1.RETURN_NUMBER=T.RETURN_NUMBER AND T1.STATE IN('1','2'))
+		          GROUP BY T.ORDER_NUMBER,
+		                   T.CODENUMBER,
+		                   T.PRODUCT_UNIT_PRICE,
+		                   T.PRODUCT_OLD_UNIT_PRICE,
+		                   T.USER_NAME,
+		                   T.PRODUCT_SKU,
+		                   T.PRODUCT_SKU_NAME,
+		                   T.PRODUCT_ITEMNUMBER,
+		                   T.PRODUCT_COLOR,
+		                   T.PRODUCT_SPECS) A,
+		         TBL_PRODUCT_INFO B
+		   WHERE A.PRODUCT_ITEMNUMBER = B.ITEMNUMBER(+)
+		ORDER BY A.PRODUCT_ITEMNUMBER, A.PRODUCT_COLOR, A.CODENUMBER
+	</select>
+	<!-- 获取订单 已退货商品数量 -->
+	<select id="queryReturnsedProductCount" parameterType="java.util.Map"  resultType="int">
+		  SELECT nvl(SUM (T.COUNT),0)
+		    FROM TBL_ORDER_RETURN_PRODUCT T
+		   WHERE T.ORDER_NUMBER = #{order_number,jdbcType=VARCHAR}
+		         AND EXISTS(SELECT 1 FROM TBL_ORDER_RETURN_INFO T1 WHERE T1.RETURN_NUMBER=T.RETURN_NUMBER AND T1.STATE IN('1','2'))
+	</select>
+
+	<!-- 获取订单 可退货商品列表 -->
+	<select id="queryCanReturnProductList" parameterType="java.util.Map"  resultType="java.util.Map">
+		SELECT A.*,
+			   A.PRODUCT_UNIT_PRICE * A.CAN_RETURN_COUNT AS PRODUCT_TOTAL_MONEY_R,
+			   (A.PRODUCT_OLD_UNIT_PRICE-A.PRODUCT_UNIT_PRICE) * A.CAN_RETURN_COUNT AS PRODUCT_TOTAL_DISCOUNT_MONEY_R,
+		       B.ITEMNUMBER, B.PRODUCT_IMG_URL, B.PRODUCT_NAME
+		  FROM (SELECT T1.*, T1.COUNT - T1.TOTAL_SEND_COUNT - NVL(T3.COUNT, 0) AS CAN_RETURN_COUNT
+		              FROM TBL_ORDER_PRODUCT_SKU T1, (SELECT T2.ORDER_NUMBER, T2.PRODUCT_SKU, SUM(T2.COUNT) COUNT
+		                                   FROM TBL_ORDER_RETURN_PRODUCT T2
+		                                  WHERE EXISTS(SELECT 1 FROM TBL_ORDER_RETURN_INFO T4
+		                                          WHERE T4.STATE IN ('1', '2')
+		                                                AND T4.ORDER_NUMBER =  #{order_number,jdbcType=VARCHAR}
+		                                                AND T4.RETURN_NUMBER = T2.RETURN_NUMBER)
+		                                  GROUP BY T2.ORDER_NUMBER, T2.PRODUCT_SKU) T3
+		                         WHERE T1.ORDER_NUMBER = T3.ORDER_NUMBER(+)
+		                               AND T1.PRODUCT_SKU =  T3.PRODUCT_SKU(+)
+		                               AND T1.ORDER_NUMBER = #{order_number,jdbcType=VARCHAR}) A, TBL_PRODUCT_INFO B
+		 WHERE A.PRODUCT_ITEMNUMBER = B.ITEMNUMBER(+)
+		       And A.CAN_RETURN_COUNT &gt; 0
+		 ORDER BY A.PRODUCT_ITEMNUMBER, A.PRODUCT_COLOR, A.CODENUMBER
+	</select>
+
+	<!-- 获取订单 可退货商品列表 -->
+	<select id="queryCanReturnProductCount" parameterType="java.util.Map"  resultType="int">
+		SELECT NVL(SUM(A.CAN_RETURN_COUNT),0)
+		  FROM (SELECT T1.*, T1.COUNT - T1.TOTAL_SEND_COUNT - NVL(T3.COUNT, 0) AS CAN_RETURN_COUNT
+		              FROM TBL_ORDER_PRODUCT_SKU T1, (SELECT T2.ORDER_NUMBER, T2.PRODUCT_SKU, SUM(T2.COUNT) COUNT
+		                                   FROM TBL_ORDER_RETURN_PRODUCT T2
+		                                  WHERE EXISTS(SELECT 1 FROM TBL_ORDER_RETURN_INFO T4
+		                                          WHERE T4.STATE IN ('1', '2')
+		                                                AND T4.ORDER_NUMBER =  #{order_number,jdbcType=VARCHAR}
+		                                                AND T4.RETURN_NUMBER = T2.RETURN_NUMBER)
+		                                  GROUP BY T2.ORDER_NUMBER, T2.PRODUCT_SKU) T3
+		                         WHERE T1.ORDER_NUMBER = T3.ORDER_NUMBER(+)
+		                               AND T1.PRODUCT_SKU =  T3.PRODUCT_SKU(+)
+		                               AND T1.ORDER_NUMBER = #{order_number,jdbcType=VARCHAR}) A
+		 WHERE  A.CAN_RETURN_COUNT &gt; 0
+	</select>
+
+	<!-- 获取订单退货单可退最大运费 -->
+	<select id="queryCanReturnMaxFreightMoney" parameterType="java.util.Map"  resultType="java.util.Map">
+		 SELECT CASE WHEN T3.LOGISTICS_MONEY - T3.RETURN_LOGISTICS_MONEY &lt;= 0 THEN 0
+		        ELSE T3.LOGISTICS_MONEY- T3.RETURN_LOGISTICS_MONEY
+		        END AS MAX_RETURN_LOGISTICS_MONEY
+		   FROM (SELECT CASE
+		             WHEN (SELECT COUNT(1)
+		                     FROM TBL_ORDER_PRODUCT_SKU
+		                    WHERE ORDER_NUMBER = #{order_number,jdbcType=VARCHAR}
+		                          AND TOTAL_SEND_COUNT != 0) &gt; 0 THEN
+		                  (SELECT CASE
+		                          WHEN LOGISTICS_MONEY - GETFREIGHTMONEY_PART_RETURN(T.ORDER_NUMBER) &lt;= 0 THEN 0
+		                          ELSE LOGISTICS_MONEY - GETFREIGHTMONEY_PART_RETURN(T.ORDER_NUMBER)
+		                      END AS LOGISTICS_MONEY
+		                 FROM TBL_ORDER_INFO T
+		                WHERE ORDER_NUMBER = #{order_number,jdbcType=VARCHAR})
+		             ELSE
+		              (SELECT LOGISTICS_MONEY FROM TBL_ORDER_INFO WHERE ORDER_NUMBER = #{order_number,jdbcType=VARCHAR})
+		             END AS LOGISTICS_MONEY,
+		           (SELECT NVL(SUM(T2.LOGISTICS_MONEY),0) FROM TBL_ORDER_RETURN_INFO T2 WHERE T2.ORDER_NUMBER=#{order_number,jdbcType=VARCHAR} and T2.state in ('1','2')) AS RETURN_LOGISTICS_MONEY
+		         FROM DUAL) T3
+	</select>
+
+	<!-- 生成新的退货单号 -->
+	<select id="queryNewReturnNumber" parameterType="java.util.Map"  resultType="java.lang.String">
+		SELECT GETAUTONUMBER('TQ') FROM DUAL
+	</select>
+
+	<!-- 插入退货单商品 -->
+	<insert  id ="insertOrderReturnProduct" parameterType ="java.util.List">
+        INSERT INTO TBL_ORDER_RETURN_PRODUCT (
+        	ID,
+			RETURN_NUMBER,
+			ORDER_NUMBER,
+			CODENUMBER,
+			COUNT,
+			PRODUCT_UNIT_PRICE,
+			PRODUCT_TOTAL_MONEY,
+			PRODUCT_OLD_UNIT_PRICE,
+			PRODUCT_TOTAL_DISCOUNT_MONEY,
+			USER_NAME,
+			RETURN_DATE,
+			PRODUCT_SKU,
+			PRODUCT_SKU_NAME,
+			PRODUCT_ITEMNUMBER,
+			PRODUCT_COLOR,
+			PRODUCT_SPECS,
+			PRODUCT_OLDSALE_PRIZE
+        )
+        SELECT SEQ_ORDER_RETURN_PRODUCT_ID.NEXTVAL,
+               A.RETURN_NUMBER,
+               A.ORDER_NUMBER,
+               B.CODENUMBER,
+               A.COUNT,
+               B.PRODUCT_UNIT_PRICE,
+               A.COUNT * (B.PRODUCT_OLD_UNIT_PRICE - B.PRODUCT_TOTAL_DISCOUNT_MONEY/B.COUNT) AS PRODUCT_TOTAL_MONEY,
+               B.PRODUCT_OLD_UNIT_PRICE,
+               (B.PRODUCT_TOTAL_DISCOUNT_MONEY/B.COUNT) * A.COUNT AS PRODUCT_TOTAL_DISCOUNT_MONEY,
+               B.USER_NAME,
+               SYSDATE AS RETURN_DATE,
+               A.PRODUCT_SKU,
+               B.PRODUCT_SKU_NAME,
+               B.PRODUCT_ITEMNUMBER,
+               B.PRODUCT_COLOR,
+               B.PRODUCT_SPECS,
+               B.PRODUCT_OLDSALE_PRIZE
+          FROM (
+		        <foreach collection="list" item="item" index="index" separator="UNION">
+		            SELECT  #{item.return_number,jdbcType=INTEGER} AS RETURN_NUMBER,
+		            		#{item.order_number,jdbcType=INTEGER} AS ORDER_NUMBER,
+		            		#{item.product_sku,jdbcType=INTEGER} AS PRODUCT_SKU,
+		            		#{item.count,jdbcType=INTEGER} AS COUNT
+		            FROM DUAL
+		        </foreach>
+        	   ) A, TBL_ORDER_PRODUCT_SKU B
+         WHERE  A.ORDER_NUMBER=B.ORDER_NUMBER(+)
+         		AND A.PRODUCT_SKU=B.PRODUCT_SKU(+)
+    </insert>
+    <!-- 校验申请退货商品是否可全退 -->
+    <select id="checkReturnProductCount" parameterType="java.util.Map" resultType="int">
+		SELECT COUNT(1)
+		  FROM (SELECT T1.*, (SELECT SUM(T2.COUNT)
+		                        FROM TBL_ORDER_RETURN_PRODUCT T2
+		                       WHERE T2.ORDER_NUMBER = T1.ORDER_NUMBER
+		                             AND T2.PRODUCT_SKU = T1.PRODUCT_SKU
+		                             AND EXISTS (SELECT 1
+		                                    FROM TBL_ORDER_RETURN_INFO T3
+		                                   WHERE T3.RETURN_NUMBER = T2.RETURN_NUMBER
+		                                         AND T3.STATE IN ('1', '2'))) AS RETURNED_COUNT,
+		                     (SELECT T4.COUNT - T4.TOTAL_SEND_COUNT
+		                        FROM TBL_ORDER_PRODUCT_SKU T4
+		                       WHERE T4.ORDER_NUMBER = T1.ORDER_NUMBER
+		                             AND T4.PRODUCT_SKU = T1.PRODUCT_SKU) AS CAN_RETURN_COUNT
+		           FROM TBL_ORDER_RETURN_PRODUCT T1
+		          WHERE T1.RETURN_NUMBER = #{return_number,jdbcType=VARCHAR}) T
+		 WHERE T.CAN_RETURN_COUNT - NVL(T.RETURNED_COUNT,0) &lt; T.COUNT
+	</select>
+	<!-- 插入退货单-->
+	<insert id="insertOrderReturnInfo" parameterType="java.util.Map">
+		INSERT INTO TBL_ORDER_RETURN_INFO (	ID,
+											RETURN_NUMBER,
+											RETURN_TYPE,
+											APPLY_TYPE,
+											ORDER_NUMBER,
+											USER_NAME,
+											USER_MANAGE_NAME,
+											PRODUCT_MONEY,
+											PRODUCT_COUNT,
+											LOGISTICS_MONEY,
+											DF_MONEY,
+											RETURN_TOTAL_MONEY,
+											STATE,
+											RETURN_REMARK,
+											APPLY_USER_NAME,
+											APPLY_USER_REALNAME,
+											CREATE_DATE)
+	   SELECT   SEQ_ORDER_RETURN_ID.NEXTVAL,
+				A.RETURN_NUMBER,
+				'2',
+				'2',
+				A.ORDER_NUMBER,
+				A.USER_NAME,
+				(SELECT USER_MANAGE_NAME FROM TBL_ORDER_INFO T1 WHERE T1.ORDER_NUMBER=A.ORDER_NUMBER AND ROWNUM &lt;=1 ) AS USER_MANAGE_NAME,
+				A.PRODUCT_MONEY,
+				A.COUNT,
+				#{return_freight_money,jdbcType=DOUBLE} AS LOGISTICS_MONEY,
+				A.count * (SELECT DF_MONEY/PRODUCT_COUNT FROM TBL_ORDER_INFO T1 WHERE T1.ORDER_NUMBER=A.ORDER_NUMBER AND ROWNUM &lt;=1 ) AS DF_MONEY,
+				A.PRODUCT_MONEY + #{return_freight_money,jdbcType=DOUBLE} + A.count * (SELECT DF_MONEY/PRODUCT_COUNT FROM TBL_ORDER_INFO T1 WHERE T1.ORDER_NUMBER=A.ORDER_NUMBER AND ROWNUM &lt;=1 )  as  RETURN_TOTAL_MONEY,
+				'1' AS STATE,
+				#{return_remark,jdbcType=VARCHAR} AS RETURN_REMARK,
+				#{public_user_name,jdbcType=VARCHAR} AS APPLY_USER_NAME,
+				#{public_user_realname,jdbcType=VARCHAR} AS APPLY_USER_REALNAME,
+				SYSDATE AS CREATE_DATE
+		FROM (SELECT T.RETURN_NUMBER,
+				T.ORDER_NUMBER,
+				T.USER_NAME,
+				ROUND(SUM(T.PRODUCT_TOTAL_MONEY),2) AS PRODUCT_MONEY,
+				SUM(T.COUNT) COUNT
+		 FROM TBL_ORDER_RETURN_PRODUCT T WHERE T.RETURN_NUMBER=#{return_number,jdbcType=VARCHAR}
+		 GROUP BY T.RETURN_NUMBER,T.ORDER_NUMBER,T.USER_NAME
+		 ) A
+	</insert>
+
+	<!-- 查询退款订单审批列表 -->
+	<select id="queryOrderRefundList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		select  a.*,
+		(select login_name from tbl_user_info where user_name = a.user_name) login_name from (select t.*,rownum as rn
+		from (  select temp.return_number,
+				       temp.order_number,
+				       temp.user_name,
+				       temp.user_manage_name,
+				       temp.state,
+				       to_char(temp.create_date, 'yyyy-mm-dd hh24:mi:ss') create_date,
+				       to_char(temp.check_date, 'yyyy-mm-dd hh24:mi:ss') check_date,
+				       temp.product_count,
+				       temp.return_total_money,
+				       temp.check_cancle_reason,
+				       temp.mark_remark,
+				       to_char(temp1.create_date, 'yyyy-mm-dd hh24:mi:ss') order_date,
+				       temp1.product_count as order_count
+				  from tbl_order_return_info temp, tbl_order_info temp1
+				<where>
+						temp.order_type = #{order_type,jdbcType=INTEGER}
+					    and temp.order_number = temp1.order_number
+					<if test="return_number != null and return_number != '' ">
+					    and	temp.return_number = #{return_number,jdbcType=VARCHAR}
+					</if>
+					<if test="order_number != null and order_number != '' ">
+					    and	temp.order_number = #{order_number,jdbcType=VARCHAR}
+					</if>
+					<if test="refund_state != null and refund_state != ''">
+						<foreach collection="refund_state" open="and (" close=")" item="item" separator=" or ">
+							temp.state = #{item,jdbcType=CHAR}
+						</foreach>
+					</if>
+					<if test="start_date != null and start_date != '' ">
+					    and	temp.create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+					</if>
+					<if test="end_date != null and end_date != '' ">
+					    and	temp.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+					</if>
+					<if test="check_start_date != null and check_start_date != '' ">
+					    and	temp.check_date &gt;= to_date(#{check_start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+					</if>
+					<if test="check_end_date != null and check_end_date != '' ">
+					    and	temp.check_date &lt;= to_date(#{check_end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+					</if>
+					<if test="login_name != null and login_name != ''">
+						and exists (select 1 from tbl_user_info where user_name = temp.user_name and login_name = #{login_name,jdbcType=VARCHAR})
+					</if>
+					<if test="user_manage_name != null and user_manage_name != ''">
+						and temp.user_manage_name = #{user_manage_name,jdbcType=VARCHAR}
+					</if>
+				</where>
+				order by temp.state asc,temp.create_date desc,temp.id desc) t
+			where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) a
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+
+	<!-- 查询退款订单审批记录数 -->
+	<select id="queryOrderRefundCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_order_return_info temp, tbl_order_info temp1
+		<where>
+				temp.order_type = #{order_type,jdbcType=INTEGER}
+			    and temp.order_number = temp1.order_number
+			<if test="return_number != null and return_number != '' ">
+			    and	temp.return_number = #{return_number,jdbcType=VARCHAR}
+			</if>
+			<if test="order_number != null and order_number != '' ">
+			    and	temp.order_number = #{order_number,jdbcType=VARCHAR}
+			</if>
+			<if test="refund_state != null and refund_state != ''">
+				<foreach collection="refund_state" open="and (" close=")" item="item" separator=" or ">
+					temp.state = #{item,jdbcType=CHAR}
+				</foreach>
+			</if>
+			<if test="start_date != null and start_date != '' ">
+			    and	temp.create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+			<if test="end_date != null and end_date != '' ">
+			    and	temp.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+			<if test="check_start_date != null and check_start_date != '' ">
+			    and	temp.check_date &gt;= to_date(#{check_start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+			<if test="check_end_date != null and check_end_date != '' ">
+			    and	temp.check_date &lt;= to_date(#{check_end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+			<if test="login_name != null and login_name != ''">
+				and exists (select 1 from tbl_user_info where user_name = temp.user_name and login_name = #{login_name,jdbcType=VARCHAR})
+			</if>
+			<if test="user_manage_name != null and user_manage_name != ''">
+				and temp.user_manage_name = #{user_manage_name,jdbcType=VARCHAR}
+			</if>
+		</where>
+	</select>
+	<!-- 订单退款审批 -->
+	<update id="approvalOrderRefund" parameterType="java.lang.String">
+		update TBL_ORDER_RETURN_INFO
+		<set>
+			STATE = '2',
+			<if test="approval_user_name !=null and approval_user_name !=''">
+				CHECK_USER_NAME = #{approval_user_name,jdbcType=VARCHAR}
+			</if>
+			<if test="approval_user_realname !=null and approval_user_realname !=''">
+				CHECK_USER_REALNAME = #{approval_user_realname,jdbcType=VARCHAR}
+			</if>
+		</set>
+		where return_number = #{return_number,jdbcType=VARCHAR}
+	</update>
+
+	<!-- 执行订单退款 -->
+	<update id="orderRefundPerform" statementType="CALLABLE" parameterType="java.util.Map">
+		<![CDATA[
+			call PRO_RETURN_REFUND_ORDER(
+					#{operate_type,mode=IN,jdbcType=VARCHAR},
+					#{return_number,mode=IN,jdbcType=VARCHAR},
+					'',
+					#{refund_operation_name,mode=IN,jdbcType=VARCHAR},
+					#{output_status,mode=OUT,jdbcType=VARCHAR},
+					#{output_msg,mode=OUT,jdbcType=VARCHAR}
+				)
+			]]>
+	</update>
+
+	<!-- 执行订单退款驳回 -->
+	<update id="orderRefundRejectPerform" statementType="CALLABLE" parameterType="java.util.Map">
+		<![CDATA[
+			call PRO_RETURN_REFUND_ORDER(
+					#{operate_type,mode=IN,jdbcType=VARCHAR},
+					#{return_number,mode=IN,jdbcType=VARCHAR},
+					#{return_reject_reson,mode=IN,jdbcType=VARCHAR},
+					#{refund_operation_name,mode=IN,jdbcType=VARCHAR},
+					#{output_status,mode=OUT,jdbcType=VARCHAR},
+					#{output_msg,mode=OUT,jdbcType=VARCHAR}
+				)
+			]]>
+	</update>
+
+	<!-- 订单退货退款计算商品分配金额 -->
+	<insert id="insertOrderReturnMoney" parameterType="java.lang.String">
+		insert into TBL_RETURN_AMOUNT(
+			id,
+			return_number,
+			user_id,
+			bank_account,
+			user_name,
+			return_user_id,
+			return_bank_account,
+			return_user_name,
+			return_amount,
+			remark,
+			operation_type,
+			finance_state,
+			return_type,
+			count,
+			third_logno,
+			settlement_state
+		)
+		SELECT seq_return_amount.nextval,
+			return_number,
+			user_id,
+			bank_account,
+			user_name,
+			return_user_id,
+			return_bank_account,
+			return_user_name,
+			return_amount,
+			remark,
+			operation_type,
+			'2',
+			return_type,
+			count,
+			GETTHIRDLOGNUMBER('L'),
+			case when return_type = '3' and is_store_order in (0,1)
+				then (
+					select max(settlement_state) from TBL_BUSS_SETTLEMENT_INFO where order_number = a.order_number and settlement_user_id = a.return_user_id
+                	and REMARK = case a.divide_type when '1' then '入驻商货款' when '2' then '会员服务费' when '3' then '仓储费' end
+				)
+			when return_type = '2' and divide_type = '1' and is_store_order in (0,1)
+				then (
+					select max(settlement_state) from TBL_BUSS_SETTLEMENT_INFO where order_number = a.order_number and settlement_user_id = a.return_user_id
+                	and REMARK = case a.divide_type when '1' then '入驻商货款' when '2' then '会员服务费' when '3' then '仓储费' end
+				)
+			else '2' end settlement_state
+		FROM (
+		SELECT
+			 MIN(return_number) return_number,
+			 MIN(order_number) order_number,
+			 divide_type,
+			 min(is_store_order) is_store_order,
+             MIN (user_id) user_id,
+             MIN(bank_account) bank_account,
+             MIN(user_name) user_name,
+             return_user_id,
+             MIN(return_bank_account) return_bank_account,
+             MIN(return_user_name) return_user_name,
+		     CASE divide_type
+				  WHEN '3' THEN round(SUM(return_amount),2) + MIN(logistics_money) + MIN(df_money)
+				  ELSE round(sum(return_amount),2)
+			 END return_amount,
+             MIN(remark) remark,
+             MIN(operation_type) operation_type,
+             min(refund_type) return_type,
+             sum(count) count
+			FROM (SELECT
+					t.return_number,
+					t.order_number,
+					o.is_store_order,
+					u.id user_id,
+					b.bank_account,
+					u.user_manage_name user_name,
+					t.return_type,
+					t.logistics_money,
+					t.df_money,
+					CASE r.divide_type WHEN '1' THEN t2.count
+						WHEN '2' THEN 0
+						WHEN '3' THEN 0
+						WHEN '4' THEN 0
+						WHEN '5' THEN 0
+						ELSE t2.count
+					 END count,
+				CASE r.divide_type
+					WHEN '4' THEN '2'
+					WHEN '5' THEN '2'
+					ELSE r.divide_type
+				END divide_type,
+
+				CASE r.divide_type
+					WHEN '1' THEN r.divide_user_id
+					WHEN '2' THEN (SELECT to_number(value) FROM TBL_SYS_PARAM_CONFIG WHERE key = 'platform_user_id')
+					WHEN '3' THEN (SELECT to_number(value) FROM TBL_SYS_PARAM_CONFIG WHERE key = 'storage_user_id')
+					WHEN '4' THEN (SELECT to_number(value) FROM TBL_SYS_PARAM_CONFIG WHERE key = 'platform_user_id')
+					WHEN '5' THEN (SELECT to_number(value) FROM TBL_SYS_PARAM_CONFIG WHERE key = 'platform_user_id')
+					ELSE (SELECT ps.stationed_user_id FROM TBL_PRODUCT_SKU ps WHERE ps.id = s.product_sku)
+				END return_user_id,
+
+				CASE r.divide_type
+					WHEN '1' THEN (select a.bank_account from tbl_bank_account a where a.user_id = r.divide_user_id and a.user_type = '2')
+					WHEN '2' THEN (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'platform_bank_account')
+					WHEN '3' THEN (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'storage_bank_account')
+					WHEN '4' THEN (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'platform_bank_account')
+					WHEN '5' THEN (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'platform_bank_account')
+					ELSE (select a.bank_account from tbl_bank_account a where a.user_id = (SELECT ps.stationed_user_id FROM TBL_PRODUCT_SKU ps WHERE ps.id = s.product_sku) and a.user_type = '2')
+				END return_bank_account,
+
+				CASE r.divide_type
+					WHEN '1' THEN (select a.company_name from TBL_STATIONED_USER_INFO a where a.id = r.divide_user_id)
+					WHEN '2' THEN '童库平台服务'
+					WHEN '3' THEN '童库仓储服务'
+					WHEN '4' THEN '童库平台服务'
+					WHEN '5' THEN '童库平台服务'
+					ELSE (select a.company_name from TBL_STATIONED_USER_INFO a where a.id = (SELECT ps.stationed_user_id FROM TBL_PRODUCT_SKU ps WHERE ps.id = s.product_sku))
+				END return_user_name,
+
+				CASE
+                    when r.divide_type = '2' then
+						case when o.is_store_order = 2 then t2.count * r.divide_money else t2.count * (r.divide_money-s.product_total_discount_money/s.count) end
+                    when r.divide_type = '1' or r.divide_type = '3' or r.divide_type = '4' or r.divide_type = '5' then t2.count * r.divide_money
+                    else t2.count * t2.product_unit_price
+                END as return_amount,
+
+				CASE t.return_type
+				   WHEN '1' THEN
+						CASE r.divide_type
+							WHEN '1' THEN '订单【'||o.order_number||'】取消订单，入驻商账户退款'
+							WHEN '2' THEN '订单【'||o.order_number||'】取消订单，平台服务账户退款'
+							WHEN '3' THEN '订单【'||o.order_number||'】取消订单，仓储服务账户退款'
+							WHEN '4' THEN '订单【'||o.order_number||'】取消订单，平台服务账户退款'
+							WHEN '5' THEN '订单【'||o.order_number||'】取消订单，平台服务账户退款'
+							ELSE '订单【'||t.return_number||'】取消订单，入驻商退款'
+						END
+				   WHEN '2' THEN
+					   CASE r.divide_type
+							WHEN '1' THEN '订单【'||o.order_number||'】退货，退货单【'||t.return_number||'】入驻商账户退款'
+							WHEN '2' THEN '订单【'||o.order_number||'】退货，退货单【'||t.return_number||'】平台服务账户退款'
+							WHEN '3' THEN '订单【'||o.order_number||'】退货，退货单【'||t.return_number||'】仓储服务账户退款'
+							WHEN '4' THEN '订单【'||o.order_number||'】退货，退货单【'||t.return_number||'】平台服务账户退款'
+							WHEN '5' THEN '订单【'||o.order_number||'】退货，退货单【'||t.return_number||'】平台服务账户退款'
+							ELSE '退货单【'||t.return_number||'】老订单退货，入驻商账户退款'
+					   END
+				END as remark,
+
+				'1' operation_type,
+				case when instr(o.payment_type,'授信') > 0 then '3'
+					 else '2' end refund_type
+		FROM tbl_order_return_info t,
+			tbl_order_return_product t2,
+			tbl_order_divide_record r,
+			tbl_order_info o,
+			tbl_order_product_sku s,
+			tbl_user_info u,
+			tbl_bank_account b
+		WHERE s.order_number = r.order_number(+)
+			and s.product_sku = r.product_sku(+)
+			and s.product_sku = t2.product_sku
+			and t.return_number = t2.return_number
+	  		and t.order_number = o.order_number
+			and o.order_number = s.order_number
+			AND o.user_name = u.user_name
+			AND u.id = b.user_id
+			and t.return_number = #{return_number,jdbcType=VARCHAR})
+			GROUP BY return_user_id,return_user_name,divide_type,return_type) a
+	</insert>
+
+	<!--根据退款单号查询退款单信息-->
+	<select id="queryOrderReturnsByReturnNumber" parameterType="java.lang.String" resultType="java.util.Map">
+		SELECT a.*,(select is_store_order from TBL_ORDER_INFO where order_number = a.order_number) is_store_order FROM tbl_order_return_info a WHERE return_number = #{return_number,jdbcType=VARCHAR}
+	</select>
+	<!-- 根据退款单号更新正常结算单金额 -->
+	<update id="updateSettlementAmountByReturnNumber">
+		UPDATE TBL_BUSS_SETTLEMENT_INFO s
+		   SET (SETTLEMENT_AMOUNT, PRODUCT_NUM) = (SELECT s.SETTLEMENT_AMOUNT - a.return_amount, s.PRODUCT_NUM - a.count FROM tmp_return_info a
+					WHERE a.return_user_id = s.SETTLEMENT_USER_ID AND a.order_number = s.order_number)
+		WHERE EXISTS (SELECT 1 FROM tmp_return_info a WHERE a.return_user_id = s.SETTLEMENT_USER_ID AND a.order_number = s.order_number)
+	    	and SETTLEMENT_STATE = '1' and settlement_group = '1'
+	</update>
+	<!-- 根据退款单号更新授信结算单金额 -->
+	<update id="updateCreditSettlementAmountByReturnNumber" parameterType="java.lang.String">
+		UPDATE TBL_BUSS_SETTLEMENT_INFO s
+			SET (SETTLEMENT_AMOUNT, PRODUCT_NUM) = (SELECT s.SETTLEMENT_AMOUNT - a.return_amount, s.PRODUCT_NUM - a.count FROM tmp_return_info a
+				WHERE a.return_user_id = s.SETTLEMENT_USER_ID AND a.order_number = s.order_number and a.divide_user_id = nvl(s.STATIONED_USER_ID,0)
+					and a.return_type = s.remark)
+		WHERE EXISTS (SELECT 1 FROM tmp_return_info a
+			WHERE a.return_user_id = s.SETTLEMENT_USER_ID AND a.order_number = s.order_number and a.divide_user_id = nvl(s.STATIONED_USER_ID,0)
+				and a.return_type = s.remark)
+			and SETTLEMENT_STATE != '2' and settlement_group = '2'
+	</update>
+	<!-- 根据退款单号删除结算金额<0的记录 -->
+	<delete id="deleteSettlementByReturnNumber" parameterType="java.lang.String">
+		update TBL_BUSS_SETTLEMENT_INFO s set s.is_delete = '1'
+		where EXISTS (SELECT 1 FROM tmp_return_info a WHERE a.return_user_id = s.SETTLEMENT_USER_ID AND a.order_number = s.order_number)
+	    	and PRODUCT_NUM &lt;= 0 and SETTLEMENT_STATE != '2'
+	</delete>
+	<!-- 增加入驻商资金流水 add wanghai -->
+	<insert id="insertStationedCapitalLogs" parameterType="java.lang.String">
+		insert into TBL_STATIONED_CAPITAL_LOGS(
+			id,
+			log_number,
+			turnover_number,
+			log_type,
+			tran_amount,
+			account_balance,
+			deposit_balance,
+			unliquidated_balance,
+			record_channel,
+			stationed_user_id
+		)
+		select SEQ_STATIONED_CAPITAL_LOGS.nextval,
+			GETAUTONUMBERSHORT(15),
+			return_number,
+			'未发退款',
+			return_amount,
+			(select account_balance from tbl_bank_account where user_id = a.return_user_id),
+			(select deposit_money_balance from tbl_bank_account where user_id = a.return_user_id),
+			(select sum(case when settlement_amount <![CDATA[ > ]]> settled_amount then settlement_amount - settled_amount else 0 end) from TBL_BUSS_SETTLEMENT_INFO
+				where SETTLEMENT_USER_ID = a.return_user_id and SETTLEMENT_STATE != '2' and IS_DELETE = '0'),
+			'待结算',
+			return_user_id
+		from TBL_RETURN_AMOUNT a
+		where not exists (select 1 from TBL_SYS_PARAM_CONFIG where value = to_char(a.return_user_id) and key in ('platform_user_id','storage_user_id'))
+			and return_number = #{return_number,jdbcType=VARCHAR}
+			and (case when return_type = '3' or return_type = '2' then 1 else 0 end) = 1
+        	and exists (select 1 from TBL_BUSS_SETTLEMENT_INFO s,TBL_ORDER_RETURN_INFO r where s.order_number = r.order_number and s.settlement_state != '2'
+        		and r.return_number = a.return_number and s.SETTLEMENT_USER_ID = a.return_user_id)
+	</insert>
+	
+	<!-- 插入退货临时商品【计算应退运费用】 -->
+	<insert  id ="insertTmpOrderReturnProduct" parameterType ="java.util.List">
+        INSERT INTO TMP_ORDER_PRODUCT_SKU_RETURN (
+			ORDER_NUMBER,
+			PRODUCT_SKU,
+			RETURN_COUNT
+        )
+        SELECT A.ORDER_NUMBER,
+               A.PRODUCT_SKU,
+               A.RETURN_COUNT
+          FROM (
+		        <foreach collection="list" item="item" index="index" separator="UNION">
+		            SELECT  #{item.order_number,jdbcType=INTEGER} AS ORDER_NUMBER,
+		            		#{item.product_sku,jdbcType=INTEGER} AS PRODUCT_SKU,
+		            		#{item.count,jdbcType=INTEGER} AS RETURN_COUNT
+		            FROM DUAL
+		        </foreach>
+        	   ) A
+    </insert>
+    
+    <!--计算应退运费用-->
+	<select id="queryReturnProductLogisticsMoney" parameterType="java.lang.String" resultType="java.util.Map">
+		SELECT GETFREIGHTMONEY_ORDER_RETURN(#{order_number,jdbcType=VARCHAR}) as return_logistics_money   FROM DUAL
+	</select>
+	
+	<!-- 退货退款列表 -->
+	<select id="queryReturnInfoList" parameterType="java.util.Map" resultType="java.util.Map">
+		select  a.*,
+    			(select user_realname from tbl_sys_user_info where user_name = a.check_user_name) check_user_realname,
+	            (select login_name from tbl_user_info where user_name = a.create_user_name) login_name,
+	            (select user_manage_name from tbl_user_info where user_name = a.create_user_name) user_manage_name,
+	            nvl((select sum(count) from tbl_return_product where return_number = a.return_number and type='2'),0) actual_return_product_count,
+	            (select user_realname from tbl_sys_user_info where user_name = a.partner_user_name) partner_user_realname,
+	            (select user_realname from tbl_sys_user_info where user_name = a.partner_check_user_name) partner_check_user_realname,
+	            (select user_control_store_name from tbl_user_info where user_name = a.create_user_name) user_store_name
+    	  from (select t.*,rownum as rn
+				  from (select <include refid="returnInfo_column"/>
+				  		  from tbl_return_info tri
+					    <where>
+							   1=1
+							   and exists(
+							   	   select 1 from tbl_user_info tui 
+							   	   <where>
+							   	  		    1=1
+							   	  		    and tui.user_name = tri.create_user_name
+							   	  		<if test="login_name != null and login_name != '' ">
+							    			and	tui.login_name = #{login_name,jdbcType=VARCHAR}
+										</if>
+										<if test="ywjl_user_name != null and ywjl_user_name != '' ">
+							    			and	tui.market_supervision_user_id = #{ywjl_user_name,jdbcType=VARCHAR}
+										</if>
+										<if test="md_id != null and md_id != 0 ">
+							    			and	tui.store_id = #{md_id,jdbcType=INTEGER}
+										</if>
+										<if test="ywy_user_name != null and ywy_user_name != '' ">
+							    			and	tui.referee_user_id = #{ywy_user_name,jdbcType=VARCHAR}
+										</if>
+							   	  		<if test="public_user_type != null and public_user_type == 2">
+								            and EXISTS (SELECT 1 FROM TBL_SYS_USER_STORE TSUS WHERE TSUS.STORE_ID = tui.STORE_ID AND TSUS.USER_ID = #{public_user_id,jdbcType=INTEGER})
+								        </if>
+								        <if test="public_user_type != null and public_user_type == 3">
+								            and tui.referee_user_id = #{public_user_id,jdbcType=INTEGER}
+								        </if>
+								        <if test="public_user_type != null and public_user_type == 4">
+								            and tui.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+								        </if>
+								        <if test="public_user_type != null and public_user_type == 5">
+								            and EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID = tui.STORE_ID AND TSI.SHOPKEEPER_USER_ID = #{public_user_id,jdbcType=INTEGER})
+								        </if>
+								        <if test="public_user_type != null and public_user_type == 6">
+								            and EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUI WHERE TSUI.STORE_ID = tui.STORE_ID AND TSUI.USER_ID = #{public_user_id,jdbcType=INTEGER})
+								        </if>
+								        <if test="public_user_type != null and public_user_type == 9">
+								            and EXISTS(SELECT 1 
+								                         FROM TBL_SYS_USER_INFO TSUI
+								                        WHERE TSUI.USER_TYPE = 4
+								            				  AND TSUI.ORGANIZATION_ID IN (
+																  	SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+																  	START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER} CONNECT BY PRIOR ID = PARENT_ID
+													              )
+													          AND TSUI.id = tui.market_supervision_user_id)
+								        </if>
+							   	   </where>)
+							<!-- 退货单申请人类型 默认0-普通会员 1店铺会员  songwangwen 2018.03.24-->
+							<if test="create_user_type != null">
+						    	and	tri.CREATE_USER_TYPE = #{create_user_type,jdbcType=INTEGER}
+						    </if>
+							<if test="apply_state != null">
+								and tri.apply_state in
+				                <foreach item="item" collection="apply_state" open="(" separator="," close=")">
+									#{item}
+								</foreach>
+							</if>
+							<if test="return_number != null and return_number != '' ">
+							    and	tri.return_number = #{return_number,jdbcType=VARCHAR}
+							</if>
+							<if test="return_type != null and return_type != '' ">
+							    and	tri.return_type = #{return_type,jdbcType=VARCHAR}
+							</if>
+							<if test="start_date != null and start_date != '' ">
+							    and	tri.create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+							</if>
+							<if test="end_date != null and end_date != '' ">
+							    and	tri.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+							</if>
+							<if test="user_store_name !=null and user_store_name !=''">
+								and exists(select 1 from tbl_user_info tui where tui.user_name = tri.create_user_name and tui.user_control_store_name like '%'||#{user_store_name,jdbcType=VARCHAR}||'%')
+							</if>
+					    </where>
+					    order by tri.create_date desc) t
+		 		 where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) A
+		 where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 退货退款数量 -->
+	<select id="queryReturnInfoCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+	  		  from tbl_return_info tri
+		    <where>
+				   1=1
+				   and exists(
+				   	   select 1 from tbl_user_info tui 
+				   	   <where>
+			   	  		    1=1
+			   	  		    and tui.user_name = tri.create_user_name
+			   	  		<if test="login_name != null and login_name != '' ">
+			    			and	tui.login_name = #{login_name,jdbcType=VARCHAR}
+						</if>
+			   	  		<if test="ywjl_user_name != null and ywjl_user_name != '' ">
+			    			and	tui.market_supervision_user_id = #{ywjl_user_name,jdbcType=VARCHAR}
+						</if>
+						<if test="md_id != null and md_id != 0 ">
+			    			and	tui.store_id = #{md_id,jdbcType=INTEGER}
+						</if>
+						<if test="ywy_user_name != null and ywy_user_name != '' ">
+			    			and	tui.referee_user_id = #{ywy_user_name,jdbcType=VARCHAR}
+						</if>
+			   	  		<if test="public_user_type != null and public_user_type == 2">
+				            and EXISTS (SELECT 1 FROM TBL_SYS_USER_STORE TSUS WHERE TSUS.STORE_ID = tui.STORE_ID AND TSUS.USER_ID = #{public_user_id,jdbcType=INTEGER})
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 3">
+				            and tui.referee_user_id = #{public_user_id,jdbcType=INTEGER}
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 4">
+				            and tui.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 5">
+				            and EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID = tui.STORE_ID AND TSI.SHOPKEEPER_USER_ID = #{public_user_id,jdbcType=INTEGER})
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 6">
+				            and EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUI WHERE TSUI.STORE_ID = tui.STORE_ID AND TSUI.USER_ID = #{public_user_id,jdbcType=INTEGER})
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 9">
+				            and EXISTS(SELECT 1 
+				                         FROM TBL_SYS_USER_INFO TSUI
+				                        WHERE TSUI.USER_TYPE = 4
+				            				  AND TSUI.ORGANIZATION_ID IN (
+												  	SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+												  	START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER} CONNECT BY PRIOR ID = PARENT_ID
+									              )
+									          AND TSUI.id = tui.market_supervision_user_id)
+				        </if>
+			   	   </where>)
+			   	<!-- 退货单申请人类型 默认0-普通会员 1店铺会员  songwangwen 2018.03.24-->
+				<if test="create_user_type != null">
+			    	and	tri.CREATE_USER_TYPE = #{create_user_type,jdbcType=INTEGER}
+			    </if> 
+				<if test="apply_state != null">
+					and tri.apply_state in
+	                <foreach item="item" collection="apply_state" open="(" separator="," close=")">
+						#{item}
+					</foreach>
+				</if>
+				<if test="return_number != null and return_number != '' ">
+				    and	tri.return_number = #{return_number,jdbcType=VARCHAR}
+				</if>
+				<if test="return_type != null and return_type != '' ">
+				    and	tri.return_type = #{return_type,jdbcType=VARCHAR}
+				</if>
+				<if test="start_date != null and start_date != '' ">
+				    and	tri.create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+				</if>
+				<if test="end_date != null and end_date != '' ">
+				    and	tri.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+				</if>
+				<if test="user_store_name !=null and user_store_name !=''">
+					and exists(select 1 from tbl_user_info tui where tui.user_name = tri.create_user_name and tui.user_control_store_name like '%'||#{user_store_name,jdbcType=VARCHAR}||'%')
+				</if>
+		    </where>
+	</select>
+	<!-- 退货退款详情 -->
+	<select id="queryReturnInfoDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select <include refid="returnInfo_column"/>,
+			(select login_name from tbl_user_info where user_name = tri.create_user_name) login_name,
+			(select sum(count) from tbl_return_product trp where trp.return_number=tri.return_number and trp.type='2')can_return_product_count,
+			return_logistics_company,
+			(select user_realname from tbl_sys_user_info where user_name = tri.partner_user_name) partner_user_realname,
+	        (select user_realname from tbl_sys_user_info where user_name = tri.partner_check_user_name) partner_check_user_realname,
+	        (select user_control_store_name from tbl_user_info where user_name = tri.create_user_name) user_store_name
+		  from tbl_return_info tri
+		<where>
+				1=1
+			<if test="return_number != null and return_number != '' ">
+			    and	tri.return_number = #{return_number,jdbcType=VARCHAR}
+			</if>
+		</where>
+	</select>
+	
+	<!-- 获取退货退款商品信息列表 -->
+    <select id="queryReturnInfoProductList" parameterType="java.util.Map" resultType="java.util.Map">
+    	select  trp.id,
+                trp.return_number,
+                trp.codenumber,
+                trp.count,
+                trp.product_sku,
+                trp.product_sku_name,
+                trp.product_itemnumber,
+                trp.product_color,
+                trp.product_specs,
+                (select tpi.product_img_url from tbl_product_info tpi where tpi.itemnumber = trp.product_itemnumber) as product_img_url,
+                (select tpi.product_name from tbl_product_info tpi where tpi.itemnumber = trp.product_itemnumber) as product_name,
+                (SELECT ORIGINAL_PRODUCT_ITEMNUMBER FROM TBL_CUSTOM_PRODUCT_REL TCPR WHERE TCPR.CUSTOM_PRODUCT_ITEMNUMBER = TRP.product_itemnumber) AS PRODUCT_OLD_ITEMNUMBER
+          from tbl_return_product trp
+		<where>
+			    1=1
+			  <if test="return_number != null and return_number != '' ">
+				and	trp.return_number = #{return_number,jdbcType=VARCHAR}
+			  </if>
+		</where>
+		order by trp.product_itemnumber,trp.product_color,trp.codenumber asc
+	</select>
+	<!-- 退货退款审批 -->
+	<update id="checkReturnInfo" parameterType="java.util.Map">
+		update tbl_return_info
+		   set apply_state = #{apply_state,jdbcType=CHAR},
+		   <if test="check_cancel_reason !=null and check_cancel_reason !=''">
+		   		check_cancel_reason = #{check_cancel_reason,jdbcType=VARCHAR},
+		   </if>
+		   <if test="after_sale_name !=null and after_sale_name !=''">
+		   		return_after_sale_name = #{after_sale_name,jdbcType=VARCHAR},
+		   </if>
+		   <if test="after_sale_mobile !=null and after_sale_mobile !=''">
+		   		return_after_sale_mobile = #{after_sale_mobile,jdbcType=VARCHAR},
+		   </if>
+		   <if test="after_sale_address !=null and after_sale_address !=''">
+		   		return_after_sale_address = #{after_sale_address,jdbcType=VARCHAR},
+		   </if>
+		   <if test="after_sale_warhouse_id !=null and after_sale_warhouse_id !=''">
+		   		warehouse_id = #{after_sale_warhouse_id,jdbcType=INTEGER},
+		   </if>
+		   check_user_name = #{public_user_id,jdbcType=VARCHAR},
+		   check_date = sysdate
+		where return_number = #{return_number,jdbcType=VARCHAR}
+	</update>
+	
+	<!-- 查询 申请 可退 不可退 商品列表-->
+	<select id="queryCanReturn" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT CODENUMBER,
+	       PRODUCT_SKU,
+	       PRODUCT_ITEMNUMBER,
+	       PRODUCT_COLOR,
+	       PRODUCT_SPECS,
+	       COUNT,
+	       (SELECT PRODUCT_NAME FROM TBL_PRODUCT_INFO T WHERE T.ITEMNUMBER = T1.PRODUCT_ITEMNUMBER) PRODUCT_NAME,
+	       (SELECT PRODUCT_IMG_URL FROM TBL_PRODUCT_INFO T WHERE T.ITEMNUMBER = T1.PRODUCT_ITEMNUMBER)PRODUCT_IMG_URL,
+	       (SELECT ORIGINAL_PRODUCT_ITEMNUMBER FROM TBL_CUSTOM_PRODUCT_REL TCPR WHERE TCPR.CUSTOM_PRODUCT_ITEMNUMBER = T1.product_itemnumber) AS PRODUCT_OLD_ITEMNUMBER
+	  FROM TBL_RETURN_PRODUCT T1
+	 WHERE TYPE = #{type,jdbcType=CHAR} and return_number=#{return_number,jdbcType=VARCHAR}
+	 order by T1.PRODUCT_ITEMNUMBER, T1.PRODUCT_COLOR,T1.PRODUCT_SPECS,T1.CODENUMBER
+	</select>
+	
+	<!-- 查询货号凭证-->
+	<select id="queryReturnImages" parameterType="string" resultType="java.util.Map">
+		select product_itemnumber,voucher_type,voucher_img_url from tbl_return_images
+		 where return_number = #{return_number,jdbcType=VARCHAR} and voucher_type='1'
+		 order by product_itemnumber
+	</select>
+	
+	<!-- 查询货号凭证-->
+	<select id="queryImgsByItemnumber" parameterType="java.util.Map" resultType="string">
+		select voucher_img_url from tbl_return_images
+		 where return_number = #{return_number,jdbcType=VARCHAR} 
+		 and product_itemnumber=#{product_itemnumber,jdbcType=VARCHAR} 
+		 and voucher_type='1'
+		 order by product_itemnumber
+	</select>
+	
+	<!-- 根据退款单号查询物流凭证-->
+	<select id="queryLogisticsImages" parameterType="string" resultType="string">
+		select voucher_img_url from tbl_return_images
+		 where return_number = #{return_number,jdbcType=VARCHAR} 
+		 and voucher_type='2'
+	</select>
+	
+	<!-- 查询异常商品-->
+	<select id="queryUnusualProduct" parameterType="string" resultType="java.util.Map">
+		select id,
+		return_number,
+		unusual_title,
+		unusual_num,
+		to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date
+		 from tbl_return_product_unusual
+		 where return_number = #{return_number,jdbcType=VARCHAR} 
+	</select>
+	<!-- 获取退款方式 -->
+	<select id="queryReturnType" parameterType="java.lang.String" resultType="int">
+		select return_type from TBL_RETURN_AMOUNT where return_number = #{return_number,jdbcType=VARCHAR} and rownum = 1
+	</select>
+	<!-- 添加临时退款信息 -->
+	<insert id="insertTmpReturnInfoNormal" parameterType="java.lang.String">
+		insert into tmp_return_info(order_number,return_user_id,count,return_amount)
+		SELECT ri.order_number,
+			   ra.return_user_id,
+			   ra.count,
+			   ra.return_amount
+		FROM TBL_RETURN_AMOUNT ra, TBL_ORDER_RETURN_INFO ri
+		WHERE ra.return_number = ri.return_number
+			AND ra.return_user_id NOT IN (
+				SELECT VALUE FROM TBL_SYS_PARAM_CONFIG WHERE key IN ('platform_user_id','storage_user_id')
+			)
+			and ra.return_type = '2'
+			and ra.settlement_state = '1'
+			AND ra.return_number = #{return_number,jdbcType=VARCHAR}
+	</insert>
+	<!-- 添加月结临时退款信息 -->
+	<insert id="insertTmpReturnInfoCredit" parameterType="java.lang.String">
+		insert into tmp_return_info(order_number,return_user_id,return_type,divide_user_id,count,return_amount)
+		select order_number,return_user_id,return_type,divide_user_id,count,return_amount from (
+			select order_number,return_user_id,return_type,divide_user_id,sum(count) count,sum(return_amount) return_amount from (
+				SELECT t.return_number,
+					   t.order_number,
+					   t2.count,
+					   r.divide_type,
+					   r.divide_user_id,
+					   CASE r.divide_type
+							WHEN '1' THEN r.divide_user_id
+							WHEN '2' THEN (SELECT to_number(value) FROM TBL_SYS_PARAM_CONFIG WHERE key = 'platform_user_id')
+							WHEN '3' THEN (SELECT to_number(value) FROM TBL_SYS_PARAM_CONFIG WHERE key = 'storage_user_id')
+							WHEN '4' THEN (SELECT to_number(value) FROM TBL_SYS_PARAM_CONFIG WHERE key = 'platform_user_id')
+							WHEN '5' THEN (SELECT to_number(value) FROM TBL_SYS_PARAM_CONFIG WHERE key = 'platform_user_id')
+							ELSE (SELECT ps.stationed_user_id FROM TBL_PRODUCT_SKU ps WHERE ps.id = s.product_sku)
+					   END return_user_id,
+
+					   CASE r.divide_type
+							WHEN '1' THEN '入驻商货款'
+							WHEN '2' THEN '会员服务费'
+							WHEN '3' THEN '仓储费'
+							WHEN '4' THEN '入驻商服务费'
+							WHEN '5' THEN '入驻商支付服务费'
+							ELSE '入驻商货款'
+					   END return_type,
+
+					   CASE when r.divide_type = '2' then
+					   			case when o.is_store_order = 2 then t2.count * r.divide_money else t2.count * (r.divide_money-s.product_total_discount_money/s.count) end
+							when r.divide_type = '1' or r.divide_type = '3' or r.divide_type = '4' or r.divide_type = '5' then t2.count * r.divide_money
+							else t2.count * t2.product_unit_price
+					   END as return_amount
+
+					   FROM tbl_order_return_info t,
+							tbl_order_return_product t2,
+							tbl_order_info o,
+							tbl_order_divide_record r,
+							tbl_order_product_sku s
+					   WHERE s.order_number = r.order_number(+) and s.product_sku = r.product_sku(+) and t.return_number = t2.return_number
+					   		and t.order_number = o.order_number and t.order_number = s.order_number and t2.product_sku = s.product_sku
+					   		and exists (select 1 from tbl_return_amount where return_type = '3' and return_number = t.return_number)
+							and t.return_number = #{return_number,jdbcType=VARCHAR})
+			group by order_number,return_user_id,return_type,divide_user_id
+
+		   	union all
+
+		   	select order_number,(SELECT to_number(value) FROM TBL_SYS_PARAM_CONFIG WHERE key = 'storage_user_id') return_user_id,'代发费' return_type,0 divide_user_id,product_count count,df_money return_amount
+		   	from tbl_order_return_info t where exists (select 1 from tbl_return_amount where return_type = '3' and return_number = t.return_number)
+				and t.return_number = #{return_number,jdbcType=VARCHAR}
+
+		   	union all
+
+		   	select order_number,(SELECT to_number(value) FROM TBL_SYS_PARAM_CONFIG WHERE key = 'storage_user_id') return_user_id,'物流费' return_type,0 divide_user_id,product_count count,logistics_money return_amount
+		   	from tbl_order_return_info t where exists (select 1 from tbl_return_amount where return_type = '3' and return_number = t.return_number)
+				and t.return_number = #{return_number,jdbcType=VARCHAR})
+	</insert>
+	
+	<!-- 查询退款商品零售价总金额 -->
+	<select id="queryReturnProductStorePrice" parameterType="java.util.Map" resultType="java.util.Map">
+	   SELECT SUM (t.PRODUCT_STORE_PRICE * t1.COUNT) AS return_product_store_price
+	  		FROM TBL_ORDER_PRODUCT_SKU t, tbl_order_return_product t1
+	   WHERE t.order_number = t1.order_number
+	       AND t.product_sku = t1.product_sku
+	       AND t1.return_number = #{RETURN_NUMBER,jdbcType=VARCHAR}
+	</select>
+	<!--更新店铺账户押金余额-->
+	<update id="updateStoreBankAccountBalance" parameterType="java.util.Map">
+		  update tbl_store_bank_account 
+		  	set account_balance_checkcode=getCheck_Code(#{user_id,jdbcType=VARCHAR},nvl(account_balance,0),#{c_user_key,jdbcType=VARCHAR}),
+		  		goods_deposit_balance=nvl(goods_deposit_balance,0)+#{recharge_money,jdbcType=INTEGER},
+		  		goods_deposit_bal_checkcode=getCheck_Code(#{user_id,jdbcType=VARCHAR},(nvl(goods_deposit_balance,0)+#{recharge_money,jdbcType=INTEGER}),#{c_user_key,jdbcType=VARCHAR}),
+		  		store_goods_deposit_balance=nvl(store_goods_deposit_balance,0)+#{store_recharge_money,jdbcType=INTEGER},
+		  		store_goods_dpst_bal_checkcode=getCheck_Code(#{user_id,jdbcType=VARCHAR},(nvl(store_goods_deposit_balance,0)+#{store_recharge_money,jdbcType=INTEGER}),#{c_user_key,jdbcType=VARCHAR}),
+		  		store_deposit_checkcode=getCheck_Code(#{user_id,jdbcType=VARCHAR},nvl(store_deposit,0),#{c_user_key,jdbcType=VARCHAR}),
+		  		shelf_deposit_checkcode=getCheck_Code(#{user_id,jdbcType=VARCHAR},nvl(shelf_deposit,0),#{c_user_key,jdbcType=VARCHAR})
+		  where user_id=#{user_id,jdbcType=INTEGER}
+	</update>
+	<!-- 店铺货品押金退款记录-->
+    <insert id="insertStoreGoodsDepositAccountRecord" parameterType="java.util.Map">
+        insert into tbl_store_account_record(
+            id,
+            record_number,
+            record_channel,
+            record_type,
+            remark,
+            collect_user_id,
+            collect_user_manager_name,
+            collect_store_name,
+            collect_user_partner_id,
+            money,
+            count,
+            surplus_money,
+            docket_number,
+            docket_type,
+            create_date
+        )values (
+            seq_store_account_record.nextval,
+            getAutoNumber('CZ'),
+            '店铺货品押金',
+            1,
+            #{storeGoodsDepositRemark,jdbcType=VARCHAR},
+            #{collect_user_id,jdbcType=INTEGER},
+            #{collect_user_manager_name,jdbcType=VARCHAR},
+            #{collect_store_name,jdbcType=VARCHAR},
+            #{collect_user_partner_id,jdbcType=INTEGER},
+            #{store_recharge_money,jdbcType=INTEGER},
+            #{product_count,jdbcType=INTEGER},
+            #{store_recharge_money,jdbcType=INTEGER}+#{store_goods_deposit_balance,jdbcType=INTEGER},
+            #{return_number,jdbcType=VARCHAR},
+            '门店订货退款',
+            sysdate
+        )
+    </insert>
+    <!-- 货品押金退款记录-->
+    <insert id="insertGoodsDepositAccountRecord" parameterType="java.util.Map">
+        insert into tbl_store_account_record(
+            id,
+            record_number,
+            record_channel,
+            record_type,
+            remark,
+            collect_user_id,
+            collect_user_manager_name,
+            collect_store_name,
+            collect_user_partner_id,
+            money,
+            count,
+            surplus_money,
+            docket_number,
+            docket_type,
+            create_date
+        )values (
+            seq_store_account_record.nextval,
+            getAutoNumber('CZ'),
+            '货品押金',
+            1,
+            #{goodsDepositRemark,jdbcType=VARCHAR},
+            #{collect_user_id,jdbcType=INTEGER},
+            #{collect_user_manager_name,jdbcType=VARCHAR},
+            #{collect_store_name,jdbcType=VARCHAR},
+            #{collect_user_partner_id,jdbcType=INTEGER},
+            #{recharge_money,jdbcType=INTEGER},
+            #{product_count,jdbcType=INTEGER},
+            #{goods_deposit_balance,jdbcType=INTEGER}+#{recharge_money,jdbcType=INTEGER},
+            #{return_number,jdbcType=VARCHAR},
+            '门店订货退款',
+            sysdate
+        )
+    </insert>
+    <!--退款单备注标记-->
+	<update id="orderReturnMarkRemark" parameterType="java.util.Map">
+		  update tbl_order_return_info 
+		  	set mark_remark=#{mark_remark,jdbcType=VARCHAR}
+		  where return_number=#{return_number,jdbcType=VARCHAR}
+	</update>
+	<!-- 锁表 add wanghai -->
+	<!-- 更新清分任务状态 -->
+	<update id="updateBussSettlementState" parameterType="java.util.Map">
+		update TBL_BUSS_SETTLEMENT_INFO s set liquidation_date = sysdate, settlement_state = 2
+		where EXISTS (SELECT 1 FROM tmp_return_info a WHERE a.return_user_id = s.SETTLEMENT_USER_ID AND a.order_number = s.order_number)
+		and product_num <![CDATA[ <= ]]> settled_quantity and settlement_amount <![CDATA[ <= ]]> settled_amount
+	</update>
+	<update id="lockTable"  parameterType="java.lang.String">
+		update TBL_STATIONED_USER_APPLY a set id = id where exists (SELECT 1 FROM tmp_return_info WHERE a.id = return_user_id)
+	</update>
+
+	<!--查询当前退货单对应的订单是否使用了会员卡优化，同时统计退货数量-->
+	<select id="getDetailByOrderAndReturnNumber" parameterType="java.util.Map" resultType="java.util.Map">
+		select
+			is_use_card,
+    		user_id,
+			sum(order_count) order_count,
+			sum(return_count) return_count,
+			sum(total_renturn_price) total_return_price
+		from (select
+			oi.mbr_card as is_use_card,
+    		oi.user_name as user_id,
+			nvl(ops.count,0) as order_count,
+			nvl(orp.count,0) as return_count,
+			nvl((ops.product_old_unit_price * orp.count),0) total_renturn_price
+		from tbl_order_product_sku ops
+		left join tbl_order_info oi on oi.order_number = ops.order_number
+		left join tbl_order_return_product orp on ops.order_number = orp.order_number and ops.product_sku = orp.product_sku and orp.return_number = #{return_number,jdbcType=VARCHAR}
+		where ops.order_number = #{order_number,jdbcType=VARCHAR})
+		group by is_use_card,user_id
+	</select>
+
+	<!-- 通过ID查询用户会员卡信息 -->
+	<select id="getUserMbrCardByUserId" parameterType="long" resultType="java.util.Map">
+		select 
+			ID,
+            USER_ID,
+            CARD_BALANCE,
+            CARD_BALANCE_CHECKCODE,
+            EXPIRATION_DATE,
+            CREATE_DATE,
+            CREATER_ID,
+            UPDATE_DATE,
+            UPDATE_ID,
+            IS_DELETE,
+            (CASE WHEN EXPIRATION_DATE &gt; SYSDATE THEN 0 ELSE 1 END) EXPIRATION_FLAG
+		 from tbl_user_mbr_card where user_id = #{user_id,jdbcType=INTEGER}
+	</select>
+
+	<!-- 更新充值卡记录 -->
+	<update id="updateUserMbrCard" parameterType="java.util.Map">
+		update tbl_user_mbr_card set
+		<if test="CARD_BALANCE != null and CARD_BALANCE != ''">
+			card_balance = #{CARD_BALANCE,jdbcType=FLOAT},
+			card_balance_checkcode = #{card_balance_checkcode,jdbcType=VARCHAR},
+		</if>
+			update_date = sysdate
+		where user_id = #{USER_ID,jdbcType=INTEGER}
+	</update>
+
+	<!--新增会员卡收支记录-->
+	<insert id="insertUserMbrCardUseRecord" parameterType="java.util.Map">
+		<selectKey keyProperty="id" resultType="long" order="BEFORE">
+			select seq_user_mbr_card_use_record.nextval from dual
+		</selectKey>
+		insert into tbl_user_mbr_card_use_record (
+			id,
+			mbr_card_id,
+			order_number,
+			type,
+			used_amount,
+			remark,
+			create_date
+		) values (
+			#{id,jdbcType=INTEGER},
+			#{mbr_card_id,jdbcType=INTEGER},
+			#{order_number,jdbcType=VARCHAR},
+			#{type,jdbcType=INTEGER},
+			#{used_amount,jdbcType=FLOAT},
+			#{remark,jdbcType=VARCHAR},
+			sysdate
+		)
+	</insert>
+	<!-- 校验余额是否被篡改 -->
+	<select id="checkBalance" parameterType="long" resultType="int">
+		select count(1) from TBL_USER_MBR_CARD umc
+		INNER JOIN TBL_USER_INFO ui on ui.id = umc.user_id
+		INNER JOIN TBL_USER_MBR_CARD_CACHE_KEY uck on ui.user_name = uck.user_name
+		where umc.card_balance_checkcode = getCheck_Code(ui.user_name, nvl(umc.card_balance, 0), uck.cache_key)
+		and ui.id = #{user_id,jdbcType=INTEGER}
+	</select>
+
+	<!--修改退款商品SKU为上架状态-->
+	<update id="updateReturnProductSkuAutoShelf">
+		update TBL_PRODUCT_SKU ps set STATE = '上架',SELL_STATE_DATE = sysdate
+			WHERE EXISTS (select 1 from tbl_order_return_product t where return_number = #{returnNumber, jdbcType=VARCHAR} and t.product_sku = ps.id)
+			  AND EXISTS
+				  (
+				  --商品参加订货会或预售活动商品  自动上架
+				   SELECT 1
+					 FROM tbl_activity_info a, tbl_activity_product c
+					WHERE     a.id = c.activity_id
+						  AND a.activity_type IN ('2', '4')
+						  AND a.activity_state = '3'
+						  AND a.state = '2'
+						  AND ps.product_itemnumber = c.product_itemnumber
+						  AND SYSDATE BETWEEN c.activity_start_date
+										  AND c.activity_end_date
+						  AND EXISTS
+								 (SELECT 1
+									FROM tbl_product_info dd
+								   WHERE     dd.itemnumber = c.product_itemnumber
+										 AND dd.start_stop_state = 1)
+				   --有库存且SKU状态为下架状态的sku 自动上架
+				   UNION ALL
+				   SELECT 1
+					 FROM tbl_product_sku a
+					WHERE     product_group = '尺码'
+						  AND a.state = '下架'
+						  AND a.start_stop_state = 1
+						  AND a.id = ps.id
+						  AND EXISTS
+								 (SELECT 1
+									FROM (SELECT product_total_count,
+												 (c.product_order_occupy_count - t.product_count) product_order_occupy_count,
+												 c.PRODUCT_SKU
+											FROM tbl_product_sku_stock c,
+												 (  SELECT COUNT (1) product_count,
+														   t.product_sku
+													  FROM tbl_order_return_product t
+													  	WHERE return_number = #{returnNumber, jdbcType=VARCHAR}
+												  GROUP BY product_sku) t
+										   WHERE c.product_sku = t.product_sku)
+								   WHERE     product_sku = a.id
+										 AND product_total_count >
+												product_order_occupy_count
+										 AND EXISTS
+												(SELECT 1
+												   FROM tbl_product_info tpi
+												  WHERE     tpi.itemnumber =
+															   a.product_itemnumber
+														AND tpi.product_type IN
+															   (0, 3)
+														AND tpi.start_stop_state =
+															   1)))
+	</update>
+</mapper>

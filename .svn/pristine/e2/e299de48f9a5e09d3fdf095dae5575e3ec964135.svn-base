@@ -1,0 +1,839 @@
+package com.tk.analysis.stationed.dao;
+
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.stereotype.Repository;
+
+/**
+ * 
+ * Copyright (c), 2017, Tongku
+ * FileName : StationedAnalysisDao.java
+ * 运营分析-商家 dao层
+ *
+ * @author yejingquan
+ * @version 1.00
+ * @date Oct 18, 2019
+ */
+@Repository
+public interface StationedAnalysisDao {
+	/**
+	 * 商家今日实时销量-商家销售额列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryRealTime_StationedPayMoneyList(Map<String, Object> paramMap);
+	/**
+	 * 商家今日实时销量-商家销量列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryRealTime_StationedPayCountList(Map<String, Object> paramMap);
+	/**
+	 * 商家总数
+	 * @param paramMap
+	 * @return
+	 */
+	int r_queryStationedCount(Map<String, Object> paramMap);
+	/**
+	 * 商品销量---获取排序后的商家列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<String> r_queryStationed_PayCount_Stationed(Map<String, Object> paramMap);
+	/**
+	 * 商品销售总额---获取排序后的商家列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<String> r_queryStationed_PayMoney_Stationed(Map<String, Object> paramMap);
+	/**
+	 * 支付买家数---获取排序后的商家列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<String> r_queryStationed_PurchaseNumber_Stationed(Map<String, Object> paramMap);
+	/**
+	 * 查询默认排序的商家列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<String> r_queryRealTimeSaleStationedListBy_Default(Map<String, Object> paramMap);
+	/**
+	 * 商家列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationedList(Map<String, Object> paramMap);
+	/**
+	 * 商品销量，商品销售总额，支付买家数
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryRealTimeSale_PayPurchaseNumberCountMoney(Map<String, Object> paramMap);
+	/**
+	 * 预定订单的定金
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryRealTimeSale_PreFirstMoney(Map<String, Object> paramMap);
+	/**
+	 * 商家分布地图
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryDistributionMap(Map<String, Object> paramMap);
+	/**
+	 * 以省份为维度查询商家数量
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationedCountToProvince(Map<String, Object> paramMap);
+	/**
+	 * 以城市为维度查询商家数量
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationedCountToCity(Map<String, Object> paramMap);
+	/**
+	 * 商家分布区域明细
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryDistributionAreaDetail(Map<String, Object> paramMap);
+	/**
+	 * 在售商品-饼图
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryOnSaleProductChart(Map<String, Object> paramMap);
+	/**
+	 * 货号数---获取排序后的商家列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<String> r_queryStationed_ItemCount_Stationed(Map<String, Object> paramMap);
+	/**
+	 * sku数---获取排序后的商家列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<String> r_queryStationed_SkuCount_Stationed(Map<String, Object> paramMap);
+	/**
+	 * 查询默认排序的商家列表<货号数>
+	 * @param paramMap
+	 * @return
+	 */
+	List<String> r_queryOnSaleProductStationedListBy_Default(Map<String, Object> paramMap);
+	/**
+	 * 在售商品——货号数
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryOnSaleProduct_ItemCount(Map<String, Object> paramMap);
+	/**
+	 * 在售商品——sku数
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryOnSaleProduct_SkuCount(Map<String, Object> paramMap);
+	/**
+	 * 商家注册资本-商家数
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryRegisteredCapitalStationedCount(Map<String, Object> paramMap);
+	/**
+	 * 商家成立年数-商家数
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryEstablishYearStationedCount(Map<String, Object> paramMap);
+	/**
+	 * 在售商品过季情况-过季/过时
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryOutSeasonDateItemCount(Map<String, Object> paramMap);
+	/**
+	 * 在售商品过季情况-应季
+	 * @param paramMap
+	 * @return
+	 */
+	float r_querySeasonalItemCount(Map<String, Object> paramMap);
+	/**
+	 * 货号数---获取排序后的商家列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<String> r_queryOutOfSeason_ItemCount_Stationed(Map<String, Object> paramMap);
+	/**
+	 * 过季/过时货号数---获取排序后的商家列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<String> r_queryStationed_OuteSeasonCount_Stationed(Map<String, Object> paramMap);
+	/**
+	 * 过季/过时货号数
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationed_OutSeasonCount(Map<String, Object> paramMap);
+	/**
+	 * 用户复购数
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryStationed_RepeatPurchaseNumber(Map<String, Object> paramMap);
+	/**
+	 * 用户复购数---获取排序后的商家列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<String> r_queryStationed_RepeatPurchaseNumber_Stationed(Map<String, Object> paramMap);
+	/**
+	 * 查询默认排序的商家列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<String> r_queryRepeatPurchaseStationedListBy_Default(Map<String, Object> paramMap);
+	/**
+	 * 用户复购-支付买家数
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryRepeatPurchase_PurchaseNumber(Map<String, Object> paramMap);
+	/**
+	 * 用户复购-用户复购数
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryRepeatPurchase_RepeatPurchaseNumber(Map<String, Object> paramMap);
+	/**
+	 * 商家交易-商品销量
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryStationedTr_PayCount(Map<String, Object> paramMap);
+	/**
+	 * 商家交易-商品销售总额
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryStationedTr_PayMoney(Map<String, Object> paramMap);
+	/**
+	 * 商家交易-未发退货数
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryStationedTr_UnsentReturnCount(Map<String, Object> paramMap);
+	/**
+	 * 商家交易-已发退货数
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryStationedTr_SentReturnCount(Map<String, Object> paramMap);
+	/**
+	 * 商家交易-终检异常
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryStationedTr_FqcCount(Map<String, Object> paramMap);
+	/**
+	 * 商家交易-售后异常
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryStationedTr_SaleReturnCount(Map<String, Object> paramMap);
+	/**
+	 * 商家交易-商品销量、商品销售总额<天>
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationedTr_PayCountMoneyD_Chart(Map<String, Object> paramMap);
+	/**
+	 * 商家交易-预定订单的定金<天>
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationedTr_PreFirstMoneyD_Chart(Map<String, Object> paramMap);
+	/**
+	 * 商家交易-未发退货数<天>
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationedTr_UnsentReturnCountD_Chart(Map<String, Object> paramMap);
+	/**
+	 * 商家交易-已发退货数<天>
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationedTr_SentReturnCountD_Chart(Map<String, Object> paramMap);
+	/**
+	 * 商家交易-终检异常<天>
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationedTr_FqcCountD_Chart(Map<String, Object> paramMap);
+	/**
+	 * 商家交易-售后异常<天>
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationedTr_SaleReturnCountD_Chart(Map<String, Object> paramMap);
+	/**
+	 * 商家交易-商家汇总信息
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationedSummary_Chart(Map<String, Object> paramMap);
+	/**
+	 * 商家汇总信息列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationedSummaryList(Map<String, Object> paramMap);
+	/**
+	 * 商家配合度列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationedCooperationDegreeList(Map<String, Object> paramMap);
+	/**
+	 * 根据活动商品数排序
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryActivityProductCountListForPage(Map<String, Object> paramMap);
+	/**
+	 * 商家配合度默认排序
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationedCooperationDegreeListForPage(Map<String, Object> paramMap);
+	/**
+	 * 商家配合度-活动商品数
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationedCooperationDegree_ActivityProductCount(Map<String, Object> paramMap);
+	/**
+	 * 商家分析-基本信息
+	 * @param paramMap
+	 * @return
+	 */
+	Map<String, Object> r_queryStationedAnalysisDetail(Map<String, Object> paramMap);
+	/**
+	 * 商家分析-商品销售总额
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationed_PayMoney_Chart(Map<String, Object> paramMap);
+	/**
+	 * 商家分析-预定订单的定金
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationed_PreFirstMoney_Chart(Map<String, Object> paramMap);
+	/**
+	 * 商家分析-今日实时销售-商品销售额
+	 */
+	float r_queryStationed_PayMoney(Map<String, Object> paramMap);
+	/**
+	 * 商家分析-今日实时销售-预定订单的定金
+	 */
+	float r_queryStationed_PreFirstMoney(Map<String, Object> paramMap);
+	/**
+	 * 商家分析-今日实时销售-商品浏览量
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryStationed_PvCount(Map<String, Object> paramMap);
+	/**
+	 * 商家分析-今日实时销售-商品访客量
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryStationed_VisitorCount(Map<String, Object> paramMap);
+	/**
+	 * 商家分析-今日实时销售-支付买家数
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryStationed_PurchaseNumber(Map<String, Object> paramMap);
+	/**
+	 * 商家分析-过时/过季商品占比
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryStationed_OutSeasonDateItemCount(Map<String, Object> paramMap);
+	/**
+	 * 查询商家的货号数,sku数,品牌数
+	 * @param paramMap
+	 * @return
+	 */
+	Map<String, Object> r_queryStationed_ItemSkuBrandCount(Map<String, Object> paramMap);
+	/**
+	 * 商品分类列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>>r_queryProductTypeList(Map<String, Object> paramMap);
+	/**
+	 * 商家分析-商品分类销量
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationedAnalysis_ProductType(Map<String, Object> paramMap);
+	/**
+	 * 商品结构-累计货号数
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryStationed_Cumulative_ItemCount(Map<String, Object> paramMap);
+	/**
+	 * 累计SKU数量
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryStationed_Cumulative_SkuCount(Map<String, Object> paramMap);
+	/**
+	 * 累计品牌数
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryStationed_Cumulative_BrandCount(Map<String, Object> paramMap);
+	/**
+	 * 查询商家 所有货号数
+	 * @param paramMap
+	 * @return
+	 */
+	int r_queryStationed_ItemCount(Map<String, Object> paramMap);
+	/**
+	 * 折线图 商品分类货号数
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationed_ProductType_ItemCount_Chart(Map<String, Object> paramMap);
+	/**
+	 * 查询商品分类货号数
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationed_ProductType_ItemCount(Map<String, Object> paramMap);
+	/**
+	 * 商品结构-年份占比
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationed_ProductType_Year_Chart(Map<String, Object> paramMap);
+	/**
+	 * 商品结构-品牌占比
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationed_ProductType_Brand_Chart(Map<String, Object> paramMap);
+	/**
+	 * 商品结构-季节占比
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationed_ProductType_Season_Chart(Map<String, Object> paramMap);
+	/**
+	 * 商品结构-分类占比
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationed_ProductType_Classify_Chart(Map<String, Object> paramMap);
+	/**
+	 * 商品结构-性别占比
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationed_ProductType_Gender_Chart(Map<String, Object> paramMap);
+	/**
+	 * 商品结构-风格款式占比
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationed_ProductType_Style_Chart(Map<String, Object> paramMap);
+	/**
+	 * 商品结构-年份占比总数
+	 * @param paramMap
+	 * @return
+	 */
+	int r_queryStationed_ProductType_YearCount(Map<String, Object> paramMap);
+	/**
+	 * 商品结构-年份占比列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationed_ProductType_YearList(Map<String, Object> paramMap);
+	/**
+	 * 商品结构-品牌占比总数
+	 * @param paramMap
+	 * @return
+	 */
+	int r_queryStationed_ProductType_BrandCount(Map<String, Object> paramMap);
+	/**
+	 * 商品结构-品牌占比列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationed_ProductType_BrandList(Map<String, Object> paramMap);
+	/**
+	 * 商品结构-季节占比总数
+	 * @param paramMap
+	 * @return
+	 */
+	int r_queryStationed_ProductType_SeasonCount(Map<String, Object> paramMap);
+	/**
+	 * 商品结构-季节占比列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationed_ProductType_SeasonList(Map<String, Object> paramMap);
+	/**
+	 * 商品结构-分类占比总数
+	 * @param paramMap
+	 * @return
+	 */
+	int r_queryStationed_ProductType_ClassifyCount(Map<String, Object> paramMap);
+	/**
+	 * 商品结构-分类占比列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationed_ProductType_ClassifyList(Map<String, Object> paramMap);
+	/**
+	 * 商品结构-性别占比总数
+	 * @param paramMap
+	 * @return
+	 */
+	int r_queryStationed_ProductType_GenderCount(Map<String, Object> paramMap);
+	/**
+	 * 商品结构-性别占比列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationed_ProductType_GenderList(Map<String, Object> paramMap);
+	/**
+	 * 商品结构-风格款式占比总数
+	 * @param paramMap
+	 * @return
+	 */
+	int r_queryStationed_ProductType_StyleCount(Map<String, Object> paramMap);
+	/**
+	 * 商品结构-风格款式占比列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationed_ProductType_StyleList(Map<String, Object> paramMap);
+	/**
+	 * 商品结构-商品总数
+	 * @param paramMap
+	 * @return
+	 */
+	int r_queryStationed_ProductStructure_ProductCount(Map<String, Object> paramMap);
+	/**
+	 * 商品结构-商品列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationed_ProductStructure_ProductList(Map<String, Object> paramMap);
+	/**
+	 * 码段结构
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryCodeSegmentList(Map<String, Object> paramMap);
+	/**
+	 * 商家-新品数量
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryStationed_NewProductCount(Map<String, Object> paramMap);
+	/**
+	 * 商家-活动商品数
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryStationed_ActivityProductCount(Map<String, Object> paramMap);
+	/**
+	 * 折线图 支付买家数
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationed_PurchaseNumber_Chart(Map<String, Object> paramMap);
+	/**
+	 * 折线图 新品数量<天>
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationed_NewProductCountD_Chart(Map<String, Object> paramMap);
+	/**
+	 * 折线图 活动商品数<天>
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationed_ActivityProductCountD_Chart(Map<String, Object> paramMap);
+	/**
+	 * 折线图 新品数量
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationed_NewProductCount_Chart(Map<String, Object> paramMap);
+	/**
+	 * 折线图 活动商品数
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationed_ActivityProductCount_Chart(Map<String, Object> paramMap);
+	/**
+	 * 商家-商品总数
+	 * @param paramMap
+	 * @return
+	 */
+	int r_queryStationedProductCount(Map<String, Object> paramMap);
+	/**
+	 * 商家-商品列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationedProductList(Map<String, Object> paramMap);
+	/**
+	 * 商品-供应商总数
+	 * @param paramMap
+	 * @return
+	 */
+	int r_queryProductSupplierCount(Map<String, Object> paramMap);
+	/**
+	 * 商品-供应商列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryProductSupplierList(Map<String, Object> paramMap);
+	/**
+	 * 销售总数
+	 * @param paramMap
+	 * @return
+	 */
+	int r_queryStationed_PayCount(Map<String, Object> paramMap);
+	/**
+	 * 按省份 销售数量
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationed_PayCountToProvince(Map<String, Object> paramMap);
+	/**
+	 * 按城市 销售数量
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationed_PayCountToCity(Map<String, Object> paramMap);
+	/**
+	 * 区域销售-商品总数
+	 * @param paramMap
+	 * @return
+	 */
+	int r_queryStationed_ProductCount(Map<String, Object> paramMap);
+	/**
+	 * 区域销售-商品列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryStationed_ProductList(Map<String, Object> paramMap);
+	/**
+	 * 区域销售分析地图
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_querySaleAreaMap(Map<String, Object> paramMap);
+	/**
+	 * 折线图 售后/品质问题分析
+	 * @param paramMap
+	 * @return
+	 */
+	Map<String, Object> r_queryReturnQualityChart(Map<String, Object> paramMap);
+	/**
+	 * 品质退换货商品总数
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryReturnQualityProductCount(Map<String, Object> paramMap);
+	/**
+	 * 品质退换货总数
+	 * @param paramMap
+	 * @return
+	 */
+	int r_queryReturnQualityCount(Map<String, Object> paramMap);
+	/**
+	 * 品质退换货列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryReturnQualityList(Map<String, Object> paramMap);
+	/**
+	 * 供应商-生产计划数
+	 * @param paramMap
+	 * @return
+	 */
+	float r_querySupplier_ProductionCount(Map<String, Object> paramMap);
+	/**
+	 * 供应商-入库数
+	 * @param paramMap
+	 * @return
+	 */
+	float r_querySupplier_InstorageCount(Map<String, Object> paramMap);
+	/**
+	 * 供应商-出货数
+	 * @param paramMap
+	 * @return
+	 */
+	float r_querySupplier_OutProductCount(Map<String, Object> paramMap);
+	/**
+	 * 供应商-终检异常
+	 * @param paramMap
+	 * @return
+	 */
+	float r_querySupplier_FqcCount(Map<String, Object> paramMap);
+	/**
+	 * 供应商-售后异常
+	 * @param paramMap
+	 * @return
+	 */
+	float r_querySupplier_SaleReturnCount(Map<String, Object> paramMap);
+	/**
+	 * 折线图 生产计划数<天>
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_querySupplier_ProductionCountD_Chart(Map<String, Object> paramMap);
+	/**
+	 * 折线图 入库数<天>
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_querySupplier_InstorageCountD_Chart(Map<String, Object> paramMap);
+	/**
+	 * 折线图 出货数
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_querySupplier_OutProductCountD_Chart(Map<String, Object> paramMap);
+	/**
+	 * 折线图 终检异常
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_querySupplier_FqcCountD_Chart(Map<String, Object> paramMap);
+	/**
+	 * 折线图 售后异常
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_querySupplier_SaleReturnCountD_Chart(Map<String, Object> paramMap);
+	/**
+	 * 折线图 供应商汇总
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_querySupplierSummary_Chart(Map<String, Object> paramMap);
+	/**
+	 * 供应商总数
+	 * @param paramMap
+	 * @return
+	 */
+	int r_querySupplierCount(Map<String, Object> paramMap);
+	/**
+	 * 供应商列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_querySupplierList(Map<String, Object> paramMap);
+	/**
+	 * 商品类型下拉框
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryProductTypeOption(Map<String, Object> paramMap);
+	/**
+	 * 供应商入库商品总数
+	 * @param paramMap
+	 * @return
+	 */
+	int r_querySupplierInstorageProductCount(Map<String, Object> paramMap);
+	/**
+	 * 供应商入库商品列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_querySupplierInstorageList(Map<String, Object> paramMap);
+	/**
+	 * 供应商出货商品总数
+	 * @param paramMap
+	 * @return
+	 */
+	int r_querySupplierOutProductProductCount(Map<String, Object> paramMap);
+	/**
+	 * 供应商出货商品列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_querySupplierOutProductList(Map<String, Object> paramMap);
+	/**
+	 * 供应商终检商品总数
+	 * @param paramMap
+	 * @return
+	 */
+	int r_querySupplierFqcProductCount(Map<String, Object> paramMap);
+	/**
+	 * 供应商终检列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_querySupplierFqcList(Map<String, Object> paramMap);
+	/**
+	 * 供应商售后商品总数
+	 * @param paramMap
+	 * @return
+	 */
+	int r_querySupplierSaleReturnProductCount(Map<String, Object> paramMap);
+	/**
+	 * 供应商售后列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_querySupplierSaleReturnList(Map<String, Object> paramMap);
+	/**
+	 * 商品库存量
+	 * @param productList
+	 * @return
+	 */
+	List<Map<String, Object>> queryProductStockCount(List<String> list);
+	/**
+	 * 近30天销量
+	 * @param productList
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryProductSaleList(Map<String, Object> map);
+	/**
+	 * 供应商商品总数
+	 * @param paramMap
+	 * @return
+	 */
+	int r_querySupplierProductCount(Map<String, Object> paramMap);
+	/**
+	 * 供应商商品列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_querySupplierProductList(Map<String, Object> paramMap);
+	/**
+	 * 获取 平均值和标准差
+	 * @param paramMap
+	 * @return
+	 */
+	Map<String, Object> r_queryProductStddevAvg(Map<String, Object> paramMap);
+	
+}

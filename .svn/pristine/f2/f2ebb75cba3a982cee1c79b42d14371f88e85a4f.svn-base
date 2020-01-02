@@ -1,0 +1,51 @@
+package com.tk.sys.util;
+
+import java.io.IOException;
+
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+/**
+ * Jackson Object与json相互转换通用类
+ * 
+ * @author zhanglei
+ * @date 2016/06/01
+ * 
+ */
+public class Jackson {
+
+	private static ObjectMapper objectMapper = null;
+
+	/**
+	 * 转化Object为json字符串
+	 */
+	public static String writeObject2Json(Object obj) {
+		objectMapper = new ObjectMapper();
+		try {
+			return objectMapper.writeValueAsString(obj);
+		} catch (JsonProcessingException e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+	/**
+	 * 转换json字符串为Object
+	 */
+	public static Object readJson2Object(String json, Class<?> c) {
+		objectMapper = new ObjectMapper();
+		try {
+			return objectMapper.readValue(json, c);
+		} catch (JsonParseException e) {
+			e.printStackTrace();
+		} catch (JsonMappingException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+}

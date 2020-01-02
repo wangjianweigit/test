@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.product.dao.ProductTypeDao">
+   <sql id="all_column">
+        id,
+        type_name,
+        parent_id,
+        to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+        sortid
+	</sql>
+	<!-- 新增 -->
+	<insert id="insert" parameterType="java.util.Map">
+		<selectKey keyProperty="id" resultType="int" order="BEFORE">
+			select seq_dic_product_type.nextval from dual
+		</selectKey>
+		insert into tbl_dic_product_type(
+			id,
+			type_name,
+			parent_id,
+			create_date,
+			sortid,
+			create_user_id
+		) values
+		(
+			#{id,jdbcType=INTEGER},
+			#{type_name,jdbcType=VARCHAR},
+			#{parent_id,jdbcType=INTEGER},
+			sysdate,
+			(select nvl(max(sortid),0)+1 from tbl_dic_product_type where parent_id = #{parent_id,jdbcType=INTEGER}),
+			#{public_user_id,jdbcType=INTEGER}
+		)
+	</insert>
+	<!-- 批量更新 -->
+	<update id="batchUpdate" parameterType="java.util.List">
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";">
+			update tbl_dic_product_type
+			   set type_name = #{item.type_name,jdbcType=VARCHAR}
+			 where id = #{item.id,jdbcType=INTEGER}
+		</foreach>
+	</update>
+	<!-- 更新 -->
+	<update id="update" parameterType="java.util.Map">
+		update tbl_dic_product_type
+		<set>
+			<if test="type_name!=null and type_name!=''">
+				type_name = #{type_name,jdbcType=VARCHAR}
+			</if>
+			<if test="type == 'top'">
+				<if test="parent_id!=null">
+				sortid = (select max(sortid) + 1 from tbl_dic_product_type where parent_id = #{parent_id,jdbcType=INTEGER})
+				</if>
+			</if>
+			<if test="type == 'bottom'">
+				<if test="parent_id!=null">
+				sortid = (select min(sortid) - 1 from tbl_dic_product_type where parent_id = #{parent_id,jdbcType=INTEGER})
+				</if>
+			</if>
+			<if test="sortid!=null">
+				sortid = #{sortid,jdbcType=INTEGER}
+			</if>
+		</set>
+		where id = #{id,jdbcType=INTEGER}
+	</update>
+	<!-- 删除 -->
+	<delete id="delete" parameterType="java.util.Map">
+		delete from  tbl_dic_product_type where id = #{id,jdbcType=INTEGER}
+	</delete>
+	<!-- 批量删除 -->
+	<delete id="batchDelete" parameterType ="java.util.List">
+		delete from  tbl_dic_product_type
+		where id in
+		<foreach collection="list" item="id" open="(" close=")" separator=",">
+			#{id,jdbcType=INTEGER}
+		</foreach>
+	</delete>
+	<!-- 根据父节点ID查询所有的子节点 -->
+	<select id="queryChildrenByParentId" parameterType ="java.util.Map" resultType="java.util.Map">
+		select
+        dpt.id,
+        dpt.type_name,
+        (select count(1) from tbl_dic_product_type where parent_id =  dpt.id) children
+        from  tbl_dic_product_type dpt
+        where id = #{id,jdbcType=INTEGER}
+	</select>
+	<!-- 查询商品分类信息 -->
+    <select id="queryProductTypeList" resultType="java.util.Map" parameterType="java.util.Map">
+     	select
+		<include refid="all_column" />
+		from tbl_dic_product_type dpt
+		<where>
+			<if test="type_name!=null and type_name!=''">
+				type_name = #{type_name,jdbcType=VARCHAR}
+		    </if>
+			<if test="parent_id!=null">
+		        and parent_id = #{parent_id,jdbcType=INTEGER}
+		    </if>
+			<if test="type != null and type != ''">
+				and type = #{type,jdbcType=CHAR}
+			</if>
+		</where>
+		order by sortid desc
+    </select>
+	<!-- 是否存在 -->
+    <select id="isExist" resultType="int" parameterType="java.util.Map">
+     	SELECT
+		count(id)
+		from tbl_dic_product_type
+		<where>
+			parent_id=#{parent_id,jdbcType=INTEGER}
+			<if test="id!=null and id!=0">
+				and id != #{id,jdbcType=INTEGER}
+		    </if>
+			<if test="type_name!=null and type_name!=''">
+				and type_name = #{type_name,jdbcType=VARCHAR}
+		    </if>
+		</where>
+    </select>
+	<!-- 根据主建查询对象信息 -->
+    <select id="queryById" resultType="java.util.Map" parameterType="long">
+     	select
+		<include refid="all_column" />
+		from tbl_dic_product_type
+		where id = #{id,jdbcType=INTEGER}
+	</select>
+
+	<resultMap id="resutlTypeMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="type_name" property="option"/>
+        <result column="parent_id" property="pid"/>
+    </resultMap>
+	<!-- 查询分类下拉框列表 -->
+	<select id="queryTypeList" parameterType="java.util.Map" resultType="java.util.Map" resultMap="resutlTypeMap">
+		select id,type_name,parent_id
+		  from tbl_dic_product_type
+		  order by parent_id
+	</select>
+	<!-- 查询大类 -->
+	<select id="queryMainTypeList" parameterType="java.util.Map" resultType="java.util.Map">
+		select id,type_name,type,code
+          from tbl_dic_product_type
+         where parent_id = 0
+         order by sortid desc
+	</select>
+
+    <select id="queryBasicDataByTypeId"  parameterType="long" resultType="java.util.Map">
+        select basic_name, state
+        from tbl_product_type_basic_ref
+        where product_type_id = #{product_type_id, jdbcType=INTEGER}
+    </select>
+
+    <delete id="deleteBasicDataByTypeId" parameterType="long">
+        delete from tbl_product_type_basic_ref
+        where product_type_id = #{product_type_id, jdbcType=INTEGER}
+    </delete>
+
+    <insert id="insertBasicData" parameterType="java.util.Map">
+        insert into tbl_product_type_basic_ref
+        (product_type_id, basic_name, state)
+        select #{product_type_id, jdbcType=INTEGER}, basic_name, state FROM (
+            <foreach collection="basic_data_list" open="(" close=")" item="item" separator="union all">
+                select
+                #{item.basic_name,jdbcType=VARCHAR} as basic_name,
+                #{item.state, jdbcType=INTEGER} as state
+                from dual
+            </foreach>
+        )
+    </insert>
+
+</mapper>

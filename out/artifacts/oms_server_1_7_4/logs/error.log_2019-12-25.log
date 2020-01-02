@@ -1,0 +1,67 @@
+2019-12-25 17:03:45 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-12-25 17:03:47 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-12-25 17:03:48 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-12-25 17:03:49 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-12-25 17:13:27 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-12-25 17:13:30 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-12-25 17:13:31 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-12-25 17:13:32 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-12-25 17:14:21 ERROR [com.tk.analysis.home.service.HomeAnalysisService] org.springframework.jdbc.BadSqlGrammarException: 
+### Error querying database.  Cause: java.sql.SQLException: ORA-00942: 表或视图不存在
+
+### The error may exist in file [D:\Work\program\oms_server_1.7.4\out\artifacts\oms_server_1_7_4\WEB-INF\classes\com\tk\analysis\home\mapper\HomeAnalysisMapper.xml]
+### The error may involve com.tk.analysis.home.dao.HomeAnalysisDao.r_queryProductRankListBy_Default-Inline
+### The error occurred while setting parameters
+### SQL: select itemnumber       from (     select t.itemnumber,nvl(t1.product_money,0)+nvl(t2.pre_first_money,0) pay_money       from dim_product t,(select t1.product_key,nvl(sum(t1.pay_money),0) product_money                   from fact_product_sale_d t1,dim_date dt,dim_product dp,dim_member dm                  where t1.date_key = dt.date_key                    and dt.date_short >= ?              and dt.date_short <= ?              and t1.pay_money > 0                    and dp.product_key = t1.product_key      and t1.member_key = dm.member_key                                        and dm.member_key > 0                              group by t1.product_key) t1,           (select t1.product_key,nvl(sum(t1.product_money*(t2.earnest_money/t2.product_money)),0) pre_first_money            from fact_pre_order_product t1 ,fact_pre_order t2,dim_date dt,dim_product dp,dim_member dm           where t1.order_key = t2.order_key             and t2.payment_date_key = dt.date_key             and dt.date_short >= ?             and dt.date_short <= ?             and t1.product_key > 0                    and dp.product_key = t1.product_key      and t1.member_key = dm.member_key                                        and dm.member_key > 0                              group by t1.product_key) t2      where t.product_key = t1.product_key(+)        and t.product_key = t2.product_key(+)                                                       and t.product_key > 0                               order by pay_money desc)              where rownum <= ?
+### Cause: java.sql.SQLException: ORA-00942: 表或视图不存在
+
+; bad SQL grammar []; nested exception is java.sql.SQLException: ORA-00942: 表或视图不存在
+
+2019-12-25 17:14:21 ERROR [com.tk.analysis.home.service.HomeAnalysisService] org.springframework.jdbc.BadSqlGrammarException: 
+### Error querying database.  Cause: java.sql.SQLException: ORA-00942: 表或视图不存在
+
+### The error may exist in file [D:\Work\program\oms_server_1.7.4\out\artifacts\oms_server_1_7_4\WEB-INF\classes\com\tk\analysis\home\mapper\HomeAnalysisMapper.xml]
+### The error may involve com.tk.analysis.home.dao.HomeAnalysisDao.r_queryPayMoneyTotal-Inline
+### The error occurred while setting parameters
+### SQL: select nvl(sum(t1.pay_total_moeny),0)       from fact_user_order_d t1,dim_date dt,dim_member dm      where t1.date_key = dt.date_key              and dt.date_short >= ?           and dt.date_short <= ?           and t1.member_key = dm.member_key           and dm.user_state in (1,2)                                                    and dm.member_key > 0
+### Cause: java.sql.SQLException: ORA-00942: 表或视图不存在
+
+; bad SQL grammar []; nested exception is java.sql.SQLException: ORA-00942: 表或视图不存在
+
+2019-12-25 17:14:21 ERROR [com.tk.analysis.home.service.HomeAnalysisService] org.springframework.jdbc.BadSqlGrammarException: 
+### Error querying database.  Cause: java.sql.SQLException: ORA-00942: 表或视图不存在
+
+### The error may exist in file [D:\Work\program\oms_server_1.7.4\out\artifacts\oms_server_1_7_4\WEB-INF\classes\com\tk\analysis\home\mapper\HomeAnalysisMapper.xml]
+### The error may involve com.tk.analysis.home.dao.HomeAnalysisDao.r_querySaleAreaMap-Inline
+### The error occurred while setting parameters
+### SQL: select t.region_id as id,            t.name,            nvl(t1.pay_money,0) as value          from dim_dic_region t,(select dm.user_company_address_province as province_id,nvl(sum(t1.pay_total_moeny),0) pay_money              from fact_user_order_d t1,dim_date dt,dim_member dm             where t1.date_key = dt.date_key                     and dt.date_short >= ?                  and dt.date_short <= ?                  and t1.member_key = dm.member_key                  and dm.user_state in (1,2)                                                                    and dm.member_key > 0                                   group by dm.user_company_address_province) t1       where t.parent_id in (select region_id from dim_dic_region where parent_id = 0)         and t.region_id = t1.province_id(+)
+### Cause: java.sql.SQLException: ORA-00942: 表或视图不存在
+
+; bad SQL grammar []; nested exception is java.sql.SQLException: ORA-00942: 表或视图不存在
+
+2019-12-25 17:14:21 ERROR [com.tk.analysis.home.service.HomeAnalysisService] org.springframework.jdbc.BadSqlGrammarException: 
+### Error querying database.  Cause: java.sql.SQLException: ORA-00942: 表或视图不存在
+
+### The error may exist in file [D:\Work\program\oms_server_1.7.4\out\artifacts\oms_server_1_7_4\WEB-INF\classes\com\tk\analysis\home\mapper\HomeAnalysisMapper.xml]
+### The error may involve com.tk.analysis.home.dao.HomeAnalysisDao.r_queryBrandRankListBy_Default-Inline
+### The error occurred while setting parameters
+### SQL: select brand_id       from (     select t.brand_id,nvl(sum(t1.product_money),0)+nvl(sum(t2.pre_first_money),0) pay_money       from dim_product t       left join (select dp.brand_id,nvl(sum(t1.pay_money),0) product_money                 from fact_product_sale_d t1,dim_date dt,dim_product dp,dim_member dm                where t1.date_key = dt.date_key                  and dt.date_short >= ?            and dt.date_short <= ?            and t1.pay_money > 0                  and dp.product_key = t1.product_key      and t1.member_key = dm.member_key                                        and dm.member_key > 0                            group by dp.brand_id) t1 on t.brand_id = t1.brand_id       left join (select dp.brand_id,nvl(sum(t1.product_money*(t2.earnest_money/t2.product_money)),0) pre_first_money          from fact_pre_order_product t1 ,fact_pre_order t2,dim_date dt,dim_product dp,dim_member dm         where t1.order_key = t2.order_key           and t2.payment_date_key = dt.date_key           and dt.date_short >= ?           and dt.date_short <= ?                  and dp.product_key = t1.product_key      and t1.member_key = dm.member_key                                        and dm.member_key > 0                            group by dp.brand_id) t2 on t.brand_id = t2.brand_id      where 1=1                                                       and t.product_key > 0                               group by t.brand_id              order by pay_money desc)              where rownum <= ?
+### Cause: java.sql.SQLException: ORA-00942: 表或视图不存在
+
+; bad SQL grammar []; nested exception is java.sql.SQLException: ORA-00942: 表或视图不存在
+
+2019-12-25 17:14:21 ERROR [com.tk.analysis.home.service.HomeAnalysisService] org.springframework.jdbc.BadSqlGrammarException: 
+### Error querying database.  Cause: java.sql.SQLException: ORA-00942: 表或视图不存在
+
+### The error may exist in file [D:\Work\program\oms_server_1.7.4\out\artifacts\oms_server_1_7_4\WEB-INF\classes\com\tk\analysis\home\mapper\HomeAnalysisMapper.xml]
+### The error may involve com.tk.analysis.home.dao.HomeAnalysisDao.r_queryStationedRankListBy_Default-Inline
+### The error occurred while setting parameters
+### SQL: select stationed_user_id       from (     select t.stationed_user_id,nvl(sum(t1.product_money),0)+nvl(sum(t2.pre_first_money),0) pay_money       from dim_product t       left join (select dp.stationed_user_id,nvl(sum(t1.pay_money),0) product_money                 from fact_product_sale_d t1,dim_date dt,dim_product dp,dim_member dm                where t1.date_key = dt.date_key                  and dt.date_short >= ?            and dt.date_short <= ?            and t1.pay_money > 0                  and dp.product_key = t1.product_key      and t1.member_key = dm.member_key                                        and dm.member_key > 0                            group by dp.stationed_user_id) t1 on t.stationed_user_id = t1.stationed_user_id       left join (select dp.stationed_user_id,nvl(sum(t1.product_money*(t2.earnest_money/t2.product_money)),0) pre_first_money          from fact_pre_order_product t1 ,fact_pre_order t2,dim_date dt,dim_product dp,dim_member dm         where t1.order_key = t2.order_key           and t2.payment_date_key = dt.date_key           and dt.date_short >= ?           and dt.date_short <= ?                  and dp.product_key = t1.product_key      and t1.member_key = dm.member_key                                        and dm.member_key > 0                            group by dp.stationed_user_id) t2 on t.stationed_user_id = t2.stationed_user_id      where 1=1                                                       and t.product_key > 0                               group by t.stationed_user_id              order by pay_money desc)              where rownum <= ?
+### Cause: java.sql.SQLException: ORA-00942: 表或视图不存在
+
+; bad SQL grammar []; nested exception is java.sql.SQLException: ORA-00942: 表或视图不存在
+
+2019-12-25 17:33:25 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-12-25 17:33:27 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-12-25 17:33:28 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-12-25 17:33:29 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.

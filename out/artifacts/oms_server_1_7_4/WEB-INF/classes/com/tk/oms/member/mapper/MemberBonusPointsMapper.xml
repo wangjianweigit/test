@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.member.dao.MemberBonusPointsDao">
+    <!-- 查询会员消费积分列表 -->
+	<select id="queryMemberBonusPointsList" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT * FROM (
+            SELECT a.*, rownum as ranking from (
+                SELECT
+                    NVL(temp1.user_name,'') user_name,
+                    NVL(temp1.login_name,'') login_name,
+                    NVL(temp1.USER_MANAGE_NAME,'') USER_MANAGE_NAME,
+                    temp1.score,
+                    (SELECT GRADE_NAME FROM TBL_BONUS_POINTS_GRADE WHERE MAX_SOURCE &gt; temp1.score and MIN_SOURCE &lt;=temp1.score) gradeName
+                FROM
+                (select
+                    bp.user_name,
+                    ui.login_name,
+                    ui.USER_MANAGE_NAME,
+                    sum(nvl(bp.score,0)) score
+                FROM TBL_MEMBER_BONUS_POINTS bp, TBL_USER_INFO ui
+                <where>
+                    bp.user_name = ui.user_name
+                    <if test="login_name!=null and login_name!='' ">
+                        and ui.login_name =#{login_name,jdbcType=VARCHAR}
+                    </if>
+                    <if test="market_supervision_user_id!=null and market_supervision_user_id!='' ">
+                        and ui.market_supervision_user_id =#{market_supervision_user_id,jdbcType=INTEGER}
+                    </if>
+                    <if test="referee_user_id!=null and referee_user_id!='' ">
+                        and ui.referee_user_id =#{referee_user_id,jdbcType=INTEGER}
+                    </if>
+                    <if test="store_id!=null and store_id!='' ">
+                        and ui.store_id =#{store_id,jdbcType=INTEGER}
+                    </if>
+                    <if test="public_user_type != null and public_user_type == 2">
+                        and EXISTS (SELECT 1 FROM TBL_SYS_USER_STORE TSUS WHERE TSUS.STORE_ID = ui.STORE_ID AND TSUS.USER_ID = #{public_user_id,jdbcType=INTEGER})
+                    </if>
+                    <if test="public_user_type != null and public_user_type == 3">
+                        and ui.referee_user_id = #{public_user_id,jdbcType=INTEGER}
+                    </if>
+                    <if test="public_user_type != null and public_user_type == 4">
+                        and ui.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+                    </if>
+                    <if test="public_user_type != null and public_user_type == 5">
+                        and EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID = ui.STORE_ID AND TSI.SHOPKEEPER_USER_ID = #{public_user_id,jdbcType=INTEGER})
+                    </if>
+                    <if test="public_user_type != null and public_user_type == 6">
+                        and EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUI WHERE TSUI.STORE_ID = ui.STORE_ID AND TSUI.USER_ID = #{public_user_id,jdbcType=INTEGER})
+                    </if>
+                    <if test="public_user_type != null and public_user_type == 9">
+                        and EXISTS(SELECT 1 FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.USER_TYPE = 4
+                            AND TSUI.ORGANIZATION_ID IN (
+                            SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+                            START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER}
+                            CONNECT BY PRIOR ID = PARENT_ID
+                        )
+                        AND TSUI.id = ui.market_supervision_user_id)
+                    </if>
+                    <if test="day!=null and day!=''">
+                        and bp.CREATE_DATE &gt;=add_months(sysdate,-1)
+                    </if>
+                </where>
+                group by bp.user_name,ui.login_name,ui.USER_MANAGE_NAME) temp1
+                order by score desc
+            ) a WHERE rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) WHERE ranking &gt;#{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!-- 查询会员消费积分记录数 -->
+    <select id="queryMemberBonusPointsCount" parameterType="java.util.Map" resultType="int">
+        select count(1) from (
+        SELECT
+        NVL(temp1.user_name,'') user_name,
+        NVL(temp1.login_name,'') login_name,
+        NVL(temp1.USER_MANAGE_NAME,'') USER_MANAGE_NAME,
+        temp1.score,
+        (SELECT GRADE_NAME FROM TBL_BONUS_POINTS_GRADE WHERE MAX_SOURCE &gt; temp1.score and MIN_SOURCE &lt;=temp1.score) gradeName
+        FROM
+        (select
+        bp.user_name,
+        ui.login_name,
+        ui.USER_MANAGE_NAME,
+        sum(nvl(bp.score,0)) score
+        FROM TBL_MEMBER_BONUS_POINTS bp, TBL_USER_INFO ui
+        <where>
+            bp.user_name = ui.user_name
+            <if test="login_name!=null and login_name!='' ">
+                and ui.login_name =#{login_name,jdbcType=VARCHAR}
+            </if>
+            <if test="market_supervision_user_id!=null and market_supervision_user_id!='' ">
+                and ui.market_supervision_user_id =#{market_supervision_user_id,jdbcType=INTEGER}
+            </if>
+            <if test="referee_user_id!=null and referee_user_id!='' ">
+                and ui.referee_user_id =#{referee_user_id,jdbcType=INTEGER}
+            </if>
+            <if test="store_id!=null and store_id!='' ">
+                and ui.store_id =#{store_id,jdbcType=INTEGER}
+            </if>
+            <if test="public_user_type != null and public_user_type == 2">
+                and EXISTS (SELECT 1 FROM TBL_SYS_USER_STORE TSUS WHERE TSUS.STORE_ID = ui.STORE_ID AND TSUS.USER_ID = #{public_user_id,jdbcType=INTEGER})
+            </if>
+            <if test="public_user_type != null and public_user_type == 3">
+                and ui.referee_user_id = #{public_user_id,jdbcType=INTEGER}
+            </if>
+            <if test="public_user_type != null and public_user_type == 4">
+                and ui.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+            </if>
+            <if test="public_user_type != null and public_user_type == 5">
+                and EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID = ui.STORE_ID AND TSI.SHOPKEEPER_USER_ID = #{public_user_id,jdbcType=INTEGER})
+            </if>
+            <if test="public_user_type != null and public_user_type == 6">
+                and EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUI WHERE TSUI.STORE_ID = ui.STORE_ID AND TSUI.USER_ID = #{public_user_id,jdbcType=INTEGER})
+            </if>
+            <if test="public_user_type != null and public_user_type == 9">
+                and EXISTS(SELECT 1 FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.USER_TYPE = 4
+                AND TSUI.ORGANIZATION_ID IN (
+                SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+                START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER}
+                CONNECT BY PRIOR ID = PARENT_ID
+                )
+                AND TSUI.id = ui.market_supervision_user_id)
+            </if>
+            <if test="day!=null and day!=''">
+                and bp.CREATE_DATE &gt;=add_months(sysdate,-1)
+            </if>
+        </where>
+        group by bp.user_name,ui.login_name,ui.USER_MANAGE_NAME) temp1
+        order by score desc
+        ) a
+    </select>
+
+    <!-- 分页查询会员积分详细列表 -->
+    <select id="queryMemberScoreDetailList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * FROM (
+            select a.*, rownum num FROM (
+                select
+                    bp.id,
+                    bp.user_name,
+                    bp.order_source,
+                    bp.order_number,
+                    bp.type,
+                    bp.product_total_money,
+                    nvl(bp.score,0) as score,
+                    to_char(bp.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+                    bp.remark
+                FROM tbl_member_bonus_points bp,TBL_USER_INFO ui
+                <where>
+                    bp.user_name = ui.user_name(+)
+                    <if test="login_name!=null and login_name!='' ">
+                        and ui.login_name =#{login_name,jdbcType=VARCHAR}
+                    </if>
+                    <if test="market_supervision_user_id!=null and market_supervision_user_id!='' ">
+                        and ui.market_supervision_user_id =#{market_supervision_user_id,jdbcType=INTEGER}
+                    </if>
+                    <if test="referee_user_id!=null and referee_user_id!='' ">
+                        and ui.referee_user_id =#{referee_user_id,jdbcType=INTEGER}
+                    </if>
+                    <if test="store_id!=null and store_id!='' ">
+                        and ui.store_id =#{store_id,jdbcType=INTEGER}
+                    </if>
+                    <if test="public_user_type != null and public_user_type == 2">
+                        and EXISTS (SELECT 1 FROM TBL_SYS_USER_STORE TSUS WHERE TSUS.STORE_ID = ui.STORE_ID AND TSUS.USER_ID = #{public_user_id,jdbcType=INTEGER})
+                    </if>
+                    <if test="public_user_type != null and public_user_type == 3">
+                        and ui.referee_user_id = #{public_user_id,jdbcType=INTEGER}
+                    </if>
+                    <if test="public_user_type != null and public_user_type == 4">
+                        and ui.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+                    </if>
+                    <if test="public_user_type != null and public_user_type == 5">
+                        and EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID = ui.STORE_ID AND TSI.SHOPKEEPER_USER_ID = #{public_user_id,jdbcType=INTEGER})
+                    </if>
+                    <if test="public_user_type != null and public_user_type == 6">
+                        and EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUI WHERE TSUI.STORE_ID = ui.STORE_ID AND TSUI.USER_ID = #{public_user_id,jdbcType=INTEGER})
+                    </if>
+                    <if test="public_user_type != null and public_user_type == 9">
+                        and EXISTS(SELECT 1 FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.USER_TYPE = 4
+                        AND TSUI.ORGANIZATION_ID IN (
+                        SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+                        START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER}
+                        CONNECT BY PRIOR ID = PARENT_ID
+                        )
+                        AND TSUI.id = ui.market_supervision_user_id)
+                    </if>
+                    <if test="day!=null and day!=''">
+                        and bp.create_date >=add_months(sysdate,-1)
+                    </if>
+                </where>
+                order by bp.create_date desc
+            ) a where ROWNUM  &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where num &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+
+    <!-- 查询会员积分详细记录数 -->
+    <select id="queryMemberScoreDetailCount" parameterType="java.util.Map" resultType="int">
+        SELECT
+          COUNT (1)
+        FROM tbl_member_bonus_points bp,TBL_USER_INFO ui
+        <where>
+            bp.user_name = ui.user_name(+)
+            <if test="login_name!=null and login_name!='' ">
+                and ui.login_name =#{login_name,jdbcType=VARCHAR}
+            </if>
+            <if test="market_supervision_user_id!=null and market_supervision_user_id!='' ">
+                and ui.market_supervision_user_id =#{market_supervision_user_id,jdbcType=INTEGER}
+            </if>
+            <if test="referee_user_id!=null and referee_user_id!='' ">
+                and ui.referee_user_id =#{referee_user_id,jdbcType=INTEGER}
+            </if>
+            <if test="store_id!=null and store_id!='' ">
+                and ui.store_id =#{store_id,jdbcType=INTEGER}
+            </if>
+            <if test="public_user_type != null and public_user_type == 2">
+                and EXISTS (SELECT 1 FROM TBL_SYS_USER_STORE TSUS WHERE TSUS.STORE_ID = ui.STORE_ID AND TSUS.USER_ID = #{public_user_id,jdbcType=INTEGER})
+            </if>
+            <if test="public_user_type != null and public_user_type == 3">
+                and ui.referee_user_id = #{public_user_id,jdbcType=INTEGER}
+            </if>
+            <if test="public_user_type != null and public_user_type == 4">
+                and ui.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+            </if>
+            <if test="public_user_type != null and public_user_type == 5">
+                and EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID = ui.STORE_ID AND TSI.SHOPKEEPER_USER_ID = #{public_user_id,jdbcType=INTEGER})
+            </if>
+            <if test="public_user_type != null and public_user_type == 6">
+                and EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUI WHERE TSUI.STORE_ID = ui.STORE_ID AND TSUI.USER_ID = #{public_user_id,jdbcType=INTEGER})
+            </if>
+            <if test="public_user_type != null and public_user_type == 9">
+                and EXISTS(SELECT 1 FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.USER_TYPE = 4
+                AND TSUI.ORGANIZATION_ID IN (
+                SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+                START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER}
+                CONNECT BY PRIOR ID = PARENT_ID
+                )
+                AND TSUI.id = ui.market_supervision_user_id)
+            </if>
+            <if test="day != null and day != ''">
+                and bp.create_date >=add_months(sysdate,-1)
+            </if>
+        </where>
+    </select>
+    
+</mapper>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.demo.dao.TestUserDao">
+	
+	<!-- 测试 -->
+    <select id="queryTestUserList" resultType="java.util.HashMap">
+		select * from (
+			select t.*, rownum rn from (
+				select user_name, user_pwd from tbl_user_info order by user_create_date desc
+			) t where rownum &lt;= 10
+		)
+		where rn >= 1
+	</select>
+    
+</mapper>

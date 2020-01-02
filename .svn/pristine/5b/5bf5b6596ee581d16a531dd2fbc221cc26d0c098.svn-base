@@ -1,0 +1,54 @@
+package com.tk.oms.analysis.service;
+
+import java.util.List;
+import java.util.Map;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.stereotype.Service;
+
+import com.tk.oms.analysis.dao.MemberLogDao;
+import com.tk.oms.member.dao.MemberInfoDao;
+import com.tk.sys.util.GridResult;
+import com.tk.sys.util.HttpUtil;
+import com.tk.sys.util.PageUtil;
+import com.tk.sys.util.Transform;
+@Service("memberLogService")
+public class MemberLogService {
+	private Log logger = LogFactory.getLog(this.getClass());
+	@Resource
+	private MemberLogDao memberLogDao;
+	
+	/**
+	 * 查询会员日志列表
+	 * @param request
+	 * @return
+	 */
+	public GridResult queryMemberLogList(HttpServletRequest request) {
+		GridResult pr = new GridResult();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			Map<String,Object> params = (Map<String,Object>)Transform.GetPacket(json, Map.class);
+			GridResult pageParamResult = PageUtil.handlePageParams(params);
+			if(pageParamResult!=null){
+				return pageParamResult;
+			}
+			List<Map<String,Object>> userList = null;
+			int userCount=memberLogDao.queryMemberLogCount(params);
+			userList = memberLogDao.queryMemberLogList(params);
+			pr.setState(true);
+			pr.setMessage("获取会员日志列表数据成功");
+			pr.setObj(userList);
+			pr.setTotal(userCount);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			logger.error(e);
+		}
+		return pr;
+	}
+
+}

@@ -1,0 +1,842 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.store.product.dao.StoreProductDao">
+	<sql id="data_access">
+		<if test="public_user_type != null and public_user_type == 1">
+           	and 1=2
+        </if>
+        <if test="public_user_type != null and public_user_type == 2">
+           	and 1=2
+        </if>
+		<if test="public_user_type != null and public_user_type == 3">
+           	and 1=2
+        </if>
+        <if test="public_user_type != null and public_user_type == 4">
+            and 1=2
+        </if>
+        <if test="public_user_type != null and public_user_type == 5">
+            and 1=2
+        </if>
+        <if test="public_user_type != null and public_user_type == 6">
+            and 1=2
+        </if>
+        <if test="public_user_type != null and public_user_type == 7">
+			and 1=2
+        </if>
+        <if test="public_user_type != null and public_user_type == 9">
+            and tui.partner_user_id = #{public_user_id,jdbcType=INTEGER}
+        </if>
+	</sql>
+	<!-- 商品数量 -->
+	<select id="queryProductCount" parameterType="java.util.Map" resultType="int">
+		   select count(1)
+			 from (select product_itemnumber,max(create_date) create_date,max(state) state from tbl_product_store group by product_itemnumber) tps,
+		          tbl_product_info t1
+		    where tps.product_itemnumber = t1.itemnumber(+)
+		          <if test="product_itemnumber != null and product_itemnumber !=''">
+			 		  and tps.product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+			 	  </if>
+			 	  <if test="product_type_id != null and product_type_id !=''">
+			 		  and (t1.product_type_id = #{product_type_id,jdbcType=INTEGER}
+			  		  or t1.product_type_id in (select id from tbl_dic_product_type t start with parent_id = #{product_type_id,jdbcType=INTEGER} connect by prior id=parent_id))
+			 	  </if>
+			 	  <if test="product_name != null and product_name !=''">
+			 		  and t1.product_name like '%'||#{product_name,jdbcType=VARCHAR}||'%'
+			 	  </if>
+			 	  <if test="state != null">
+					  and tps.state in
+		                 <foreach item="item" collection="state" open="(" separator="," close=")">
+							 #{item}
+						 </foreach>
+				  </if>
+				  <if test="brand_id != null and brand_id !=''">
+			 		  and t1.brand_id = #{brand_id,jdbcType=INTEGER}
+			 	  </if>
+			 	  <if test="year != null and year !=''">
+			 		  and t1.year = #{year,jdbcType=INTEGER}
+			 	  </if>
+				  <if test="start_date != null and start_date != '' ">
+					  and tps.create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+				  </if>
+				  <if test="end_date != null and end_date != '' ">
+					  and tps.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+				  </if>
+			 	  <if test="season_id != null and season_id !=''">
+			 		  and t1.season_id = #{season_id,jdbcType=INTEGER}
+			 	  </if>
+			 	  <if test="user_id != null and user_id != ''">
+			 	  	  and exists (select 1 from tbl_product_store where user_id = #{user_id,jdbcType=INTEGER} and product_itemnumber = tps.product_itemnumber)
+			 	  </if>
+			 	  and exists(
+				   	   select 1 from tbl_user_info tui 
+				   	   <where>
+			   	  		    1=1
+			   	  		    and exists (select 1 from tbl_product_store where user_id = tui.id and product_itemnumber = tps.product_itemnumber)
+				        <include refid="data_access"/>
+			   	   	</where>)
+	</select>
+	<!-- 商品列表 -->
+	<select id="queryProductListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+		select temp.*,(select to_char(wm_concat(type_name)) from tbl_dic_product_type start with id=temp.product_type_id connect by prior parent_id=id) as product_type,
+			          (select name from tbl_dic_product_season tdps where tdps.id = temp.season_id) as season,
+			          (select brand_name from tbl_dic_product_brand tdpb where tdpb.id = temp.brand_id) as brand,
+			          (select to_char(wm_concat((select login_name from tbl_user_info tui where id = t.user_id
+			          	<include refid="data_access"/>
+			          )||'：￥'||to_char(t1.min_retail_price,'fm9999990.00')||'-￥'||to_char(t2.max_retail_price,'fm9999990.00'))) from tbl_product_store t,
+						(select product_store_id,min(retail_price) min_retail_price from tbl_product_store_detail group by product_store_id) t1,
+						(select product_store_id,max(retail_price) max_retail_price from tbl_product_store_detail group by product_store_id) t2
+						where t.id = t1.product_store_id
+						and  t.id = t2.product_store_id
+						and t.product_itemnumber = temp.product_itemnumber
+						and exists (select 1 from tbl_user_info tui where id = t.user_id
+			          	<include refid="data_access"/>)
+						) retail_price,
+			          (select to_char(wm_concat(login_name)) from tbl_user_info tui 
+			          	where exists (select 1 from tbl_product_store where user_id = tui.id and product_itemnumber = temp.product_itemnumber)
+			          	<include refid="data_access"/>) product_store,
+			          	(select user_id from tbl_product_store where product_itemnumber = temp.product_itemnumber and rownum &lt;= 1) user_id
+		  from (
+			select a.*,rownum rn from (
+			   select t1.id as product_id,
+			          tps.product_itemnumber,
+			          t1.product_name,
+			          to_char(tps.create_date, 'yyyy-mm-dd hh24:mi:ss') create_date,
+					  t1.product_img_url,
+			          tps.state,
+			          t1.year,
+					  t1.product_type_id,
+					  t1.season_id,
+					  t1.brand_id,
+                      (select max(product_prize_tag) from tbl_product_sku where product_itemnumber=tps.product_itemnumber) product_prize_tag
+			     from (select product_itemnumber,max(create_date) create_date,max(state) state from tbl_product_store group by product_itemnumber) tps,
+			          tbl_product_info t1
+			    where tps.product_itemnumber = t1.itemnumber(+)
+			          <if test="product_itemnumber != null and product_itemnumber !=''">
+				 		  and tps.product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+				 	  </if>
+				 	  <if test="product_type_id != null and product_type_id !=''">
+				 		  and (t1.product_type_id = #{product_type_id,jdbcType=INTEGER}
+			  		  		or t1.product_type_id in (select id from tbl_dic_product_type t start with parent_id = #{product_type_id,jdbcType=INTEGER} connect by prior id=parent_id))
+				 	  </if>
+				 	  <if test="product_name != null and product_name !=''">
+				 		  and t1.product_name like '%'||#{product_name,jdbcType=VARCHAR}||'%'
+				 	  </if>
+				 	  <if test="state != null">
+						  and tps.state in
+			                 <foreach item="item" collection="state" open="(" separator="," close=")">
+								 #{item}
+							 </foreach>
+					  </if>
+				 	  <if test="brand_id != null and brand_id !=''">
+				 		  and t1.brand_id = #{brand_id,jdbcType=INTEGER}
+				 	  </if>
+				 	  <if test="year != null and year !=''">
+				 		  and t1.year = #{year,jdbcType=INTEGER}
+				 	  </if>
+				 	  <if test="start_date != null and start_date != '' ">
+						  and tps.create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+					  </if>
+					  <if test="end_date != null and end_date != '' ">
+						  and tps.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+					  </if>
+				 	  <if test="season_id != null and season_id !=''">
+				 		  and t1.season_id = #{season_id,jdbcType=INTEGER}
+				 	  </if>
+				 	  <if test="user_id != null and user_id != ''">
+				 	  	  and exists (select 1 from tbl_product_store where user_id = #{user_id,jdbcType=INTEGER} and product_itemnumber = tps.product_itemnumber)
+				 	  </if>
+					  and exists(
+					   	   select 1 from tbl_user_info tui 
+					   	   <where>
+				   	  		    1=1
+				   	  		    and exists (select 1 from tbl_product_store where user_id = tui.id and product_itemnumber = tps.product_itemnumber)
+					        <include refid="data_access"/>
+				   	   	</where>)
+				   	   	order by tps.create_date desc
+					  ) a
+		 	where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) temp
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 是否销售 -->
+	<update id="updateStoreProductState" parameterType="java.util.Map">
+		update tbl_product_store
+		   set state = #{state,jdbcType=INTEGER},
+		   	   update_id = #{public_user_id,jdbcType=INTEGER},
+		   	   update_date = sysdate
+		 where product_itemnumber=#{product_itemnumber,jdbcType=VARCHAR}
+	</update>
+	<!-- 获取商家ID -->
+	<select id="queryById" parameterType="java.util.Map" resultType="string">
+		select user_id as agent_id
+		  from tbl_product_store t
+		 where product_itemnumber=#{product_itemnumber,jdbcType=VARCHAR}
+		   and exists (select 1 from tbl_user_info tui where id = t.user_id
+			          	<include refid="data_access"/>)
+	</select>
+	<!-- 商品库数量 -->
+	<select id="queryProductLibraryCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_product_info tpi
+		 where exists (select 1 from tbl_product_region tpr where product_itemnumber = tpi.itemnumber 
+		 				  and exists(
+				   	   	select 1 from tbl_sys_user_info tsui 
+				   	   	<where>
+			   	  		    1=1
+			   	  		    and tsui.id = tpr.user_id
+			   	  		    <if test="public_user_type != null and public_user_type == 1">
+					            and 1=2
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 2">
+					            and 1=2
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 3">
+					            and 1=2
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 4">
+					            and 1=2
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 5">
+					            and 1=2
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 6">
+					            and 1=2
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 7">
+								and 1=2
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 9">
+					            and tsui.id = #{public_user_id,jdbcType=INTEGER}
+					        </if>
+				   	   	</where>))
+		   and tpi.itemnumber not in (select product_itemnumber from tbl_product_store t where exists (select 1 from tbl_user_info tui where id = t.user_id
+			          	<include refid="data_access"/>))
+		  <if test="itemnumber != null and itemnumber !=''">
+	 		  and tpi.itemnumber = #{itemnumber,jdbcType=VARCHAR}
+	 	  </if>
+	 	  <if test="product_type_id != null and product_type_id !=''">
+	 		  and (tpi.product_type_id = #{product_type_id,jdbcType=INTEGER}
+			  or tpi.product_type_id in (select id from tbl_dic_product_type t start with parent_id = #{product_type_id,jdbcType=INTEGER} connect by prior id=parent_id))
+	 	  </if>
+	 	  <if test="season_id != null and season_id !=''">
+	 		  and tpi.season_id = #{season_id,jdbcType=INTEGER}
+	 	  </if>
+	 	  <if test="brand_id != null and brand_id !=''">
+	 		  and tpi.brand_id = #{brand_id,jdbcType=INTEGER}
+	 	  </if>
+	 	  <if test="year != null and year !=''">
+	 		  and tpi.year = #{year,jdbcType=INTEGER}
+	 	  </if>
+	 	  <if test="product_itemnumbers != null and product_itemnumbers != ''">
+	 	  	  and tpi.itemnumber not in
+	 	  	  <foreach collection="product_itemnumbers" item="item" open="(" separator="," close=")">
+	 	  	  	#{item}
+	 	  	  </foreach>
+	 	  </if>
+	</select>
+	<!-- 商品库列表 -->
+	<select id="queryProductLibraryListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+			select a.*,rownum rn from (
+				select tpi.itemnumber,
+				       tpi.product_name,
+				       tpi.year,
+				       (select brand_name from tbl_dic_product_brand tdpb where tdpb.id = tpi.brand_id)  as brand,
+				       (select type_name from tbl_dic_product_type tdpt where tdpt.id = tpi.product_type_id)  as product_type,
+				       (select name from tbl_dic_product_season tdps where tdps.id = tpi.season_id)  as season,
+				       tpi.product_img_url
+				  from tbl_product_info tpi
+				 where exists (select 1 from tbl_product_region tpr where product_itemnumber = tpi.itemnumber
+				 				and exists(
+				   	   	select 1 from tbl_sys_user_info tsui 
+				   	   	<where>
+			   	  		    1=1
+			   	  		    and tsui.id = tpr.user_id
+			   	  		    <if test="public_user_type != null and public_user_type == 1">
+					            and 1=2
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 2">
+					            and 1=2
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 3">
+					            and 1=2
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 4">
+					            and 1=2
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 5">
+					            and 1=2
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 6">
+					            and 1=2
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 7">
+								and 1=2
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 9">
+					            and tsui.id = #{public_user_id,jdbcType=INTEGER}
+					        </if>
+				   	   	</where>))
+				   and tpi.itemnumber not in (select product_itemnumber from tbl_product_store t where exists (select 1 from tbl_user_info tui where id = t.user_id
+			          	<include refid="data_access"/>))
+				  <if test="itemnumber != null and itemnumber !=''">
+			 		  and tpi.itemnumber = #{itemnumber,jdbcType=VARCHAR}
+			 	  </if>
+			 	  <if test="product_type_id != null and product_type_id !=''">
+			 		  and (tpi.product_type_id = #{product_type_id,jdbcType=INTEGER}
+			  			or tpi.product_type_id in (select id from tbl_dic_product_type t start with parent_id = #{product_type_id,jdbcType=INTEGER} connect by prior id=parent_id))
+			 	  </if>
+			 	  <if test="season_id != null and season_id !=''">
+			 		  and tpi.season_id = #{season_id,jdbcType=INTEGER}
+			 	  </if>
+			 	  <if test="brand_id != null and brand_id !=''">
+			 		  and tpi.brand_id = #{brand_id,jdbcType=INTEGER}
+			 	  </if>
+			 	  <if test="year != null and year !=''">
+			 		  and tpi.year = #{year,jdbcType=INTEGER}
+			 	  </if>
+			 	  <if test="product_itemnumbers != null and product_itemnumbers != ''">
+			 	  	  and tpi.itemnumber not in
+			 	  	  <foreach collection="product_itemnumbers" item="item" open="(" separator="," close=")">
+			 	  	  	#{item}
+			 	  	  </foreach>
+			 	  </if>) a
+		 	where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 新增商家商品 -->
+	<insert id="insert" parameterType="java.util.Map">
+		<selectKey keyProperty="id" resultType="int" order="BEFORE">
+			select seq_product_store.nextval from dual
+		</selectKey>
+		insert into tbl_product_store(
+				id,
+				user_id,
+				product_itemnumber,
+				create_id,
+				create_date,
+				update_id,
+				update_date)
+		values (#{id,jdbcType=INTEGER},
+				#{user_id,jdbcType=INTEGER},
+				#{product_itemnumber,jdbcType=VARCHAR},
+				#{public_user_id,jdbcType=INTEGER},
+				sysdate,
+				#{public_user_id,jdbcType=INTEGER},
+				sysdate)
+	</insert>
+	<!-- 商品基本信息详情结果封装 -->
+	<resultMap type="java.util.Map" id="baseProductResultMap">
+        <result property="PRODUCT_CONTENT" column="PRODUCT_CONTENT" jdbcType="CLOB" javaType = "java.lang.String"/>
+    </resultMap>
+	<!-- 查询商品基本信息 -->
+	<select id="queryProductDetail" parameterType="java.util.Map" resultMap="baseProductResultMap">
+		 select tpi.id,
+				tpi.stationed_user_id,
+				tpi.brand_id,
+				tpi.product_type_id,
+				tpi.itemnumber,
+				tpi.product_name,
+				tpi.product_subtitle,
+				tpi.year,
+				tpi.season_id,
+				tpi.sex,
+				tpi.product_img_url,
+				tpi.state,
+	 			tpi.product_content,
+    		   (select brand_name from tbl_dic_product_brand tdpb where tdpb.id = tpi.brand_id)  as brand,
+    		   (select to_char(wm_concat(type_name)) from tbl_dic_product_type start with id=tpi.product_type_id connect by prior parent_id=id) as product_type,
+    		   (select name from tbl_dic_product_season tdps where tdps.id = tpi.season_id) as season
+		  from tbl_product_info tpi
+		 where tpi.itemnumber = #{itemnumber,jdbcType=VARCHAR}
+	</select>
+	<!-- 获取商品sku信息列表 -->
+    <select id="queryProductSkuList" parameterType="java.util.Map" resultType="java.util.Map">
+    	SELECT  TPS.ID,
+				TPS.PRODUCT_GROUP,
+				TPS.PRODUCT_GROUP_MEMBER,
+				TPS.PRODUCT_COLOR_IMGURL,
+				TPS.PRODUCT_PRIZE_TAG,
+				TPS.PRODUCT_PRIZE_COST,
+				TPS.PRODUCT_GBCODE,
+				TPS.PRODUCT_SKU_NAME,
+				TPS.PRODUCT_INLONG,
+				TPS.PRODUCT_COLOR,
+				TPS.PRODUCT_SPECS,
+				(select retail_price from tbl_product_store_detail where product_sku = TPS.id and product_store_id = #{id,jdbcType=INTEGER}) retail_price
+		  FROM TBL_PRODUCT_SKU TPS
+		<where>
+			    1=1
+			  <if test="itemnumber != null and itemnumber != '' ">
+				AND	TPS.PRODUCT_ITEMNUMBER = #{itemnumber,jdbcType=VARCHAR}
+			  </if>
+			  <if test="product_group != null and product_group != '' ">
+				AND	TPS.PRODUCT_GROUP = #{product_group,jdbcType=INTEGER}
+			  </if>
+		</where>
+		ORDER BY TPS.PRODUCT_COLOR,TPS.PRODUCT_SPECS,TPS.PRODUCT_GROUP_MEMBER 
+	</select>
+	
+	<!-- 查询联营商品基本信息 -->
+	<select id="queryProductInfo" parameterType="java.util.Map" resultMap="baseProductResultMap">
+		select product_name,
+			   product_img_url,
+			   product_type_id as second_type,
+			   product_subtitle,
+			   product_content,
+			   year,
+			   sex,
+			   unit,
+			   (select brand_name from tbl_dic_product_brand tdpb where tdpb.id = tpi.brand_id)  as brand,
+			   (select name from tbl_dic_product_season tdps where tdps.id = tpi.season_id)  as season,
+			   (select state from tbl_product_store where product_itemnumber=tpi.itemnumber and rownum &lt;= 1) state
+		  from tbl_product_info tpi
+		 where itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+	</select>
+	<!-- 获取商品大类 -->
+	<select id="queryBasicType" parameterType="java.util.Map" resultType="int">
+		select id from
+            (select id from tbl_dic_product_type start with id = #{SECOND_TYPE,jdbcType=INTEGER}
+            connect by prior parent_id = id 
+            order by level desc) temp 
+            where rownum &lt;=1
+	</select>
+	<!-- 查询sku颜色信息 -->
+	<select id="querySkuColorList" parameterType="java.util.Map" resultType="java.util.Map">
+		select product_group_member as PRODUCT_COLOR,
+			   product_color_imgurl
+		  from tbl_product_sku
+		 where product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+		   and product_group = '颜色'
+	</select>
+	<!-- 查询sku基本信息 -->
+	<select id="querySkuInfoList" parameterType="java.util.Map" resultType="java.util.Map">
+		select id as sku,
+			   product_group_member as product_size,
+			   1 status,
+			   (select retail_price from tbl_product_store_detail where product_sku = tps.id and product_store_id = #{id,jdbcType=INTEGER} and rownum &lt;= 1) price_sale,
+			   nvl(product_prize_tag,0) as price_tag,
+			   nvl(tps.product_weight,0) product_weight,
+			   product_gbcode as gb_code,
+			   nvl(product_inlong,0) product_inlong
+		  from tbl_product_sku tps
+		 where product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+		   and product_color = #{product_color,jdbcType=VARCHAR}
+		   order by id asc
+	</select>
+	<!-- 获取商品图片数据 -->
+	<select id="queryImgList" parameterType="java.util.Map" resultType="string">
+		select image_url
+		  from tbl_product_images
+		 where product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+		 order by type asc, is_primary desc,sortid desc
+	</select>
+	<!-- 获取商品详情参数 -->
+	<select id="queryProductParamsList" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT TPPI.PARAMETER_VALUE as PARAM_VALUE,TDPP.PARAMETER_NAME as PARAM_NAME
+		  FROM TBL_PRODUCT_PARAMS_INFO TPPI,TBL_DIC_PRODUCT_PARAMETER TDPP
+		where TPPI.PARAMETER_ID = TDPP.ID
+			  AND TPPI.PRODUCT_ITEMNUMBER = #{product_itemnumber,jdbcType=VARCHAR}
+		ORDER BY TDPP.SORT_ID DESC
+	</select>
+	<!-- 新增门店商品关联明细数据 -->
+	<insert id="insertStoreProductDetail" parameterType="java.util.Map">
+		insert into tbl_product_store_detail(id,product_store_id,product_itemnumber,product_specs,product_sku,retail_price,create_user_id) 
+		select seq_product_store_detail.nextval,
+			   #{id,jdbcType=INTEGER},
+			   product_itemnumber,
+			   product_specs,
+			   product_sku,
+			   <choose>
+			   	<when test="retail_price != null">#{retail_price,jdbcType=INTEGER},</when>
+			   	<otherwise>retail_price,</otherwise>
+			   </choose>
+			   #{public_user_id,jdbcType=INTEGER} 
+		 from tbl_product_region_detail t
+		where product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+		      and exists(
+		      	  select 1 
+		      	    from tbl_user_info tui,tbl_product_region tpr 
+		      	   where tui.user_name = #{user_id,jdbcType=VARCHAR}
+		      	   		 and tui.partner_user_id = tpr.user_id
+		      	   		 and tpr.id = t.product_region_id
+		      )
+			  <if test="product_specs != null and product_specs != ''">
+				  and t.product_specs = #{product_specs,jdbcType=VARCHAR}
+			  </if>
+			 
+	</insert>
+	
+	<!-- 商品零售详情 -->
+	<select id="queryProductRetailDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		<choose>
+			<when test="type == 1">
+				select temp.product_store_id,
+					   a.product_itemnumber,
+				       tpi.product_name,
+				       tpi.product_img_url,
+				       a.product_specs,
+				       NVL(getSpecs_SalePrice(a.product_itemnumber,a.product_specs,0),0) min_product_prize_cost,
+         	   		   NVL(getSpecs_SalePrice(a.product_itemnumber,a.product_specs,1),0) max_product_prize_cost,
+				       case when nvl(temp.retail_price, 0) = 0 then nvl(tpc.retail_price, 0)
+                            else nvl(temp.retail_price, 0) end retail_price
+				  from (select product_itemnumber, product_specs
+				          from tbl_product_sku
+				         where product_itemnumber in 
+				         <foreach item="item" collection="product_itemnumber" open="(" separator="," close=")">
+					    	#{item,jdbcType=VARCHAR}
+					     </foreach>
+				           and product_specs is not null
+				         group by product_itemnumber,
+				                  product_specs) a,
+				       tbl_product_info tpi,
+				       (select product_store_id, product_itemnumber, product_specs, retail_price
+				          from tbl_product_store_detail where product_store_id in (select product_store_id from
+				          <foreach item="item" collection="userList" open="(" close=")" separator="union all">
+				          	select #{item.ID} as product_store_id from dual
+				          </foreach>)
+				         group by product_store_id, product_itemnumber, product_specs, retail_price) temp,
+				 (select product_itemnumber, product_specs, retail_price
+                          from tbl_product_region_detail t
+                         where product_itemnumber in
+                         <foreach item="item" collection="product_itemnumber" open="(" separator="," close=")">
+					    	#{item,jdbcType=VARCHAR}
+					     </foreach>
+                          and exists (select 1 from tbl_product_region tpr where id = t.product_region_id
+				          and user_id = #{public_user_id,jdbcType=INTEGER})
+                         group by product_itemnumber, product_specs, retail_price) tpc
+                 where a.product_itemnumber = tpi.itemnumber(+)
+                   and a.product_itemnumber = temp.product_itemnumber(+)
+                   and a.product_specs = temp.product_specs(+)
+                   and a.product_itemnumber = tpc.product_itemnumber(+)
+                   and a.product_specs = tpc.product_specs(+)
+				   order by temp.product_store_id,a.product_itemnumber,a.product_specs
+			</when>
+			<otherwise>
+				select a.product_itemnumber,
+				       tpi.product_name,
+				       tpi.product_img_url,
+				       a.product_specs,
+				       NVL(getSpecs_SalePrice(a.product_itemnumber,a.product_specs,0),0) min_product_prize_cost,
+         	   		   NVL(getSpecs_SalePrice(a.product_itemnumber,a.product_specs,1),0) max_product_prize_cost,
+				       case when nvl(temp.retail_price, 0) = 0 then nvl(tpc.retail_price, 0)
+                            else nvl(temp.retail_price, 0) end retail_price,
+                       temp.user_id
+				  from (select product_itemnumber, product_specs
+				          from tbl_product_sku
+				         where product_itemnumber in
+				         <foreach item="item" collection="product_itemnumber" open="(" separator="," close=")">
+					    	#{item,jdbcType=VARCHAR}
+					     </foreach>
+				           and product_specs is not null
+				         group by product_itemnumber,
+				                  product_specs) a,
+				       tbl_product_info tpi,
+				       (select t1.user_id, t.product_itemnumber, t.product_specs, t.retail_price
+				          from tbl_product_store_detail t,tbl_product_store t1
+                          where t.product_store_id = t1.id
+                            and t1.user_id in 
+							<foreach item="user_id" collection="user_ids" open="(" separator="," close=")">
+								#{user_id,jdbcType=INTEGER}
+							</foreach>
+                            and t1.product_itemnumber in 
+							<foreach item="item" collection="product_itemnumber" open="(" separator="," close=")">
+						    	#{item,jdbcType=VARCHAR}
+						    </foreach>
+				         group by t1.user_id, t.product_itemnumber, t.product_specs, t.retail_price) temp,
+				       (select product_itemnumber, product_specs, retail_price
+				          from tbl_product_region_detail t
+				         where product_itemnumber in
+				         <foreach item="item" collection="product_itemnumber" open="(" separator="," close=")">
+					    	#{item,jdbcType=VARCHAR}
+					     </foreach>
+                          and exists (select 1 from tbl_product_region tpr where id = t.product_region_id
+				          and user_id = #{public_user_id,jdbcType=INTEGER})
+				         group by product_itemnumber, product_specs, retail_price) tpc
+				 where a.product_itemnumber = tpi.itemnumber(+)
+				   and a.product_itemnumber = temp.product_itemnumber(+)
+                   and a.product_specs = temp.product_specs(+)
+				   and a.product_itemnumber = tpc.product_itemnumber(+)
+				   and a.product_specs = tpc.product_specs(+)
+				   order by temp.user_id,a.product_itemnumber,a.product_specs
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 更新零售价 -->
+	<update id="update" parameterType="java.util.Map">
+		update tbl_product_store_detail
+		   set retail_price = #{retail_price,jdbcType=INTEGER}
+		 where product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+		   and product_specs = #{product_specs,jdbcType=VARCHAR}
+		   and product_store_id = #{id,jdbcType=INTEGER}
+	</update>
+	<!-- 查询sku零售价 -->
+	<select id="querySkuPrice" parameterType="java.util.Map" resultType="java.util.Map">
+	    select product_sku as SKU,
+	  		   retail_price as PRICE
+	  	  from tbl_product_store_detail t 
+		 where t.product_store_id = #{id,jdbcType=INTEGER}
+	</select>
+	<!-- 商家商品规格sku数量 -->
+	<select id="queryStoreProductSkuCount" parameterType="java.util.Map" resultType="int">
+		select count(1) from tbl_product_store_detail
+		 where product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+		   and product_specs = #{product_specs,jdbcType=VARCHAR}
+		   and product_store_id = #{id,jdbcType=INTEGER}
+	</select>
+	
+	<!-- 商品规格sku数量 -->
+	<select id="queryProductSkuCount" parameterType="java.util.Map" resultType="int">
+		select count(1) from tbl_product_sku
+		 where product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+		   and product_specs = #{product_specs,jdbcType=VARCHAR}
+	</select>
+	
+	<!-- 查询商品所属商家 -->
+	<select id="queryUserList" parameterType="java.util.Map" resultType="java.util.Map">
+		select id,
+			   user_id,
+			   (select login_name from tbl_user_info where id = t.user_id) user_name,
+			   1 check_type
+		  from tbl_product_store t
+		 where product_itemnumber in
+			<foreach item="item" collection="product_itemnumber" open="(" separator="," close=")">
+		    	#{item,jdbcType=VARCHAR}
+		    </foreach>
+		   and exists (
+		   	select 1 from tbl_user_info tui
+		   	where t.user_id = tui.id
+		   	<include refid="data_access"/>
+		   )
+		 order by create_date desc
+	</select>
+	
+	<!-- 查询区域信息 -->
+	<select id="queryUserInfo" parameterType="java.util.Map" resultType="java.util.Map">
+		select id as user_id,login_name as user_name 
+		  from tbl_user_info tui
+		 where id in
+			<foreach item="user_id" collection="user_ids" open="(" separator="," close=")">
+				 #{user_id,jdbcType=INTEGER}
+			</foreach>
+	</select>
+	
+	<!-- 商家商品是否存在 -->
+	<select id="queryStoreProductIsExist" parameterType="java.util.Map" resultType="int">
+		select count(1) from tbl_product_store where user_id = #{user_id,jdbcType=INTEGER} and product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+	</select>
+	<!-- 查询A商家和B商家不相同商品信息 -->
+	<select id="queryProductDifferList" parameterType="java.util.Map" resultType="java.util.Map">
+		select id,product_itemnumber,#{in_user_id,jdbcType=INTEGER} as user_id,#{public_user_id,jdbcType=INTEGER} as public_user_id
+		 from tbl_product_store t where user_id = #{out_user_id,jdbcType=INTEGER} and not exists 
+		(select 1 from tbl_product_store where user_id =#{in_user_id,jdbcType=INTEGER} and product_itemnumber =t.product_itemnumber)
+	</select>
+	
+	<!-- 批量导入商品明细 -->
+	<insert id="addStoreProductDetailBatch" parameterType="java.util.Map">
+		insert into tbl_product_store_detail(id,product_store_id,product_itemnumber,product_specs,product_sku,retail_price,create_user_id) 
+		select seq_product_store_detail.nextval,
+			   #{id,jdbcType=INTEGER},
+			   product_itemnumber,
+			   product_specs,
+			   product_sku,
+			   retail_price,
+			   #{public_user_id,jdbcType=INTEGER} 
+		 from tbl_product_store_detail t 
+		where product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+		  and product_store_id = #{product_store_id,jdbcType=INTEGER}
+	</insert>
+	<!-- 商品信息列表 -->
+	<select id="queryProductInfoList" parameterType="java.util.Map" resultType="java.util.Map">
+		select itemnumber as product_itemnumber,product_name,product_img_url 
+		from tbl_product_info where itemnumber in
+		<foreach item="item" collection="product_itemnumber" open="(" separator="," close=")">
+	    	#{item,jdbcType=VARCHAR}
+	    </foreach>
+	</select>
+	<!-- 查询货号相关的商家信息 -->
+	<select id="queryUserListByItemnumber" parameterType="java.util.Map" resultType="java.util.Map">
+		select tui.id,
+			   login_name,
+			   user_manage_name,
+			   user_manage_mobilephone,
+			   market_supervision_user_realna,
+			   supervisor_user_realna,
+			   to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+			   1 check_type
+		  from tbl_user_info tui
+		 where exists (
+		select 1
+		  from tbl_product_store
+		 where product_itemnumber = #{itemnumber,jdbcType=VARCHAR}
+		   and user_id = tui.id)
+		   <include refid="data_access"/>
+		   
+	</select>
+	<!-- 新增商家商品明细(过滤sku) -->
+	<insert id="insertStoreProductDetailFilter" parameterType="java.util.Map">
+		insert into tbl_product_store_detail(id,product_store_id,product_itemnumber,product_specs,product_sku,retail_price,create_user_id) 
+		select seq_product_store_detail.nextval,
+			   #{id,jdbcType=INTEGER},
+			   product_itemnumber,
+			   product_specs,
+			   id,
+			   #{retail_price,jdbcType=INTEGER},
+			   #{public_user_id,jdbcType=INTEGER} 
+		 from tbl_product_sku t
+		where t.product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+		  and t.product_specs = #{product_specs,jdbcType=VARCHAR}
+		  and not exists (select 1 from tbl_product_store_detail where product_itemnumber=t.product_itemnumber and product_specs = t.product_specs
+          and product_sku = t.id and product_store_id = #{id,jdbcType=INTEGER})
+	</insert>
+	
+	<!-- 【批量】新增商家商品临时数据 -->
+	<insert id="insertTmpStoreProductBatch" parameterType="java.util.List">
+		insert into tmp_product_store(
+			product_store_id,
+			user_id,
+			product_itemnumber,
+			public_user_id
+		)
+		select a.product_store_id,
+				a.user_id,
+				a.product_itemnumber,
+				a.public_user_id
+		 from (<foreach collection="list" item="item" index="index" separator="UNION">
+	            select  #{item.ID,jdbcType=INTEGER} as product_store_id,
+	            		#{item.USER_ID,jdbcType=INTEGER} as user_id,
+	            		#{item.PRODUCT_ITEMNUMBER,jdbcType=VARCHAR} as product_itemnumber,
+	            		#{item.PUBLIC_USER_ID,jdbcType=INTEGER} as public_user_id
+	            from dual
+	        </foreach>) a
+	</insert>
+	<!-- 【批量】新增商家商品 -->
+	<insert id="insertStoreProductBatch" parameterType="java.util.List">
+		insert into tbl_product_store(
+				id,
+				user_id,
+				product_itemnumber,
+				create_id)
+		select seq_product_store.nextval,
+				a.user_id,
+				a.product_itemnumber,
+				a.public_user_id
+		from tmp_product_store a
+		where user_id = #{in_user_id,jdbcType=INTEGER}
+	</insert>
+	
+	<!-- 【批量】新增商品明细 -->
+	<insert id="insertStoreProductDetailBatch" parameterType="java.util.Map">
+		insert into tbl_product_store_detail(id,product_store_id,product_itemnumber,product_specs,product_sku,retail_price,create_user_id) 
+		select seq_product_store_detail.nextval,
+			   t2.id,
+			   t.product_itemnumber,
+			   t.product_specs,
+			   t.product_sku,
+			   t.retail_price,
+			   #{public_user_id,jdbcType=INTEGER}
+		 from tbl_product_store_detail t left join tbl_product_store t2 on t2.user_id = #{in_user_id,jdbcType=INTEGER} and t.product_itemnumber = t2.product_itemnumber,
+		  (select product_store_id,product_itemnumber from tmp_product_store where user_id = #{in_user_id,jdbcType=INTEGER}) t1
+		where t.product_itemnumber = t1.product_itemnumber
+		  and t.product_store_id = t1.product_store_id
+	</insert>
+	<!-- 【批量】获取商品信息 -->
+	<select id="getProductInfo" parameterType="java.util.Map" resultType="java.util.Map">
+		select tpi.itemnumber,
+               tpi.product_name,
+			   tpi.product_img_url,
+			   tpi.product_type_id as second_type,
+			   tpi.product_subtitle,
+			   to_char(tpi.product_content) product_content,
+			   tpi.year,
+			   tpi.sex,
+			   tpi.unit,
+			   (select brand_name from tbl_dic_product_brand tdpb where tdpb.id = tpi.brand_id)  as brand,
+			   (select name from tbl_dic_product_season tdps where tdps.id = tpi.season_id)  as season,
+			   (select state from tbl_product_store where product_itemnumber=tpi.itemnumber and rownum &lt;= 1) state,
+               (select parent_id from tbl_dic_product_type where id = tpi.product_type_id
+                                         and parent_id in (select id from tbl_dic_product_type t2 where t2.parent_id = 0)) basic_type
+		  from tbl_product_info tpi, tmp_product_store t
+		 where tpi.itemnumber = t.product_itemnumber
+		   and t.user_id = #{in_user_id,jdbcType=INTEGER}
+	</select>
+	
+	<!-- 【批量】获取商品详情参数 -->
+	<select id="getProductParamsList" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT TPPI.PRODUCT_ITEMNUMBER,TPPI.PARAMETER_VALUE as PARAM_VALUE,TDPP.PARAMETER_NAME as PARAM_NAME
+		  FROM TBL_PRODUCT_PARAMS_INFO TPPI,TBL_DIC_PRODUCT_PARAMETER TDPP,TMP_PRODUCT_STORE t
+		where TPPI.PARAMETER_ID = TDPP.ID
+			  AND TPPI.PRODUCT_ITEMNUMBER = t.PRODUCT_ITEMNUMBER
+		   	  AND t.USER_ID = #{in_user_id,jdbcType=INTEGER}
+		ORDER BY TPPI.PRODUCT_ITEMNUMBER ASC
+	</select>
+	<!-- 【批量】获取商品颜色数据 -->
+	<select id="getSkuColorList" parameterType="java.util.Map" resultType="java.util.Map">
+		select t.product_itemnumber,
+			   t.product_group_member as PRODUCT_COLOR,
+			   t.product_color_imgurl
+		  from tbl_product_sku t,tmp_product_store t1
+		 where t.product_itemnumber = t1.product_itemnumber
+		   and t.product_group = '颜色'
+		   and t1.user_id = #{in_user_id,jdbcType=INTEGER}
+		   order by t.id asc
+	</select>
+	
+	<!-- 【批量】获取sku基本信息 -->
+	<select id="getSkuInfoList" parameterType="java.util.Map" resultType="java.util.Map">
+		select tps.product_itemnumber,
+			   tps.id as sku,
+			   tps.product_group_member as product_size,
+			   1 status,
+			   (select min(retail_price) from tbl_product_store_detail 
+			   where product_sku = tps.id and product_store_id = (select id from tbl_product_store where product_itemnumber = tps.product_itemnumber and user_id = #{in_user_id,jdbcType=INTEGER})) price_sale,
+			   nvl(tps.product_prize_tag,0) as price_tag,
+			   nvl(tps.product_weight,0) product_weight,
+			   tps.product_gbcode as gb_code,
+			   nvl(tps.product_inlong,0) product_inlong,
+			   tps.product_color
+		  from tbl_product_sku tps,tmp_product_store t
+		 where tps.product_itemnumber = t.product_itemnumber
+		   and tps.product_color is not null
+		   and t.user_id = #{in_user_id,jdbcType=INTEGER}
+		   order by tps.id asc
+	</select>
+	<!-- 【批量】获取商品图片数据 -->
+	<select id="getImgList" parameterType="java.util.Map" resultType="java.util.Map">
+		select t.product_itemnumber,t.image_url
+		  from tbl_product_images t, tmp_product_store t1
+		 where t.product_itemnumber = t1.product_itemnumber
+		   and t1.user_id = #{in_user_id,jdbcType=INTEGER}
+		 order by type asc, is_primary desc,sortid asc
+	</select>
+	<!-- 批量新增门店商品关联明细数据 -->
+	<insert id="batchInsertStoreProductDetail" parameterType="java.util.List">
+		insert into tbl_product_store_detail(id,product_store_id,product_itemnumber,product_specs,product_sku,retail_price,create_user_id)
+		select seq_product_store_detail.nextval,a.* from (
+		<foreach collection="list" item="item" separator="union all">
+		select #{item.id,jdbcType=INTEGER} as product_store_id,
+			   product_itemnumber,
+			   product_specs,
+			   product_sku,
+			   <choose>
+			   	<when test="item.retail_price != null">#{item.retail_price,jdbcType=INTEGER} as retail_price,</when>
+			   	<otherwise>retail_price,</otherwise>
+			   </choose>
+			   #{item.public_user_id,jdbcType=INTEGER} 
+		 from tbl_product_region_detail t
+		where product_itemnumber = #{item.product_itemnumber,jdbcType=VARCHAR}
+		      and exists(
+		      	  select 1 
+		      	    from tbl_user_info tui,tbl_product_region tpr 
+		      	   where tui.user_name = #{item.user_id,jdbcType=VARCHAR}
+		      	   		 and tui.partner_user_id = tpr.user_id
+		      	   		 and tpr.id = t.product_region_id
+		      )
+			  <if test="item.product_specs != null and item.product_specs != ''">
+				  and t.product_specs = #{item.product_specs,jdbcType=VARCHAR}
+			  </if>
+		</foreach>
+			  ) a
+	</insert>
+</mapper>

@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tk.oms.basicinfo.dao.StandardLogisticsDao">
+
+    <!--分页查询标准物流公司-->
+    <select id="listStandardLogisticsForPage" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+            select a.*, rownum num from (
+                select
+                    id,
+                    logistics_name,
+                    logistics_code,
+                    logistics_logo,
+                    (select method_name from tbl_shipping_method where shipping_method_id = id) shipping_method_name,
+                    state,
+                    is_collect,
+                    logistics_type
+                from tbl_standard_logistics
+                where is_delete = 1
+                <if test="logistics_name != null and logistics_name != ''">
+                    and logistics_name like '%' || #{logistics_name,jdbcType=VARCHAR} || '%'
+                </if>
+                <if test="shipping_method_id !=null and shipping_method_id !=''">
+                    and shipping_method_id = #{shipping_method_id,jdbcType=INTEGER}
+                </if>
+                order by sort_id desc
+            ) a where ROWNUM  &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where num &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--查询标准物流公司总数量-->
+    <select id="countStandardLogisticsForPage" parameterType="java.util.Map" resultType="int">
+        select count(1) from tbl_standard_logistics where is_delete = 1
+        <if test="logistics_name != null and logistics_name != ''">
+            and logistics_name like '%' || #{logistics_name,jdbcType=VARCHAR} || '%'
+        </if>
+        <if test="shipping_method_id !=null and shipping_method_id !=''">
+            and shipping_method_id = #{shipping_method_id,jdbcType=INTEGER}
+        </if>
+    </select>
+
+    <!--查询标准物流公司-->
+    <resultMap type="java.util.Map" id="standardLogisticsListMap">
+        <result column="id" property="id"/>
+        <result column="logistics_name" property="option"/>
+        <result column="logistics_company_flag" property="logistics_company_flag"/>
+    </resultMap>
+    <select id="listStandardLogistics"  parameterType="java.util.Map" resultMap="standardLogisticsListMap">
+        select 
+        sl.id,
+        sl.logistics_name,
+        <choose>
+			<when test="logistics_company_id!=null and logistics_company_id!=0">
+        		(case when #{logistics_company_id,jdbcType=INTEGER} = slcr.logistics_company_id then 1 else 0 end) logistics_company_flag
+			</when>
+			<otherwise>
+				0 logistics_company_flag
+			</otherwise>
+		</choose>
+        from tbl_standard_logistics  sl
+        left join tbl_standard_logistics_com_ref slcr on sl.id = slcr.standard_logistics_id
+        <choose>
+			<when test="logistics_company_id!=null and logistics_company_id!=0">
+        		 and slcr.logistics_company_id=#{logistics_company_id,jdbcType=INTEGER}
+			</when>
+			<otherwise>
+				and slcr.logistics_company_id=0
+			</otherwise>
+		</choose>
+        where sl.is_delete = 1
+        and sl.state = 1
+        <if test="shipping_method_id!=null and shipping_method_id!=0">
+        	and shipping_method_id = #{shipping_method_id,jdbcType=INTEGER}
+        </if>
+        <if test="is_collect != null and is_collect == 1 ">
+        	and is_collect = 2
+        </if>
+        order by sl.create_date asc,sl.id
+    </select>
+
+    <!--根据ID查询标准物流公司-->
+    <resultMap type="java.util.Map" id="standardLogisticsMap">
+        <result column="id" property="id"/>
+        <result column="logistics_name" property="logistics_name"/>
+        <result column="logistics_code" property="logistics_code"/>
+        <result column="logistics_logo" property="logistics_logo"/>
+        <result column="shipping_method_id" property="shipping_method_id"/>
+        <result column="state" property="state"/>
+        <result column="is_collect" property="is_collect"/>
+        <result column="logistics_type" property="logistics_type"/>
+    </resultMap>
+    <select id="getStandardLogisticsById" parameterType="java.lang.Long" resultMap="standardLogisticsMap">
+        select
+            id,
+            logistics_name,
+            logistics_code,
+            logistics_logo,
+		    shipping_method_id,
+            state,
+            is_collect,
+            logistics_type
+        from tbl_standard_logistics
+        where id = #{logistics_id,jdbcType=INTEGER} and is_delete = 1
+    </select>
+
+    <!--根据物流代码查询标准物流公司数量-->
+    <select id="countStandardLogisticsByCode" parameterType="java.util.Map" resultType="int">
+        select count(1) from tbl_standard_logistics where logistics_code = #{logistics_code,jdbcType=INTEGER} and is_delete = 1
+        <if test="logistics_id != null and logistics_id != ''">
+            and id != #{logistics_id,jdbcType=INTEGER}
+        </if>
+    </select>
+
+    <!--根据物流名称查询标准物流公司数量-->
+    <select id="countStandardLogisticsByName" parameterType="java.util.Map" resultType="int">
+        select count(1) from tbl_standard_logistics where logistics_name = #{logistics_name,jdbcType=INTEGER} and is_delete = 1
+        <if test="logistics_id != null and logistics_id != ''">
+            and id != #{logistics_id,jdbcType=INTEGER}
+        </if>
+    </select>
+
+    <!--根据标准物流公司ID查询平台物流公司数量-->
+    <select id="countLogisticsByStandardId" parameterType="java.lang.Long" resultType="int">
+        select count(1) from tbl_logistics_company where standard_logistics_id = #{logistics_id,jdbcType=INTEGER}
+    </select>
+
+    <!--新增标准物流公司-->
+    <insert id="insertStandardLogistics" parameterType="java.util.Map">
+        insert into tbl_standard_logistics(
+            id,
+            logistics_name,
+            logistics_code,
+            logistics_logo,
+            shipping_method_id,
+            state,
+            create_date,
+            creater_id,
+            update_date,
+            update_id,
+            is_delete,
+            is_collect,
+            logistics_type,
+            sort_id
+        ) values (
+            seq_standard_logistics.nextval,
+            #{logistics_name,jdbcType=VARCHAR},
+            #{logistics_code,jdbcType=VARCHAR},
+            #{logistics_logo,jdbcType=VARCHAR},
+            #{shipping_method_id,jdbcType=INTEGER},
+            #{state,jdbcType=VARCHAR},
+            sysdate,
+            #{public_user_id,jdbcType=VARCHAR},
+            sysdate,
+            #{public_user_id,jdbcType=VARCHAR},
+            1,
+            #{is_collect,jdbcType=VARCHAR},
+            #{logistics_type,jdbcType=VARCHAR},
+            (select nvl(max(sort_id),0) + 1 from tbl_standard_logistics)
+        )
+    </insert>
+
+    <!--更新标准物流公司-->
+    <update id="updateStandardLogistics" parameterType="java.util.Map">
+        update tbl_standard_logistics set
+        <if test="logistics_name != null and logistics_name != ''">
+            logistics_name = #{logistics_name,jdbcType=VARCHAR},
+        </if>
+        <if test="logistics_code != null and logistics_code != ''">
+            logistics_code = #{logistics_code,jdbcType=VARCHAR},
+        </if>
+        <if test="logistics_logo != null and logistics_logo != ''">
+            logistics_logo = #{logistics_logo,jdbcType=VARCHAR},
+        </if>
+        <if test="shipping_method_id != null and shipping_method_id != ''">
+            shipping_method_id = #{shipping_method_id,jdbcType=INTEGER},
+        </if>
+        <if test="is_collect != null and is_collect != ''">
+            is_collect = #{is_collect,jdbcType=INTEGER},
+        </if>
+        <if test="logistics_type != null and logistics_type != ''">
+            logistics_type = #{logistics_type,jdbcType=INTEGER},
+        </if>
+        <if test="state != null and state != ''">
+            state = #{state,jdbcType=VARCHAR},
+        </if>
+            update_date = sysdate,update_id = #{public_user_id,jdbcType=VARCHAR}
+        where id = #{logistics_id,jdbcType=INTEGER} and is_delete = 1
+    </update>
+
+    <!--删除标准物流公司-->
+    <update id="deleteStandardLogistics" parameterType="java.util.Map">
+        update tbl_standard_logistics set
+            is_delete = 2,
+            update_date = sysdate,
+            update_id = #{public_user_id,jdbcType=VARCHAR}
+        where id = #{logistics_id,jdbcType=INTEGER} and is_delete = 1
+    </update>
+    
+    <!-- 查询物流公司列表-->
+	<select id="queryLogisticsCompanyList" parameterType="java.util.Map" resultType="java.util.Map">
+		select id,logistics_name,logistics_code 
+	      from tbl_standard_logistics
+		  where state=1 
+		        and is_delete=1
+				and logistics_code!='SF'
+				<if test="shipping_method_id != null and shipping_method_id != ''">
+				and shipping_method_id = #{shipping_method_id,jdbcType=INTEGER}
+				</if>
+				<if test="is_collect != null and is_collect == 2 ">
+				and is_collect =  #{is_collect,jdbcType=INTEGER}
+				</if>
+		  order by sort_id desc
+	</select>
+	<!-- 查询排序ID -->
+	<select id="queryById" parameterType="long" resultType="java.util.Map">
+        select sort_id
+        from tbl_standard_logistics where id=#{id,jdbcType=INTEGER}
+    </select>
+    <!-- 更新排序 -->
+    <update id="updateSort" parameterType="java.util.Map">
+    	update tbl_standard_logistics
+    		set	update_id=#{public_user_id,jdbcType=INTEGER},
+    			update_date=sysdate,
+    		<choose>
+				<when test="type !=null and type != ''">
+					<if test="type == 'top' ">
+							sort_id = (select max(sort_id) + 1 from tbl_standard_logistics)
+					 </if>
+					 <if test="type == 'bottom'">
+							sort_id = (select min(sort_id) - 1 from tbl_standard_logistics)
+					 </if>
+				</when>
+				<otherwise>
+					sort_id = #{sort_id,jdbcType=INTEGER}
+				</otherwise>
+		</choose>
+    	where id = #{id,jdbcType=INTEGER}
+    </update>
+</mapper>

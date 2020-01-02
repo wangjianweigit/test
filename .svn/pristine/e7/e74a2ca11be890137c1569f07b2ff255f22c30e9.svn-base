@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.marketing.dao.ActivityDetailDao">
+
+    <sql id="all_column">
+        cai.activity_id,
+        cai.user_group_id,
+        cai.tiered_discount_flag,
+        cai.custom_discount_flag,
+        cai.activity_service_discount * 10 as activity_service_discount,
+        cai.activity_max_discount * 10 as activity_max_discount,
+        cai.activity_min_discount * 10 as activity_min_discount,
+        cai.activity_discount * 10 as activity_discount,
+        cai.deposit_percent * 100 as deposit_percent,
+        cai.is_add,
+        cai.locked_stock,
+        cai.activity_quit_flag,
+        cai.apply_product_limit_amount,
+        cai.tag_color,
+        cai.tag_name,
+        cai.tag_level,
+        cai.tag_advance_img,
+        cai.tag_activity_img,
+        cai.background_img_display,
+        cai.tag_img_pc,
+        cai.tag_img_wx,
+        cai.recommen_home,
+        cai.scene_img_url,
+        cai.scene_type
+	</sql>
+
+    <!-- 根据活动ID查询活动详情 -->
+    <select id="queryByActivityId" parameterType="java.lang.Long" resultType="java.util.HashMap">
+        select <include refid="all_column"/>,
+            (SELECT NAME||decode(state,'1','(已禁用)','') FROM TBL_USER_GROUP WHERE ID = cai.USER_GROUP_ID) AS USER_GROUP_NAME
+        from tbl_activity_detail cai where cai.activity_id = #{activity_id,jdbcType=INTEGER}
+    </select>
+
+    <!-- 新增活动详情信息 -->
+    <insert id="insert" parameterType="java.util.HashMap">
+    	insert into tbl_activity_detail(
+            activity_id,
+            user_group_id,
+            tiered_discount_flag,
+            custom_discount_flag,
+            activity_service_discount,
+            activity_max_discount,
+            activity_min_discount,
+            activity_discount,
+            deposit_percent,
+            is_add,
+            locked_stock,
+            activity_quit_flag,
+            apply_product_limit_amount,
+            tag_color,
+            tag_name,
+            tag_level,
+            tag_advance_img,
+            tag_activity_img,
+            background_img_display,
+            tag_img_pc,
+            tag_img_wx,
+            recommen_home,
+            scene_img_url,
+            scene_type
+    	) values (
+            #{ACTIVITY_ID,jdbcType=INTEGER},
+            #{USER_GROUP_ID,jdbcType=INTEGER},
+            #{TIERED_DISCOUNT_FLAG,jdbcType=CHAR},
+            #{CUSTOM_DISCOUNT_FLAG,jdbcType=VARCHAR},
+            #{ACTIVITY_SERVICE_DISCOUNT,jdbcType=DOUBLE},
+            #{ACTIVITY_MAX_DISCOUNT,jdbcType=DOUBLE},
+            #{ACTIVITY_MIN_DISCOUNT,jdbcType=DOUBLE},
+            #{ACTIVITY_DISCOUNT,jdbcType=DOUBLE},
+            #{DEPOSIT_PERCENT,jdbcType=DOUBLE},
+            #{IS_ADD,jdbcType=VARCHAR},
+            #{LOCKED_STOCK,jdbcType=VARCHAR},
+            #{ACTIVITY_QUIT_FLAG,jdbcType=VARCHAR},
+            #{APPLY_PRODUCT_LIMIT_AMOUNT,jdbcType=INTEGER},
+            #{TAG_COLOR,jdbcType=VARCHAR},
+            #{TAG_NAME,jdbcType=VARCHAR},
+            #{TAG_LEVEL,jdbcType=VARCHAR},
+            #{TAG_ADVANCE_IMG,jdbcType=VARCHAR},
+            #{TAG_ACTIVITY_IMG,jdbcType=VARCHAR},
+            #{BACKGROUND_IMG_DISPLAY,jdbcType=VARCHAR},
+            #{TAG_IMG_PC,jdbcType=VARCHAR},
+            #{TAG_IMG_WX,jdbcType=VARCHAR},
+            #{recommen_home,jdbcType=INTEGER},
+            #{SCENE_IMG_URL,jdbcType=VARCHAR},
+            #{SCENE_TYPE,jdbcType=INTEGER}
+    	)
+	</insert>
+
+    <!-- 更新活动详情信息 -->
+    <update id="update" parameterType="java.util.HashMap">
+        UPDATE  TBL_ACTIVITY_DETAIL
+        SET
+            <if test="PRODUCT_TYPE!=NULL and PRODUCT_TYPE!=''">
+                PRODUCT_TYPE = #{PRODUCT_TYPE,jdbcType=VARCHAR},
+            </if>
+            <if test='CUSTOM_DISCOUNT_FLAG != null and CUSTOM_DISCOUNT_FLAG == "1" '>
+                ACTIVITY_DISCOUNT = #{ACTIVITY_DISCOUNT,jdbcType=DOUBLE},
+                ACTIVITY_MAX_DISCOUNT = NULL,
+                ACTIVITY_MIN_DISCOUNT = NULL,
+            </if>
+            <if test='CUSTOM_DISCOUNT_FLAG != null and CUSTOM_DISCOUNT_FLAG == "2" '>
+                ACTIVITY_DISCOUNT = NULL,
+                ACTIVITY_MAX_DISCOUNT = #{ACTIVITY_MAX_DISCOUNT,jdbcType=DOUBLE},
+                ACTIVITY_MIN_DISCOUNT = #{ACTIVITY_MIN_DISCOUNT,jdbcType=DOUBLE},
+            </if>
+            <if test='BACKGROUND_IMG_DISPLAY != null and BACKGROUND_IMG_DISPLAY == "1" '>
+                TAG_ADVANCE_IMG = #{TAG_ADVANCE_IMG,jdbcType=VARCHAR},
+                TAG_ACTIVITY_IMG = #{TAG_ACTIVITY_IMG,jdbcType=VARCHAR},
+            </if>
+            <if test='BACKGROUND_IMG_DISPLAY != null and BACKGROUND_IMG_DISPLAY == "2" '>
+                TAG_ADVANCE_IMG = NULL,
+                TAG_ACTIVITY_IMG = NULL,
+            </if>
+            <if test='TAG_LEVEL != null and TAG_LEVEL == "1" '>
+                TAG_IMG_WX = #{TAG_IMG_WX,jdbcType=VARCHAR},
+                TAG_IMG_PC = #{TAG_IMG_PC,jdbcType=VARCHAR},
+            </if>
+            <if test='TAG_LEVEL != null and TAG_LEVEL != "1" '>
+                TAG_IMG_WX = NULL,
+                TAG_IMG_PC = NULL,
+            </if>
+            DEPOSIT_PERCENT= #{DEPOSIT_PERCENT,jdbcType=DOUBLE},
+            USER_GROUP_ID = #{USER_GROUP_ID,jdbcType=INTEGER},
+            TIERED_DISCOUNT_FLAG = #{TIERED_DISCOUNT_FLAG,jdbcType=CHAR},
+            CUSTOM_DISCOUNT_FLAG = #{CUSTOM_DISCOUNT_FLAG,jdbcType=VARCHAR},
+            ACTIVITY_SERVICE_DISCOUNT = #{ACTIVITY_SERVICE_DISCOUNT,jdbcType=DOUBLE},
+            IS_ADD = #{IS_ADD,jdbcType=VARCHAR},
+            LOCKED_STOCK = #{LOCKED_STOCK,jdbcType=VARCHAR},
+            ACTIVITY_QUIT_FLAG = #{ACTIVITY_QUIT_FLAG,jdbcType=VARCHAR},
+            TAG_COLOR = #{TAG_COLOR,jdbcType=VARCHAR},
+            TAG_NAME = #{TAG_NAME,jdbcType=VARCHAR},
+            APPLY_PRODUCT_LIMIT_AMOUNT = #{APPLY_PRODUCT_LIMIT_AMOUNT,jdbcType=INTEGER},
+            TAG_LEVEL = #{TAG_LEVEL,jdbcType=VARCHAR},
+            SCENE_TYPE = #{SCENE_TYPE,jdbcType=INTEGER},
+            SCENE_IMG_URL = #{SCENE_IMG_URL,jdbcType=VARCHAR},
+            BACKGROUND_IMG_DISPLAY = #{BACKGROUND_IMG_DISPLAY,jdbcType=VARCHAR},
+            RECOMMEN_HOME = #{recommen_home,jdbcType=INTEGER}
+        WHERE ACTIVITY_ID = #{ID,jdbcType=INTEGER}
+    </update>
+
+    <update id="updateDecorate" parameterType="java.util.HashMap">
+        UPDATE TBL_ACTIVITY_DETAIL
+        SET TAG_LEVEL = #{TAG_LEVEL,jdbcType=VARCHAR},
+            SCENE_TYPE = #{SCENE_TYPE,jdbcType=INTEGER},
+            SCENE_IMG_URL = #{SCENE_IMG_URL,jdbcType=VARCHAR},
+            <if test='BACKGROUND_IMG_DISPLAY != null and BACKGROUND_IMG_DISPLAY == "1" '>
+                TAG_ADVANCE_IMG = #{TAG_ADVANCE_IMG,jdbcType=VARCHAR},
+                TAG_ACTIVITY_IMG = #{TAG_ACTIVITY_IMG,jdbcType=VARCHAR},
+            </if>
+            <if test='BACKGROUND_IMG_DISPLAY != null and BACKGROUND_IMG_DISPLAY == "2" '>
+                TAG_ADVANCE_IMG = NULL,
+                TAG_ACTIVITY_IMG = NULL,
+            </if>
+            <if test='TAG_LEVEL != null and TAG_LEVEL == "1" '>
+                TAG_IMG_WX = #{TAG_IMG_WX,jdbcType=VARCHAR},
+                TAG_IMG_PC = #{TAG_IMG_PC,jdbcType=VARCHAR},
+            </if>
+            <if test='TAG_LEVEL != null and TAG_LEVEL != "1" '>
+                TAG_IMG_WX = NULL,
+                TAG_IMG_PC = NULL,
+            </if>
+            TAG_COLOR = #{TAG_COLOR,jdbcType=VARCHAR},
+            TAG_NAME = #{TAG_NAME,jdbcType=VARCHAR},
+            BACKGROUND_IMG_DISPLAY = #{BACKGROUND_IMG_DISPLAY,jdbcType=VARCHAR},
+            RECOMMEN_HOME = #{recommen_home,jdbcType=INTEGER}
+        WHERE ACTIVITY_ID = #{ID,jdbcType=INTEGER}
+    </update>
+
+    <!--更新是否推荐至首页状态-->
+    <update id="updateActivityRecommen" parameterType="java.util.Map">
+		update TBL_ACTIVITY_DETAIL
+		set recommen_home = #{recommen_home,jdbcType=INTEGER}
+		where activity_id = #{activity_id,jdbcType=INTEGER}
+	</update>
+
+    <!-- 获取参与预售活动的商品sku列表 -->
+    <select id="queryActivityProductSkuList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+        SELECT
+        TSAS.ACTIVITY_ID,
+        TSAS.PRODUCT_ITEMNUMBER,
+        TSAS.PRODUCT_SKU,
+        TSAS.PRESELL_STOCK_AMOUNT LOCKED_STOCK_AMOUNT,
+        TPS.PRODUCT_COLOR,
+        TPS.PRODUCT_SPECS,
+        TPS.PRODUCT_GROUP_MEMBER
+        FROM
+        <choose>
+            <when test="approval==1">
+                TBL_PRESELL_ACTIVITY_SKU_APPLY TSAS
+            </when >
+            <otherwise>
+                TBL_PRESELL_ACTIVITY_SKU TSAS
+            </otherwise>
+        </choose>
+        ,TBL_PRODUCT_SKU TPS
+        <where>
+            TSAS.ACTIVITY_ID = #{activity_id,jdbcType=INTEGER}
+            AND TSAS.PRODUCT_ITEMNUMBER = #{product_itemnumber,jdbcType=VARCHAR}
+            AND TSAS.PRODUCT_SKU = TPS.ID
+            AND TPS.PRODUCT_GROUP = '尺码'
+        </where>
+        ORDER BY TPS.PRODUCT_COLOR,TPS.PRODUCT_GROUP_MEMBER
+    </select>
+
+</mapper>

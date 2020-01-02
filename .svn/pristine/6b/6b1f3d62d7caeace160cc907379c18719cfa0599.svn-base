@@ -1,0 +1,755 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.platform.dao.FixedModuleDao">
+
+    <!--根据页面ID查询页面信息-->
+    <select id="getDecoratePageById" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            page_type,
+            support_flag,
+            page_state
+        from tbl_decorate_page dp
+        left join tbl_decorate_template dt on dt.id = dp.template_id
+        where dp.id = #{page_id,jdbcType=INTEGER} and is_delete = 1
+    </select>
+
+    <!--根据模块代码查询页面固定模块详情-->
+    <select id="listPageFixedModuleDetailByModuleCode" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            md.module_base_conf,
+            pm.fixed_period,
+            md.page_module_id,
+            group_id
+        from
+            tbl_platform_page_module pm,tbl_platform_page_module_dtl md
+        where
+            pm.id = md.page_module_id
+        and pm.page_id = #{page_id,jdbcType=INTEGER}
+        and exists(select 1 from tbl_platform_fixed_module fm where fm.id = pm.module_id and fm.module_code = #{module_code,jdbcType=VARCHAR})
+        and group_sort = #{group_sort,jdbcType=INTEGER}
+        order by md.sort
+    </select>
+
+    <!--根据模块代码查询页面固定模块信息-->
+    <select id="getPageFixedModuleByModuleCode" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            id as page_module_id,
+            page_id,
+            module_id,
+            fixed_period
+        from
+            tbl_platform_page_module pm
+        where
+            pm.page_id = #{page_id,jdbcType=INTEGER}
+        and exists(select 1 from tbl_platform_fixed_module fm where fm.id = pm.module_id and fm.module_code = #{module_code,jdbcType=VARCHAR})
+    </select>
+
+    <!--新增页面固定模块-->
+    <insert id="insertPageFixedModule" parameterType="java.util.Map">
+        <selectKey keyProperty="id" resultType="int" order="BEFORE">
+            select seq_platform_page_module.nextval from dual
+        </selectKey>
+        insert into tbl_platform_page_module(
+            id,
+            page_id,
+            module_id,
+            fixed_period,
+            create_date,
+            creater_id
+        ) values (
+            #{id,jdbcType=INTEGER},
+            #{page_id,jdbcType=INTEGER},
+            (select id from tbl_platform_fixed_module fm where fm.module_code = #{module_code,jdbcType=VARCHAR}),
+            10,
+            sysdate,
+            #{public_user_id,jdbcType=INTEGER}
+        )
+    </insert>
+
+    <!--新增页面模块详细信息-->
+    <insert id="insertPageFixedModuleDetail" parameterType="java.util.Map">
+        insert into tbl_platform_page_module_dtl(
+            page_module_id,
+            module_base_conf,
+            sort,
+            group_id,
+            group_sort
+        ) select
+            #{page_module_id,jdbcType=INTEGER} page_module_id,
+            t1.module_base_conf,
+            sort,
+            <choose>
+                <when test="group_id != null">
+                    #{group_id,jdbcType=INTEGER} as group_id,
+                </when>
+                <otherwise>
+                    (select (nvl(max(group_id),-1) + 1) from tbl_platform_page_module_dtl where page_module_id = #{page_module_id,jdbcType=INTEGER}) as group_id,
+                </otherwise>
+            </choose>
+            #{group_sort,jdbcType=INTEGER} as group_sort
+        from(
+        <foreach collection="moduleBaseConfList" item="item" index="index" separator="UNION">
+            select
+                #{item.module_base_conf,jdbcType=VARCHAR} module_base_conf,
+                #{item.sort,jdbcType=INTEGER} as sort
+            from dual
+        </foreach>
+        ) t1
+    </insert>
+
+    <!--查询页面固定模块数量-->
+    <select id="listPageFixedModuleCountByPageId" parameterType="long" resultType="java.util.Map">
+        select module_code,state, count (1) module_count from (
+            select module_code,state from tbl_platform_page_module pm, tbl_platform_page_module_dtl md,tbl_platform_fixed_module fm
+            where pm.id = md.page_module_id
+                 and fm.id = pm.module_id
+                 AND pm.page_id = #{page_id,jdbcType=INTEGER}
+            group by module_code,group_id,state order by module_code
+        ) group by module_code,state
+    </select>
+
+    <!--更新固定模块排序-->
+    <update id="updatePageFixedModuleSort" parameterType="java.util.Map">
+        update tbl_platform_page_module_dtl set group_sort = #{group_sort,jdbcType=INTEGER} where page_module_id = #{page_module_id,jdbcType=INTEGER} and group_id = #{group_id,jdbcType=INTEGER}
+    </update>
+
+    <!--更新现有的排序-->
+    <update id="updatePageFixedModuleAllSort" parameterType="java.util.Map">
+        update tbl_platform_page_module_dtl set
+        <if test="group_id != null">
+            group_id = group_id - 1
+        </if>
+        <if test="group_sort != null">
+            group_sort = group_sort-1
+        </if>
+        where page_module_id = #{page_module_id,jdbcType=INTEGER}
+        <if test="group_id != null">
+            and group_id &gt; #{group_id,jdbcType=INTEGER}
+        </if>
+        <if test="group_sort != null">
+            and group_sort &gt; #{group_sort,jdbcType=INTEGER}
+        </if>
+    </update>
+
+    <!--更新当前所有固定模块排序-->
+    <update id="updatePageFixedModuleSortId" parameterType="java.util.Map">
+        update tbl_platform_page_module_dtl
+        set group_sort = group_sort<if test="add != null">+1</if><if test="minus != null">-1</if>
+        where
+            page_module_id = #{page_module_id,jdbcType=INTEGER}
+        and group_sort &lt;= #{new_sort_id,jdbcType=INTEGER}
+        and group_sort &gt;= #{old_sort_id,jdbcType=INTEGER}
+        and group_id != #{group_id,jdbcType=INTEGER}
+    </update>
+
+    <!--删除页面模块详细信息-->
+    <delete id="deletePageFixedModuleDetail" parameterType="java.util.Map">
+        delete from tbl_platform_page_module_dtl md where page_module_id = #{page_module_id,jdbcType=INTEGER} and md.group_sort = #{group_sort,jdbcType=INTEGER}
+    </delete>
+
+    <!--新增初始页面固定模块-->
+    <insert id="insertInitPageFixedModule" parameterType="java.util.Map">
+        insert into
+            tbl_platform_page_module
+        select
+            seq_platform_page_module.nextval as id,
+            #{page_id,jdbcType=INTEGER} as page_id,
+            pm.module_id,
+            pm.fixed_period,
+            sysdate as create_date,
+            #{public_user_id,jdbcType=INTEGER} as creater_id,
+            1
+        from tbl_platform_page_module pm
+        where exists(select 1 from tbl_decorate_page dp where dp.id = pm.page_id and dp.page_type = #{page_type,jdbcType=INTEGER} and exists(select 1 from tbl_decorate_template dt where dt.id = dp.template_id and dt.support_flag = #{support_flag,jdbcType=VARCHAR} and dt.site_id is null))
+    </insert>
+
+    <!--新增初始页面固定模块详细数据-->
+    <insert id="insertInitPageFixedModuleDetail" parameterType="java.util.Map">
+        insert into
+            tbl_platform_page_module_dtl
+        select
+            id as page_module_id,module_base_conf,sort,group_id,group_sort
+        from (
+            select
+                module_id,
+                group_id,
+                group_id as group_sort,
+                module_base_conf,
+                sort
+            from tbl_platform_page_module pm,tbl_platform_page_module_dtl md
+            where exists(select 1 from tbl_decorate_page dp where dp.id = pm.page_id and dp.page_type = #{page_type,jdbcType=INTEGER} and exists(select 1 from tbl_decorate_template dt where dt.id = dp.template_id and dt.support_flag = #{support_flag,jdbcType=VARCHAR} and dt.site_id is null)) and pm.id = md.page_module_id
+        ) t1 left join (select id,module_id from tbl_platform_page_module pm where page_id = #{page_id,jdbcType=INTEGER}) t2 on t1.module_id = t2.module_id
+    </insert>
+
+    <!--新增初始页面布局-->
+    <insert id="insertInitPageLayout" parameterType="java.util.Map">
+        insert into
+            tbl_decorate_page_layout
+        select
+            seq_decorate_page_layout.nextval as id,
+            #{page_id,jdbcType=INTEGER} as page_id,
+            pl.layout_type,
+            pl.sort_id
+        from tbl_decorate_page_layout pl
+        where exists(select 1 from tbl_decorate_page dp where dp.id = pl.page_id and dp.page_type = #{page_type,jdbcType=INTEGER} and exists(select 1 from tbl_decorate_template dt where dt.id = dp.template_id and dt.support_flag = #{support_flag,jdbcType=VARCHAR} and dt.site_id is null))
+    </insert>
+
+    <!--更新页面固定模块状态-->
+    <update id="updatePageFixedModuleState" parameterType="java.util.Map">
+        update tbl_platform_page_module set
+            state = #{state,jdbcType=INTEGER}
+        where
+            page_id = #{page_id,jdbcType=INTEGER}
+        and exists(select 1 from tbl_platform_fixed_module fm where fm.id = module_id and fm.module_code = #{module_code,jdbcType=VARCHAR})
+    </update>
+
+    <!--查询每日上新（视频）商品信息-->
+    <select id="listUpdateVideoProduct" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select
+                pi.itemnumber as product_itemnumber,
+                pi.product_name,
+                pi.product_img_url,
+                tpi.image_url as product_video_url
+            from tbl_product_info pi
+            left join tbl_product_images tpi on pi.itemnumber = tpi.product_itemnumber
+            where tpi.type = 2
+            and exists (select 1 from tbl_site_product_delay spd where spd.site_id = #{site_id,jdbcType=INTEGER} and spd.product_id = pi.id)
+            and product_type = 0 and pi.state = '上架'
+            <if test="video_select_type != null and video_select_type == 1 and video_product_type_id != null and video_product_type_id != 0">
+                and pi.product_type_id in (select id from tbl_dic_product_type nod start with nod.id = #{video_product_type_id,jdbcType=INTEGER} connect by prior nod.id = nod.parent_id)
+            </if>
+            <if test="video_select_type != null and video_select_type == 2 and video_products != null">
+                and pi.itemnumber in
+                <foreach item="product" collection="video_products" open="(" separator="," close=")">
+                    #{product.product_itemnumber,jdbcType=VARCHAR}
+                </foreach>
+            </if>
+            <choose>
+                <when test="video_select_type != null and video_select_type == 1">
+                    order by ${video_sort},pi.itemnumber
+                </when>
+                <otherwise>
+                    <if test="video_sort_type != null and video_sort_type == 1">
+                        order by instr(<foreach collection="video_products" item="product" open="'" close="'" separator=",">${product.product_itemnumber}</foreach>,pi.itemnumber)
+                    </if>
+                    <if test="video_sort_type != null and video_sort_type == 2">
+                        order by dbms_random.value()
+                    </if>
+                </otherwise>
+            </choose>
+        ) a where rownum &lt;= #{video_count,jdbcType=INTEGER}
+    </select>
+
+    <!--查询每日上新商品信息-->
+    <select id="listUpdateProduct" parameterType="java.util.Map" resultType="java.util.Map">
+        select a.*,getProduct_OldPrice_Min(a.product_itemnumber) as sale_price_min from (
+            select
+                pi.itemnumber as product_itemnumber,
+                pi.product_name,
+                pi.product_img_url
+            from tbl_product_info pi
+            where product_type = 0 and pi.state = '上架'
+            and exists (select 1 from tbl_site_product_delay spd where spd.site_id = #{site_id,jdbcType=INTEGER} and spd.product_id = pi.id)
+            <if test="first_products != null and first_products != ''">
+                and pi.itemnumber != #{first_products,jdbcType=VARCHAR}
+            </if>
+            order by ${sort},pi.itemnumber
+        ) a where rownum &lt;= #{count,jdbcType=INTEGER}
+    </select>
+
+    <!--查询商品品牌列表-->
+    <select id="listProductBrand" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            brand_name,
+            logo brand_logo,
+            (select count(1) from tbl_product_info pi where pi.brand_id = pb.id and ceil(sysdate - to_date(pi.first_sell_state_date)) &lt;= 60) update_count
+        from tbl_dic_product_brand pb
+        where pb.state = '2' and pb.show = '1'
+        <if test="select_type != null and select_type == 1 and product_type_ids != null">
+            and exists(select 1 from tbl_brand_classify_rel cr where pb.id = cr.brand_id and cr.classify_id in
+            <foreach item="product_type_id" collection="product_type_ids" open="(" separator="," close=")">
+                #{product_type_id,jdbcType=INTEGER}
+            </foreach>)
+        </if>
+        <if test="select_type != null and select_type == 2 and brand_ids != null">
+            and pb.id in
+            <foreach item="brand" collection="brand_ids" open="(" separator="," close=")">
+                #{brand.brand_id,jdbcType=INTEGER}
+            </foreach>
+        </if>
+        <choose>
+            <when test="select_type != null and select_type == 1">
+                order by ${sort},pb.id
+            </when>
+            <otherwise>
+                order by instr(<foreach collection="brand_ids" item="brand" open="'" close="'" separator=",">${brand.brand_id}</foreach>,pb.id)
+            </otherwise>
+        </choose>
+    </select>
+
+    <!--查询预售抢先商品列表-->
+    <select id="listPreSellProduct" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select
+                a.product_itemnumber,
+                a.product_name,
+                a.product_img_url,
+                a.plan_delivery_date,
+                a.activity_discount as discount,
+                a.begin_date,
+                a.end_date,
+                a.start_flag,
+                to_char(sysdate,'yyyy-mm-dd hh24:mi:ss') now_date,
+                getProduct_OldPrice_Min(a.product_itemnumber) as sale_price_min,
+                a.product_count sale_count
+            from (
+                select
+                    pi.itemnumber as product_itemnumber,
+                    pi.product_name,
+                    pi.product_img_url,
+                    pi.sell_state_date,
+                    pi.product_count,
+                    nvl((pi.sort_value + pd.weighting),0) overall,
+                    ap.activity_discount,
+                    to_char(ap.activity_start_date,'yyyy-mm-dd hh24:mi:ss') begin_date,
+                    to_char(ap.activity_end_date,'yyyy-mm-dd hh24:mi:ss') end_date,
+                    (case when (ai.end_date &gt;= sysdate and ai.begin_date &lt; sysdate) then 1 else 2 end) start_flag,
+                    to_char(ap.plan_delivery_date,'yyyy-mm-dd hh24:mi:ss') plan_delivery_date,
+                   ((ap.activity_start_date-sysdate)*24*60*60) begintimes
+                from tbl_activity_product ap
+                left join tbl_activity_info ai on ap.activity_id = ai.id
+                left join tbl_product_info pi on pi.itemnumber = ap.product_itemnumber
+                left join tbl_site_product_delay pd on pd.product_id = pi.id
+                where pi.is_presale = 1 and pd.site_id = #{site_id,jdbcType=INTEGER}
+                and ap.activity_end_date &gt;= sysdate and pi.state = '上架'
+                and ai.activity_type = 4
+                and exists(select 1 from tbl_activity_site tas where tas.site_id = #{site_id,jdbcType=INTEGER} and tas.activity_id = ai.id)
+                <if test="select_type != null and select_type == 1">
+                    <if test="recommend_type != null and recommend_type == 1 and product_type_id != null and product_type_id != 0">
+                        and pi.product_type_id in (select id from tbl_dic_product_type nod start with nod.id = #{product_type_id,jdbcType=INTEGER} connect by prior nod.id = nod.parent_id)
+                    </if>
+                    <if test="recommend_type != null and recommend_type == 2 and activity_id != null and activity_id != 0">
+                        and ap.activity_id = #{activity_id,jdbcType=INTEGER}
+                    </if>
+                </if>
+                <if test="select_type != null and select_type == 2 and products != null">
+                    and pi.itemnumber in
+                    <foreach item="product" collection="products" open="(" separator="," close=")">
+                        #{product.product_itemnumber,jdbcType=VARCHAR}
+                    </foreach>
+                </if>
+            ) a
+            <choose>
+                <when test="select_type != null and select_type == 1">
+                    order by ${sort},a.product_itemnumber
+                </when>
+                <otherwise>
+                    <if test="sort_type != null and sort_type == 1">
+                        order by instr(<foreach collection="products" item="product" open="'" close="'" separator=",">${product.product_itemnumber}</foreach>,a.product_itemnumber)
+                    </if>
+                    <if test="sort_type != null and sort_type == 2">
+                        order by dbms_random.value()
+                    </if>
+                </otherwise>
+            </choose>
+        )
+        <if test="count != null">
+            where rownum &lt;= #{count,jdbcType=INTEGER}
+        </if>
+    </select>
+
+    <!--分页查询猜你喜欢商品信息-->
+    <select id="listLikeProductForPage" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            b.product_itemnumber,
+            b.product_name,
+            case when ${number} = 1 then b.product_img_url else getproductimage(b.product_itemnumber,4) end as product_img_url,
+            b.product_count,
+            b.is_outstock,
+            b.is_presale,
+            b.is_custom,
+            getProduct_OldPrice_Min(b.product_itemnumber) as sale_price_min,
+            getSiteProduct_Tags(#{site_id,jdbcType=INTEGER},b.product_itemnumber) product_tag,
+            (select min(product_group_member) from tbl_product_sku ps where ps.product_itemnumber = b.product_itemnumber and ps.product_group = '尺码') as min_size,
+            (select max(product_group_member) from tbl_product_sku ps where ps.product_itemnumber = b.product_itemnumber and ps.product_group = '尺码') as max_size,
+            (select type from tbl_dic_product_type where id = b.product_type_id) as product_type,
+            (select activity_discount from tbl_activity_product ap,tbl_activity_info ai
+                where ai.id = ap.activity_id and ap.product_itemnumber = b.product_itemnumber
+                and is_delete = 1 and activity_state = 3 and state = 2 and activity_type = 1 and end_date &gt;= sysdate
+                and exists(select 1 from tbl_activity_site tas where tas.site_id = #{site_id,jdbcType=INTEGER} and tas.activity_id = ai.id)
+                and rownum &lt;= 1
+            ) as discount
+        from (
+            select a.*,rownum rn from (
+                select
+                    temp.product_itemnumber,
+                    temp.product_name,
+                    temp.product_img_url,
+                    temp.product_count,
+                    temp.is_outstock,
+                    temp.is_presale,
+                    temp.product_type_id,
+                    temp.is_custom
+                from (
+                    select
+                        pi.itemnumber as product_itemnumber,
+                        pi.product_name,
+                        pi.product_img_url,
+                        pi.sell_state_date,
+                        pi.product_count,
+                        nvl((pi.sort_value + pd.weighting),0) overall,
+                        pi.is_outstock,
+                        pi.is_presale,
+                        pi.product_type_id,
+                        case when pi.product_type = 1 then 1 else 0 end as is_custom
+                    from tbl_product_info pi
+                    left join tbl_site_product_delay pd on pd.product_id = pi.id
+                    where pi.product_type = 0 and pd.site_id = #{site_id,jdbcType=INTEGER}
+                    and pi.state = '上架'
+                    <if test="product_type_id != null and product_type_id != 0">
+                        and pi.product_type_id in (select id from tbl_dic_product_type nod start with nod.id = #{product_type_id,jdbcType=INTEGER} connect by prior nod.id = nod.parent_id)
+                    </if>
+                    <if test="activity_id != null and activity_id != 0">
+                        and exists(select 1 from tbl_activity_product ap,tbl_activity_info ai where ai.id = ap.activity_id and ap.product_itemnumber = pi.itemnumber and is_delete = 1 and activity_state = 3 and end_date &gt;= sysdate and ai.id = #{activity_id,jdbcType=INTEGER})
+                    </if>
+                    <if test="products != null and products != ''">
+                        and pi.itemnumber in
+                        <foreach item="product" collection="products" open="(" separator="," close=")">
+                            #{product.product_itemnumber,jdbcType=VARCHAR}
+                        </foreach>
+                        <if test="sort_type != null and sort_type == 1">
+                            order by instr(<foreach collection="products" item="product" open="'" close="'" separator=",">${product.product_itemnumber}</foreach>,pi.itemnumber)
+                        </if>
+                        <if test="sort_type != null and sort_type == 2">
+                            order by dbms_random.value()
+                        </if>
+                    </if>
+                ) temp
+                <if test="product_type_id != null or activity_id != null">
+                    order by ${sort},temp.product_itemnumber
+                </if>
+            ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) b where b.rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--查询猜你喜欢商品信息总数量-->
+    <select id="countLikeProductForPage" parameterType="java.util.Map" resultType="int">
+        select
+            count(1)
+        from tbl_product_info pi
+        where pi.product_type = 0 and pi.state = '上架'
+        <if test="product_type_id != null and product_type_id != 0">
+            and pi.product_type_id in (select id from tbl_dic_product_type nod start with nod.id = #{product_type_id,jdbcType=INTEGER} connect by prior nod.id = nod.parent_id)
+        </if>
+        <if test="activity_id != null and activity_id != 0">
+            and exists(select 1 from tbl_activity_product ap,tbl_activity_info ai where ai.id = ap.activity_id and ap.product_itemnumber = pi.itemnumber and is_delete = 1 and activity_state = 3 and end_date &gt;= sysdate and ai.id = #{activity_id,jdbcType=INTEGER})
+        </if>
+        <if test="products != null and products != ''">
+            and pi.itemnumber in
+            <foreach item="product" collection="products" open="(" separator="," close=")">
+                #{product.product_itemnumber,jdbcType=VARCHAR}
+            </foreach>
+        </if>
+        and rownum &lt;= #{count,jdbcType=INTEGER}
+    </select>
+
+    <!--查询限时折扣活动信息-->
+    <select id="getActivityInfo" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select
+                sai.activity_id,
+                to_char(ai.begin_date,'yyyy-mm-dd hh24:mi:ss') begin_date,
+                to_char(ai.end_date,'yyyy-mm-dd hh24:mi:ss') end_date,
+                to_char(sysdate,'yyyy-mm-dd hh24:mi:ss') now_date,
+                (case when (ai.end_date &gt;= sysdate and ai.begin_date &lt; sysdate) then (ai.end_date - sysdate) * 24 * 60 * 60 * 1000 else (ai.begin_date - sysdate) * 24 * 60 * 60 * 1000 end) countdown,
+                (case when (ai.end_date &gt;= sysdate and ai.begin_date &lt; sysdate) then 1 else 2 end) start_flag,
+                sai.scene_img_url,
+                scene_type
+            from tbl_sale_activity_info sai
+            inner join tbl_activity_info ai on ai.id = sai.activity_id
+            where sai.tag_level = 1 and sai.recommen_home = 1
+            and ai.end_date &gt;= sysdate and ai.is_delete = 1 and ai.activity_state = 3 and ai.activity_type = 1 and ai.state = 2
+            and exists(select 1 from tbl_activity_site tas where tas.site_id = #{site_id,jdbcType=INTEGER} and tas.activity_id = ai.id)
+            and ai.begin_date &lt; (sysdate+numtodsinterval(24,'hour'))
+            order by ai.begin_date asc,start_flag asc
+        ) where rownum &lt;= 1
+    </select>
+
+    <!--根据活动ID查询活动信息-->
+    <select id="listActivityById" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            sai.activity_id,
+            to_char(ai.begin_date,'yyyy-mm-dd hh24:mi:ss') begin_date,
+            to_char(ai.end_date,'yyyy-mm-dd hh24:mi:ss') end_date,
+            to_char(sysdate,'yyyy-mm-dd hh24:mi:ss') now_date,
+            (case when (ai.end_date &gt;= sysdate and ai.begin_date &lt; sysdate) then 1
+                when ai.begin_date &gt; sysdate then 2
+                else 3 end
+            ) start_flag
+        from tbl_sale_activity_info sai ,tbl_activity_info ai
+        where ai.id = sai.activity_id and ai.is_delete = 1 and ai.activity_state = 3 and ai.state = 2 and ai.activity_type = 1
+        <if test="activity_id != null and activity_id !=''">
+            and ai.id = #{activity_id,jdbcType=VARCHAR}
+        </if>
+        <if test="activities != null and activities.size() > 0">
+        and ai.id in
+            <foreach item="activity" collection="activities" open="(" separator="," close=")">
+                #{activity.activity_id,jdbcType=VARCHAR}
+            </foreach>
+        </if>
+        <if test="start_flag != null and start_flag == 1">
+            and sysdate between ai.begin_date and ai.end_date
+            and exists(select 1 from tbl_activity_site tas where tas.activity_id = ai.id and tas.site_id = #{site_id,jdbcType=INTEGER})
+        </if>
+    </select>
+
+    <!--查询活动商品列表-->
+    <select id="listActivityProduct" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            a.itemnumber as product_itemnumber,
+            a.product_name,
+            a.product_img_url,
+            a.product_subtitle,
+            nvl(case when beginTimes > 0 then c.product_count else b.product_count end,0) product_count,
+            getproduct_oldprice_min (a.itemnumber) sale_price_min
+        from (
+            select
+                pi.itemnumber,
+                pi.product_name,
+                pi.product_img_url,
+                nvl(ap.product_description,pi.product_subtitle) product_subtitle,
+                ap.sort_id,
+                pi.sell_state_date,
+                nvl((pi.sort_value + pd.weighting),0) overall,
+                ((ap.activity_start_date-sysdate)*24*60*60) begintimes
+            from tbl_activity_product ap ,tbl_product_info pi,tbl_site_product_delay pd
+            where
+                pd.product_id = pi.id and ap.product_itemnumber(+) = pi.itemnumber and pi.state = '上架'
+            and pd.site_id = #{site_id,jdbcType=INTEGER} and ap.activity_id = #{activity_id,jdbcType=INTEGER}
+        ) a,(
+            select
+                nvl (sum (h.product_count), 0) product_count,
+                h.itemnumber
+            from tbl_order_product h,tbl_order_info hh,tbl_product_info hhh,(select begin_date, end_date from tbl_activity_info where id = #{activity_id,jdbcType=INTEGER}) ai
+            where h.order_number = hh.order_number and  hh.order_state in(1,2,3,5)
+            and h.order_date between ai.begin_date and ai.end_date and hhh.itemnumber = h.itemnumber(+)
+            group by h.itemnumber
+        )b,(
+            select page_name itemnumber,count(1) product_count from tbl_user_log_info where page_type='商品详情' group by page_name
+        ) c where a.itemnumber = b.itemnumber(+) and a.itemnumber = c.itemnumber(+) order by ${sort},a.itemnumber
+    </select>
+
+    <!--查询活动商品列表-->
+    <select id="listActivityProductForPage" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            a.itemnumber as product_itemnumber,
+            a.product_name,
+            a.product_img_url,
+            a.product_subtitle,
+            nvl(case when beginTimes > 0 then c.product_count else b.product_count end,0) product_count,
+            getproduct_oldprice_min (a.itemnumber) sale_price_min
+        from (
+            select * from (
+                select t.*,rownum as rn from (
+                    select
+                        pi.itemnumber,
+                        pi.product_name,
+                        pi.product_img_url,
+                        nvl(ap.product_description,pi.product_subtitle) product_subtitle,
+                        ap.sort_id,
+                        pi.sell_state_date,
+                        nvl((pi.sort_value + pd.weighting),0) overall,
+                        ((ap.activity_start_date-sysdate)*24*60*60) begintimes
+                    from tbl_activity_product ap ,tbl_product_info pi,tbl_site_product_delay pd
+                    where
+                        pd.product_id = pi.id and ap.product_itemnumber(+) = pi.itemnumber and pi.state = '上架'
+                    and pd.site_id = #{site_id,jdbcType=INTEGER} and ap.activity_id = #{activity_id,jdbcType=INTEGER}
+                    order by ${sort},pi.itemnumber
+                ) t where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+            ) where rn &gt; #{start_rownum,jdbcType=INTEGER}
+        ) a,(
+            select
+                nvl (sum (h.product_count), 0) product_count,
+                h.itemnumber
+            from tbl_order_product h,tbl_order_info hh,tbl_product_info hhh,(select begin_date, end_date from tbl_activity_info where id = #{activity_id,jdbcType=INTEGER}) ai
+            where h.order_number = hh.order_number and  hh.order_state in(1,2,3,5)
+            and h.order_date between ai.begin_date and ai.end_date and hhh.itemnumber = h.itemnumber(+)
+            group by h.itemnumber
+        ) b,(
+            select page_name itemnumber,count(1) product_count from tbl_user_log_info where page_type='商品详情' group by page_name
+        ) c where a.itemnumber = b.itemnumber(+) and a.itemnumber = c.itemnumber(+) order by ${sort},a.itemnumber
+    </select>
+
+    <!--查询活动模块商品列表总数量-->
+    <select id="countActivityProductForPage" parameterType="java.util.Map" resultType="int">
+        select
+            count(1)
+        from tbl_activity_product ap ,tbl_product_info pi,tbl_site_product_delay pd
+        where
+            pd.product_id = pi.id and ap.product_itemnumber(+) = pi.itemnumber and pi.state = '上架'
+        and pd.site_id = #{site_id,jdbcType=INTEGER} and ap.activity_id = #{activity_id,jdbcType=INTEGER}
+    </select>
+
+    <!--查询限时秒杀商品列表-->
+    <select id="listSeckillProduct" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            a.itemnumber as product_itemnumber,
+            a.product_name,
+            a.product_img_url,
+            nvl(case when beginTimes > 0 then c.product_count else b.product_count end,0) sale_count,
+            getproduct_oldprice_min (a.itemnumber) sale_price_min
+        from (
+            select
+                pi.itemnumber,
+                pi.product_name,
+                pi.product_img_url,
+                ap.sort_id,
+                pi.sell_state_date,
+                nvl((pi.sort_value + pd.weighting),0) overall,
+                pi.product_count,
+                ((ap.activity_start_date-sysdate)*24*60*60) begintimes
+            from tbl_activity_product ap ,tbl_product_info pi,tbl_site_product_delay pd
+            where
+                pd.product_id = pi.id and ap.product_itemnumber(+) = pi.itemnumber and pi.state = '上架'
+            and pd.site_id = #{site_id,jdbcType=INTEGER} and ap.activity_id = #{activity_id,jdbcType=INTEGER}
+        ) a,(
+            select
+                nvl (sum (h.product_count), 0) product_count,
+                h.itemnumber
+            from tbl_order_product h,tbl_order_info hh,tbl_product_info hhh,(select begin_date, end_date from tbl_activity_info where id = #{activity_id,jdbcType=INTEGER}) ai
+            where h.order_number = hh.order_number and  hh.order_state in(1,2,3,5)
+            and h.order_date between ai.begin_date and ai.end_date and hhh.itemnumber = h.itemnumber(+)
+            group by h.itemnumber
+        )b,(
+            select page_name itemnumber,count(1) product_count from tbl_user_log_info where page_type='商品详情' group by page_name
+        ) c where a.itemnumber = b.itemnumber(+) and a.itemnumber = c.itemnumber(+) order by ${sort}
+    </select>
+
+    <!--查询自动选择商品列表-->
+    <select id="listAutoSelectProduct" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select
+                temp.product_itemnumber,
+                temp.product_name,
+                temp.product_img_url,
+                getproduct_oldprice_min (temp.product_itemnumber) sale_price_min
+                <if test="is_discount != null and is_discount == 1 and discount_price != null">
+                    ,temp.discount_price as discount
+                </if>
+                <if test="is_discount != null and is_discount == 1 and discount_price == null">
+                    ,(select activity_discount from tbl_activity_product ap,tbl_activity_info ai
+                        where ai.id = ap.activity_id and ap.product_itemnumber = temp.product_itemnumber
+                        and is_delete = 1 and activity_state = 3 and state = 2 and activity_type = 1 and end_date &gt;= sysdate
+                        and exists(select 1 from tbl_activity_site tas where tas.site_id = #{site_id,jdbcType=INTEGER} and tas.activity_id = ai.id)
+                        and rownum &lt;= 1
+                    ) as discount
+                </if>
+            from (
+                select
+                    pi.itemnumber as product_itemnumber,
+                    pi.product_name,
+                    pi.product_img_url,
+                    pi.sell_state_date,
+                    nvl((pi.sort_value + pd.weighting),0) overall,
+                    pi.product_count,
+                    pi.product_count7,
+                    pi.product_count15,
+                    pi.product_count30,
+                    pi.product_count90
+                <if test="discount_price != null and discount_price != ''">
+                    ,nvl((
+                        select activity_discount from tbl_activity_product ap,tbl_activity_info ai
+                        where ai.id = ap.activity_id
+                        and ap.product_itemnumber = pi.itemnumber
+                        and is_delete = 1 and activity_state = 3 and state = 2 and activity_type = 1
+                        and end_date &gt;= sysdate
+                        and exists(select 1 from tbl_activity_site tas where tas.site_id = #{site_id,jdbcType=INTEGER} and tas.activity_id = ai.id)
+                        and rownum &lt;= 1
+                    ),1) as discount_price
+                </if>
+                from tbl_product_info pi,tbl_site_product_delay pd
+                where pi.product_type = 0 and pd.product_id = pi.id and pd.site_id = #{site_id,jdbcType=INTEGER} and pi.state = '上架'
+                <if test="product_type_id != null and product_type_id != 0">
+                    and pi.product_type_id in (select id from tbl_dic_product_type nod start with nod.id = #{product_type_id,jdbcType=INTEGER} connect by prior nod.id = nod.parent_id)
+                </if>
+                <if test="activity_id != null and activity_id != 0">
+                    and exists(select 1 from tbl_activity_product ap,tbl_activity_info ai where ai.id = ap.activity_id and ap.product_itemnumber = pi.itemnumber and ai.id = #{activity_id,jdbcType=INTEGER} and ai.end_date &gt;= sysdate)
+                </if>
+                <if test="module_code != null and module_code == 'custom'">
+                    and (pi.is_brand_custom = 1 or pi.is_common_custom = 1)
+                </if>
+            ) temp order by ${sort},temp.product_itemnumber
+        ) where rownum &lt;= #{count,jdbcType=INTEGER}
+    </select>
+
+    <!--查询手动选择商品列表-->
+    <select id="listManualSelectProduct" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select
+                a.product_itemnumber,
+                pi.product_name,
+                pi.product_img_url,
+                getProduct_OldPrice_Min(a.product_itemnumber) as sale_price_min
+                <if test="is_discount != null and is_discount == 1">
+                    ,(select activity_discount from tbl_activity_product ap,tbl_activity_info ai
+                        where ai.id = ap.activity_id and ap.product_itemnumber = a.product_itemnumber
+                        and is_delete = 1 and activity_state = 3 and state = 2 and activity_type = 1 and end_date &gt;= sysdate
+                        and exists(select 1 from tbl_activity_site tas where tas.site_id = #{site_id,jdbcType=INTEGER} and tas.activity_id = ai.id)
+                        and rownum &lt;= 1
+                    ) as discount
+                </if>
+            from (
+                <foreach collection="products" open="(" close=")" item="product" separator="union all">
+                    select #{product.product_itemnumber,jdbcType=VARCHAR} as product_itemnumber from dual
+                </foreach>
+            ) a left join tbl_product_info pi on a.product_itemnumber = pi.itemnumber
+            where pi.product_type = 0 and pi.state = '上架'
+            and exists (select 1 from tbl_site_product_delay spd where spd.site_id = #{site_id,jdbcType=INTEGER} and spd.product_id = pi.id)
+            <if test="module_code != null and module_code == 'custom'">
+                and (pi.is_brand_custom = 1 or pi.is_common_custom = 1)
+            </if>
+            <if test="sort_type != null and sort_type == 1">
+                order by instr(<foreach collection="products" item="product" open="'" close="'" separator=",">${product.product_itemnumber}</foreach>,pi.itemnumber)
+            </if>
+            <if test="sort_type != null and sort_type == 2">
+                order by dbms_random.value()
+            </if>
+        )where rownum &lt;= #{count,jdbcType=INTEGER}
+    </select>
+
+    <!--查询往期预售活动商品列表-->
+    <select id="listPastPreSellProduct" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            a.product_itemnumber,
+            a.product_name,
+            a.product_img_url,
+            a.plan_delivery_date,
+            getProduct_OldPrice_Min(a.product_itemnumber) as sale_price_min
+        from (
+            select
+                pi.itemnumber as product_itemnumber,
+                pi.product_name,
+                pi.product_img_url,
+                pi.sell_state_date,
+                pi.product_count,
+                nvl((pi.sort_value + pd.weighting),0) overall,
+                to_char(ap.plan_delivery_date,'yyyy-mm-dd hh24:mi:ss') plan_delivery_date
+            from tbl_activity_product ap
+            left join tbl_product_info pi on pi.itemnumber = ap.product_itemnumber
+            left join tbl_site_product_delay pd on pd.product_id = pi.id
+            where pi.is_presale = 1 and pd.site_id = #{site_id,jdbcType=INTEGER} and ap.activity_end_date &lt; sysdate and pi.state = '上架'
+            and ap.activity_id in (
+                select id from (
+                    select id,end_date from tbl_activity_info ai where ai.activity_type = 4
+                    and exists(select 1 from tbl_activity_site tas where tas.site_id = #{site_id,jdbcType=INTEGER} and tas.activity_id = ai.id)
+                    and ai.end_date &lt; sysdate
+                    order by ai.end_date desc
+                ) where rownum &lt;= #{period_num,jdbcType=INTEGER}
+            )
+            order by ${sort},pi.itemnumber
+        ) a
+    </select>
+</mapper>

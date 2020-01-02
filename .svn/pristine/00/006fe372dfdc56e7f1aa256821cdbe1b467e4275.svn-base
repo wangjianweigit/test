@@ -1,0 +1,697 @@
+package com.tk.oms.stationed.dao;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.ibatis.annotations.Param;
+
+import com.tk.sys.common.BaseDao;
+import org.springframework.stereotype.Repository;
+
+/**
+ * 
+ * Copyright (c), 2017, Tongku
+ * FileName : StationedDao
+ * 
+ *
+ * @author yejingquan
+ * @version 1.00
+ * @date 2017-4-10
+ */
+@Repository
+public interface StationedDao extends BaseDao<Map<String, Object>> {
+	/**
+	 * 新增入驻商申请数据
+	 * @param map
+	 * @return
+	 */
+	public int insertStationedAudit(Map<String, Object> map);
+
+	/**
+	 * 生成入驻商ID
+	 * @return
+     */
+	public long queryStationedId();
+	/**
+	 * 查询是否已存在相同用户名
+	 * @param map
+	 * @return
+	 */
+	public int queryStationedByUserName(Map<String, Object> map);
+	/**
+	 * 查询入驻商审数量
+	 * @param paramMap
+	 * @return
+	 */
+	public int queryStationedAuditCount(Map<String, Object> paramMap);
+	/**
+	 * 查询入驻商审核列表
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> queryStationedAuditList(Map<String, Object> paramMap);
+
+	/**
+	 * 查询入驻商审核详情
+	 * @param paramMap
+	 * @return
+	 */
+	public Map<String, Object> queryStationedAuditDetail(Map<String, Object> paramMap);
+	/**
+	 * 查询入驻商详情
+	 * @param paramMap
+	 * @return
+	 */
+	public Map<String, Object> queryStationedDetail(Map<String, Object> paramMap);
+	/**
+	 * 查询入驻商数量
+	 * @param paramMap
+	 * @return
+	 */
+	public int queryStationedCount(Map<String, Object> paramMap);
+	/**
+	 * 查询入驻商列表
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> queryStationedList(Map<String, Object> paramMap);
+	/**
+	 * 更新入驻商申请数据用户审核状态
+	 * @param paramMap
+	 * @return
+	 */
+	public int updateStationedUserApplyUserState(Map<String, Object> paramMap);
+	/**
+	 * 新增入驻商信息表数据
+	 * @param paramMap
+	 */
+	public void insertStationedUserInfo(Map<String, Object> paramMap);
+
+	/**
+	 * 新增ERP供应商信息表数据
+	 * @param paramMap
+     */
+	public void insertErpSupplier(Map<String, Object> paramMap);
+	/**
+	 * 新增入驻商关联的银行账户信息
+	 * @param param
+	 * @return 
+	 */
+	public int insertBankAccountInfo(Map<String, Object> param);
+	/**
+	 * 删除入驻商仓储费
+	 * @param map
+	 */
+	public void deleteStorageCharges(Map<String, Object> map);
+	/**
+	 * 新增入驻商仓储费
+	 * @param map
+	 */
+	public void insertStorageCharges(Map<String, Object> map);
+	/**
+	 * 仓储费列表
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> queryStorageChargesList(Map<String, Object> paramMap);
+	/**
+	 * 仓储费列表(过滤鞋类)
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> queryStorageChargesTypeList(Map<String, Object> paramMap);
+	/**
+	 * 查询入驻商关联品牌是否存在
+	 * @param map
+	 * @return
+	 */
+	public int queryBrandUserRelIsExists(Map<String, Object> map);
+	/**
+	 * 删除入驻商关联品牌
+	 * @param map
+	 */
+	public int deleteBrandUserRel(Map<String, Object> map);
+	/**
+	 * 新增入驻商关联品牌
+	 * @param map
+	 */
+	public int insertBrandUserRel(Map<String, Object> map);
+	/**
+	 * 查询入驻商品牌授权信息
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> queryBrandUserRel(Map<String, Object> paramMap);
+	
+	/**
+	 * 查询品牌信息
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> queryBrandList(Map<String, Object> paramMap);
+	/**
+	 * 根据生产计划明细规格参数查询计划明细
+	 * @param param
+	 */
+	public List<Map<String, Object>> queryProductionPlanDetailSizeByParam(Map param);
+	/**
+	 * 生产计划列表
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> queryProductionPlanList(Map<String, Object> paramMap);
+	/**
+	 * 生产计划数量
+	 * @param paramMap
+	 * @return
+	 */
+	public int queryProductionPlanCount(Map<String, Object> paramMap);
+	/**
+	 * 分组查询生产计划明细
+	 */
+	public List<Map<String, Object>> queryProductionPlanDetailByGroup(Map<String, Object> paramMap);
+	/**
+	 * 入库申请列表
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> queryInStorageApplyList(Map<String, Object> paramMap);
+	/**
+	 * 入库申请数量
+	 * @param paramMap
+	 * @return
+	 */
+	public int queryInStorageApplyCount(Map<String, Object> paramMap);
+	/**
+	 * 分组查询入库申请规格明细
+	 * @param apply_number
+	 * @return
+	 */
+	public List<Map<String, Object>> queryInStorageApplyDetailByGroup(String apply_number);
+	/**
+	 * 根据入库申请规格参数查询申请明细
+	 * @param param
+	 * @return
+	 */
+	public List<Map<String, Object>> queryInStorageApplySizeByParam(Map param);
+
+	/**
+	 * 入驻商删除
+	 * @param paramMap
+	 * @return
+	 */
+	public int delete(Map<String, Object> paramMap);
+	/**
+	 * 入驻商审核数据更新
+	 * @param paramMap
+	 * @return
+	 */
+	public int updateStationedAudit(Map<String, Object> paramMap);
+	/**
+	 * 入驻商数据更新
+	 * @param paramMap
+	 * @return
+	 */
+	public int updateStationed(Map<String, Object> paramMap);
+	
+	/**
+	 * 删除入驻商权限节点的相关关联信息
+	 * @param paramMap
+	 * @return
+	 */
+	public int deleteUserNode(Map<String, Object> paramMap);
+	
+	/**
+	 * 设置入驻商权限节点相关关联信息 
+	 * @param paramMap
+	 * @return
+	 */
+	public int insertUserNode(Map<String, Object> paramMap);
+	
+	/**
+	 * 查询入驻商菜单或按钮节点列表，如果有权限则选中
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> queryUserNodeList(Map<String, Object> paramMap);
+	/**
+	 * 查询是否存在入驻商授权品牌信息
+	 * @param paramMap
+	 * @return
+	 */
+	public int queryBrandUserRelCount(Map<String, Object> paramMap);
+	/**
+	 * 根据入驻商用户ID获取入驻商信息以及入驻商账号信息
+	 * @param id 入驻商ID
+	 * @return
+	 */
+	public Map<String, Object> queryUserAccountById(long id);
+	/**
+	 * 密码重置
+	 * @param params
+	 * @return
+	 */
+	public int update_pwd(Map<String, Object> params);
+	/**
+	 * 查询已审核数据
+	 * @param paramMap 
+	 * @return
+	 */
+	public int queryStationedApplyById(Map<String, Object> paramMap);
+	/**
+	 * ERP校验入驻商代码
+	 * @param map
+	 * @return
+	 */
+	public int queryMerchantInfoByCode(Map<String, Object> map);
+	/**
+	 * 校验入驻商代码
+	 * @param map
+	 * @return
+	 */
+	public int queryStationedApplyByCode(Map<String, Object> map);
+
+	/**
+	 * 通过申请入驻商的代码查询erp供应商
+	 * @param map
+	 * @return
+     */
+	public Map<String, Object> queryErpSupplierByCode(Map<String, Object> map);
+	/**
+	 * ERP新增入驻商数据
+	 * @param paramMap
+	 * @return
+	 */
+	public int insertMerchantInfo(Map<String, Object> paramMap);
+	/**
+	 * 查询企业注册号是否存在
+	 * @param map
+	 * @return
+	 */
+	public int queryRegistrationNumberIsExist(Map<String, Object> map);
+	/**
+	 * 查询入驻商编号是否存在
+	 * @param map
+	 * @return
+	 */
+	public int queryStationedApplyByNumber(Map<String, Object> map);
+	/**
+	 * 查询入驻商主表编号是否存在
+	 * @param map
+	 * @return
+	 */
+	public int queryStationedByNumber(Map<String, Object> map);
+	/**
+	 * 保证金配置
+	 * @param params
+	 * @return
+	 */
+	public int editDepositMoney(Map<String, Object> params);
+	/**
+	 * 查询保证金
+	 * @param paramMap
+	 * @return
+	 */
+	public String queryDepositMoney(Map<String, Object> paramMap);
+	/**
+	 * 获取用户key，用于生产校检码
+	 * @param codeParams
+	 * @return
+	 */
+	public String getUserKey(Map<String, Object> codeParams);
+	/**
+	 * 获取余额校验码
+	 * @param codeParams
+	 * @return
+	 */
+	public String getCheck_Code(Map<String, Object> codeParams);
+	/**
+	 * 新增用户key缓存表
+	 * @param uck
+	 * @return
+	 */
+	public int insertCacheKey(Map<String, Object> uck);
+	/**
+	 * 公司名称是否重复
+	 * @param map
+	 * @return
+	 */
+	public int queryStationedApplyByCompanyName(Map<String, Object> map);
+	/**
+	 * 入驻商收支记录数量
+	 * @param paramMap
+	 * @return
+	 */
+	public int queryInExpRecordCount(Map<String, Object> paramMap);
+	/**
+	 * 入驻商收支记录列表
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> queryInExpRecordList(Map<String, Object> paramMap);
+	/**
+	 * 查询入驻商主账号简要信息列表，主要用户选择入驻商，仅查询入驻商名称、入驻商ID等主要信息
+	 * @return
+	 */
+	public List<Map<String, Object>> querySimpleStationedList(Map<String, Object> paramMap);
+	/**
+	 * 根据入驻商用户ID入驻商账号信息
+	 * @return
+	 */
+	public Map<String, Object> queryBankAccountById(long id);
+	
+	/**
+     * 
+     * 统计某个入驻商的待结算金额 
+     * @param public_user_stationed_user_id 入驻商ID
+     * @return
+     */
+    public Map<String, Object> queryWaitSettlementAmount(@Param("public_user_stationed_user_id")long public_user_stationed_user_id);
+    
+    /**
+	 * 按照单个入驻商锁定操作 add for wangpeng 2017-07-25
+	 * @param paramMap
+	 * @return
+	 */
+	public int lockTable(Map<String, Object> paramMap);
+	
+	/**
+	 * 查询入驻商下拉列表
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> queryStationedOption(Map<String, Object> paramMap);
+
+	/**
+	 * 更新入驻商余额
+	 *
+	 * @param paramMap
+	 * @return
+     */
+	int updateAccountBalance(Map<String, Object> paramMap);
+
+
+	/**
+	 * 查询入驻商角色列表，如果有权限则选中
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> queryStationedRoleList(Map<String,Object> paramMap);
+
+	/**
+	 * 删除入驻商角色
+	 * @param paramMap
+	 * @return
+     */
+	int deleteStationedRole(Map<String, Object> paramMap);
+
+	/**
+	 * 配置入驻商用户角色
+	 * @param paramMap
+	 * @return
+     */
+	int insertStationedRole(Map<String, Object> paramMap);
+
+	/**
+	 * 查询系统入驻商角色列表
+	 * @return
+     */
+	List<Map<String, Object>> querySysStationedRoleList(Map<String, Object> paramMap);
+
+	/**
+	 * 查询系统入驻商角色记录数
+	 * @return
+	 */
+	int querySysStationedRoleCount(Map<String, Object> paramMap);
+
+	/**
+	 * 查询系统角色明细
+	 * @param paramMap
+	 * @return
+     */
+	Map<String, Object> querySysStationedRoleDetail(Map<String, Object> paramMap);
+
+	/**
+	 * 判断是否有重复的角色名称
+	 * @param params
+	 * @return
+	 */
+	int queryBySysStationedRoleName(Map<String, Object> params);
+
+	/**
+	 * 修改系统入驻商角色
+	 * @param paramMap
+	 */
+	int updateSysStationedRole(Map<String,Object> paramMap);
+
+	/**
+	 * 删除角色或节点的相关关联信息
+	 * @param paramMap
+	 */
+	int deleteSysStationedRole(Map<String,Object> paramMap);
+
+	/**
+	 * 新增系统入驻商角色相关菜单或节点
+	 * @param paramMap
+	 */
+	int insertSysStationedRoleNode(Map<String,Object> paramMap);
+
+	/**
+	 * 删除系统入驻商角色权限菜单节点表数据
+	 * @param paramMap
+	 */
+	int deleteSysStationedRoleNode(Map<String,Object> paramMap);
+
+	/**
+	 * 删除系统入驻商角色权限菜单节点表数据
+	 * @param paramMap
+	 */
+	int deleteSysStationedUserRole(Map<String,Object> paramMap);
+
+	/**
+	 * 查询系统入驻商角色节点列表
+	 * @param paramMap
+	 * @return
+     */
+	List<Map<String, Object>> querySysStationedRoleNodeList(Map<String,Object> paramMap);
+
+	/**
+	 * 查询入驻商节点列表
+	 * @param paramMap
+	 * @return
+     */
+	List<Map<String, Object>> queryAllNodeList(Map<String, Object> paramMap);
+
+	/**
+	 * 新增系统入驻商角色信息
+	 * @param paramMap
+	 * @return
+     */
+	int insertSysStationedRole(Map<String, Object> paramMap);
+	/**
+	 * 查询供应商
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> querySupplierList(Map<String, Object> paramMap);
+	/**
+	 * 删除入驻商关联的供应商
+	 * @param paramMap
+	 * @return
+	 */
+	public int deleteSupplier(Map<String, Object> paramMap);
+	/**
+	 * 新增入驻商关联供应商信息
+	 * @param paramMap
+	 * @return
+	 */
+	public int insertSupplier(Map<String, Object> paramMap);
+	
+	/**
+	 * 入驻商认证审批列表总条数
+	 *
+	 * @param params
+	 * @return
+     */
+	public int queryStationedCertificationApprovalCount(Map<String, Object> params);
+	
+	/**
+	 * 入驻商认证审批列表
+	 *
+	 * @param params
+	 * @return
+     */
+	public List<Map<String,Object>> queryStationedCertificationApprovalList(Map<String, Object> params);
+	
+	/**
+     * 入驻商认证审批详情
+     * @param params
+     * @return
+     */
+    public Map<String,Object> queryStationedCertificationApprovalDetail(Map<String,Object> params);
+    
+    /**
+	 * 会员账户表更新见证宝相关信息
+	 *
+	 * @param params
+	 * @return
+     */
+	public int updateBankAccountInfo(Map<String, Object> params);
+	
+	/**
+	 * 更新银行卡会员资料信息状态
+	 *
+	 * @param params
+	 * @return
+     */
+	public int updateBankCardUserInfo(Map<String, Object> params);
+
+	/**
+	 * 新增商家类型
+	 * @param params
+	 * @return
+	 */
+	public int insertMerchantsType(Map<String, Object> params);
+
+	/**
+	 * 删除商家类型
+	 * @param paramId
+	 * @return
+	 */
+	public int deleteMerchantsType(@Param("stationed_user_id") long paramId);
+	
+	/**
+	 * 查询入驻商补扣款总数
+	 * @param paramMap
+	 * @return
+	 */
+	public int querySupDeductCount(Map<String, Object> paramMap);
+	
+	/**
+	 * 查询入驻商补扣款列表
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> querySupDeductListForPage(Map<String, Object> paramMap);
+	
+	/**
+	 * 新增入驻商补扣款
+	 * @param paramMap
+	 * @return
+	 */
+	public int insertSupDeduct(Map<String, Object> paramMap);
+	
+	/**
+	 * 删除入驻商补扣款
+	 * @param paramMap
+	 * @return
+	 */
+	public int deleteSupDeduct(Map<String, Object> paramMap);
+	
+	/**
+	 * 更新入驻商补扣款
+	 * @param paramMap
+	 * @return
+	 */
+	public int updateSupDeduct(Map<String, Object> paramMap);
+	
+	/**
+	 * 查询入驻商扣款详情
+	 * @param paramMap
+	 * @return
+	 */
+	public Map<String, Object> querySupDeductDetail(Map<String, Object> paramMap);
+	
+	/**
+	 * 入驻商补扣款审批
+	 * @param paramMap
+	 * @return
+	 */
+	public int approvalSupDeduct(Map<String, Object> paramMap);
+	/**
+	 * 入驻商补签批
+	 * @param paramMap
+	 * @return
+	 */
+	public int signApprovalSupDeduct(Map<String, Object> paramMap);
+	/**
+	 * 补扣款，入驻商锁定操作 add for yejingquan 2019-03-13
+	 * @param paramMap
+	 * @return
+	 */
+	public int supDeductLockTable(Map<String, Object> paramMap);
+	/**
+	 * 增加入驻商资金流水 add yejingquan
+	 * @param paramMap
+	 * @return
+	 */
+	public int insertStationedCapitalLogsBySupDeductPass(Map<String, Object> paramMap);
+	/**
+	 * 增加入驻商收支记录 add yejingquan
+	 * @param param
+	 * @return
+	 */
+	public int insertStationRecordBySupDeductPass(Map<String, Object> paramMap);
+	/**
+	 * 查询入驻商账户信息
+	 * @param codeParams
+	 * @return
+	 */
+	public Map<String, Object> queryBankAccountInfo(Map<String, Object> codeParams);
+	/**
+	 * 更新入驻商保证金余额信息
+	 * @param codeParams
+	 * @return
+	 */
+	public int updateDepositMoneyBalanceInfo(Map<String, Object> codeParams);
+	/**
+	 * 查询支付服务费
+	 * @param paramMap
+	 * @return
+	 */
+	public int queryPayServiceRate(Map<String, Object> paramMap);
+	/**
+	 * 更新入驻商余额信息
+	 * @param codeParams
+	 * @return
+	 */
+	public int updateAccountBalanceInfo(Map<String, Object> codeParams);
+	/**
+	 * 校验入驻商余额校验码
+	 * @param codeParams
+	 * @return
+	 */
+	public int queryCheckAccountBalance(Map<String, Object> codeParams);
+	/**
+	 * 更新入驻商余额校验码
+	 * @param codeParams
+	 */
+	public void updateUserAccountCheckCode(Map<String, Object> codeParams);
+	/**
+	 * 校验入驻商保证金余额校验码
+	 * @param codeParams
+	 * @return
+	 */
+	public int queryCheckDepositBalance(Map<String, Object> codeParams);
+	/**
+	 * 批量更新或 插入入驻商仓储费设置
+	 * @param codeParams
+	 * @return
+	 */
+	public int updateOrInsertStorageCharges(List<Map<String, Object>> list);
+	/**
+     * 记录用户操作日志
+     * @param login_name
+     * @return
+     */
+    public int insertUserOperationLog(Map<String,Object> param);
+
+	/**
+	 * 获取入驻商信息
+	 * @param id
+	 * @return
+	 */
+	Map<String, Object> getById(@Param("id") long id);
+
+}

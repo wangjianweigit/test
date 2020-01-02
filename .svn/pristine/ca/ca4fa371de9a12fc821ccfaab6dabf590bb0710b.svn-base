@@ -1,0 +1,252 @@
+package com.tk.oms.finance.service;
+
+import com.tk.oms.attesttreas.dao.AttesttreasDao;
+import com.tk.oms.attesttreas.service.AttesttreasTimeoutService;
+import com.tk.oms.contribution.dao.ContributionWaitDao;
+import com.tk.oms.finance.dao.UserAccountRecordDao;
+import com.tk.oms.finance.dao.UserChargeRecordDao;
+import com.tk.oms.member.dao.MemberInfoDao;
+import com.tk.sys.util.*;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import java.net.SocketTimeoutException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 入驻商结算管理
+ * @author zhenghui
+ */
+@Service("UserChargeRecordService")
+public class UserChargeRecordService {
+	
+	@Value("${pay_service_url}")
+	private String pay_service_url;//见证宝接口地址信息
+	@Value("${tran_rechange}")
+	private String tran_rechange;//会员充值地址
+    @Resource
+    private UserChargeRecordDao userChargeRecordDao;
+	@Resource
+	private MemberInfoDao memberInfoDao;
+	@Resource
+	private ContributionWaitDao contributionWaitDao;
+	@Resource
+	private UserAccountRecordDao userAccountRecordDao;
+	@Resource
+	private AttesttreasDao attesttreasDao;
+
+	@Resource
+	private AttesttreasTimeoutService attesttreasTimeoutService;
+    /**
+     * 分页获取待审批平台会员充值记录信息
+     * @param request
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+	public GridResult queryChargeRecordListByPage(HttpServletRequest request) {
+        GridResult gr = new GridResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                gr.setState(false);
+                gr.setMessage("缺少参数");
+                return gr;
+            }
+            @SuppressWarnings("unchecked")
+			Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            GridResult pageParamResult = PageUtil.handlePageParams(params);
+            if (pageParamResult != null) {
+                return pageParamResult;
+            }
+            List<String> state_list = null;
+			if(params.get("state") instanceof List<?>){
+				state_list = (List<String>) params.get("state");
+			}else if(params.get("state") instanceof String){
+				state_list = new ArrayList<String>();
+				state_list.add(params.get("state").toString());
+			}
+			params.put("state", state_list);
+            int total = this.userChargeRecordDao.queryListForCount(params);
+            List<Map<String, Object>> list = this.userChargeRecordDao.queryListForPage(params);
+            if (list != null && list.size() > 0) {
+                gr.setMessage("获取待审批充值记录列表成功");
+                gr.setObj(list);
+            } else {
+                gr.setMessage("无数据");
+            }
+            gr.setState(true);
+            gr.setTotal(total);
+        } catch (Exception ex) {
+            gr.setState(false);
+            gr.setMessage(ex.getMessage());
+            ex.printStackTrace();
+        }
+        return gr;
+    }
+    /**
+     * 根据ID查询充值记录详情
+     * @param request
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+    public ProcessResult queryChargeRecordById(HttpServletRequest request) {
+    	ProcessResult gr = new ProcessResult();
+    	try {
+    		String json = HttpUtil.getRequestInputStream(request);
+    		if (StringUtils.isEmpty(json)) {
+    			gr.setState(false);
+    			gr.setMessage("缺少参数");
+    			return gr;
+    		}
+    		Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+    		if(params==null
+    				||StringUtils.isEmpty(params.get("id"))){
+    			gr.setState(false);
+    			gr.setMessage("缺少参数[id]");
+    			return gr;
+    		}
+    		Map<String, Object> recordObj = this.userChargeRecordDao.queryById(Long.parseLong(params.get("id").toString()));
+    		if (recordObj != null && !recordObj.isEmpty()) {
+    			gr.setState(true);
+    			gr.setMessage("获取待审批充值记录成功");
+    			gr.setObj(recordObj);
+    		} else {
+    			gr.setState(false);
+    			gr.setMessage("记录不存在或已删除");
+    		}
+    	} catch (Exception ex) {
+    		gr.setState(false);
+    		gr.setMessage(ex.getMessage());
+    		ex.printStackTrace();
+    	}
+    	return gr;
+    }
+    /**
+     * 根据ID 修改充值记录
+     * @param request
+     * @return
+     */
+    @Transactional
+    public ProcessResult editChargeRecordById(HttpServletRequest request) throws Exception{
+    	ProcessResult gr = new ProcessResult();
+
+		String json = HttpUtil.getRequestInputStream(request);
+		if (StringUtils.isEmpty(json)) {
+			gr.setState(false);
+			gr.setMessage("缺少参数");
+			return gr;
+		}
+		Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+		if(params==null
+				||StringUtils.isEmpty(params.get("id"))
+				||StringUtils.isEmpty(params.get("state"))
+				){
+			gr.setState(false);
+			gr.setMessage("缺少参数");
+			return gr;
+		}
+		Map<String, Object> recordObj = this.userChargeRecordDao.queryById(Long.parseLong(params.get("id").toString()));
+		if(recordObj==null || recordObj.isEmpty()){
+			gr.setState(false);
+			gr.setMessage("记录不存在或被删除");
+			return gr;
+		}
+		if(!"1".equals(recordObj.get("STATE"))){
+			gr.setState(false);
+			gr.setMessage("记录已审批，请勿重复操作");
+			return gr;
+		}
+		//审批驳回
+		if("3".equals(params.get("state").toString())){
+			if (this.userChargeRecordDao.update(params)>0) {
+				gr.setState(true);
+				gr.setMessage("驳回成功");
+			} else {
+				gr.setState(false);
+				gr.setMessage("驳回失败");
+			}
+		}else if("2".equals(params.get("state").toString())){
+    		//审批通过
+			//查询平台会员信息
+			Map<String,Object> userInfo = memberInfoDao.queryUserAccountByUserName(recordObj.get("COLLECT_USER_NAME").toString());
+			if(userInfo ==null || StringUtils.isEmpty(userInfo.get("BANK_ACCOUNT"))){
+				gr.setState(false);
+				gr.setMessage("会员用户帐户信息异常！");
+				return gr;
+			}
+			/******************调用见证宝之前，先进行本地的余额修改*****************************/
+			Map<String, Object> rechange_param = new HashMap<String, Object>();
+			rechange_param.put("user_id",userInfo.get("USER_ID") );
+			rechange_param.put("user_type","1");//默认为平台会员
+			rechange_param.put("money",recordObj.get("MONEY"));
+			//校验充值类型：1、正常充值；2、预付充值
+			if(recordObj.get("CHARGETYPE").toString().equals("1")){
+				userChargeRecordDao.updateUserAccountBalance(rechange_param);
+			}else{
+				userChargeRecordDao.updateAccountAndFrozenBalance(rechange_param);
+			}
+			if("1".equals(rechange_param.get("output_status"))){//本地余额修改成功
+				int insert_record_num = userAccountRecordDao.insertUserRecordByCharge(params);
+				/***************************增加充值记录--end**************************/
+				if(insert_record_num>0){
+					/******************调用见证包进行充值*****************************/
+					Map<String, Object> param = new HashMap<String, Object>();
+					/**
+					 * params: {
+							user_id: 用户ID，
+							bank_account：银行会员子账户，
+							rechange_number：充值单号，
+							tran_amount：金额
+					   }
+					 */
+					param.put("user_id",userInfo.get("USER_ID") );
+					param.put("bank_account",userInfo.get("BANK_ACCOUNT"));
+					param.put("rechange_number",recordObj.get("RECORD_NUMBER"));
+					param.put("tran_amount",recordObj.get("MONEY"));
+					param.put("order_number", recordObj.get("RECORD_NUMBER"));
+					param.put("thirdLogNo", attesttreasDao.getThiredLogNo());
+					//远程调用见证宝接口
+
+					try {
+						gr = HttpClientUtil.post(pay_service_url + tran_rechange, param);
+					}catch (SocketTimeoutException e) {
+						// 记录超时异常记录
+						param.put("tran_type", 6056);
+						attesttreasTimeoutService.saveTimeoutException(param);
+						throw new RuntimeException("支付超时");
+					}
+
+					if(gr.getState()){
+						if (this.userChargeRecordDao.update(params)>0) {
+							//充值验款审批通过后，在待缴款订单中增加一条记录
+							if(contributionWaitDao.insertWaitByUserCharge(Long.parseLong(params.get("id").toString()))<=0){
+								throw new RuntimeException("审批通过失败，创建代缴款记录失败");
+							};
+							gr.setState(true);
+							gr.setMessage("审批通过成功");
+						} else {
+							gr.setState(false);
+							gr.setMessage("审批通过失败");
+						}
+					}else{
+						throw new RuntimeException("审批通过失败，注册银行会员子账户失败"+gr.getMessage());
+					}
+				}else{
+					throw new RuntimeException("创建收支记录失败");
+				}
+			}else{
+				throw new RuntimeException(rechange_param.get("output_msg")==null?"修改帐户余额失败":rechange_param.get("output_msg").toString());
+			}
+		}
+    	return gr;
+    }
+}

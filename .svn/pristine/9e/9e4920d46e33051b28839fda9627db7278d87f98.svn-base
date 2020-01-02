@@ -1,0 +1,1716 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tk.analysis.flow.dao.FlowAnalysisDao">
+							<!-- #################        公用         ################ -->
+	<!-- 折线图 访客数，浏览量<天> -->
+	<select id="r_queryVisitorPvCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select create_date,nvl(sum(visitor_count),0) visitor_count,nvl(sum(pv_count),0) pv_count
+		  from
+		(select dt.hours24_full||':00' create_date,count(distinct a.member_key) visitor_count,count(*) pv_count
+		  from
+		(select t.log_time_key,t.access_terminal_key,t.member_key
+		  from fact_user_log t,dim_date dt
+		 where t.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and t.access_terminal_key > 0
+		   <if test="channel_name != null and channel_name != ''">
+		   and exists (select 1 from dim_platform_channel where channel_type_name = #{channel_name,jdbcType=VARCHAR} and channel_key = t.channel_key)
+		   </if>
+		   <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>) a, dim_time dt
+           where a.log_time_key = dt.time_key
+           group by dt.hours24_full,a.access_terminal_key)
+           group by create_date
+           order by create_date
+	</select>
+	<!-- 折线图 商品访客数，浏览量<天> -->
+	<select id="r_queryProductVisitorPvCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select create_date,nvl(sum(visitor_count),0) visitor_count,nvl(sum(pv_count),0) pv_count
+		  from
+		(select dt.hours24_full||':00' create_date,count(distinct a.member_key) visitor_count,count(*) pv_count
+		  from
+		(select t.log_time_key,t.access_terminal_key,t.member_key
+		  from fact_user_log_product t,dim_date dt
+		 where t.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="itemnumber != null and itemnumber != ''">
+		   and t.product_key = (select product_key from dim_product where itemnumber = #{itemnumber,jdbcType=VARCHAR})
+		   </if>
+		   <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>) a, dim_time dt
+           where a.log_time_key = dt.time_key
+           group by dt.hours24_full,a.access_terminal_key)
+           group by create_date
+           order by create_date
+	</select>
+	<!-- 折线图 下单买家数<天> -->
+	<select id="r_queryPurchaseNumberD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select create_date,nvl(sum(purchase_number),0) purchase_number
+             from
+           (select dt.hours24_full||':00' create_date, a.access_terminal_key,count(distinct a.member_key) purchase_number
+            from (select t.create_date_time_key,(select decode (order_source,1,2,2,1,3,1,4,32,5,31,6,31) from dim_order where order_key = t.order_key) access_terminal_key,t.member_key
+            from fact_order_product_sku t,dim_date dt
+           where t.create_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="itemnumber != null and itemnumber != ''">
+		   and t.product_key = (select product_key from dim_product where itemnumber = #{itemnumber,jdbcType=VARCHAR})
+		   </if>
+		   <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>) a,dim_time dt
+		   where a.create_date_time_key = dt.time_key
+           group by dt.hours24_full,a.access_terminal_key)
+           group by create_date
+           order by create_date
+	</select>
+	<!-- 折线图 支付买家数<天> -->
+	<select id="r_queryPayPurchaseNumberD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select create_date,nvl(sum(purchase_number),0) purchase_number
+             from
+           (select dt.hours24_full||':00' create_date, a.access_terminal_key,count(distinct a.member_key) purchase_number
+            from (select t.payment_date_time_key,(select decode (order_source,1,2,2,1,3,1,4,32,5,31,6,31) from dim_order where order_key = t.order_key) access_terminal_key,t.member_key
+            from fact_order_product_sku t,dim_date dt
+           where t.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="itemnumber != null and itemnumber != ''">
+		   and t.product_key = (select product_key from dim_product where itemnumber = #{itemnumber,jdbcType=VARCHAR})
+		   </if>
+		   <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>) a,dim_time dt
+           where a.payment_date_time_key = dt.time_key
+           group by dt.hours24_full,a.access_terminal_key)
+           group by create_date
+           order by create_date
+	</select>
+	<!-- 折线图 访客数，浏览量 -->
+	<select id="r_queryVisitorPvCount_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select create_date,nvl(sum(visitor_count),0) visitor_count,nvl(sum(pv_count),0) pv_count
+		  from
+		(select to_char(dt.date_value,'yyyy-mm-dd') as create_date,t.access_terminal_key,count(distinct t.member_key) visitor_count,count(*) pv_count
+		  from fact_user_log t,dim_date dt
+		 where t.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and t.access_terminal_key > 0
+		   <if test="channel_name != null and channel_name != ''">
+		   and exists (select 1 from dim_platform_channel where channel_type_name = #{channel_name,jdbcType=VARCHAR} and channel_key = t.channel_key)
+		   </if>
+		   <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+           group by to_char(dt.date_value,'yyyy-mm-dd'),t.access_terminal_key)
+           group by create_date
+	</select>
+	<!-- 折线图 商品访客数，浏览量 -->
+	<select id="r_queryProductVisitorPvCount_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select create_date,nvl(sum(visitor_count),0) visitor_count,nvl(sum(pv_count),0) pv_count
+		  from
+		(select to_char(dt.date_value,'yyyy-mm-dd') as create_date,t.access_terminal_key,count(distinct t.member_key) visitor_count,count(*) pv_count
+		  from fact_user_log_product t,dim_date dt
+		 where t.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="itemnumber != null and itemnumber != ''">
+		   and t.product_key = (select product_key from dim_product where itemnumber = #{itemnumber,jdbcType=VARCHAR})
+		   </if>
+		   <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+           group by to_char(dt.date_value,'yyyy-mm-dd'),t.access_terminal_key)
+           group by create_date
+	</select>
+	<!-- 折线图 下单买家数 -->
+	<select id="r_queryPurchaseNumber_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select create_date,nvl(sum(purchase_number),0) purchase_number
+             from
+           (select create_date, access_terminal_key,count(distinct member_key) purchase_number
+            from (select to_char(dt.date_value,'yyyy-mm-dd') as create_date,(select decode (order_source,1,2,2,1,3,1,4,32,5,31,6,31) from dim_order where order_key = t.order_key) access_terminal_key,t.member_key
+            from fact_order_product_sku t,dim_date dt
+           where t.create_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="itemnumber != null and itemnumber != ''">
+		   and t.product_key = (select product_key from dim_product where itemnumber = #{itemnumber,jdbcType=VARCHAR})
+		   </if>
+		   <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>)
+           group by create_date,access_terminal_key)
+           group by create_date
+           order by create_date
+	</select>
+	<!-- 折线图 支付买家数 -->
+	<select id="r_queryPayPurchaseNumber_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select create_date,nvl(sum(purchase_number),0) purchase_number
+             from
+           (select create_date, access_terminal_key,count(distinct member_key) purchase_number
+            from (select to_char(dt.date_value,'yyyy-mm-dd') as create_date,(select decode (order_source,1,2,2,1,3,1,4,32,5,31,6,31) from dim_order where order_key = t.order_key) access_terminal_key,t.member_key
+            from fact_order_product_sku t,dim_date dt
+           where t.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="itemnumber != null and itemnumber != ''">
+		   and t.product_key = (select product_key from dim_product where itemnumber = #{itemnumber,jdbcType=VARCHAR})
+		   </if>
+		   <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>) 
+           group by create_date,access_terminal_key)
+           group by create_date
+           order by create_date
+	</select>
+							<!-- #################        流量概况         ################ -->
+	<!-- 流量总览-商品访客数 -->
+	<select id="r_queryOverview_ProductVisitorCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(product_visitor_count),0)
+		  from
+		(select t.access_terminal_key,count(distinct t.member_key) product_visitor_count
+		  from fact_user_log_product t,dim_date dt
+		 where t.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+		   group by t.access_terminal_key)
+	</select>
+	<!-- 流量总览-访客数 -->
+	<select id="r_queryOverview_VisitorCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(visitor_count),0)
+		  from
+		(select t.access_terminal_key,count(distinct t.member_key) visitor_count
+		  from fact_user_log t,dim_date dt
+		 where t.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and t.access_terminal_key > 0
+		   <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+		   group by t.access_terminal_key)
+	</select>
+	<!-- 流量总览-浏览量 -->
+	<select id="r_queryOverview_PvCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(*)
+		  from fact_user_log t,dim_date dt
+		 where t.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and t.access_terminal_key > 0
+		   <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+	</select>
+	<!-- 流量来源列表 -->
+	<select id="r_queryFlowSourceList" parameterType="java.util.Map" resultType="java.util.Map">
+        select channel_type_name as channel_name, nvl(sum(t1.visitor_count),0) visitor_count,nvl(sum(t1.pv_count),0) pv_count
+		 from dim_platform_channel t,(
+		select t.channel_key,count(distinct t.member_key) visitor_count,count(*) pv_count
+		  from fact_user_log t,dim_date dt
+		  where t.log_date_key = dt.date_key
+		   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           and t.access_terminal_key > 0
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+           group by t.access_terminal_key,t.channel_key) t1
+           where t.channel_key = t1.channel_key(+)
+           group by channel_type_name
+           order by visitor_count desc
+	</select>
+	<!-- 流量来源-引导下单买家数 -->
+	<select id="r_queryFlowSource_PurchaseNumber" parameterType="java.util.Map" resultType="java.util.Map">
+        select channel_type_name as channel_name,
+		  	   nvl(sum(purchase_number),0) purchase_number
+          from dim_platform_channel t,
+        (select t.channel_key,count(distinct t.member_key) purchase_number
+		  from fact_user_log t,dim_date dt
+		  where t.log_date_key = dt.date_key
+		   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           and t.access_terminal_key > 0
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+           and exists
+          (select 1
+            from (select (select decode (order_source,1,2,2,1,3,1,4,32,5,31,6,31) from dim_order where order_key = t.order_key) access_terminal_key,t.member_key
+            from fact_order t,dim_date dt
+           where t.create_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>) where access_terminal_key = t.access_terminal_key and member_key = t.member_key
+           group by access_terminal_key, member_key)
+           group by t.channel_key,t.access_terminal_key) t1
+        where t.channel_key = t1.channel_key(+)
+       group by channel_type_name
+	</select>
+	<!-- 商品访客总数 -->
+	<select id="r_queryProductVisitorCountTotal" parameterType="java.util.Map" resultType="long">
+		select nvl(sum(visitor_count),0)
+          from (
+        select t.product_key,t.access_terminal_key,count(distinct t.member_key) visitor_count
+		  from fact_user_log_product t,dim_date dt
+		 where t.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+           group by t.product_key,t.access_terminal_key)
+	</select>
+	<!-- 排序获取某一页的商品排行-访客数 -->
+	<select id="r_queryProductRank_VisitorCount_Product" parameterType="java.util.Map" resultType="string">
+		select itemnumber
+		  from (
+		select t.itemnumber,nvl(sum(t1.visitor_count),0) visitor_count
+		  from dim_product t,(
+		select t.product_key,count(distinct t.member_key) visitor_count
+		  from fact_user_log_product t,dim_date dt
+		 where t.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+   		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+		   group by t.product_key,t.access_terminal_key) t1
+		 where t.product_key = t1.product_key(+)
+           and t.itemnumber is not null
+           group by itemnumber
+           order by ${sort} ${sort_by})
+           where rownum &lt;= #{num,jdbcType=INTEGER}
+	</select>
+	<!-- 排序获取某一页的商品排行-浏览量 -->
+	<select id="r_queryProductRank_PvCount_Product" parameterType="java.util.Map" resultType="string">
+		select itemnumber
+		  from (
+		select t.itemnumber,nvl(sum(t1.pv_count),0) pv_count
+		  from dim_product t,(
+		select t.product_key,t.access_terminal_key,count(*) pv_count
+		  from fact_user_log_product t,dim_date dt
+		 where t.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+   		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+		   group by t.product_key,t.access_terminal_key) t1
+		 where t.product_key = t1.product_key(+)
+           and t.itemnumber is not null
+           group by itemnumber
+           order by ${sort} ${sort_by})
+           where rownum &lt;= #{num,jdbcType=INTEGER}
+	</select>
+	<!-- 排序获取某一页的商品排行-支付买家数 -->
+	<select id="r_queryProductRank_PayPurchaseNumber_Product" parameterType="java.util.Map" resultType="string">
+		select itemnumber
+		  from (
+		select itemnumber,nvl(sum(p_purchase_number),0) p_purchase_number
+		  from (
+		select t.itemnumber,count(distinct t1.member_key) p_purchase_number
+		  from dim_product t,(
+		select t.product_key,(select decode (order_source,1,2,2,1,3,1,4,32,5,31,6,31) from dim_order where order_key = t.order_key) access_terminal_key,
+			   t.member_key
+		  from fact_order_product_sku t,dim_date dt
+		 where t.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+   		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>) t1
+		 where t.product_key = t1.product_key(+)
+           and t.itemnumber is not null
+           group by t.itemnumber,t1.access_terminal_key)
+           group by itemnumber
+           order by ${sort} ${sort_by})
+           where rownum &lt;= #{num,jdbcType=INTEGER}
+	</select>
+	<!-- 排序获取某一页的商品排行-支付转化率 -->
+	<select id="r_queryProductRank_PayZhl_Product" parameterType="java.util.Map" resultType="string">
+		select itemnumber
+		  from (
+		select t.itemnumber, case when nvl(t2.purchase_number,0) = 0 or nvl(t1.visitor_count,0) = 0  then 0
+					else nvl(t2.purchase_number,0)/nvl(t1.visitor_count,0) end p_zhl
+		from dim_product t,
+		(select product_key,nvl(sum(visitor_count),0) visitor_count
+		  from (
+		select t.product_key,count(distinct t.member_key) visitor_count
+		  from fact_user_log_product t,dim_date dt
+		 where t.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+   		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+		   group by t.product_key,t.access_terminal_key)
+           group by product_key) t1,
+       (select product_key,nvl(sum(purchase_number),0) purchase_number
+		  from (
+		select product_key,count(distinct member_key) purchase_number
+		  from (
+		select t.product_key,(select decode (order_source,1,2,2,1,3,1,4,32,5,31,6,31) from dim_order where order_key = t.order_key) access_terminal_key,
+			   t.member_key
+		  from fact_order_product_sku t,dim_date dt
+		 where t.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+   		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>)
+           group by product_key,access_terminal_key)
+           group by product_key) t2
+         where t.product_key = t1.product_key(+)
+           and t.product_key = t2.product_key(+)
+           and t.itemnumber is not null
+           order by ${sort} ${sort_by})
+           where rownum &lt;= #{num,jdbcType=INTEGER}
+	</select>
+	<!-- 查询默认排序的商品排行 -->
+	<select id="r_queryProductRankListBy_Default" parameterType="java.util.Map" resultType="string">
+		select itemnumber
+		  from (
+		select t.itemnumber,nvl(sum(t1.pv_count),0) pv_count
+		  from dim_product t,(
+		select t.product_key,t.access_terminal_key,count(*) pv_count
+		  from fact_user_log_product t,dim_date dt
+		 where t.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+   		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+		   group by t.product_key,t.access_terminal_key) t1
+		 where t.product_key = t1.product_key(+)
+           and t.itemnumber is not null
+           group by itemnumber
+           order by pv_count desc)
+           where rownum &lt;= #{num,jdbcType=INTEGER}
+	</select>
+	<!-- 查询排序后的商品信息列表 -->
+	<select id="r_queryProductList" parameterType="java.util.Map" resultType="java.util.Map">
+		select itemnumber,
+			   product_name,
+			   product_img_url
+		  from dim_product t
+		 where itemnumber in
+		 <foreach collection="productList" item="item" open="(" close=")" separator=",">
+		 	#{item,jdbcType=VARCHAR}
+		 </foreach>
+		 order by decode(t.itemnumber
+		 <foreach collection="productList" item="item" index="_index" open="," close="" separator=",">
+            #{item},${_index}
+         </foreach>)
+	</select>
+	<!-- 商品-商品访客数，浏览量 -->
+	<select id="r_queryProduct_VisitorPvCount" parameterType="java.util.Map" resultType="java.util.Map">
+		select t.itemnumber,nvl(sum(t1.visitor_count),0) visitor_count,nvl(sum(t1.pv_count),0) pv_count
+		  from dim_product t,(
+		select t.product_key,count(distinct t.member_key) visitor_count,count(*) pv_count
+		  from fact_user_log_product t,dim_date dt
+		 where t.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+   		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+		   group by t.product_key,t.access_terminal_key) t1
+		 where t.product_key = t1.product_key(+)
+           and t.itemnumber in
+		   <foreach collection="productList" item="item" open="(" close=")" separator=",">
+		 	#{item,jdbcType=VARCHAR}
+		   </foreach>
+           group by t.itemnumber
+	</select>
+	<!-- 商品-下单买家数 -->
+	<select id="r_queryProduct_PurchaseNumber" parameterType="java.util.Map" resultType="java.util.Map">
+		select t.itemnumber,nvl(sum(t1.purchase_number),0) purchase_number
+		  from dim_product t,(
+		select product_key,count(distinct member_key) purchase_number
+		  from (
+		select t.product_key,(select decode (order_source,1,2,2,1,3,1,4,32,5,31,6,31) from dim_order where order_key = t.order_key) access_terminal_key,
+			   t.member_key
+		  from fact_order_product_sku t,dim_date dt
+		 where t.create_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+   		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>)
+           group by product_key,access_terminal_key) t1
+         where t.product_key = t1.product_key(+)
+           and t.itemnumber in
+		   <foreach collection="productList" item="item" open="(" close=")" separator=",">
+		 	#{item,jdbcType=VARCHAR}
+		   </foreach>
+           group by t.itemnumber
+	</select>
+	<!-- 商品-支付买家数 -->
+	<select id="r_queryProduct_PayPurchaseNumber" parameterType="java.util.Map" resultType="java.util.Map">
+		select t.itemnumber,nvl(sum(t1.purchase_number),0) purchase_number
+		  from dim_product t,(
+		select product_key,count(distinct member_key) purchase_number
+		  from (
+		select t.product_key,(select decode (order_source,1,2,2,1,3,1,4,32,5,31,6,31) from dim_order where order_key = t.order_key) access_terminal_key,
+			   t.member_key
+		  from fact_order_product_sku t,dim_date dt
+		 where t.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+   		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>)
+           group by product_key,access_terminal_key) t1
+         where t.product_key = t1.product_key(+)
+           and t.itemnumber in
+		   <foreach collection="productList" item="item" open="(" close=")" separator=",">
+		 	#{item,jdbcType=VARCHAR}
+		   </foreach>
+           group by t.itemnumber
+	</select>
+	<!-- 流量分布-地区访客总数 -->
+	<select id="r_queryAreaVisitorCountTotal" parameterType="java.util.Map" resultType="long">
+		select nvl(sum(visitor_count),0)
+		  from (
+		select t1.user_company_address_city as city_id, count(distinct t.member_key) visitor_count
+		  from fact_user_log t,dim_member t1,dim_date dt
+		 where t.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+   		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and t.access_terminal_key > 0
+		   and t.member_key = t1.member_key
+           and t1.user_company_address_province > 0
+           and t1.user_company_address_city > 0
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+           group by t1.user_company_address_city,t.access_terminal_key)
+	</select>
+	<!-- 流量分布-城市访客数排行 -->
+	<select id="r_queryVisitorCountCity_Rank" parameterType="java.util.Map" resultType="java.util.Map">
+		select (select name from dim_dic_region where region_id = a.city_id) city_name,visitor_count
+		  from (
+		select city_id,nvl(sum(visitor_count),0) visitor_count
+		  from (
+		select t1.user_company_address_city as city_id,count(distinct t.member_key) visitor_count
+		  from fact_user_log t,dim_member t1,dim_date dt
+		 where t.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+   		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+   		   and t.access_terminal_key > 0
+		   and t.member_key = t1.member_key
+           and t1.user_company_address_province > 0
+           and t1.user_company_address_city > 0
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+           group by t1.user_company_address_city,t.access_terminal_key)
+           group by city_id
+           order by visitor_count desc) a
+           where rownum &lt;= #{num,jdbcType=INTEGER}
+	</select>
+	<!-- 查询访客数排名前十的城市所属省份 -->
+	<select id="r_queryFlowDistributionMap" parameterType="java.util.Map" resultMap="areaMap">
+		select id,
+               (select name from dim_dic_region where region_id = a.id) name,
+               value
+          from (
+        select t.region_id as id,
+        	   nvl(sum(t1.visitor_count),0) value
+          from dim_dic_region t,
+        (select (select parent_id from dim_dic_region where region_id = a.city_id) province_id,visitor_count
+          from (
+        select city_id,nvl(sum(visitor_count),0) visitor_count
+		  from (
+		select t1.user_company_address_city as city_id,count(distinct t.member_key) visitor_count
+		  from fact_user_log t,dim_member t1,dim_date dt
+		 where t.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+   		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+   		   and t.access_terminal_key > 0
+		   and t.member_key = t1.member_key
+           and t1.user_company_address_province > 0
+           and t1.user_company_address_city > 0
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+           group by t1.user_company_address_city,t.access_terminal_key)
+           group by city_id
+           order by visitor_count desc) a
+           where rownum &lt;= #{num,jdbcType=INTEGER}) t1
+           where t.parent_id in (select region_id from dim_dic_region where parent_id = 0)
+             and t.region_id = t1.province_id(+)
+           group by t.region_id) a
+	</select>
+							<!-- #################        页面分析         ################ -->
+	<!-- 排序获取某一页的频道页-访客数 -->
+	<select id="r_queryPage_VisitorCount_Page" parameterType="java.util.Map" resultType="string">
+		select channel_name
+		  from (
+		select channel_type_name as channel_name,
+		  	   nvl(sum(visitor_count),0) visitor_count
+          from dim_platform_channel t,(
+		select t.channel_key,count(distinct t.member_key) visitor_count
+		  from fact_user_log t,dim_date dt
+		  where t.log_date_key = dt.date_key
+		   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           and t.access_terminal_key > 0
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+		   group by t.channel_key,t.access_terminal_key) t1
+		   where t.channel_key = t1.channel_key(+)
+           group by channel_type_name
+		   order by ${sort} ${sort_by})
+	</select>
+	<!-- 排序获取某一页的频道页-浏览量 -->
+	<select id="r_queryPage_PvCount_Page" parameterType="java.util.Map" resultType="string">
+		select channel_name
+		  from (
+		select channel_type_name as channel_name,
+		  	   nvl(sum(pv_count),0) pv_count
+          from dim_platform_channel t,(
+		select t.channel_key,count(*) pv_count
+		  from fact_user_log t,dim_date dt
+		  where t.log_date_key = dt.date_key
+		   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           and t.access_terminal_key > 0
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+		   group by t.channel_key,t.access_terminal_key) t1
+		   where t.channel_key = t1.channel_key(+)
+           group by channel_type_name
+		   order by ${sort} ${sort_by})
+	</select>
+	<!-- 排序获取某一页的频道页-引导下单买家数 -->
+	<select id="r_queryPage_PurchaseNumber_Page" parameterType="java.util.Map" resultType="string">
+		select channel_name
+          from (
+        select channel_type_name as channel_name,
+		  	   nvl(sum(o_purchase_number),0) o_purchase_number
+          from dim_platform_channel t,
+        (select t.channel_key,count(distinct t.member_key) o_purchase_number
+		  from fact_user_log t,dim_date dt
+		  where t.log_date_key = dt.date_key
+		   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           and t.access_terminal_key > 0
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+           and exists
+          (select 1
+            from (select (select decode (order_source,1,2,2,1,3,1,4,32,5,31,6,31) from dim_order where order_key = t.order_key) access_terminal_key,t.member_key
+            from fact_order t,dim_date dt
+           where t.create_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>) where access_terminal_key = t.access_terminal_key and member_key = t.member_key
+           group by access_terminal_key, member_key)
+           group by t.channel_key,t.access_terminal_key) t1
+        where t.channel_key = t1.channel_key(+)
+       group by channel_type_name
+       order by ${sort} ${sort_by})
+	</select>
+	<!-- 排序获取某一页的频道页-引导下单转化率 -->
+	<select id="r_queryPage_Zhl_Page" parameterType="java.util.Map" resultType="string">
+        select channel_name
+          from (
+        select channel_name,case when nvl(purchase_number,0) = 0 or nvl(visitor_count,0) = 0  then 0
+					else nvl(purchase_number,0)/nvl(visitor_count,0) end o_zhl
+		  from (
+		select t.channel_type_name as channel_name, nvl(sum(t1.visitor_count),0) visitor_count,nvl(sum(t2.purchase_number),0) purchase_number
+		  from dim_platform_channel t,(
+		  select channel_key,nvl(sum(visitor_count),0) visitor_count
+	        from (
+	      select t.channel_key,count(distinct t.member_key) visitor_count
+		  from fact_user_log t,dim_date dt
+		  where t.log_date_key = dt.date_key
+		   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           and t.access_terminal_key > 0
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+		   group by t.channel_key,t.access_terminal_key)
+	       group by channel_key) t1,
+	   (select channel_key,nvl(sum(purchase_number),0) purchase_number
+          from (
+        select t.channel_key,count(distinct t.member_key) purchase_number
+		  from fact_user_log t,dim_date dt
+		  where t.log_date_key = dt.date_key
+		   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           and t.access_terminal_key > 0
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+           and exists
+          (select 1
+            from (select (select decode (order_source,1,2,2,1,3,1,4,32,5,31,6,31) from dim_order where order_key = t.order_key) access_terminal_key,t.member_key
+            from fact_order t,dim_date dt
+           where t.create_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>) where access_terminal_key = t.access_terminal_key and member_key = t.member_key
+           group by access_terminal_key, member_key)
+           group by t.channel_key,t.access_terminal_key)
+           group by channel_key) t2
+           where t.channel_key = t1.channel_key(+)
+             and t.channel_key = t2.channel_key(+)
+           group by t.channel_type_name)
+           order by ${sort} ${sort_by})
+	</select>
+	<!-- 排序获取某一页的频道页-引导支付买家数 -->
+	<select id="r_queryPage_PayPurchaseNumber_Page" parameterType="java.util.Map" resultType="string">
+		select channel_name
+          from (
+        select channel_type_name as channel_name,
+		  	   nvl(sum(p_purchase_number),0) p_purchase_number
+          from dim_platform_channel t,
+        (select t.channel_key,count(distinct t.member_key) p_purchase_number
+		  from fact_user_log t,dim_date dt
+		  where t.log_date_key = dt.date_key
+		   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           and t.access_terminal_key > 0
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+           and exists
+          (select 1
+            from (select (select decode (order_source,1,2,2,1,3,1,4,32,5,31,6,31) from dim_order where order_key = t.order_key) access_terminal_key,t.member_key
+            from fact_order t,dim_date dt
+           where t.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>) where access_terminal_key = t.access_terminal_key and member_key = t.member_key
+           group by access_terminal_key, member_key)
+           group by t.channel_key,t.access_terminal_key) t1
+        where t.channel_key = t1.channel_key(+)
+       group by channel_type_name
+       order by ${sort} ${sort_by})
+	</select>
+	<!-- 排序获取某一页的频道页-引导支付转化率 -->
+	<select id="r_queryPage_PayZhl_Page" parameterType="java.util.Map" resultType="string">
+		select channel_name
+          from (
+        select channel_name,case when nvl(purchase_number,0) = 0 or nvl(visitor_count,0) = 0  then 0
+					else nvl(purchase_number,0)/nvl(visitor_count,0) end p_zhl
+		  from (
+		select t.channel_type_name as channel_name, nvl(sum(t1.visitor_count),0) visitor_count,nvl(sum(t2.purchase_number),0) purchase_number
+		  from dim_platform_channel t,(
+		  select channel_key,nvl(sum(visitor_count),0) visitor_count
+	        from (
+	      select t.channel_key,count(distinct t.member_key) visitor_count
+		  from fact_user_log t,dim_date dt
+		  where t.log_date_key = dt.date_key
+		   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           and t.access_terminal_key > 0
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+		   group by t.channel_key,t.access_terminal_key)
+	       group by channel_key) t1,
+	   (select channel_key,nvl(sum(purchase_number),0) purchase_number
+          from (
+        select t.channel_key,count(distinct t.member_key) purchase_number
+		  from fact_user_log t,dim_date dt
+		  where t.log_date_key = dt.date_key
+		   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           and t.access_terminal_key > 0
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+           and exists
+          (select 1
+            from (select (select decode (order_source,1,2,2,1,3,1,4,32,5,31,6,31) from dim_order where order_key = t.order_key) access_terminal_key,t.member_key
+            from fact_order t,dim_date dt
+           where t.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>) where access_terminal_key = t.access_terminal_key and member_key = t.member_key
+           group by access_terminal_key, member_key)
+           group by t.channel_key,t.access_terminal_key)
+           group by channel_key) t2
+           where t.channel_key = t1.channel_key(+)
+             and t.channel_key = t2.channel_key(+)
+           group by t.channel_type_name)
+           order by ${sort} ${sort_by})
+	</select>
+	<!-- 查询默认排序的频道页 -->
+	<select id="r_queryPageListBy_Default" parameterType="java.util.Map" resultType="string">
+		select channel_type_name as channel_name
+		  from dim_platform_channel
+		 group by channel_type_name,channel_type
+		 order by channel_type
+	</select>
+	<!-- 查询系统页和自定义页列表 -->
+	<select id="r_queryPageList" parameterType="java.util.Map" resultType="java.util.Map">
+		select channel_name
+		  from 
+		(select channel_type_name as channel_name
+		  from dim_platform_channel
+		  group by channel_type_name) t
+        where channel_name in 
+         <foreach collection="pageList" item="item" open="(" close=")" separator=",">
+		 	#{item,jdbcType=VARCHAR}
+		 </foreach>
+		 order by decode(t.channel_name
+		 <foreach collection="pageList" item="item" index="_index" open="," close="" separator=",">
+            #{item,jdbcType=VARCHAR},${_index}
+         </foreach>)
+	</select>
+	<!-- 页面列表-访客数，浏览量 -->
+	<select id="r_queryPage_VisitorPvCount" parameterType="java.util.Map" resultType="java.util.Map">
+		select channel_type_name as channel_name,nvl(sum(visitor_count),0) visitor_count,nvl(sum(pv_count),0) pv_count
+		  from dim_platform_channel t,(
+		  select t.channel_key,count(distinct t.member_key) visitor_count,count(*) pv_count
+		  from fact_user_log t,dim_date dt
+		  where t.log_date_key = dt.date_key
+		   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           and t.access_terminal_key > 0
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+		   group by t.channel_key,t.access_terminal_key) t1
+		   where t.channel_key = t1.channel_key(+)
+             and t.channel_type_name in 
+         <foreach collection="pageList" item="item" open="(" close=")" separator=",">
+		 	#{item,jdbcType=VARCHAR}
+		 </foreach>
+		 group by channel_type_name
+	</select>
+	<!-- 页面列表-引导下单买家数 -->
+	<select id="r_queryPage_PurchaseNumber" parameterType="java.util.Map" resultType="java.util.Map">
+		select channel_type_name as channel_name,nvl(sum(purchase_number),0) purchase_number
+          from dim_platform_channel t,(
+        select t.channel_key,count(distinct t.member_key) purchase_number
+		  from fact_user_log t,dim_date dt
+		  where t.log_date_key = dt.date_key
+		   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           and t.access_terminal_key > 0
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+           and exists
+          (select 1
+            from (select (select decode (order_source,1,2,2,1,3,1,4,32,5,31,6,31) from dim_order where order_key = t.order_key) access_terminal_key,t.member_key
+            from fact_order t,dim_date dt
+           where t.create_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>) where access_terminal_key = t.access_terminal_key and member_key = t.member_key
+           group by access_terminal_key, member_key)
+           group by t.channel_key,t.access_terminal_key) t1
+           where t.channel_key = t1.channel_key(+)
+             and t.channel_type_name in 
+         <foreach collection="pageList" item="item" open="(" close=")" separator=",">
+		 	#{item,jdbcType=VARCHAR}
+		 </foreach>
+		 group by channel_type_name
+	</select>
+	<!-- 页面列表-引导支付买家数 -->
+	<select id="r_queryPage_PayPurchaseNumber" parameterType="java.util.Map" resultType="java.util.Map">
+		select channel_type_name as channel_name,nvl(sum(purchase_number),0) purchase_number
+          from dim_platform_channel t,(
+        select t.channel_key,count(distinct t.member_key) purchase_number
+		  from fact_user_log t,dim_date dt
+		  where t.log_date_key = dt.date_key
+		   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           and t.access_terminal_key > 0
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+           and exists
+          (select 1
+            from (select (select decode (order_source,1,2,2,1,3,1,4,32,5,31,6,31) from dim_order where order_key = t.order_key) access_terminal_key,t.member_key
+            from fact_order t,dim_date dt
+           where t.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>) where access_terminal_key = t.access_terminal_key and member_key = t.member_key
+           group by access_terminal_key, member_key)
+           group by t.channel_key,t.access_terminal_key) t1
+           where t.channel_key = t1.channel_key(+)
+             and t.channel_type_name in 
+         <foreach collection="pageList" item="item" open="(" close=")" separator=",">
+		 	#{item,jdbcType=VARCHAR}
+		 </foreach>
+		 group by channel_type_name
+	</select>
+	<!-- 趋势分析 折线图 引导下单买家数<天> -->
+	<select id="r_queryPageTrend_PurchaseNumberD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		<!-- 当天订单下单时间的会员和订单所属终端，比较当天日志表访问的会员和日志所属终端，最后以下单时间按小时分组每个终端的下单买家数，并按小时合计下单买家数 -->
+		select create_date,nvl(sum(purchase_number),0) purchase_number
+             from
+           (select dt.hours24_full||':00' create_date, a.access_terminal_key,count(distinct a.member_key) purchase_number
+            from (select t.create_date_time_key,(select decode (order_source,1,2,2,1,3,1,4,32,5,31,6,31) from dim_order where order_key = t.order_key) access_terminal_key,t.member_key
+            from fact_order t,dim_date dt
+           where t.create_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>) a,
+           (select t.access_terminal_key,t.member_key
+              from fact_user_log t,dim_date dt
+              where t.log_date_key = dt.date_key
+               and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   	   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+               and t.access_terminal_key > 0
+               and exists (select 1 from dim_platform_channel where channel_type_name = #{channel_name,jdbcType=VARCHAR} and channel_key = t.channel_key)
+               <if test="access_terminal_id != null and access_terminal_id != ''">
+			   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+			   </if>
+               group by t.access_terminal_key,t.member_key) b,dim_time dt
+           where a.access_terminal_key = b.access_terminal_key
+             and a.member_key = b.member_key
+             and a.create_date_time_key = dt.time_key
+           group by dt.hours24_full,a.access_terminal_key)
+           group by create_date
+           order by create_date
+	</select>
+	<!-- 趋势分析 折线图 引导支付买家数<天> -->
+	<select id="r_queryPageTrend_PayPurchaseNumberD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		<!-- 当天订单支付时间的会员和订单所属终端，比较当天日志表访问的会员和日志所属终端，最后以支付时间按小时分组每个终端的支付买家数，并按小时合计支付买家数 -->
+		select create_date,nvl(sum(purchase_number),0) purchase_number
+             from
+           (select dt.hours24_full||':00' create_date, a.access_terminal_key,count(distinct a.member_key) purchase_number
+            from (select t.payment_date_time_key,(select decode (order_source,1,2,2,1,3,1,4,32,5,31,6,31) from dim_order where order_key = t.order_key) access_terminal_key,t.member_key
+            from fact_order t,dim_date dt
+           where t.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>) a,
+           (select t.access_terminal_key,t.member_key
+              from fact_user_log t,dim_date dt
+              where t.log_date_key = dt.date_key
+               and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   	   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+               and t.access_terminal_key > 0
+               and exists (select 1 from dim_platform_channel where channel_type_name = #{channel_name,jdbcType=VARCHAR} and channel_key = t.channel_key)
+               <if test="access_terminal_id != null and access_terminal_id != ''">
+			   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+			   </if>
+               group by t.access_terminal_key,t.member_key) b,dim_time dt
+           where a.access_terminal_key = b.access_terminal_key
+             and a.member_key = b.member_key
+             and a.payment_date_time_key = dt.time_key
+           group by dt.hours24_full,a.access_terminal_key)
+           group by create_date
+           order by create_date
+	</select>
+	<!-- 趋势分析 折线图 引导下单买家数 -->
+	<select id="r_queryPageTrend_PurchaseNumber_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+	<!-- 根据订单下单时间区间的会员和订单所属终端，比较日志表访问的会员和日志所属终端，最后以下单时间按天分组每个终端的下单买家数，并按天合计下单买家数 -->
+		select create_date,nvl(sum(purchase_number),0) purchase_number
+             from
+           (select a.create_date, a.access_terminal_key,count(distinct a.member_key) purchase_number
+            from (select to_char(dt.date_value,'yyyy-mm-dd') as create_date,(select decode (order_source,1,2,2,1,3,1,4,32,5,31,6,31) from dim_order where order_key = t.order_key) access_terminal_key,t.member_key
+            from fact_order t,dim_date dt
+           where t.create_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>) a,
+           (select t.access_terminal_key,t.member_key
+              from fact_user_log t,dim_date dt
+              where t.log_date_key = dt.date_key
+               and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   	   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+               and t.access_terminal_key > 0
+               and exists (select 1 from dim_platform_channel where channel_type_name = #{channel_name,jdbcType=VARCHAR} and channel_key = t.channel_key)
+               <if test="access_terminal_id != null and access_terminal_id != ''">
+			   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+			   </if>
+               group by t.access_terminal_key,t.member_key) b
+           where a.access_terminal_key = b.access_terminal_key
+             and a.member_key = b.member_key
+           group by a.create_date,a.access_terminal_key)
+           group by create_date
+           order by create_date
+	</select>
+	<!-- 趋势分析 折线图 引导支付买家数 -->
+	<select id="r_queryPageTrend_PayPurchaseNumber_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		<!-- 根据订单支付时间区间的会员和订单所属终端，比较日志表访问的会员和日志所属终端，最后以支付时间按天分组每个终端的支付买家数，并按天合计支付买家数 -->
+		select create_date,nvl(sum(purchase_number),0) purchase_number
+             from
+           (select a.create_date, a.access_terminal_key,count(distinct a.member_key) purchase_number
+            from (select to_char(dt.date_value,'yyyy-mm-dd') as create_date,(select decode (order_source,1,2,2,1,3,1,4,32,5,31,6,31) from dim_order where order_key = t.order_key) access_terminal_key,t.member_key
+            from fact_order t,dim_date dt
+           where t.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>) a,
+           (select t.access_terminal_key,t.member_key
+              from fact_user_log t,dim_date dt
+              where t.log_date_key = dt.date_key
+               and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   	   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+               and t.access_terminal_key > 0
+               and exists (select 1 from dim_platform_channel where channel_type_name = #{channel_name,jdbcType=VARCHAR} and channel_key = t.channel_key)
+               <if test="access_terminal_id != null and access_terminal_id != ''">
+			   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+			   </if>
+               group by t.access_terminal_key,t.member_key) b
+           where a.access_terminal_key = b.access_terminal_key
+             and a.member_key = b.member_key
+           group by a.create_date,a.access_terminal_key)
+           group by create_date
+           order by create_date
+	</select>
+	<!-- 查询商品总数 -->
+	<select id="r_queryProductCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from dim_product t
+		 where t.itemnumber is not null
+	</select>
+	<!-- 排序获取某一页的商品信息-访客数 -->
+	<select id="r_queryProduct_VisitorCount_Product" parameterType="java.util.Map" resultType="string">
+		select itemnumber
+		  from (
+		select a.*,rownum rn
+		  from (
+		select t.itemnumber,nvl(sum(t1.visitor_count),0) visitor_count
+		  from dim_product t,(
+		select t.product_key,count(distinct t.member_key) visitor_count
+		  from fact_user_log_product t,dim_date dt
+		 where t.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+   		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+		   group by t.product_key,t.access_terminal_key) t1
+		 where t.product_key = t1.product_key(+)
+           and t.itemnumber is not null
+           group by itemnumber
+           order by ${sort} ${sort_by}) a
+           where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 排序获取某一页的商品信息-浏览量 -->
+	<select id="r_queryProduct_PvCount_Product" parameterType="java.util.Map" resultType="string">
+		select itemnumber
+		  from (
+		select a.*,rownum rn
+		  from (
+		select t.itemnumber,nvl(sum(t1.pv_count),0) pv_count
+		  from dim_product t,(
+		select t.product_key,t.access_terminal_key,count(*) pv_count
+		  from fact_user_log_product t,dim_date dt
+		 where t.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+   		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+		   group by t.product_key,t.access_terminal_key) t1
+		 where t.product_key = t1.product_key(+)
+           and t.itemnumber is not null
+           group by itemnumber
+           order by ${sort} ${sort_by}) a
+           where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 排序获取某一页的商品信息-下单买家数 -->
+	<select id="r_queryProduct_PurchaseNumber_Product" parameterType="java.util.Map" resultType="string">
+		select itemnumber
+		  from (
+		select a.*,rownum rn
+		  from (
+		select itemnumber,nvl(sum(o_purchase_number),0) o_purchase_number
+		  from (
+		select t.itemnumber,count(distinct t1.member_key) o_purchase_number
+		  from dim_product t,(
+		select t.product_key,(select decode (order_source,1,2,2,1,3,1,4,32,5,31,6,31) from dim_order where order_key = t.order_key) access_terminal_key,
+			   t.member_key
+		  from fact_order_product_sku t,dim_date dt
+		 where t.create_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+   		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>) t1
+		 where t.product_key = t1.product_key(+)
+           and t.itemnumber is not null
+           group by t.itemnumber,t1.access_terminal_key)
+           group by itemnumber
+           order by ${sort} ${sort_by}) a
+           where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 排序获取某一页的商品信息-下单转化率 -->
+	<select id="r_queryProduct_Zhl_Product" parameterType="java.util.Map" resultType="string">
+		select itemnumber
+		  from (
+		select a.*,rownum rn
+		  from (
+		select t.itemnumber, case when nvl(t2.purchase_number,0) = 0 or nvl(t1.visitor_count,0) = 0  then 0
+					else nvl(t2.purchase_number,0)/nvl(t1.visitor_count,0) end o_zhl
+		from dim_product t,
+		(select product_key,nvl(sum(visitor_count),0) visitor_count
+		  from (
+		select t.product_key,count(distinct t.member_key) visitor_count
+		  from fact_user_log_product t,dim_date dt
+		 where t.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+   		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+		   group by t.product_key,t.access_terminal_key)
+           group by product_key) t1,
+       (select product_key,nvl(sum(purchase_number),0) purchase_number
+		  from (
+		select product_key,count(distinct member_key) purchase_number
+		  from (
+		select t.product_key,(select decode (order_source,1,2,2,1,3,1,4,32,5,31,6,31) from dim_order where order_key = t.order_key) access_terminal_key,
+			   t.member_key
+		  from fact_order_product_sku t,dim_date dt
+		 where t.create_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+   		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>)
+           group by product_key,access_terminal_key)
+           group by product_key) t2
+         where t.product_key = t1.product_key(+)
+           and t.product_key = t2.product_key(+)
+           and t.itemnumber is not null
+           order by ${sort} ${sort_by}) a
+           where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 排序获取某一页的商品信息-支付买家数 -->
+	<select id="r_queryProduct_PayPurchaseNumber_Product" parameterType="java.util.Map" resultType="string">
+		select itemnumber
+		  from (
+		select a.*,rownum rn
+		  from (
+		select itemnumber,nvl(sum(p_purchase_number),0) p_purchase_number
+		  from (
+		select t.itemnumber,count(distinct t1.member_key) p_purchase_number
+		  from dim_product t,(
+		select t.product_key,(select decode (order_source,1,2,2,1,3,1,4,32,5,31,6,31) from dim_order where order_key = t.order_key) access_terminal_key,
+			   t.member_key
+		  from fact_order_product_sku t,dim_date dt
+		 where t.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+   		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>) t1
+		 where t.product_key = t1.product_key(+)
+           and t.itemnumber is not null
+           group by t.itemnumber,t1.access_terminal_key)
+           group by itemnumber
+           order by ${sort} ${sort_by}) a
+           where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 排序获取某一页的商品信息-支付转化率 -->
+	<select id="r_queryProduct_PayZhl_Product" parameterType="java.util.Map" resultType="string">
+		select itemnumber
+		  from (
+		select a.*,rownum rn
+		  from (
+		select t.itemnumber, case when nvl(t2.purchase_number,0) = 0 or nvl(t1.visitor_count,0) = 0  then 0
+					else nvl(t2.purchase_number,0)/nvl(t1.visitor_count,0) end p_zhl
+		from dim_product t,
+		(select product_key,nvl(sum(visitor_count),0) visitor_count
+		  from (
+		select t.product_key,count(distinct t.member_key) visitor_count
+		  from fact_user_log_product t,dim_date dt
+		 where t.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+   		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+		   group by t.product_key,t.access_terminal_key)
+           group by product_key) t1,
+       (select product_key,nvl(sum(purchase_number),0) purchase_number
+		  from (
+		select product_key,count(distinct member_key) purchase_number
+		  from (
+		select t.product_key,(select decode (order_source,1,2,2,1,3,1,4,32,5,31,6,31) from dim_order where order_key = t.order_key) access_terminal_key,
+			   t.member_key
+		  from fact_order_product_sku t,dim_date dt
+		 where t.payment_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+   		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>)
+           group by product_key,access_terminal_key)
+           group by product_key) t2
+         where t.product_key = t1.product_key(+)
+           and t.product_key = t2.product_key(+)
+           and t.itemnumber is not null
+           order by ${sort} ${sort_by}) a
+           where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 查询默认排序的商品信息 -->
+	<select id="r_queryProductListBy_Default" parameterType="java.util.Map" resultType="string">
+		select itemnumber
+		  from (
+		select a.*,rownum rn
+		  from (
+		select t.itemnumber,nvl(sum(t1.pv_count),0) pv_count
+		  from dim_product t,(
+		select t.product_key,t.access_terminal_key,count(*) pv_count
+		  from fact_user_log_product t,dim_date dt
+		 where t.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+   		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>
+		   group by t.product_key,t.access_terminal_key) t1
+		 where t.product_key = t1.product_key(+)
+           and t.itemnumber is not null
+           group by itemnumber
+           order by pv_count desc) a
+           where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+							<!-- #################        访客分析         ################ -->
+	<!-- 下单买家总数 -->
+	<select id="r_queryPurchaseNumberTotal" parameterType="java.util.Map" resultType="long">
+		select nvl(sum(purchase_number),0)
+		  from (
+		select province_id,access_terminal_key,count(distinct member_key) purchase_number
+		  from (
+     	select t1.user_company_address_province as province_id,(select decode (order_source,1,2,2,1,3,1,4,32,5,31,6,31) from dim_order where order_key = t.order_key) access_terminal_key,t.member_key
+		  from fact_order t,dim_member t1,dim_date dt
+ 		 where t.member_key = t1.member_key
+   		   and t.create_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+	   	   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+	   	   and t1.user_company_address_province > 0
+   		   and t1.user_company_address_city > 0
+   		   <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>)
+		   group by province_id,access_terminal_key)
+  	</select>
+  	<!-- 省份 下单买家数 排行榜 -->
+	<select id="r_queryPurchaseNumberProvince_Rank" parameterType="java.util.Map" resultType="java.util.Map">
+  		select (select name from dim_dic_region where region_id = a.province_id) province_name,purchase_number
+  		  from (
+  		select province_id,nvl(sum(purchase_number),0) purchase_number
+		  from (
+		select province_id,count(distinct member_key) purchase_number
+		  from (
+		select t1.user_company_address_province as province_id,(select decode (order_source,1,2,2,1,3,1,4,32,5,31,6,31) from dim_order where order_key = t.order_key) access_terminal_key,t.member_key
+		  from fact_order t,dim_member t1,dim_date dt
+		 where t.member_key = t1.member_key
+		   and t.create_date_key = dt.date_key
+		   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and t1.user_company_address_province > 0
+		   and t1.user_company_address_city > 0
+		   <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>)
+		 group by province_id,access_terminal_key)
+		 group by province_id
+		 order by purchase_number desc) a
+		 where rownum &lt;=#{num,jdbcType=INTEGER}
+  	</select>
+  	<!-- 城市 下单买家数 排行榜 -->
+  	<select id="r_queryPurchaseNumberCity_Rank" parameterType="java.util.Map" resultType="java.util.Map">
+  		select (select name from dim_dic_region where region_id = a.city_id) city_name,purchase_number
+  		  from (
+  		select city_id,nvl(sum(purchase_number),0) purchase_number
+		  from (
+		select city_id,count(distinct member_key) purchase_number
+		  from (
+		select t1.user_company_address_city as city_id,(select decode (order_source,1,2,2,1,3,1,4,32,5,31,6,31) from dim_order where order_key = t.order_key) access_terminal_key,t.member_key
+		  from fact_order t,dim_member t1,dim_date dt
+		 where t.member_key = t1.member_key
+		   and t.create_date_key = dt.date_key
+		   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+		   and t1.user_company_address_province > 0
+		   and t1.user_company_address_city > 0
+		   <if test="access_terminal_id == 1">
+		   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 2">
+		   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 31">
+		   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+		   </if>
+		   <if test="access_terminal_id == 32">
+		   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+		   </if>)
+		 group by city_id,access_terminal_key)
+		 group by city_id
+		 order by purchase_number desc) a
+		 where rownum &lt;=#{num,jdbcType=INTEGER}
+  	</select>
+  	<!-- 访客总数 -->
+	<select id="r_queryVisitorCountTotal" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(visitor_count),0) visitor_count
+		  from (
+		select province_id,count(distinct member_key) visitor_count
+		  from (
+		select t1.user_company_address_province as province_id,t.access_terminal_key,t.member_key 
+		  from fact_user_log t,dim_member t1,dim_date dt
+		 where t.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+   		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+   		   and t.access_terminal_key > 0
+		   and t.member_key = t1.member_key
+           and t1.user_company_address_province > 0
+           and t1.user_company_address_city > 0
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>)
+		   group by province_id,access_terminal_key)
+  	</select>
+  	<!-- 省份 访客数 排行榜 -->
+	<select id="r_queryVisitorCountProvince_Rank" parameterType="java.util.Map" resultType="java.util.Map">
+		select (select name from dim_dic_region where region_id = a.province_id) province_name,visitor_count
+		  from (
+		select province_id,nvl(sum(visitor_count),0) visitor_count
+		  from (
+		select province_id,count(distinct member_key) visitor_count
+		  from (
+		select t1.user_company_address_province as province_id,t.access_terminal_key,t.member_key 
+		  from fact_user_log t,dim_member t1,dim_date dt
+		 where t.log_date_key = dt.date_key
+           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+   		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+   		   and t.access_terminal_key > 0
+		   and t.member_key = t1.member_key
+           and t1.user_company_address_province > 0
+           and t1.user_company_address_city > 0
+           <if test="access_terminal_id != null and access_terminal_id != ''">
+		   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+		   </if>)
+		   group by province_id,access_terminal_key)
+           group by province_id
+           order by visitor_count desc) a
+           where rownum &lt;= #{num,jdbcType=INTEGER}
+  	</select>
+  	<!-- 其他 区域分布明细 -->
+  	<select id="r_queryAreaDetail" parameterType="java.util.Map" resultType="java.util.Map">
+  		<if test="type == 1">
+  			select city_name,nvl(sum(visitor_count),0) visitor_count
+			  from (
+			select city_name,count(distinct member_key) visitor_count
+			  from (
+			select (select name from dim_dic_region where region_id = t1.user_company_address_city) as city_name,t.access_terminal_key,t.member_key 
+			  from fact_user_log t,dim_member t1,dim_date dt
+			 where t.log_date_key = dt.date_key
+	           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+	   		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+	   		   and t.access_terminal_key > 0
+			   and t.member_key = t1.member_key
+	           and t1.user_company_address_province = #{province_id,jdbcType=INTEGER}
+	           and t1.user_company_address_city > 0
+	           <if test="access_terminal_id != null and access_terminal_id != ''">
+			   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+			   </if>)
+			   group by city_name,access_terminal_key)
+	           group by city_name
+  		</if>
+  		<if test="type == 2">
+  			select city_name,nvl(sum(purchase_number),0) purchase_number
+			  from (
+			select city_name,count(distinct member_key) purchase_number
+			  from (
+			select (select name from dim_dic_region where region_id = t1.user_company_address_city) as city_name,(select decode (order_source,1,2,2,1,3,1,4,32,5,31,6,31) from dim_order where order_key = t.order_key) access_terminal_key,t.member_key
+			  from fact_order t,dim_member t1,dim_date dt
+			 where t.member_key = t1.member_key
+			   and t.create_date_key = dt.date_key
+			   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+			   and t1.user_company_address_province = #{province_id,jdbcType=INTEGER}
+			   and t1.user_company_address_city > 0
+			   <if test="access_terminal_id == 1">
+			   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+			   </if>
+			   <if test="access_terminal_id == 2">
+			   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+			   </if>
+			   <if test="access_terminal_id == 31">
+			   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+			   </if>
+			   <if test="access_terminal_id == 32">
+			   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+			   </if>)
+			 group by city_name,access_terminal_key)
+			 group by city_name
+  		</if>
+  	</select>
+  	<resultMap type="java.util.Map" id="areaMap">
+  		<result column="id" property="id"/>
+  		<result column="name" property="name"/>
+  		<result column="value" property="value"/>
+  	</resultMap>
+  	<!-- 其他 区域分布地图 -->
+  	<select id="r_queryAreaMap" parameterType="java.util.Map" resultMap="areaMap">
+  		<if test="type == 1">
+	  		select t.region_id as id,
+	  			   t.name,
+	  			   nvl(t1.visitor_count,0) as value
+	  		  from dim_dic_region t,(select province_id,nvl(sum(visitor_count),0) visitor_count
+									  from (
+									select province_id,count(distinct member_key) visitor_count
+									  from (
+									select t1.user_company_address_province as province_id,t.access_terminal_key,t.member_key 
+									  from fact_user_log t,dim_member t1,dim_date dt
+									 where t.log_date_key = dt.date_key
+							           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+							   		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+							   		   and t.access_terminal_key > 0
+									   and t.member_key = t1.member_key
+							           and t1.user_company_address_province > 0
+							           and t1.user_company_address_city > 0
+							           <if test="access_terminal_id != null and access_terminal_id != ''">
+									   	and exists (select 1 from dim_access_terminal where access_terminal_id = #{access_terminal_id,jdbcType=INTEGER} and access_terminal_key = t.access_terminal_key)
+									   </if>)
+									   group by province_id,access_terminal_key)
+							           group by province_id) t1
+		      where t.parent_id in (select region_id from dim_dic_region where parent_id = 0)
+			    and t.region_id = t1.province_id(+)
+  		</if>
+  		<if test="type == 2">
+  			select t.region_id as id,
+  			   t.name,
+  			   nvl(t1.purchase_number,0) as value
+	  		  from dim_dic_region t,(select province_id,nvl(sum(purchase_number),0) purchase_number
+									  from (
+									select province_id,count(distinct member_key) purchase_number
+									  from (
+									select t1.user_company_address_province as province_id,(select decode (order_source,1,2,2,1,3,1,4,32,5,31,6,31) from dim_order where order_key = t.order_key) access_terminal_key,t.member_key
+									  from fact_order t,dim_member t1,dim_date dt
+									 where t.member_key = t1.member_key
+									   and t.create_date_key = dt.date_key
+									   and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+									   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+									   and t1.user_company_address_province > 0
+									   and t1.user_company_address_city > 0
+									   <if test="access_terminal_id == 1">
+									   and exists (select 1 from dim_order where order_source in (2,3) and order_key = t.order_key)
+									   </if>
+									   <if test="access_terminal_id == 2">
+									   and exists (select 1 from dim_order where order_source = 1 and order_key = t.order_key)
+									   </if>
+									   <if test="access_terminal_id == 31">
+									   and exists (select 1 from dim_order where order_source in (5,6) and order_key = t.order_key)
+									   </if>
+									   <if test="access_terminal_id == 32">
+									   and exists (select 1 from dim_order where order_source = 4 and order_key = t.order_key)
+									   </if>)
+									 group by province_id,access_terminal_key)
+									 group by province_id) t1
+		      where t.parent_id in (select region_id from dim_dic_region where parent_id = 0)
+			    and t.region_id = t1.province_id(+)
+  		</if>
+  	</select>
+  							<!-- #################        流量来源         ################ -->
+  	<!-- 访问设备 -->
+	<select id="r_queryFacility_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select page_name,nvl(sum(cnt),0) cnt
+		  from (
+		select decode(t.access_terminal_id,1,'PC',2,'手机',31,'手机',32,'手机','其他') as page_name,
+  			   nvl(t1.visitor_count,0) as cnt
+  		  from dim_access_terminal t,(
+									select t.access_terminal_key,count(distinct t.member_key) visitor_count
+									  from fact_user_log t,dim_date dt
+									 where t.log_date_key = dt.date_key
+							           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+							   		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+							   		   and t.access_terminal_key > 0
+									   group by access_terminal_key) t1
+	     where t.access_terminal_key = t1.access_terminal_key(+))
+	     group by page_name
+	</select>
+	<!-- 移动端分布 -->
+	<select id="r_queryMobileTerminalChart" parameterType="java.util.Map" resultType="java.util.Map">
+		select page_name,nvl(sum(cnt),0) cnt
+		  from (
+		select decode(t.access_terminal_id,2,'微信',31,'ANDROID',32,'IOS','其他') as page_name,
+  			   nvl(t1.visitor_count,0) as cnt
+  		  from dim_access_terminal t,(
+									select t.access_terminal_key,count(distinct t.member_key) visitor_count
+									  from fact_user_log t,dim_date dt
+									 where t.log_date_key = dt.date_key
+							           and dt.date_value >= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+							   		   and dt.date_value &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd')
+							   		   and t.access_terminal_key > 0
+									   group by access_terminal_key) t1
+	     where t.access_terminal_key = t1.access_terminal_key(+)
+	       and t.access_terminal_id != 1)
+	     group by page_name
+	</select>
+</mapper>

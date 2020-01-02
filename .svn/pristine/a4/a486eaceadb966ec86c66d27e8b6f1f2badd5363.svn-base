@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.contribution.dao.ContributionOrderDao">
+	<!-- 缴款单字段 -->
+	<sql id="all_column">
+		id,
+		contribution_number,
+		sale_user_name,
+		(select user_realname from  tbl_sys_user_info where user_name=sale_user_name) as sale_user_realname,
+		total_money,
+		to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+		state,
+		audit_user_id,
+		audit_user_name,
+		(select user_realname from  tbl_sys_user_info where id=audit_user_id) as  audit_user_realname,
+		to_char(audit_date,'yyyy-mm-dd hh24:mi:ss') audit_date,
+		voucher_path,
+		receipt_type,
+		remark,
+		xdr_user_type,
+		md_id
+	</sql>
+	<!-- 查询缴款单列表 -->
+	<select id="queryContributionOrderList" parameterType="java.util.Map" resultType="java.util.Map">
+		select *
+		from (select A.*, rownum rn
+		from (
+			select <include refid="all_column"/>
+			from tbl_contribution_order
+			<where>
+				<if test="states != null and states.length!=0">
+					and state in
+					<foreach item="item" index="index" collection="states" open="(" separator="," close=")">
+						#{item,jdbcType=INTEGER}
+					</foreach>
+				</if>
+				<if test="contribution_number != null and contribution_number != ''">
+					and contribution_number like '%'||#{contribution_number,jdbcType=VARCHAR}||'%'
+				</if>
+				<if test="sale_user_name != null and sale_user_name !=''">
+					and sale_user_name = #{sale_user_name,jdbcType=VARCHAR}
+				</if>
+				<if test="receipt_type != null and receipt_type !=''">
+					<choose>
+						<when test="receipt_type == '转账'">
+							and receipt_type = #{receipt_type,jdbcType=VARCHAR}
+						</when>
+						<otherwise>and receipt_type != '转账'</otherwise>
+					</choose>
+				</if>
+				<if test="market_supervision_user_id != null and market_supervision_user_id != 0">
+					and exists (select 1 from tbl_store_info tsi where tsi.id = md_id and tsi.manager_user_id = #{market_supervision_user_id,jdbcType=INTEGER})
+				</if>
+				<if test="referee_user_id != null and referee_user_id != 0">
+					and exists( select 1 from tbl_sys_user_info u where u.user_name = sale_user_name and u.id = #{referee_user_id,jdbcType=VARCHAR})
+				</if>
+				<if test="store_id != null and store_id != 0">
+					and md_id = #{store_id,jdbcType=INTEGER}
+					and xdr_user_type in('5','6')
+				</if>
+				<if test="start_date != null and start_date != ''">
+					and create_date &gt; to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+				</if>
+				<if test="end_date != null and end_date != ''">
+					and create_date &lt; to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+				</if>
+				<if test="public_user_type != null and public_user_type == 2">
+					and (exists (select 1 from tbl_sys_user_store tsus where tsus.store_id = md_id and tsus.user_id = #{public_user_id,jdbcType=INTEGER})
+					or exists(
+						select 1
+						from
+							tbl_store_user_rel tsur,tbl_sys_user_info u
+						where tsur.type = 3
+							and u.id = tsur.user_id
+							and tsur.store_id in (select store_id from tbl_sys_user_store tsus where tsus.user_id = #{public_user_id,jdbcType=INTEGER})
+							and sale_user_name = u.user_name
+					    )
+					)
+				</if>
+				<if test="public_user_type != null and public_user_type == 3">
+					and sale_user_name = #{public_user_name,jdbcType=VARCHAR}
+				</if>
+				<if test="public_user_type != null and public_user_type == 4">
+					and sale_user_name = #{public_user_name,jdbcType=VARCHAR}
+				</if>
+				<if test="public_user_type != null and public_user_type == 5">
+					and exists(select 1 from tbl_store_info tsi where tsi.id = md_id and tsi.shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER})
+				</if>
+				<if test="public_user_type != null and public_user_type == 6">
+					and 1 = 2
+				</if>
+				<if test="public_user_type != null and public_user_type == 9">
+					and 1 = 2
+				</if>
+			</where>
+			order by create_date desc
+		) A
+		where rownum  &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 查询缴款单数量 -->
+	<select id="queryContributionOrderCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_contribution_order
+		<where>
+				<if test="states != null and states.length!=0">
+					and state in
+					<foreach item="item" index="index" collection="states" open="(" separator="," close=")">
+						#{item,jdbcType=INTEGER}
+					</foreach>
+				</if>
+				<if test="contribution_number != null and contribution_number != ''">
+					and contribution_number like '%'||#{contribution_number,jdbcType=VARCHAR}||'%'
+				</if>
+				<if test="sale_user_name != null and sale_user_name !=''">
+					and sale_user_name = #{sale_user_name,jdbcType=VARCHAR}
+				</if>
+				<if test="receipt_type != null and receipt_type !=''">
+					<choose>
+						<when test="receipt_type == '转账'">
+							and receipt_type = #{receipt_type,jdbcType=VARCHAR}
+						</when>
+						<otherwise>and receipt_type != '转账'</otherwise>
+					</choose>
+				</if>
+				<if test="market_supervision_user_id != null and market_supervision_user_id != 0">
+					and exists (select 1 from tbl_store_info tsi where tsi.id = md_id and tsi.manager_user_id = #{market_supervision_user_id,jdbcType=INTEGER})
+				</if>
+				<if test="referee_user_id != null and referee_user_id != 0">
+					and exists( select 1 from tbl_sys_user_info u where u.user_name = sale_user_name and u.id = #{referee_user_id,jdbcType=VARCHAR})
+				</if>
+				<if test="store_id != null and store_id != 0">
+					and md_id = #{store_id,jdbcType=INTEGER}
+					and xdr_user_type in('5','6')
+				</if>
+				<if test="start_date != null and start_date != ''">
+					and create_date &gt; to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+				</if>
+				<if test="end_date != null and end_date != ''">
+					and create_date &lt; to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+				</if>
+				<if test="public_user_type != null and public_user_type == 2">
+					and (exists (select 1 from tbl_sys_user_store tsus where tsus.store_id = md_id and tsus.user_id = #{public_user_id,jdbcType=INTEGER})
+					or exists(
+						select 1
+						from
+							tbl_store_user_rel tsur,tbl_sys_user_info u
+						where tsur.type = 3
+							and u.id = tsur.user_id
+							and tsur.store_id in (select store_id from tbl_sys_user_store tsus where tsus.user_id = #{public_user_id,jdbcType=INTEGER})
+							and sale_user_name = u.user_name
+					    )
+					)
+				</if>
+				<if test="public_user_type != null and public_user_type == 3">
+					and sale_user_name = #{public_user_name,jdbcType=VARCHAR}
+				</if>
+				<if test="public_user_type != null and public_user_type == 4">
+					and sale_user_name = #{public_user_name,jdbcType=VARCHAR}
+				</if>
+				<if test="public_user_type != null and public_user_type == 5">
+					and exists(select 1 from tbl_store_info tsi where tsi.id = md_id and tsi.shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER})
+				</if>
+				<if test="public_user_type != null and public_user_type == 6">
+					and 1 = 2
+				</if>
+				<if test="public_user_type != null and public_user_type == 9">
+					and 1 = 2
+				</if>
+		</where>
+	</select>
+	
+	<!-- 查询缴款单详情 -->
+	<select id="queryContributionOrderDetail" parameterType="java.util.Map" resultType="java.util.Map">
+			select <include refid="all_column"/>
+			  from tbl_contribution_order
+			<where>
+				<if test="id != null and id != 0">
+					id = #{id,jdbcType=INTEGER}
+				</if>
+				<if test="contribution_number != null and contribution_number != ''">
+					and contribution_number = #{contribution_number,jdbcType=VARCHAR}
+				</if>
+			</where>
+	</select>
+	
+	<!-- 查询缴款单订单列表 -->
+	<select id="queryContributionWaitList" parameterType="java.util.Map" resultType="java.util.Map">
+	  select t2.order_number,
+	         t2.contribution_type,
+	         t2.sale_user_name,
+	  		 t2.contribution_money,
+	  		 to_char(t2.create_date,'yyyy-mm-dd hh24:mi:ss') as create_date
+  		from tbl_contribution_wait t2
+		 where exists
+       	   (select 1
+           	  from tbl_contribution_order_detail t3
+           		 where     t3.contribution_wait_id = t2.id
+                 		 and t3.contribution_number = #{contribution_number,jdbcType=VARCHAR})
+	</select>
+	<!-- 新增缴款单 -->
+	<insert id="insert" parameterType="java.util.Map">
+		<selectKey keyProperty="id" resultType="long" order="BEFORE">
+			select seq_contribution_order.nextval from dual
+		</selectKey>
+		insert into tbl_contribution_order
+		(
+			id,
+			contribution_number,
+			sale_user_name,
+			total_money,
+			create_date,
+			state,
+			voucher_path,
+			receipt_type,
+			remark,
+			xdr_user_type,
+			md_id
+		)
+		values
+		(
+			#{id,jdbcType=INTEGER},
+			getAutoNumber('C'),
+			#{sale_user_name,jdbcType=VARCHAR},
+			#{total_money,jdbcType=INTEGER},
+			sysdate,
+			1,
+			#{voucher_path,jdbcType=VARCHAR},
+			#{receipt_type,jdbcType=VARCHAR},
+			#{remark,jdbcType=VARCHAR},
+			#{public_user_type,jdbcType=VARCHAR},
+			#{md_id,jdbcType=INTEGER}
+		)
+	</insert>
+	<!-- 根据ID查询 -->
+	<select id="queryById" parameterType="long" resultType="java.util.Map">
+		select <include refid="all_column"/>
+		from tbl_contribution_order
+		where id = #{id,jdbcType=INTEGER}
+	</select>
+
+	<update id="paymentAuditing" statementType="CALLABLE" parameterType="java.util.Map">
+		<![CDATA[
+			call pro_payment_approval(
+					#{public_user_name,mode=IN,jdbcType=VARCHAR},
+					#{contribution_number,mode=IN,jdbcType=VARCHAR},
+					#{remark,mode=IN,jdbcType=VARCHAR},
+					#{operate_type,mode=IN,jdbcType=VARCHAR},
+					#{output_status,mode=OUT,jdbcType=VARCHAR},
+					#{output_msg,mode=OUT,jdbcType=VARCHAR}
+				)
+			]]>
+	</update>
+</mapper>

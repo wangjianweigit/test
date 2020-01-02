@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.marketing.dao.PresellActivityDao">
+
+    <sql id="all_column">
+        TPAI.ACTIVITY_ID,
+        TPAI.CUSTOM_DISCOUNT_FLAG,
+        TPAI.ACTIVITY_SERVICE_DISCOUNT * 10 AS ACTIVITY_SERVICE_DISCOUNT,
+        TPAI.ACTIVITY_MAX_DISCOUNT * 10 AS ACTIVITY_MAX_DISCOUNT,
+        TPAI.ACTIVITY_MIN_DISCOUNT * 10 AS ACTIVITY_MIN_DISCOUNT,
+        TPAI.ACTIVITY_DISCOUNT * 10 AS ACTIVITY_DISCOUNT,
+        TPAI.IS_ADD,
+        TPAI.ACTIVITY_QUIT_FLAG,
+        TPAI.TAG_COLOR,
+        TPAI.TAG_NAME,
+        TPAI.APPLY_PRODUCT_LIMIT_AMOUNT,
+        TPAI.TAG_LEVEL,
+        TPAI.TAG_ADVANCE_IMG,
+        TPAI.TAG_ACTIVITY_IMG,
+        TPAI.BACKGROUND_IMG_DISPLAY,
+        TPAI.TAG_IMG_PC,
+        TPAI.TAG_IMG_WX
+    </sql>
+
+    <!--插入预售活动信息-->
+    <insert id="insertPreSellActivity" parameterType="java.util.HashMap">
+        insert into tbl_presell_activity_info(
+            activity_id,
+            custom_discount_flag,
+            activity_service_discount,
+            activity_max_discount,
+            activity_min_discount,
+            activity_discount,
+            is_add,
+            activity_quit_flag,
+            tag_color,
+            tag_name,
+            apply_product_limit_amount,
+            tag_level,
+            tag_advance_img,
+            tag_activity_img,
+            background_img_display,
+            tag_img_wx,
+            tag_img_pc
+        ) values (
+            #{ACTIVITY_ID,jdbcType=INTEGER},
+            #{CUSTOM_DISCOUNT_FLAG,jdbcType=VARCHAR},
+            #{ACTIVITY_SERVICE_DISCOUNT,jdbcType=DOUBLE},
+            #{ACTIVITY_MAX_DISCOUNT,jdbcType=DOUBLE},
+            #{ACTIVITY_MIN_DISCOUNT,jdbcType=DOUBLE},
+            #{ACTIVITY_DISCOUNT,jdbcType=DOUBLE},
+            #{IS_ADD,jdbcType=VARCHAR},
+            #{ACTIVITY_QUIT_FLAG,jdbcType=VARCHAR},
+            #{TAG_COLOR,jdbcType=VARCHAR},
+            #{TAG_NAME,jdbcType=VARCHAR},
+            #{APPLY_PRODUCT_LIMIT_AMOUNT,jdbcType=INTEGER},
+            #{TAG_LEVEL,jdbcType=VARCHAR},
+            #{TAG_ADVANCE_IMG,jdbcType=VARCHAR},
+            #{TAG_ACTIVITY_IMG,jdbcType=VARCHAR},
+            #{BACKGROUND_IMG_DISPLAY,jdbcType=VARCHAR},
+            #{TAG_IMG_WX,jdbcType=VARCHAR},
+            #{TAG_IMG_PC,jdbcType=VARCHAR}
+        )
+    </insert>
+
+    <!--更新预售商品信息-->
+    <update id="updatePreSellActivity" parameterType="java.util.HashMap">
+        update tbl_presell_activity_info set
+        <if test='CUSTOM_DISCOUNT_FLAG != null and CUSTOM_DISCOUNT_FLAG == "1" '>
+            activity_discount = #{ACTIVITY_DISCOUNT,jdbcType=DOUBLE},
+            activity_max_discount = NULL,
+            activity_min_discount = NULL,
+        </if>
+        <if test='CUSTOM_DISCOUNT_FLAG != null and CUSTOM_DISCOUNT_FLAG == "2" '>
+            activity_discount = NULL,
+            activity_max_discount = #{ACTIVITY_MAX_DISCOUNT,jdbcType=DOUBLE},
+            activity_min_discount = #{ACTIVITY_MIN_DISCOUNT,jdbcType=DOUBLE},
+        </if>
+        <if test='BACKGROUND_IMG_DISPLAY != null and BACKGROUND_IMG_DISPLAY == "1" '>
+            tag_advance_img = #{TAG_ADVANCE_IMG,jdbcType=VARCHAR},
+            tag_activity_img = #{TAG_ACTIVITY_IMG,jdbcType=VARCHAR},
+        </if>
+        <if test='BACKGROUND_IMG_DISPLAY != null and BACKGROUND_IMG_DISPLAY == "2" '>
+            tag_advance_img = NULL,
+            tag_activity_img = NULL,
+        </if>
+        <if test='TAG_LEVEL != null and TAG_LEVEL == "1" '>
+            tag_img_wx = #{TAG_IMG_WX,jdbcType=VARCHAR},
+            tag_img_pc = #{TAG_IMG_PC,jdbcType=VARCHAR},
+        </if>
+        <if test='TAG_LEVEL != null and TAG_LEVEL != "1" '>
+            tag_img_wx = NULL,
+            tag_img_pc = NULL,
+        </if>
+            custom_discount_flag = #{CUSTOM_DISCOUNT_FLAG,jdbcType=VARCHAR},
+            activity_service_discount = #{ACTIVITY_SERVICE_DISCOUNT,jdbcType=DOUBLE},
+            is_add = #{IS_ADD,jdbcType=VARCHAR},
+            activity_quit_flag = #{ACTIVITY_QUIT_FLAG,jdbcType=VARCHAR},
+            tag_color = #{TAG_COLOR,jdbcType=VARCHAR},
+            tag_name = #{TAG_NAME,jdbcType=VARCHAR},
+            apply_product_limit_amount = #{APPLY_PRODUCT_LIMIT_AMOUNT,jdbcType=INTEGER},
+            tag_level = #{TAG_LEVEL,jdbcType=VARCHAR},
+            background_img_display = #{BACKGROUND_IMG_DISPLAY,jdbcType=VARCHAR}
+        where activity_id = #{ID,jdbcType=INTEGER}
+    </update>
+
+    <!-- 更新限时折扣活动信息 -->
+    <update id="updatePreSellActivityDecorate" parameterType="java.util.HashMap">
+        update tbl_presell_activity_info set
+            tag_level = #{TAG_LEVEL,jdbcType=VARCHAR},
+        <if test='BACKGROUND_IMG_DISPLAY != null and BACKGROUND_IMG_DISPLAY == "1" '>
+            tag_advance_img = #{TAG_ADVANCE_IMG,jdbcType=VARCHAR},
+            tag_activity_img = #{TAG_ACTIVITY_IMG,jdbcType=VARCHAR},
+        </if>
+        <if test='BACKGROUND_IMG_DISPLAY != null and BACKGROUND_IMG_DISPLAY == "2" '>
+            tag_advance_img = NULL,
+            tag_activity_img = NULL,
+        </if>
+        <if test='TAG_LEVEL != null and TAG_LEVEL == "1" '>
+            tag_img_wx = #{TAG_IMG_WX,jdbcType=VARCHAR},
+            tag_img_pc = #{TAG_IMG_PC,jdbcType=VARCHAR},
+        </if>
+        <if test='TAG_LEVEL != null and TAG_LEVEL != "1" '>
+            tag_img_wx = NULL,
+            tag_img_pc = NULL,
+        </if>
+            tag_color = #{TAG_COLOR,jdbcType=VARCHAR},
+            tag_name = #{TAG_NAME,jdbcType=VARCHAR},
+            background_img_display = #{BACKGROUND_IMG_DISPLAY,jdbcType=VARCHAR}
+        where activity_id = #{ID,jdbcType=INTEGER}
+    </update>
+
+    <!--查询预售活动详情-->
+    <select id="queryPreSellActivityDetail" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+        select <include refid="all_column"/> from tbl_presell_activity_info tpai where tpai.activity_id = #{id,jdbcType=INTEGER}
+    </select>
+    
+    <!-- 获取参与预售活动的商品sku列表 -->
+	<select id="queryActivityProductSkuList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+				SELECT  
+				TSAS.ACTIVITY_ID,
+				TSAS.PRODUCT_ITEMNUMBER,
+				TSAS.PRODUCT_SKU,
+				TSAS.PRESELL_STOCK_AMOUNT LOCKED_STOCK_AMOUNT,
+				TPS.PRODUCT_COLOR,
+				TPS.PRODUCT_SPECS,
+				TPS.PRODUCT_GROUP_MEMBER
+		  FROM 
+			 <choose>  
+	            <when test="approval==1">  
+				  	TBL_PRESELL_ACTIVITY_SKU_APPLY TSAS
+	            </when >  
+	            <otherwise>  
+				  	TBL_PRESELL_ACTIVITY_SKU TSAS
+	            </otherwise>  
+	        </choose>  
+		   ,TBL_PRODUCT_SKU TPS
+		<where>
+				TSAS.ACTIVITY_ID = #{activity_id,jdbcType=INTEGER}
+			AND TSAS.PRODUCT_ITEMNUMBER = #{product_itemnumber,jdbcType=VARCHAR}
+			AND TSAS.PRODUCT_SKU = TPS.ID
+			AND TPS.PRODUCT_GROUP = '尺码'
+		</where>
+		ORDER BY TPS.PRODUCT_COLOR,TPS.PRODUCT_GROUP_MEMBER  
+	</select>
+</mapper>

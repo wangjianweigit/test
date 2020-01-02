@@ -1,0 +1,696 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.product.dao.SampleDao">
+	<sql id="all_column">
+			tsi.id,
+			tsi.stationed_user_id,
+			tsi.brand_id,
+			tsi.itemnumber,
+			tsi.sample_name,
+			tsi.create_user_id,
+			to_char(tsi.create_date,'yyyy-mm-dd hh24:mi:ss') as create_date,
+			tsi.update_user_id,
+			to_char(tsi.update_date,'yyyy-mm-dd hh24:mi:ss') as update_date,
+			tsi.approval_user_id,
+			to_char(tsi.approval_date,'yyyy-mm-dd hh24:mi:ss') as approval_date,
+			tsi.sample_img_url,
+			tsi.sample_floor_price,
+			tsi.sample_ceiling_price,
+			tsi.state,
+			case when state = 1 then '草稿'
+				 when state = 2 then '待审批'
+				 when state = 3 then '已通过'
+				 else '已驳回' end states,
+			tsi.rejected_reason
+	</sql>
+	<sql id="all_column_detail">
+			tsi.id,
+			tsi.stationed_user_id,
+			tsi.brand_id,
+			tsi.itemnumber,
+			tsi.sample_name,
+			to_char(tsi.create_date,'yyyy-mm-dd hh24:mi:ss') as create_date,
+			tsi.create_user_id,
+			to_char(tsi.update_date,'yyyy-mm-dd hh24:mi:ss') as update_date,
+			tsi.update_user_id,
+			to_char(tsi.approval_date,'yyyy-mm-dd hh24:mi:ss') as approval_date,
+			tsi.approval_user_id,
+			tsi.sample_img_url,
+			tsi.sample_floor_price,
+			tsi.sample_ceiling_price,
+			tsi.rejected_reason,
+			tsi.state,
+			to_char(review_start_date, 'yyyy-mm-dd hh24:mi:ss') as review_start_date,
+			case when review_stop_state = 1 then to_char(review_stop_date, 'yyyy-mm-dd hh24:mi:ss')
+			     else to_char(review_end_date, 'yyyy-mm-dd hh24:mi:ss') end review_end_date
+	</sql>
+	<!-- 样品审批数量 -->
+	<select id="querySampleApprovalCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_sample_info tsi
+		 <where>
+		 	state != '1'
+		 	and delete_flag = 0
+		 	<if test="state != null">
+				and state in
+                <foreach item="item" collection="state" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+			</if>
+			<if test="stationed_user_name != null and stationed_user_name != ''">
+				and exists(select 1 from tbl_stationed_user_info where id = tsi.stationed_user_id and company_name like '%'||#{stationed_user_name,jdbcType=VARCHAR}||'%')
+			</if>
+			<if test="sample_name != null and sample_name != ''">
+				and sample_name like '%'||#{sample_name,jdbcType=VARCHAR}||'%'
+			</if>
+			<if test="itemnumber != null and itemnumber != ''">
+				and itemnumber like '%'||#{itemnumber,jdbcType=VARCHAR}||'%'
+			</if>
+			<if test="brand_id != null and brand_id != ''">
+				and brand_id = #{brand_id,jdbcType=INTEGER}
+			</if>
+		 </where>
+	</select>
+	<!-- 样品审批列表 -->
+	<select id="querySampleApprovalList" parameterType="java.util.Map" resultType="java.util.Map">
+		select a.*,
+			   (select brand_name from tbl_dic_product_brand tdpb where tdpb.id = a.brand_id)  as brand,
+    		   (select company_name from tbl_stationed_user_info tsui where tsui.id = a.stationed_user_id)  as stationed_user_name,
+    		   (select tsui.user_realname from tbl_sys_user_info tsui where tsui.id = a.approval_user_id) as approval_user_realname,
+    		   (select tsui.user_name from tbl_stationed_user_info tsui where tsui.id = a.update_user_id) as update_user_name,
+    		   (select tsui.contacts from tbl_stationed_user_info tsui where tsui.id = a.update_user_id) as  update_user_realname
+		  from (select t.*, rownum rn
+		  		  from (select <include refid="all_column"/>
+		  		          from tbl_sample_info tsi
+		  		          <where>
+						 	state != '1'
+						 	and delete_flag = 0
+						 	<if test="state != null">
+								and state in
+				                <foreach item="item" collection="state" open="(" separator="," close=")">
+									#{item}
+								</foreach>
+							</if>
+							<if test="stationed_user_name != null and stationed_user_name != ''">
+								and exists(select 1 from tbl_stationed_user_info where id = tsi.stationed_user_id and company_name like '%'||#{stationed_user_name,jdbcType=VARCHAR}||'%')
+							</if>
+							<if test="sample_name != null and sample_name != ''">
+								and sample_name like '%'||#{sample_name,jdbcType=VARCHAR}||'%'
+							</if>
+							<if test="itemnumber != null and itemnumber != ''">
+								and itemnumber like '%'||#{itemnumber,jdbcType=VARCHAR}||'%'
+							</if>
+							<if test="brand_id != null and brand_id != ''">
+								and brand_id = #{brand_id,jdbcType=INTEGER}
+							</if>
+						 </where>
+						 order by state asc, update_date desc)t
+		  		where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) a
+		 where rn &gt; #{start_rownum,jdbcType=INTEGER} 
+	</select>
+	<!-- 样品审批详情 -->
+	<select id="querySampleApprovalDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select <include refid="all_column_detail"/>,
+    		   (select brand_name from tbl_dic_product_brand tdpb where tdpb.id = tsi.brand_id)  as brand,
+    		   (select user_code from tbl_stationed_user_info tsui where tsui.id = tsi.stationed_user_id)  as stationed_user_code,
+    		   (select company_name from tbl_stationed_user_info tsui where tsui.id = tsi.stationed_user_id)  as stationed_user_name,
+    		   (select tsui.user_realname from tbl_sys_user_info tsui where tsui.id = tsi.approval_user_id) as approval_user_realname
+		  from tbl_sample_info tsi
+		<where>
+				1=1
+			<if test="itemnumber != null and itemnumber != '' ">
+				and	itemnumber = #{itemnumber,jdbcType=VARCHAR}
+			</if>
+		</where> 
+	</select>
+	
+	<!-- 获取样品评审类型列表 -->
+	<select id="queryTemplateTypeList" parameterType="java.util.Map" resultType="java.util.Map">
+		select id,
+			   type_id,
+			   type_name,
+			   if_display_pic,
+			   if_words,
+			   if_open_score,
+			   if_suggest,
+			   description
+		  from tbl_sample_review_type
+		 where sample_itemnumber = #{itemnumber,jdbcType=VARCHAR}
+	</select>
+	<!-- 获取样品评审表单项列表 -->
+	<select id="queryTemplateFormList" parameterType="java.util.Map" resultType="java.util.Map">
+		select template_form_name,
+			   case when template_form_way = 'text' then '文本框'
+			   		when template_form_way = 'radio' then '单选框'
+			   		when template_form_way = 'select' then '下拉框'
+			   		when template_form_way = 'checkbox' then '复选框' end template_form_way,
+			   required_flag,
+			   template_form_option
+		  from tbl_sample_review_type_detail
+		 where sample_itemnumber = #{itemnumber,jdbcType=VARCHAR}
+		   and template_type_id = #{type_id,jdbcType=INTEGER}
+	</select>
+	<!-- 获取样品评审图片列表 -->
+	<select id="querySampleReviewPicList" parameterType="java.util.Map" resultType="java.util.Map">
+		select img_url
+		  from tbl_sample_review_type_img
+		 where sample_itemnumber = #{itemnumber,jdbcType=VARCHAR}
+		   and template_type_id = #{type_id,jdbcType=INTEGER}
+	</select>
+	<!-- 审批 -->
+	<update id="updateSampleApprovalState" parameterType="java.util.Map">
+		update tbl_sample_info
+		   set <if test="review_start_date != null and review_start_date != ''">review_start_date = to_date(#{review_start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss'),</if>
+		   	   <if test="review_end_date != null and review_end_date != ''">review_end_date = to_date(#{review_end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss'),</if>
+		   	   <if test="rejected_reason != null and rejected_reason != ''">rejected_reason = #{rejected_reason,jdbcType=VARCHAR},</if>
+		   	   approval_user_id = #{public_user_id,jdbcType=INTEGER},
+		   	   approval_date = sysdate,
+		   	   state = #{state,jdbcType=INTEGER}
+		 where itemnumber = #{itemnumber,jdbcType=VARCHAR}
+	</update>
+	<!-- 样品评审用户组列表 -->
+	<select id="querySampleReviewUserList" parameterType="java.util.Map" resultType="java.util.Map">
+		select a.*,
+			   (select count(1) from tbl_review_user_group_detail trugd where trugd.user_group_id = a.id)  as people_count,
+			   (select tr.brand_name from (select trub.user_group_id,to_char(wm_concat(tdpb.brand_name)) brand_name from tbl_review_group_brand trub
+			   		left join tbl_dic_product_brand tdpb on trub.brand_id=tdpb.id group by trub.user_group_id)tr
+			   	 where tr.user_group_id = a.id)  as brand_name
+		  from (select t.*, rownum rn
+		  		  from (select id, 
+		  		  			   user_group_name,
+		  		  			   state,
+		  		  			   remark,
+		  		  			   to_char(create_date, 'yyyy-mm-dd hh24:mi:ss') as create_date,
+		  		  			   create_user_id,
+		  		  			   type
+		  		          from tbl_review_user_group trug
+		  		          <where>
+							  trug.type = 1
+							<if test="user_group_name != null and user_group_name != ''">
+								and trug.user_group_name like '%'||#{user_group_name,jdbcType=VARCHAR}||'%'
+							</if>
+						 </where>
+						 order by create_date desc)t
+		  		where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) a
+		 where rn &gt; #{start_rownum,jdbcType=INTEGER} 
+	</select>
+	<!-- 样品评审用户组数量 -->
+	<select id="querySampleReviewUserCount" parameterType="java.util.Map" resultType="int">
+		select count(1) from tbl_review_user_group  trug
+			<where>
+				trug.type = 1
+				<if test="user_group_name != null and user_group_name != ''">
+					and trug.user_group_name = #{user_group_name,jdbcType=VARCHAR}
+				</if>
+		 	</where>
+	</select>
+	<!-- 样品评审用户组新增 -->
+	<insert id="insertReviewUserGroup" parameterType="java.util.Map">
+		<selectKey keyProperty="id" resultType="int" order="BEFORE">
+			select seq_review_user_group.nextval from dual
+		</selectKey>
+		insert into tbl_review_user_group(
+			id,
+			user_group_name,
+			state,
+			remark,
+			create_date,
+			create_user_id,
+			type
+		) values
+		(
+			#{id,jdbcType=INTEGER},
+			#{user_group_name,jdbcType=VARCHAR},
+			2,
+			#{remark,jdbcType=VARCHAR},
+			sysdate,
+			#{public_user_id,jdbcType=INTEGER},
+			#{type,jdbcType=INTEGER}
+		)
+	</insert>
+	<!-- 新增样品审批用户组明细 -->
+	<insert id="insertReviewUserGroupDetail" parameterType="java.util.List">
+		INSERT INTO TBL_REVIEW_USER_GROUP_DETAIL(
+			ID,
+			USER_GROUP_ID,
+			USER_ID
+		)
+		SELECT SEQ_REVIEW_USER_GROUP_DETAIL.NEXTVAL,
+			   A.USER_GROUP_ID,
+			   A.USER_ID
+		FROM (
+		        <foreach collection="list" item="item" index="index" separator="UNION">
+		            SELECT  #{item.user_group_id,jdbcType=INTEGER} AS user_group_id,
+		            		#{item.user_id,jdbcType=INTEGER} AS user_id
+		            FROM DUAL
+		        </foreach>
+        	   ) A
+	</insert>
+	<!-- 新增样品审批用户组品牌信息 -->
+	<insert id="insertReviewGroupBrand" parameterType="java.util.List">
+		INSERT INTO TBL_REVIEW_GROUP_BRAND(
+			ID,
+			USER_GROUP_ID,
+			BRAND_ID
+		)
+		SELECT SEQ_REVIEW_GROUP_BRAND.NEXTVAL,
+			   A.USER_GROUP_ID,
+			   A.BRAND_ID
+		FROM (
+		        <foreach collection="list" item="item" index="index" separator="UNION">
+		            SELECT  #{item.user_group_id,jdbcType=INTEGER} AS user_group_id,
+		            		#{item.brand_id,jdbcType=INTEGER} AS brand_id
+		            FROM DUAL
+		        </foreach>
+        	   ) A
+	</insert>
+	<!--查询样品评审用户组关联会员列表-->
+    <select id="queryReviewGroupUserList" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select t1.*,rownum rn from (
+                select
+                    utd.user_group_id,ui.id user_id,ui.login_name,ui.user_manage_name,
+                    (case ba.score when null then ' ' else (select grade_name from tbl_user_grade_info sg where min_score &lt;= ba.score and max_score &gt; ba.score and rownum &lt; = 1) end) score_grade
+                from
+                    tbl_review_user_group_detail utd
+                left join tbl_user_info ui on utd.user_id = ui.id
+                left join tbl_bank_account ba on utd.user_id = ba.user_id
+                where
+                    utd.user_group_id = #{review_user_group_id,jdbcType=INTEGER}
+                <if test="user_name != null and user_name != ''">
+                    and (
+                    	ui.login_name like '%'||#{user_name,jdbcType=VARCHAR}||'%' 
+                    	or
+                    	ui.user_manage_name like '%'||#{user_name,jdbcType=VARCHAR}||'%' 
+                    )
+                </if>
+                order by utd.id desc
+            ) t1 where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--查询样品评审用户组关联会员总数量-->
+    <select id="queryReviewGroupUserCount" parameterType="java.util.Map" resultType="int">
+        select
+          count(1)
+        from tbl_review_user_group_detail utd
+        left join tbl_user_info ui on utd.user_id = ui.id
+        where utd.user_group_id = #{review_user_group_id,jdbcType=INTEGER}
+        <if test="user_name != null and user_name != ''">
+            and (
+                    	ui.login_name like '%'||#{user_name,jdbcType=VARCHAR}||'%' 
+                    	or
+                    	ui.user_manage_name like '%'||#{user_name,jdbcType=VARCHAR}||'%' 
+            )
+        </if>
+    </select>
+    <!--样品评审用户组明细删除 -->
+	<delete id="deleteReviewUserGroupDetail" parameterType="java.util.Map">
+		delete from  tbl_review_user_group_detail 
+			where user_group_id = #{user_group_id,jdbcType=INTEGER}
+		and user_id in
+		 <foreach collection="user_list" item="item"  open="(" separator="," close=")">   
+           #{item.user_id}  
+        </foreach> 
+	</delete>
+	<!-- 修改样品评审用户组主表信息-->
+	<update id="editReviewUserGroup" parameterType="java.util.Map">
+		update tbl_review_user_group
+		<set>
+			<if test="user_group_name != null and user_group_name != ''">
+				user_group_name = #{user_group_name,jdbcType=VARCHAR},
+			</if>
+			<if test="remark != null and remark != ''">
+				remark = #{remark,jdbcType=VARCHAR},
+			</if>
+			<if test="type != null and type != 0">
+				type = #{type,jdbcType=INTEGER}
+			</if>
+		</set>
+		where id = #{user_group_id,jdbcType=INTEGER}
+	</update>
+	<!--根据分组ID删除样品评审主表数据 -->
+	<delete id="deleteReviewUserGroupByGroupId" parameterType="java.util.Map">
+		delete from  tbl_review_user_group
+			where id = #{user_group_id,jdbcType=INTEGER}
+	</delete>
+	<!--根据分组ID删除样品评审分组用户信息 -->
+	<delete id="deleteReviewUserGroupDetailByGroupId" parameterType="java.util.Map">
+		delete from  tbl_review_user_group_detail
+			where user_group_id = #{user_group_id,jdbcType=INTEGER}
+	</delete>
+	<!--根据分组ID删除样品评审分组品牌信息-->
+	<delete id="deleteReviewGroupBrandByGroupId" parameterType="java.util.Map">
+		delete from  tbl_review_group_brand
+			where user_group_id = #{user_group_id,jdbcType=INTEGER}
+	</delete>
+	<!--判断当前分组名称是否被使用-->
+    <select id="queryReviewUserGroupByGroupName" parameterType="java.util.Map" resultType="int">
+        select
+          count(1)
+        from tbl_review_user_group 
+        where user_group_name = #{user_group_name,jdbcType=VARCHAR}
+        <if test="id != null and id != '' and id !=0">
+			and id  &lt;&gt;#{id,jdbcType=INTEGER}
+		</if>
+    </select>
+    <!--根据分组id查询当前分组下的用户数量-->
+    <select id="queryReviewUserGroupDetailCountByGroupId" parameterType="java.util.Map" resultType="int">
+        select
+          count(1)
+        from tbl_review_user_group_detail 
+        where user_group_id = #{user_group_id,jdbcType=INTEGER}
+    </select>
+    <!-- 更新用户组启用/禁用状态-->
+	<update id="updateSampleReviewUserGroupState" parameterType="java.util.Map">
+		update tbl_review_user_group
+			set state=#{state,jdbcType=INTEGER}
+		where id = #{user_group_id,jdbcType=INTEGER}
+	</update>
+	<!--查询样品评审用户组主表详情-->
+    <select id="queryReviewUserGroupDetail" parameterType="java.util.Map" resultType="java.util.Map">
+        select id, 
+  			   user_group_name,
+  			   state,
+  			   remark,
+  			   to_char(create_date, 'yyyy-mm-dd hh24:mi:ss') as create_date,
+  			   create_user_id,
+  			   (select to_char(wm_concat(brand_id)) from tbl_review_group_brand where user_group_id=#{user_group_id,jdbcType=INTEGER}  group by user_group_id)brand_ids,
+  			   (select count(1) from tbl_review_user_group_detail trugd where trugd.user_group_id = #{user_group_id,jdbcType=INTEGER})  as user_num,
+  			   type
+          from tbl_review_user_group
+        where id = #{user_group_id,jdbcType=INTEGER}
+    </select>
+    
+    <!-- 样品评审数量 -->
+	<select id="querySampleReviewCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from (select tsi.*,
+		  			   case when tsi.STATE != 3 then
+		  			   		0
+		  			        when tsi.STATE = 3 and tsi.REVIEW_STOP_STATE = 1 then
+		  			      	4
+		  			      	when tsi.STATE = 3 and tsi.REVIEW_START_DATE &gt;= sysdate then
+		  			      	1
+		  			      	when tsi.STATE = 3 and tsi.REVIEW_END_DATE &lt; sysdate then
+		  			      	3
+		  			   else 2 end as review_state
+				  from tbl_sample_info tsi
+				 <where>
+				 	    delete_flag = 0
+					<if test="stationed_user_name != null and stationed_user_name != ''">
+						and exists(select 1 from tbl_stationed_user_info where id = tsi.stationed_user_id and company_name like '%'||#{stationed_user_name,jdbcType=VARCHAR}||'%')
+					</if>
+					<if test="sample_name != null and sample_name != ''">
+						and sample_name like '%'||#{sample_name,jdbcType=VARCHAR}||'%'
+					</if>
+					<if test="itemnumber != null and itemnumber != ''">
+						and itemnumber like '%'||#{itemnumber,jdbcType=VARCHAR}||'%'
+					</if>
+					<if test="brand_id != null and brand_id != ''">
+						and brand_id = #{brand_id,jdbcType=INTEGER}
+					</if>
+					<if test="review_start_date != null and review_start_date !=''">
+						and review_start_date &gt;= to_date(#{review_start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+					</if>
+					<if test="review_end_date != null and review_end_date !=''">
+						and review_end_date &lt;= to_date(#{review_start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+					</if>
+				 </where>)
+	     <where>
+	        review_state in (1,2,3,4)
+		 	<if test="review_state != null">
+				and review_state in
+                <foreach item="item" collection="review_state" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+			</if>
+		 </where>
+	</select>
+	<sql id="all_column_review_list">
+			tsi.id,
+			tsi.stationed_user_id,
+			tsi.brand_id,
+			tsi.itemnumber,
+			tsi.sample_name,
+			tsi.create_user_id,
+			to_char(tsi.create_date,'yyyy-mm-dd hh24:mi:ss') as create_date,
+			tsi.update_user_id,
+			to_char(tsi.update_date,'yyyy-mm-dd hh24:mi:ss') as update_date,
+			tsi.approval_user_id,
+			to_char(tsi.approval_date,'yyyy-mm-dd hh24:mi:ss') as approval_date,
+			tsi.sample_img_url,
+			tsi.sample_floor_price,
+			tsi.sample_ceiling_price,
+			tsi.state,
+			case when state = 1 then '草稿'
+				 when state = 2 then '待审批'
+				 when state = 3 then '已通过'
+				 else '已驳回' end state_name,
+			tsi.rejected_reason,
+			to_char(tsi.review_start_date, 'yyyy-mm-dd hh24:mi:ss') as review_start_date,
+			case when tsi.review_stop_state = 1 then to_char(tsi.review_stop_date, 'yyyy-mm-dd hh24:mi:ss')
+			     else to_char(tsi.review_end_date, 'yyyy-mm-dd hh24:mi:ss') end review_end_date,
+			tsi.review_stop_state
+	</sql>
+	<!-- 样品评审列表 -->
+	<select id="querySampleReviewList" parameterType="java.util.Map" resultType="java.util.Map">
+		select a.*,
+			   (select brand_name from tbl_dic_product_brand tdpb where tdpb.id = a.brand_id)  as brand,
+    		   (select company_name from tbl_stationed_user_info tsui where tsui.id = a.stationed_user_id)  as stationed_user_name,
+    		   (select tsui.user_realname from tbl_sys_user_info tsui where tsui.id = a.approval_user_id) as approval_user_realname,
+    		   (select tsui.user_name from tbl_stationed_user_info tsui where tsui.id = a.update_user_id) as update_user_name,
+    		   (select tsui.contacts from tbl_stationed_user_info tsui where tsui.id = a.update_user_id) as  update_user_realname,
+    		   (select count(1) from tbl_sample_review_record where sample_itemnumber = a.itemnumber) as review_count,
+    		   (select to_char(wm_concat(type_name)) from tbl_sample_review_type where sample_itemnumber = a.itemnumber) type_names
+		  from (select t.*, rownum rn
+		  		  from (select *
+						  from (select <include refid="all_column_review_list"/>,
+						  			   case when tsi.STATE != 3 then
+						  			   		0
+						  			        when tsi.STATE = 3 and tsi.REVIEW_STOP_STATE = 1 then
+						  			      	4
+						  			      	when tsi.STATE = 3 and tsi.REVIEW_START_DATE &gt;= sysdate then
+						  			      	1
+						  			      	when tsi.STATE = 3 and tsi.REVIEW_END_DATE &lt; sysdate then
+						  			      	3
+						  			   else 2 end as review_state
+								  from tbl_sample_info tsi
+								 <where>
+								 	    delete_flag = 0
+									<if test="stationed_user_name != null and stationed_user_name != ''">
+										and exists(select 1 from tbl_stationed_user_info where id = tsi.stationed_user_id and company_name like '%'||#{stationed_user_name,jdbcType=VARCHAR}||'%')
+									</if>
+									<if test="sample_name != null and sample_name != ''">
+										and sample_name like '%'||#{sample_name,jdbcType=VARCHAR}||'%'
+									</if>
+									<if test="itemnumber != null and itemnumber != ''">
+										and itemnumber like '%'||#{itemnumber,jdbcType=VARCHAR}||'%'
+									</if>
+									<if test="brand_id != null and brand_id != ''">
+										and brand_id = #{brand_id,jdbcType=INTEGER}
+									</if>
+									<if test="review_start_date != null and review_start_date !=''">
+										and review_start_date &gt;= to_date(#{review_start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+									</if>
+									<if test="review_end_date != null and review_end_date !=''">
+										and review_end_date &lt;= to_date(#{review_start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+									</if>
+								 </where>)
+					     <where>
+					        review_state in (1,2,3,4)
+						 	<if test="review_state != null">
+								and review_state in
+				                <foreach item="item" collection="review_state" open="(" separator="," close=")">
+									#{item}
+								</foreach>
+							</if>
+						 </where>
+						 order by review_state,id)t
+		  		where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) a
+		 where rn &gt; #{start_rownum,jdbcType=INTEGER} 
+	</select>
+	
+	
+	<!-- 样品用户评审数量 -->
+	<select id="querySampleUserReviewCount" parameterType="java.util.Map" resultType="int">
+		  select count(1) 
+		    from tbl_sample_review_record tsrr
+		   where sample_itemnumber = #{itemnumber,jdbcType=VARCHAR}
+	</select>
+	
+	<!-- 样品评审列表 -->
+	<select id="querySampleUserReviewList" parameterType="java.util.Map" resultType="java.util.Map">
+		select a.*,
+    		   (select tui.login_name from tbl_user_info tui where tui.id = a.create_user_id) as create_name
+		  from (select t.*, rownum rn
+		  		  from (select tsrr.ID,
+				  			   tsrr.SAMPLE_ID,
+				  			   tsrr.SAMPLE_ITEMNUMBER,
+				  			   tsrr.CREATE_USER_ID,
+				  			   to_char(tsrr.CREATE_DATE,'YYYY-MM-DD HH24:MI:SS') AS CREATE_DATE
+						  from tbl_sample_review_record tsrr
+						 where sample_itemnumber = #{itemnumber,jdbcType=VARCHAR}
+						 order by tsrr.CREATE_DATE DESC)t
+		  		where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) a
+		 where rn &gt; #{start_rownum,jdbcType=INTEGER} 
+	</select>
+	
+	<!-- 获取样品评审类型列表【评审分析用】 -->
+	<select id="querySampleReviewTypeList" parameterType="java.util.Map" resultType="java.util.Map">
+		select id,
+			   type_name,
+			   if_open_score,
+			   if_suggest
+		  from tbl_sample_review_type
+		 where sample_itemnumber = #{itemnumber,jdbcType=VARCHAR}
+		 order by id ASC
+	</select>
+	
+	<!-- 样品评审类型基本配置项评审列表【评审分析用】 -->
+	<select id="querySampleReviewTypeBaseItemReviewList" parameterType="java.util.Map" resultType="java.util.Map">
+		select id,
+			   template_type_id AS review_type_id,
+			   grade,
+			   suggestion
+		  from tbl_sample_review_type_record
+		 where sample_id = #{SAMPLE_ID,jdbcType=INTEGER}
+		 	   and create_user_id = #{CREATE_USER_ID,jdbcType=INTEGER}
+	</select>
+	
+	<!-- 样品评审类型扩展配置项评审列表【评审分析用】 -->
+	<select id="querySampleReviewTypeExtendItemReviewList" parameterType="java.util.Map" resultType="java.util.Map">
+		select tsrtd1.id,
+			   tsrtd2.template_type_id as review_type_id,
+			   tsrtd2.template_form_name as review_form_name,
+			   tsrtd1.review_content as review_content
+		  from tbl_sample_review_type_drecord tsrtd1,tbl_sample_review_type_detail tsrtd2
+		 where tsrtd1.sample_id = #{SAMPLE_ID,jdbcType=INTEGER}
+		 	   and tsrtd1.create_user_id = #{CREATE_USER_ID,jdbcType=INTEGER}
+		 	   and tsrtd1.sample_review_detail_id = tsrtd2.id
+		order by tsrtd2.template_type_id,tsrtd2.ID asc 	   
+	</select>
+	<!-- 查询评分信息【评审分析用】 -->
+	<select id="queryGrade" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT one_star,
+		       CASE
+		          WHEN total = 0 THEN 0
+		          WHEN one_star = 0 THEN 0
+		          ELSE ROUND (one_star / total * 100, 2)
+		       END
+		          one_ratio,
+		          two_star,
+		       CASE
+		          WHEN total = 0 THEN 0
+		          WHEN two_star = 0 THEN 0
+		          ELSE ROUND (two_star / total * 100, 2)
+		       END
+		          two_ratio,
+		          three_star,
+		       CASE
+		          WHEN total = 0 THEN 0
+		          WHEN three_star = 0 THEN 0
+		          ELSE ROUND (three_star / total * 100, 2)
+		       END
+		          three_ratio,
+		          four_star,
+		       CASE
+		          WHEN total = 0 THEN 0
+		          WHEN four_star = 0 THEN 0
+		          ELSE ROUND (four_star / total * 100, 2)
+		       END
+		          four_ratio,
+		          five_star,
+		       CASE
+		          WHEN total = 0 THEN 0
+		          WHEN five_star = 0 THEN 0
+		          ELSE ROUND (five_star / total * 100, 2)
+		       END
+		          five_ratio,
+		       CASE
+		          WHEN total = 0 THEN 0
+		          WHEN total_grade = 0 THEN 0
+		          ELSE ROUND (total_grade / total, 1)
+		       END
+		       average
+		  FROM (SELECT (SELECT COUNT (1)
+		                  FROM TBL_SAMPLE_REVIEW_TYPE_RECORD T
+		                 WHERE TEMPLATE_TYPE_ID = #{template_type_id,jdbcType=INTEGER} AND sample_itemnumber = #{itemnumber,jdbcType=VARCHAR}
+		                   AND EXISTS (SELECT 1 FROM TBL_SAMPLE_REVIEW_RECORD WHERE create_user_id = T.create_user_id and sample_itemnumber = #{itemnumber,jdbcType=VARCHAR}))
+		                  total,
+		               (SELECT SUM (GRADE)
+		                  FROM TBL_SAMPLE_REVIEW_TYPE_RECORD T
+		                 WHERE TEMPLATE_TYPE_ID = #{template_type_id,jdbcType=INTEGER} AND sample_itemnumber = #{itemnumber,jdbcType=VARCHAR}
+		                   AND EXISTS (SELECT 1 FROM TBL_SAMPLE_REVIEW_RECORD WHERE create_user_id = T.create_user_id and sample_itemnumber = #{itemnumber,jdbcType=VARCHAR}))
+		                 total_grade,   
+		               (SELECT COUNT (1)
+		                  FROM TBL_SAMPLE_REVIEW_TYPE_RECORD T
+		                 WHERE TEMPLATE_TYPE_ID = #{template_type_id,jdbcType=INTEGER} AND sample_itemnumber = #{itemnumber,jdbcType=VARCHAR} AND GRADE = 1
+		                   AND EXISTS (SELECT 1 FROM TBL_SAMPLE_REVIEW_RECORD WHERE create_user_id = T.create_user_id and sample_itemnumber = #{itemnumber,jdbcType=VARCHAR}))
+		                  one_star,
+		               (SELECT COUNT (1)
+		                  FROM TBL_SAMPLE_REVIEW_TYPE_RECORD T
+		                 WHERE TEMPLATE_TYPE_ID = #{template_type_id,jdbcType=INTEGER} AND sample_itemnumber = #{itemnumber,jdbcType=VARCHAR} AND GRADE = 2
+		                   AND EXISTS (SELECT 1 FROM TBL_SAMPLE_REVIEW_RECORD WHERE create_user_id = T.create_user_id and sample_itemnumber = #{itemnumber,jdbcType=VARCHAR}))
+		                  two_star,
+		               (SELECT COUNT (1)
+		                  FROM TBL_SAMPLE_REVIEW_TYPE_RECORD T
+		                 WHERE TEMPLATE_TYPE_ID = #{template_type_id,jdbcType=INTEGER} AND sample_itemnumber = #{itemnumber,jdbcType=VARCHAR} AND GRADE = 3
+		                   AND EXISTS (SELECT 1 FROM TBL_SAMPLE_REVIEW_RECORD WHERE create_user_id = T.create_user_id and sample_itemnumber = #{itemnumber,jdbcType=VARCHAR}))
+		                  three_star,
+		               (SELECT COUNT (1)
+		                  FROM TBL_SAMPLE_REVIEW_TYPE_RECORD T
+		                 WHERE TEMPLATE_TYPE_ID = #{template_type_id,jdbcType=INTEGER} AND sample_itemnumber = #{itemnumber,jdbcType=VARCHAR} AND GRADE = 4
+		                   AND EXISTS (SELECT 1 FROM TBL_SAMPLE_REVIEW_RECORD WHERE create_user_id = T.create_user_id and sample_itemnumber = #{itemnumber,jdbcType=VARCHAR}))
+		                  four_star,
+		               (SELECT COUNT (1)
+		                  FROM TBL_SAMPLE_REVIEW_TYPE_RECORD T
+		                 WHERE TEMPLATE_TYPE_ID = #{template_type_id,jdbcType=INTEGER} AND sample_itemnumber = #{itemnumber,jdbcType=VARCHAR} AND GRADE = 5
+		                   AND EXISTS (SELECT 1 FROM TBL_SAMPLE_REVIEW_RECORD WHERE create_user_id = T.create_user_id and sample_itemnumber = #{itemnumber,jdbcType=VARCHAR}))
+		                  five_star
+		          FROM DUAL)
+	</select>
+	<!-- 查询评审项明细列表【评审分析用】 -->
+	<select id="querySampleReviewTypeDetailList" parameterType="java.util.Map" resultType="java.util.Map">
+		select id,template_form_name,template_form_option 
+		  from tbl_sample_review_type_detail 
+		 where sample_itemnumber = #{itemnumber,jdbcType=VARCHAR}
+		   and template_type_id = #{template_type_id,jdbcType=INTEGER}
+		 order by id
+	</select>
+	<!-- 查询反馈内容 【评审分析用】-->
+	<select id="queryReviewContent" parameterType="java.util.Map" resultType="java.util.Map">
+		select #{review_content,jdbcType=VARCHAR} as review_content,
+			   review_count,
+			   case when total = 0 or review_count = 0 then 0
+					else round (review_count / total * 100, 2) end review_ratio 
+		  from (select (select count(1) from tbl_sample_review_type_drecord t where
+						sample_itemnumber = #{itemnumber,jdbcType=VARCHAR} and sample_review_detail_id = #{sample_review_detail_id,jdbcType=INTEGER}
+						and exists (select 1 from tbl_sample_review_record where create_user_id = t.create_user_id and sample_itemnumber = #{itemnumber,jdbcType=VARCHAR}))
+						total,
+						(select count(1) from tbl_sample_review_type_drecord t where sample_itemnumber =
+						#{itemnumber,jdbcType=VARCHAR} and sample_review_detail_id = #{sample_review_detail_id,jdbcType=INTEGER} and review_content like '%'||#{review_content,jdbcType=VARCHAR}||'%'
+						and exists (select 1 from tbl_sample_review_record where create_user_id = t.create_user_id and sample_itemnumber = #{itemnumber,jdbcType=VARCHAR}))
+				review_count from dual)
+	</select>
+	<!-- 客户建议列表【评审分析用】 -->
+	<select id="queryUserSuggestionList" parameterType="java.util.Map" resultType="java.util.Map">
+		select create_user_id,
+		       (select user_manage_name from tbl_user_info where id = t.create_user_id) create_user_name,suggestion 
+		  from tbl_sample_review_type_record t 
+		 where template_type_id = #{template_type_id,jdbcType=INTEGER}
+		   and sample_itemnumber = #{itemnumber,jdbcType=VARCHAR}
+		   and suggestion is not null
+		   and exists (select 1 from tbl_sample_review_record where create_user_id = t.create_user_id and sample_itemnumber = #{itemnumber,jdbcType=VARCHAR})
+		   order by create_date desc
+	</select>
+	<!-- 终止评审【评审分析用】 -->
+	<update id="updateReviewStop" parameterType="java.util.Map">
+		update tbl_sample_info
+		   set review_stop_state = 1,
+		   	   review_stop_date = sysdate
+		 where itemnumber = #{itemnumber,jdbcType=VARCHAR}
+	</update>
+</mapper>

@@ -1,0 +1,947 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.analysis.dao.SalesAchievementDao">
+	<!-- 查询销售人员绩效分析数量 -->
+	<select id="queryCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		    from (select temp.store_id,
+				       temp.store_name,
+				       temp.ywjl_user_id,
+				       temp.ywjl_user_name,
+				       temp.ywjl_user_realname,
+				       temp.ywy_user_id,
+				       temp.ywy_user_name,
+				       temp.ywy_user_realname,
+				       nvl (temp6.member_count, 0) member_count
+				  from (select tsi.id as store_id,
+				               tsi.store_name,
+				               tsi.manager_user_id as ywjl_user_id,
+				               (select user_name
+				                  from tbl_sys_user_info
+				                 where id = tsi.manager_user_id)
+				                  ywjl_user_name,
+				               (select user_realname
+				                  from tbl_sys_user_info
+				                 where id = tsi.manager_user_id)
+				                  ywjl_user_realname,
+				               tsur.user_id as ywy_user_id,
+				               (select user_name
+				                  from tbl_sys_user_info
+				                 where id = tsur.user_id)
+				                  ywy_user_name,
+				               (select user_realname
+				                  from tbl_sys_user_info
+				                 where id = tsur.user_id)
+				                  ywy_user_realname
+				          from tbl_store_info tsi, tbl_store_user_rel tsur
+				         where     tsi.manager_user_id is not null
+				               and tsi.id = tsur.store_id
+				               and tsur.type = '3') temp
+				       left join (select (select user_name from tbl_sys_user_info where id = tui.referee_user_id) as ywy_user_name, store_id as md_id,count(distinct user_name) member_count
+				                    from tbl_user_info tui
+				                  where user_type=1
+				                group by referee_user_id,store_id) temp6
+				          on temp.ywy_user_name = temp6.ywy_user_name
+				         and temp.store_id = temp6.md_id
+				union all
+				select temp.store_id,
+				       temp.store_name,
+				       temp.ywjl_user_id,
+				       temp.ywjl_user_name,
+				       temp.ywjl_user_realname,
+				       temp.ywy_user_id,
+				       temp.ywy_user_name,
+				       temp.ywy_user_realname,
+				       nvl (temp6.member_count, 0) member_count
+				  from (select tsi.id as store_id,
+				               tsi.store_name,
+				               tsi.manager_user_id as ywjl_user_id,
+				               (select user_name
+				                  from tbl_sys_user_info
+				                 where id = tsi.manager_user_id)
+				                  ywjl_user_name,
+				               (select user_realname
+				                  from tbl_sys_user_info
+				                 where id = tsi.manager_user_id)
+				                  ywjl_user_realname,
+				               0 ywy_user_id,
+				               '0' ywy_user_name,
+				               '' ywy_user_realname
+				          from tbl_store_info tsi
+				         where tsi.manager_user_id is not null) temp
+				       
+				       left join
+				       (select store_id as md_id,0 as ywy_user_id,count(distinct user_name) member_count
+				            from tbl_user_info tui
+				           where     user_type=1
+				                 and store_id is not null
+				        group by store_id) temp6
+				          on     temp.store_id = temp6.md_id
+				             and temp.ywy_user_id = temp6.ywy_user_id) a
+					<where>
+						<if test="ywjl_user_id != null and ywjl_user_id != '' ">
+					    	and	a.ywjl_user_id = #{ywjl_user_id,jdbcType=VARCHAR}
+						</if>
+						<if test="store_id != null and store_id != 0 ">
+						    and	a.store_id = #{store_id,jdbcType=INTEGER}
+						</if>
+						<if test="ywy_user_id != null and ywy_user_id != '' ">
+						    and	a.ywy_user_id = #{ywy_user_id,jdbcType=VARCHAR}
+						</if>
+						 <if test="public_user_type != null and public_user_type == 2">
+				            and exists (select 1 from tbl_sys_user_store tsus where tsus.store_id = a.store_id and tsus.user_id = #{public_user_id,jdbcType=INTEGER})
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 3">
+				            and a.ywy_user_id = #{public_user_id,jdbcType=INTEGER}
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 4">
+				            and a.ywjl_user_id = #{public_user_id,jdbcType=INTEGER}
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 5">
+				            and exists(select 1 from tbl_store_info tsi where tsi.id = a.store_id and tsi.shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER})
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 6">
+				            and exists(select 1 from tbl_store_user_rel tsui where tsui.store_id = a.store_id and tsui.user_id = #{public_user_id,jdbcType=INTEGER})
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 9">
+				            and exists(select 1 
+				                         from tbl_sys_user_info tsui
+				                        where tsui.user_type = 4
+				            				  and tsui.organization_id in (
+												  	select id from tbl_sys_organization_info where connect_by_isleaf=1
+												  	start with parent_id = #{public_user_organization_id,jdbcType=INTEGER} connect by prior id = parent_id
+									              )
+									          and tsui.id = a.ywjl_user_id)
+				        </if>
+					</where>
+	</select>
+	<!-- 查询销售人员绩效分析列表 -->
+	<select id="queryListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+			select info.*, rownum rn from (
+				select a.*
+				    from (select temp.store_id,
+						       temp.store_name,
+						       temp.ywjl_user_id,
+						       temp.ywjl_user_name,
+						       temp.ywjl_user_realname,
+						       temp.ywy_user_id,
+						       temp.ywy_user_name,
+						       temp.ywy_user_realname,
+						       nvl (temp6.member_count, 0) member_count
+						  from (select tsi.id as store_id,
+						               tsi.store_name,
+						               tsi.manager_user_id as ywjl_user_id,
+						               (select user_name
+						                  from tbl_sys_user_info
+						                 where id = tsi.manager_user_id)
+						                  ywjl_user_name,
+						               (select user_realname
+						                  from tbl_sys_user_info
+						                 where id = tsi.manager_user_id)
+						                  ywjl_user_realname,
+						               tsur.user_id as ywy_user_id,
+						               (select user_name
+						                  from tbl_sys_user_info
+						                 where id = tsur.user_id)
+						                  ywy_user_name,
+						               (select user_realname
+						                  from tbl_sys_user_info
+						                 where id = tsur.user_id)
+						                  ywy_user_realname
+						          from tbl_store_info tsi, tbl_store_user_rel tsur
+						         where     tsi.manager_user_id is not null
+						               and tsi.id = tsur.store_id
+						               and tsur.type = '3') temp
+						       left join (select (select user_name from tbl_sys_user_info where id = tui.referee_user_id) as ywy_user_name, store_id as md_id,count(distinct user_name) member_count
+							                    from tbl_user_info tui
+							                  where user_type=1
+							                group by referee_user_id,store_id) temp6
+						          on temp.ywy_user_name = temp6.ywy_user_name
+						         and temp.store_id = temp6.md_id
+						union all
+						select temp.store_id,
+						       temp.store_name,
+						       temp.ywjl_user_id,
+						       temp.ywjl_user_name,
+						       temp.ywjl_user_realname,
+						       temp.ywy_user_id,
+						       temp.ywy_user_name,
+						       temp.ywy_user_realname,
+						       nvl (temp6.member_count, 0) member_count
+						  from (select tsi.id as store_id,
+						               tsi.store_name,
+						               tsi.manager_user_id as ywjl_user_id,
+						               (select user_name
+						                  from tbl_sys_user_info
+						                 where id = tsi.manager_user_id)
+						                  ywjl_user_name,
+						               (select user_realname
+						                  from tbl_sys_user_info
+						                 where id = tsi.manager_user_id)
+						                  ywjl_user_realname,
+						               0 ywy_user_id,
+						               '0' ywy_user_name,
+						               '' ywy_user_realname
+						          from tbl_store_info tsi
+						         where tsi.manager_user_id is not null) temp
+						       
+						       left join
+						       (select store_id as md_id,0 as ywy_user_id,count(distinct user_name) member_count
+						            from tbl_user_info tui
+						           where     user_type=1
+						                 and store_id is not null
+						        group by store_id) temp6
+						          on     temp.store_id = temp6.md_id
+						             and temp.ywy_user_id = temp6.ywy_user_id) a
+							<where>
+								<if test="ywjl_user_id != null and ywjl_user_id != '' ">
+							    	and	a.ywjl_user_id = #{ywjl_user_id,jdbcType=VARCHAR}
+								</if>
+								<if test="store_id != null and store_id != 0 ">
+								    and	a.store_id = #{store_id,jdbcType=INTEGER}
+								</if>
+								<if test="ywy_user_id != null and ywy_user_id != '' ">
+								    and	a.ywy_user_id = #{ywy_user_id,jdbcType=VARCHAR}
+								</if>
+								 <if test="public_user_type != null and public_user_type == 2">
+						            and exists (select 1 from tbl_sys_user_store tsus where tsus.store_id = a.store_id and tsus.user_id = #{public_user_id,jdbcType=INTEGER})
+						        </if>
+						        <if test="public_user_type != null and public_user_type == 3">
+						            and a.ywy_user_id = #{public_user_id,jdbcType=INTEGER}
+						        </if>
+						        <if test="public_user_type != null and public_user_type == 4">
+						            and a.ywjl_user_id = #{public_user_id,jdbcType=INTEGER}
+						        </if>
+						        <if test="public_user_type != null and public_user_type == 5">
+						            and exists(select 1 from tbl_store_info tsi where tsi.id = a.store_id and tsi.shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER})
+						        </if>
+						        <if test="public_user_type != null and public_user_type == 6">
+						            and exists(select 1 from tbl_store_user_rel tsui where tsui.store_id = a.store_id and tsui.user_id = #{public_user_id,jdbcType=INTEGER})
+						        </if>
+						        <if test="public_user_type != null and public_user_type == 9">
+						            and exists(select 1 
+						                         from tbl_sys_user_info tsui
+						                        where tsui.user_type = 4
+						            				  and tsui.organization_id in (
+														  	select id from tbl_sys_organization_info where connect_by_isleaf=1
+														  	start with parent_id = #{public_user_organization_id,jdbcType=INTEGER} connect by prior id = parent_id
+											              )
+											          and tsui.id = a.ywjl_user_id)
+						        </if>
+							</where>
+						order by a.ywjl_user_id, a.store_id
+				) info
+		      where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 查询门店业务员所属会员 -->
+	<select id="queryUserList" parameterType="java.util.Map" resultType="java.util.Map">
+		select user_name
+	    from tbl_user_info
+	   where user_type = 1
+	   	<choose>
+	   		<when test="ywy_user_id != null and ywy_user_id != ''">
+	   			and referee_user_id = #{ywy_user_id,jdbcType=INTEGER}
+	   		</when>
+	   		<otherwise>and referee_user_id is null</otherwise>
+	   	</choose>
+	     and store_id = #{store_id,jdbcType=INTEGER}
+	</select>
+	<!-- 查询级别会员数量信息 -->
+	<select id="queryGradeUserInfo" parameterType="java.util.Map" resultType="java.util.Map">
+		select count(user_name) user_count,to_char(wm_concat(user_name)) user_name
+			from (
+    		select temp.user_name,
+			   nvl (temp2.sales_money_total, 0) sales_money_total,
+			   case
+		          when nvl (temp3.return_product_count, 0) = 0
+		          then
+		             0
+		          when nvl (temp3.product_count, 0) = 0
+		          then
+		             0
+		          else
+		             round (temp3.return_product_count / temp3.product_count * 100,
+		                    2)
+		       end
+		          return_rate
+				 from 
+				 (<foreach collection="user_list" item="item" index="index" separator="union all">
+               	select #{item.USER_NAME} as user_name
+               	  from dual
+               </foreach>) temp
+				 left join
+				 (select  t1.user_name, nvl(t1.payment_money,0) - nvl(t2.return_total_money,0) sales_money_total from (
+                    select user_name,sum (toi.payment_money ) payment_money
+			          from tbl_order_info toi
+			         where     toi.payment_state = 2
+				     	   and toi.payment_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+				     	   and toi.payment_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+                    	   group by user_name) t1,
+                    	   (select user_name,sum(return_total_money) return_total_money from tbl_order_return_info where
+                    	       check_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+			               and check_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+			               and state = 2
+			               group by user_name) t2
+			               where t1.user_name = t2.user_name(+)
+					) temp2 on temp.user_name = temp2.user_name
+		        left join
+				 (select a.user_name,a.product_count,b.return_product_count 
+				  from
+				  (select user_name,sum (toi.product_count) product_count
+					from tbl_order_info toi
+					where    toi.payment_state = 2
+					     and toi.payment_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+					     and toi.payment_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+					   group by user_name) a,
+					   (select toi.user_name,
+						     sum (t1.return_product_count) return_product_count
+						 from tbl_order_info toi,(select t3.order_number_platform, count (t3.id) return_product_count
+						    from ${jdbc_user}.tbl_new_return_order t2, ${jdbc_user}.tbl_new_return_detail_code t3
+						      where t2.return_number = t3.return_number
+						      and t2.state = '8'
+						      and t2.refund_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						      and t2.refund_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						      group by t3.order_number_platform) t1
+						  where toi.payment_state = 2
+						   and toi.order_number = t1.order_number_platform(+)
+						group by toi.user_name) b
+					where a.user_name = b.user_name) temp3 on temp.user_name = temp3.user_name) 
+			where sales_money_total &gt;= #{money,jdbcType=INTEGER} and return_rate &lt;= #{return_rate,jdbcType=INTEGER}
+			<if test="user_names != null and user_names != ''">
+				and user_name not in 
+				<foreach item="item" collection="user_names" open="(" separator="," close=")">
+	        		#{item}
+	        	</foreach>
+			</if>
+	</select>
+	
+    <!--查询有效会员数量-->
+    <select id="countEffectiveMember" parameterType="java.util.Map" resultType="int">
+        select
+            count(1)
+        from (
+            select
+                user_name,
+                order_number,
+                payment_date,
+                payment_money,
+                order_state,row_number() over(partition by user_name order by payment_date) as rn
+            from (
+                select
+					oi.order_number,
+					oi.user_name,
+					oi.payment_date,
+                    to_char(oi.order_state) order_state,
+					oi.payment_money
+                from
+                    tbl_order_info oi
+                where
+					oi.payment_state = 2
+				and exists (
+					select 1 from tbl_user_info where user_name = oi.user_name and user_type = 1
+					and store_id = #{store_id,jdbcType=INTEGER}
+				<if test="ywy_user_id != null and ywy_user_id !=''">
+					and referee_user_id = #{ywy_user_id,jdbcType=INTEGER}
+				</if>
+				)
+                union all
+                select
+					poi.order_number,
+					to_char(poi.user_id) user_name,
+					poi.payment_date,
+					poi.order_state,
+					poi.product_money as payment_money
+                from
+                    tbl_pre_order_info poi
+                where
+					poi.payment_state = 2
+				and exists (
+					select 1 from tbl_user_info where id = poi.user_id and user_type = 1
+					and store_id = #{store_id,jdbcType=INTEGER}
+				<if test="ywy_user_id != null and ywy_user_id !=''">
+					and referee_user_id = #{ywy_user_id,jdbcType=INTEGER}
+				</if>
+				)
+            )
+        ) temp where temp.rn &lt;= 1 and temp.payment_money &gt;= #{money,jdbcType=INTEGER}
+		<if test="start_date != null and start_date != ''">
+			and temp.payment_date &gt; to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+		</if>
+		<if test="end_date != null and end_date != ''">
+			and temp.payment_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+		</if>
+    </select>
+
+    <!--查询有效会员列表-->
+    <select id="listEffectiveMember" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+			select info.*, rownum rn from (
+				select
+					temp.order_number,
+					temp.order_state,
+					temp.payment_money,
+					tui.login_name,
+					tui.user_name,
+					tui.user_manage_name,
+                    to_char(temp.payment_date,'yyyy-mm-dd hh24:mi:ss') payment_date,
+					to_char(tui.user_last_login_date,'yyyy-mm-dd hh24:mi:ss') last_login_date,
+					to_char(tui.create_date,'yyyy-mm-dd hh24:mi:ss') create_date
+				from (
+					select
+						user_name,
+						order_number,
+						payment_date,
+						payment_money,
+						order_state,
+						row_number() over(partition by user_name order by payment_date) as rn
+					from (
+						select
+							oi.order_number,
+							oi.user_name,
+							oi.payment_date,
+							to_char(oi.order_state) order_state,
+							oi.payment_money
+						from
+							tbl_order_info oi
+						where
+							oi.payment_state = 2
+						and exists (
+							select 1 from tbl_user_info where user_name = oi.user_name and user_type = 1
+							and store_id = #{store_id,jdbcType=INTEGER}
+							<if test="ywy_user_id != null and ywy_user_id !=''">
+								and referee_user_id = #{ywy_user_id,jdbcType=INTEGER}
+							</if>
+						)
+						union all
+						select
+							poi.order_number,
+							to_char(poi.user_id) user_name,
+							poi.payment_date,
+							poi.order_state,
+							poi.product_money as payment_money
+						from
+							tbl_pre_order_info poi
+						where
+							poi.payment_state = 2
+						and exists (
+							select 1 from tbl_user_info where id = poi.user_id and user_type = 1
+							and store_id = #{store_id,jdbcType=INTEGER}
+							<if test="ywy_user_id != null and ywy_user_id !=''">
+								and referee_user_id = #{ywy_user_id,jdbcType=INTEGER}
+							</if>
+						)
+					)
+				) temp
+				left join tbl_user_info tui on temp.user_name = tui.user_name
+				where temp.rn &lt;= 1 and temp.payment_money &gt;= #{money,jdbcType=INTEGER}
+				<if test="start_date != null and start_date != ''">
+					and temp.payment_date &gt; to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+				</if>
+				<if test="end_date != null and end_date != ''">
+					and temp.payment_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+				</if>
+				order by temp.user_name
+			) info where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+		) where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--根据类型查询统计规则列表-->
+    <select id="listSalesAchieveRuleByType" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            id,
+            grade_name,
+            money,
+            return_rate,
+            sleep_date_value,
+            case when sleep_date_type=1 then '年' when sleep_date_type=2 then '月' else '日' end sleep_date_type_z ,
+            active_date_value,
+            case when active_date_type=1 then '年' when active_date_type=2 then '月' else '日' end active_date_type_z,
+            sleep_date_type,
+            active_date_type
+        from tbl_sales_achieve_rule
+        where type = #{rule_type,jdbcType=INTEGER}
+        <if test="rule_id != null and rule_id != ''">
+        	and id = #{rule_id,jdbcType=INTEGER}
+        </if>
+        order by money desc
+    </select>
+
+    <!--分页查询会员列表-->
+    <select id="listMemberForPage" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select info.*, rownum rn from (
+                select
+                    tui.user_state,
+                    tui.login_name,
+                    tui.user_manage_name,
+                    <if test="rule_type == 1">
+                    (select  nvl(t1.payment_money,0) - nvl(t2.return_total_money,0) sales_money_total from (
+                    select user_name,sum (toi.payment_money ) payment_money
+			          from tbl_order_info toi
+			         where     toi.payment_state = 2
+				     	   and toi.payment_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+				     	   and toi.payment_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+                    	   group by user_name) t1,
+                    	   (select user_name,sum(return_total_money) return_total_money from tbl_order_return_info where
+                    	       check_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+			               and check_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+			               and state = 2
+			               group by user_name) t2
+			               where t1.user_name = t2.user_name(+)
+			                 and t1.user_name = tui.user_name) money,
+                    (select case
+					          when nvl (b.return_product_count, 0) = 0
+					          then
+					             0
+					          when nvl (a.product_count, 0) = 0
+					          then
+					             0
+					          else
+					             round (b.return_product_count / a.product_count * 100,
+					                    2)
+					       end
+					          return_rate
+					  from
+					  (select user_name,sum (toi.product_count) product_count
+						from tbl_order_info toi
+						where    toi.payment_state = 2
+						     and toi.payment_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						     and toi.payment_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+						     and toi.user_name in 
+				        	<foreach item="item" collection="user_names" open="(" separator="," close=")">
+				        		#{item}
+				        	</foreach>
+						   group by user_name) a,
+						   (select toi.user_name,
+							     sum (t1.return_product_count) return_product_count
+							 from tbl_order_info toi,(select t3.order_number_platform, count (t3.id) return_product_count
+							    from ${jdbc_user}.tbl_new_return_order t2, ${jdbc_user}.tbl_new_return_detail_code t3
+							      where t2.return_number = t3.return_number
+							      and t2.state = '8'
+							      and t2.refund_date &gt;= to_date (#{start_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+							      and t2.refund_date &lt;= to_date (#{end_date,jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+							      group by t3.order_number_platform) t1
+							  where toi.payment_state = 2
+							   and toi.order_number = t1.order_number_platform(+)
+							   and toi.user_name in 
+				        	<foreach item="item" collection="user_names" open="(" separator="," close=")">
+				        		#{item}
+				        	</foreach>
+							group by toi.user_name) b
+						where a.user_name = b.user_name
+						  and a.user_name = tui.user_name
+                    ) return_rate,
+                    </if>
+                    to_char(tui.create_date,'yyyy-mm-dd hh24:mi:ss') create_date
+                from tbl_user_info tui
+                where tui.user_type = 1
+                and tui.store_id = #{store_id,jdbcType=INTEGER}
+                <if test="ywy_user_id != null and ywy_user_id !=''">
+                    and tui.referee_user_id = #{ywy_user_id,jdbcType=INTEGER}
+                </if>
+                <if test="rule_type == 1">
+		        	<choose>
+		        		<when test="user_names != null and user_names != ''">
+		        			and tui.user_name in 
+				        	<foreach item="item" collection="user_names" open="(" separator="," close=")">
+				        		#{item}
+				        	</foreach>
+		        		</when>
+		        		<otherwise>and 1=2</otherwise>
+		        	</choose>
+		        </if>
+                order by tui.create_date desc
+            ) info where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--查询会员列表总数量-->
+    <select id="countMemberForPage" parameterType="java.util.Map" resultType="int">
+        select
+            count(1)
+        from tbl_user_info tui
+        where tui.user_type = 1
+        and tui.store_id = #{store_id,jdbcType=INTEGER}
+        <if test="ywy_user_id != null and ywy_user_id !=''">
+            and tui.referee_user_id = #{ywy_user_id,jdbcType=INTEGER}
+        </if>
+        <if test="rule_type == 1">
+        	<choose>
+        		<when test="user_names != null and user_names != ''">
+        			and tui.user_name in 
+		        	<foreach item="item" collection="user_names" open="(" separator="," close=")">
+		        		#{item}
+		        	</foreach>
+        		</when>
+        		<otherwise>and 1=2</otherwise>
+        	</choose>
+        </if>
+    </select>
+
+    <!--批量新增或编辑统计规则-->
+    <insert id="batchInsertOrUpdateRule" parameterType="java.util.Map">
+        merge into tbl_sales_achieve_rule c1 using (
+            select
+                id,
+                #{rule_type,jdbcType=INTEGER} as type,
+                grade_name,
+                money,
+                return_rate,
+				sleep_date_value,
+				sleep_date_type,
+				active_date_value,
+				active_date_type
+            from (
+            <foreach collection="rule_list" open="(" close=")" item="item" index="index" separator="union all">
+                select
+                    #{item.rule_id,jdbcType=INTEGER} as id,
+                    #{item.grade_name,jdbcType=VARCHAR} as grade_name,
+                    #{item.money,jdbcType=INTEGER} as money,
+                    #{item.return_rate,jdbcType=INTEGER} as return_rate,
+                    #{item.sleep_date_value,jdbcType=INTEGER} as sleep_date_value,
+                    #{item.sleep_date_type,jdbcType=INTEGER} as sleep_date_type,
+					#{item.active_date_value,jdbcType=INTEGER} as active_date_value,
+					#{item.active_date_type,jdbcType=INTEGER} as active_date_type
+                from dual
+            </foreach>
+            )
+        ) t1 on (c1.id = t1.id)
+        when matched then
+        update set
+            c1.grade_name = (case when t1.grade_name is null then c1.grade_name else t1.grade_name end),
+            c1.money = (case when t1.money is null then c1.money else t1.money end),
+            c1.return_rate = (case when t1.return_rate is null then c1.return_rate else t1.return_rate end),
+            c1.sleep_date_value = (case when t1.sleep_date_value is null then c1.sleep_date_value else t1.sleep_date_value end),
+            c1.sleep_date_type = (case when t1.sleep_date_type is null then c1.sleep_date_type else t1.sleep_date_type end),
+			c1.active_date_value = (case when t1.active_date_value is null then c1.active_date_value else t1.active_date_value end),
+            c1.active_date_type = (case when t1.active_date_type is null then c1.active_date_type else t1.active_date_type end),
+            c1.update_date = sysdate,
+            c1.update_user_id = #{public_user_id,jdbcType=INTEGER}
+        when not matched then
+            insert
+            (
+                id,
+                type,
+                grade_name,
+                money,
+                return_rate,
+				sleep_date_value,
+				sleep_date_type,
+				active_date_value,
+				active_date_type,
+                create_date,
+                create_user_id,
+                update_date,
+                update_user_id
+            )
+            values
+            (
+                seq_sales_achieve_rule.nextval,
+                t1.type,
+                t1.grade_name,
+                t1.money,
+                t1.return_rate,
+                t1.sleep_date_value,
+                t1.sleep_date_type,
+				t1.active_date_value,
+				t1.active_date_type,
+                sysdate,
+                #{public_user_id,jdbcType=INTEGER},
+                sysdate,
+                #{public_user_id,jdbcType=INTEGER}
+            )
+    </insert>
+
+    <!--根据ID删除统计规则-->
+    <delete id="deleteRuleById" parameterType="java.lang.Long">
+        delete from tbl_sales_achieve_rule where id =  #{rule_id,jdbcType=INTEGER}
+    </delete>
+    <!-- 查询级别名称是否存在 -->
+    <select id="queryGradeNameIsExists" parameterType="java.util.Map" resultType="int">
+    	select count(1)
+    	  from tbl_sales_achieve_rule
+    	  where grade_name = #{grade_name,jdbcType=INTEGER}
+    	  <if test="rule_id != null and rule_id != ''">
+    	  	and id !=#{rule_id,jdbcType=INTEGER}
+    	  </if>
+    </select>
+    
+    <!-- 获取沉睡会员数量-->
+	<select id="getSleepMemberCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		    from tbl_user_info
+		 where user_type = 1
+	   	 <choose>
+			<when test="ywy_user_id != null and ywy_user_id !=''">
+	     		and referee_user_id = #{ywy_user_id,jdbcType=INTEGER}
+	     	</when>
+	     	<otherwise>
+	     		and referee_user_id is null 
+	     	</otherwise>
+	     </choose>
+	     and store_id = #{store_id,jdbcType=INTEGER}
+	     and sleep_state=1
+	</select>
+	
+	<!-- 获取激活会员数量-->
+	<select id="getActiveMemberCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		    from tbl_user_info tui
+		where user_type = 1
+			  and tui.sleep_state = 2
+	     <choose>
+			<when test="ywy_user_id != null and ywy_user_id !=''">
+	     		and referee_user_id = #{ywy_user_id,jdbcType=INTEGER}
+	     	</when>
+	     	<otherwise>
+	     		and referee_user_id is null 
+	     	</otherwise>
+	     </choose>
+	     and store_id = #{store_id,jdbcType=INTEGER}
+	     and exists(select 1 from tbl_member_achieve_log 
+	     				where user_id=tui.id and state=2
+	     				<if test="start_date != null and start_date != ''">
+							and create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+						</if>
+						<if test="end_date != null and end_date != ''">
+							and create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+						</if>)
+	</select>
+	
+	<!--获取激活会员数量-->
+    <select id="getEffectiveActiveMemberCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		    from tbl_user_info tui
+		   where user_type = 1
+		      <choose>
+				<when test="ywy_user_id != null and ywy_user_id !=''">
+		     		and referee_user_id = #{ywy_user_id,jdbcType=INTEGER}
+		     	</when>
+		     	<otherwise>
+		     		and referee_user_id is null 
+		     	</otherwise>
+		     </choose>
+		     and store_id = #{store_id,jdbcType=INTEGER}
+		     and exists(select 1 from tbl_member_achieve_log 
+		     				where user_id=tui.id and state=3
+		     				<if test="start_date != null and start_date != ''">
+								and create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+							</if>
+							<if test="end_date != null and end_date != ''">
+								and create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+							</if>)
+    </select>
+    
+    <!--查询休眠会员详情列表-->
+    <select id="queryMemberSleepDetailList" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select info.*, rownum rn from (
+                select user_state,
+                	   login_name,
+                	   user_manage_name,
+                	    to_char(user_last_login_date,'yyyy-mm-dd hh24:mi:ss')  as  user_last_login_date,
+                	   ceil(sysdate -USER_LAST_LOGIN_DATE) as sleep_date
+				    from tbl_user_info
+				 where user_type = 1
+			   	 <choose>
+					<when test="ywy_user_id != null and ywy_user_id !=''">
+			     		and referee_user_id = #{ywy_user_id,jdbcType=INTEGER}
+			     	</when>
+			     	<otherwise>
+			     		and referee_user_id is null 
+			     	</otherwise>
+			     </choose>
+			     and store_id = #{store_id,jdbcType=INTEGER}
+			     and sleep_state=1
+            ) info where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+    
+    <!--查询激活会员详情列表-->
+    <select id="queryMemberActiveDetailList" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select info.*,(info.pay_money-return_money) money, rownum rn from (
+                select login_name,
+                	   user_manage_name,
+                	   to_char(user_last_login_date,'yyyy-mm-dd hh24:mi:ss')  as  user_last_login_date,
+                	   to_char(create_date,'yyyy-mm-dd hh24:mi:ss')  as  create_date,
+                	   (SELECT NVL (SUM (toi.payment_money), 0) payment_money
+			                  FROM tbl_order_info toi
+			                 WHERE order_state IN (2, 3, 5)
+			                       AND payment_state = 2
+			                       AND user_name = tui.id
+			                       and toi.payment_date >=
+                                        (select max (create_date)
+                                           from tbl_member_achieve_log
+                                          where state = 2 and user_id = toi.user_name)
+                                    and toi.payment_date &lt;=(
+                                            select max (create_date) +
+                                                     (select case when active_date_type = 1
+                                                             then active_date_value * 365
+                                                             when active_date_type = 2
+                                                             then active_date_value * 30
+                                                             when active_date_type = 3
+                                                             then active_date_value end
+                                                     from tbl_sales_achieve_rule where type = 2)
+                                                   from tbl_member_achieve_log
+                                                  where state = 2 and user_id = toi.user_name
+                                                  group by user_id)
+			                       ) as pay_money,
+			           (SELECT NVL (SUM (tori.return_total_money), 0) return_money
+			                  FROM tbl_order_return_info tori
+			                 WHERE state = 2
+			                       AND user_name = tui.id
+			                       and tori.check_date >=
+                                        (select max (create_date)
+                                           from tbl_member_achieve_log
+                                          where state = 2 and user_id = tori.user_name)
+                                    and tori.check_date &lt;=(
+                                            select max (create_date) +
+                                                     (select case when active_date_type = 1
+                                                             then active_date_value * 365
+                                                             when active_date_type = 2
+                                                             then active_date_value * 30
+                                                             when active_date_type = 3
+                                                             then active_date_value end
+                                                     from tbl_sales_achieve_rule where type = 2)
+                                                   from tbl_member_achieve_log
+                                                  where state = 2 and user_id = tori.user_name
+                                                  group by user_id)
+			                       ) as return_money
+				    from tbl_user_info tui
+				where user_type = 1
+					  and tui.sleep_state = 2
+			     <choose>
+					<when test="ywy_user_id != null and ywy_user_id !=''">
+			     		and referee_user_id = #{ywy_user_id,jdbcType=INTEGER}
+			     	</when>
+			     	<otherwise>
+			     		and referee_user_id is null 
+			     	</otherwise>
+			     </choose>
+			     and store_id = #{store_id,jdbcType=INTEGER}
+			     and exists(select 1 from tbl_member_achieve_log 
+			     				where user_id=tui.id and state=2
+			     				<if test="start_date != null and start_date != ''">
+									and create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+								</if>
+								<if test="end_date != null and end_date != ''">
+									and create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+								</if>)				
+					order by user_last_login_date desc
+            ) info where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+     <!--查询有效激活会员详情列表-->
+    <select id="queryMemberEffectActiveDetailList" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select info.*,(info.pay_money-return_money) money, rownum rn from (
+                select login_name,
+                	   user_manage_name,
+                	   to_char(user_last_login_date,'yyyy-mm-dd hh24:mi:ss')  as  user_last_login_date,
+                	   to_char(create_date,'yyyy-mm-dd hh24:mi:ss')  as  create_date,
+                	   (SELECT NVL (SUM (toi.payment_money), 0) payment_money
+			                  FROM tbl_order_info toi
+			                 WHERE order_state IN (2, 3, 5)
+			                       AND payment_state = 2
+			                       AND user_name = tui.id
+			                       and toi.payment_date >=
+                                        (select max (create_date)
+                                           from tbl_member_achieve_log
+                                          where state = 2 and user_id = toi.user_name)
+                                    and toi.payment_date &lt;=(
+                                            select max (create_date) +
+                                                     (select case when active_date_type = 1
+                                                             then active_date_value * 365
+                                                             when active_date_type = 2
+                                                             then active_date_value * 30
+                                                             when active_date_type = 3
+                                                             then active_date_value end
+                                                     from tbl_sales_achieve_rule where type = 2)
+                                                   from tbl_member_achieve_log
+                                                  where state = 2 and user_id = toi.user_name
+                                                  group by user_id)
+			                       ) as pay_money,
+			             (SELECT NVL (SUM (tori.return_total_money), 0) return_money
+			                  FROM tbl_order_return_info tori
+			                 WHERE state = 2
+			                       AND user_name = tui.id
+			                       and tori.check_date >=
+                                        (select max (create_date)
+                                           from tbl_member_achieve_log
+                                          where state = 2 and user_id = tori.user_name)
+                                    and tori.check_date &lt;=(
+                                            select max (create_date) +
+                                                     (select case when active_date_type = 1
+                                                             then active_date_value * 365
+                                                             when active_date_type = 2
+                                                             then active_date_value * 30
+                                                             when active_date_type = 3
+                                                             then active_date_value end
+                                                     from tbl_sales_achieve_rule where type = 2)
+                                                   from tbl_member_achieve_log
+                                                  where state = 2 and user_id = tori.user_name
+                                                  group by user_id)
+			                       ) as return_money
+				    from tbl_user_info tui
+				where user_type = 1
+			     <choose>
+					<when test="ywy_user_id != null and ywy_user_id !=''">
+			     		and referee_user_id = #{ywy_user_id,jdbcType=INTEGER}
+			     	</when>
+			     	<otherwise>
+			     		and referee_user_id is null 
+			     	</otherwise>
+			     </choose>
+			     and store_id = #{store_id,jdbcType=INTEGER}
+			     and exists(select 1 from tbl_member_achieve_log 
+			     				where user_id=tui.id and state=3
+			     				<if test="start_date != null and start_date != ''">
+									and create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+								</if>
+								<if test="end_date != null and end_date != ''">
+									and create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+								</if>)
+            ) info where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+    <insert id="insert" parameterType="java.util.Map">
+    	insert into tbl_sales_achieve_rule
+            (
+                id,
+                type,
+                grade_name,
+                money,
+                return_rate,
+                create_date,
+                create_user_id,
+                update_date,
+                update_user_id
+            )
+            values
+            (
+                seq_sales_achieve_rule.nextval,
+                #{rule_type,jdbcType=INTEGER},
+                #{grade_name,jdbcType=VARCHAR},
+                #{money,jdbcType=INTEGER},
+                #{return_rate,jdbcType=INTEGER},
+                sysdate,
+                #{public_user_id,jdbcType=INTEGER},
+                sysdate,
+                #{public_user_id,jdbcType=INTEGER}
+            )
+    </insert>
+    <update id="update" parameterType="java.util.Map">
+    	update tbl_sales_achieve_rule
+    	   set grade_name = #{grade_name,jdbcType=VARCHAR},
+    	   	   money = #{money,jdbcType=INTEGER},
+               return_rate = #{return_rate,jdbcType=INTEGER},
+               update_date = sysdate,
+               update_user_id = #{public_user_id,jdbcType=INTEGER}
+    	 where id = #{rule_id, jdbcType=INTEGER}
+    </update>
+</mapper>

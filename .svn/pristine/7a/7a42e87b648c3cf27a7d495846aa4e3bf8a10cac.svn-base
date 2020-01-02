@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tk.oms.notice.dao.MessageCenterDao">
+
+    <!--查询消息提醒列表-->
+    <select id="queryMessageRemindForList" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+		    select t1.*,rownum rn from (
+                select
+                    ri.id,
+                    ri.key,
+                    ri.type,
+                    ri.title,
+                    ri.content,
+                    ri.state,
+                    to_char(ri.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+                    ri.read_date,
+                    sui.company_name,
+                    ri.oms_state
+                from
+                    tbl_remind_info ri
+                left join
+                    tbl_stationed_user_info sui on sui.id = ri.stationed_user_id
+                where
+                    1=1
+                    <if test="state != null and state != ''">
+                        and ri.state = #{state,jdbcType=CHAR}
+                    </if>
+                order by ri.oms_state , ri.create_date desc,ri.id desc
+            ) t1 where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+		) where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--查询消息提醒总数量-->
+    <select id="queryMessageRemindForCount" parameterType="java.util.Map" resultType="int">
+        select
+            count(ri.id)
+        from
+            tbl_remind_info ri
+        where
+            1=1
+        <if test="state != null and state != ''">
+            and ri.state = #{state,jdbcType=CHAR}
+        </if>
+    </select>
+
+    <!--通过类型查询提醒消息数量-->
+    <select id="queryMessageRemindCountByType" parameterType="java.util.Map" resultType="int">
+        select
+           count(ri.id)
+        from
+            tbl_remind_info ri
+        where
+            ri.oms_state = '0'
+        <if test="remind_type == 0">
+            and ri.type = '0'
+        </if>
+    </select>
+
+    <!--更新消息状态-->
+    <update id="updateMessageRemindState" parameterType="java.util.Map">
+        update
+            tbl_remind_info
+        set
+            oms_state = '1', read_date = sysdate
+        where
+        <if test="operation_type == 1">
+            id in
+            <foreach item="item" collection="id_list" open="(" separator="," close=")">
+                #{item}
+            </foreach>
+        </if>
+        <if test="operation_type == 2">
+            oms_state = '0'
+        </if>
+    </update>
+    
+    <!--更新会员反馈消息状态-->
+    <update id="updateMemberFeedbackRemindState" parameterType="java.util.Map">
+        update
+            tbl_user_feed_back
+        set
+            read_state = '1', read_date = sysdate
+        where
+        	read_state='0'
+        <if test="operation_type == 1">
+            and id in
+            <foreach item="item" collection="id_list" open="(" separator="," close=")">
+                #{item}
+            </foreach>
+        </if>
+    </update>
+
+    <!--删除消息提醒数据-->
+    <delete id="deleteMessageRemind" parameterType="java.util.Map">
+        delete from tbl_remind_info where id in
+        <foreach item="item" collection="id_list" open="(" separator="," close=")">
+            #{item}
+        </foreach>
+    </delete>
+
+    <!--通商品货号查询Sku列表-->
+    <select id="querySkuListByNumber" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            a.id,
+            a.product_color,
+            a.product_specs,
+            a.product_group_member,
+            nvl(b.product_total_count,0) as product_total_count,
+            c.id as warehouse_id,
+            c.name,
+            a.state,
+            a.parent_id
+        from
+            tbl_product_sku a
+        left join
+            tbl_product_sku_stock b on a.id = b.product_sku
+        left join
+            tbl_warehouse_info c on get_warehouse_parentid(b.warehouse_id) = c.id
+        where
+            a.product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+            and a.product_group = '尺码'
+        order by b.warehouse_id,a.product_group_member
+    </select>
+    
+    <!-- 获取有活动商品需要审批的数量,活动提醒列表分页总数-->
+    <select id="queryActivityProductAuditRemindCount" parameterType="java.util.Map" resultType="int">
+        select count (1)
+		  from tbl_activity_info tai
+		 where tai.end_date &gt; sysdate
+		 	   and tai.activity_state = '3'
+			   and tai.is_delete = '1'
+		       and exists
+		              (select 1
+		                 from tbl_activity_product_apply tapa
+		                where     tapa.activity_id = tai.id
+		                      and tapa.state = 2
+		                      and tapa.is_delete = '1')
+    </select>
+    
+      <!--获取有活动商品需要审批提醒的分页数据-->
+    <select id="queryActivityProductAuditRemindForList" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+		    select t1.*,rownum rn from (
+		    		 select *
+		               from  (   select id as activity_id,
+				                	   '【'||activity_name||'】有报名商品需要审批，请处理。' as CONTENT,
+				                	   (select max(id)
+								          from tbl_activity_product_apply tapa
+								         where tapa.activity_id = tai.id
+								               and tapa.state = 2
+								               and tapa.is_delete = '1') as product_id,
+								       (SELECT TSAI.LOCKED_STOCK FROM TBL_SALE_ACTIVITY_INFO TSAI WHERE TSAI.ACTIVITY_ID = tai.ID) AS LOCKED_STOCK,
+								       ACTIVITY_CONFIG        
+								  from tbl_activity_info tai
+								 where tai.end_date &gt; sysdate
+								 	   and tai.activity_state = '3'
+								 	   and tai.is_delete = '1')
+					   where product_id is not null
+					   order by product_id desc			 	   
+            ) t1 where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+		) where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+    
+     <!-- 查询会员反馈列表总数-->
+    <select id="queryMemberFeedbackCount" parameterType="java.util.Map" resultType="int">
+		 select count (1)        
+			  from tbl_user_feed_back tusb, tbl_user_info ui
+               <where>
+                   tusb.user_id = ui.user_name
+                   <if test="public_user_type != null and public_user_type == 2">
+                       and EXISTS (SELECT 1 FROM TBL_SYS_USER_STORE TSUS WHERE TSUS.STORE_ID = ui.STORE_ID AND TSUS.USER_ID = #{public_user_id,jdbcType=INTEGER})
+                   </if>
+                   <if test="public_user_type != null and public_user_type == 3">
+                       and ui.referee_user_id = #{public_user_id,jdbcType=INTEGER}
+                   </if>
+                   <if test="public_user_type != null and public_user_type == 4">
+                       and ui.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+                   </if>
+                   <if test="public_user_type != null and public_user_type == 5">
+                       and EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID = ui.STORE_ID AND TSI.SHOPKEEPER_USER_ID = #{public_user_id,jdbcType=INTEGER})
+                   </if>
+                   <if test="public_user_type != null and public_user_type == 6">
+                       and EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUI WHERE TSUI.STORE_ID = ui.STORE_ID AND TSUI.USER_ID = #{public_user_id,jdbcType=INTEGER})
+                   </if>
+                   <if test="public_user_type != null and public_user_type == 9">
+                       and EXISTS(SELECT 1 FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.USER_TYPE = 4
+                           AND TSUI.ORGANIZATION_ID IN (
+                           SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+                           START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER}
+                           CONNECT BY PRIOR ID = PARENT_ID
+                       )
+                       AND TSUI.id = ui.market_supervision_user_id)
+                   </if>
+               </where>
+    </select>
+    
+    <!--查询会员反馈列表-->
+    <select id="queryMemberFeedbackList" parameterType="java.util.Map" resultType="java.util.Map">
+    	select * from (
+			select a.*,rownum num from (
+	             select tusb.id,
+	             		tusb.user_id,
+	            		tusb.read_state,
+	            		tusb.type,
+	            		tusb.content,
+	            		ui.login_name,
+		                ui.user_manage_name,
+		                ui.user_manage_mobilephone,
+		                to_char(tusb.create_date,'yyyy-mm-dd hh24:mi:ss') as create_date          
+				  from tbl_user_feed_back tusb, tbl_user_info ui
+	               <where>
+	                   tusb.user_id = ui.user_name
+	                   <if test="public_user_type != null and public_user_type == 2">
+	                       and EXISTS (SELECT 1 FROM TBL_SYS_USER_STORE TSUS WHERE TSUS.STORE_ID = ui.STORE_ID AND TSUS.USER_ID = #{public_user_id,jdbcType=INTEGER})
+	                   </if>
+	                   <if test="public_user_type != null and public_user_type == 3">
+	                       and ui.referee_user_id = #{public_user_id,jdbcType=INTEGER}
+	                   </if>
+	                   <if test="public_user_type != null and public_user_type == 4">
+	                       and ui.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+	                   </if>
+	                   <if test="public_user_type != null and public_user_type == 5">
+	                       and EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID = ui.STORE_ID AND TSI.SHOPKEEPER_USER_ID = #{public_user_id,jdbcType=INTEGER})
+	                   </if>
+	                   <if test="public_user_type != null and public_user_type == 6">
+	                       and EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUI WHERE TSUI.STORE_ID = ui.STORE_ID AND TSUI.USER_ID = #{public_user_id,jdbcType=INTEGER})
+	                   </if>
+	                   <if test="public_user_type != null and public_user_type == 9">
+	                       and EXISTS(SELECT 1 FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.USER_TYPE = 4
+	                           AND TSUI.ORGANIZATION_ID IN (
+	                           SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+	                           START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER}
+	                           CONNECT BY PRIOR ID = PARENT_ID
+	                       )
+	                       AND TSUI.id = ui.market_supervision_user_id)
+	                   </if>
+	               </where>
+	   				order by tusb.read_state desc,create_date desc	
+	            )a where ROWNUM  &lt;= #{end_rownum,jdbcType=INTEGER}
+	      )where num &gt;#{start_rownum,jdbcType=INTEGER}
+    </select>
+    
+    <!-- 获取会员反馈提醒数量-->
+    <select id="queryMemberFeedbackRemindCount" parameterType="java.util.Map" resultType="int">
+        select count (1)
+		  from tbl_user_feed_back
+		where read_state=0
+    </select>
+</mapper>

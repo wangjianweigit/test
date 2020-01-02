@@ -1,0 +1,446 @@
+package com.tk.oms.member.service;
+
+import com.tk.oms.member.dao.DistributorManageDao;
+import com.tk.sys.config.EsbConfig;
+import com.tk.sys.util.*;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Copyright (c), 2017, Tongku
+ * FileName : DistributorManageService
+ * 经销商管理业务操作类
+ *
+ * @author zhenghui
+ * @version 1.00
+ * @date 2017/08/09
+ */
+@Service("DistributorManageService")
+public class DistributorManageService {
+
+    @Value("${retail_service_url}")
+    private String retail_service_url;
+
+    @Resource
+    private DistributorManageDao distributorManageDao;
+
+    /**
+     * 分页获取经销商列表数据
+     * @param request
+     * @return
+     */
+    public GridResult queryDistributorListForPage(HttpServletRequest request) {
+        GridResult gr = new GridResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                gr.setState(false);
+                gr.setMessage("缺少参数");
+                return gr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            GridResult pageParamResult = PageUtil.handlePageParams(params);
+            if (pageParamResult != null) {
+                return pageParamResult;
+            }
+            int total = this.distributorManageDao.queryDistributorCount(params);
+            List<Map<String, Object>> list = this.distributorManageDao.queryDistributorList(params);
+            if (list != null && list.size() > 0) {
+            	 Map<String, Object> smsMap = new HashMap<String, Object>();
+                 String account_ids="";
+                 for(int i=0;i<list.size();i++){
+                 	if(i==list.size()-1){
+                 		account_ids+=list.get(i).get("ID");
+                 	}else{
+                 		account_ids+=list.get(i).get("ID")+",";
+                 	}
+                 }
+                 smsMap.put("ACCOUNTS", account_ids);
+                 Map<String, Object> resPr=(Map<String, Object>)this.queryForPost(smsMap,retail_service_url+"open/ManageRole/getAgentRole");
+                 if (Integer.parseInt(resPr.get("state").toString()) == 1) {
+                 	 List<Map<String,Object>> distribution_name_list = (List<Map<String,Object>>)resPr.get("data");
+                     for(int i=0;i<list.size();i++){
+                    	 list.get(i).put("ROLE_NAME", distribution_name_list.get(i).get("ROLE_NAME"));
+                     }
+                     gr.setMessage("获取经销商列表成功!");
+                     gr.setObj(list);
+                 }else{
+                	 gr.setState(false);
+                 	 gr.setMessage("调用远程接口失败"); 
+                 }
+            } else {
+                gr.setMessage("无数据");
+            }
+            gr.setState(true);
+            gr.setTotal(total);
+        } catch (Exception e) {
+            gr.setState(false);
+            gr.setMessage(e.getMessage());
+            e.printStackTrace();
+        }
+        return gr;
+    }
+
+    /**
+     * 编辑经销商分销状态
+     * @param request
+     * @return
+     * @throws Exception
+     */
+    @Transactional
+    public ProcessResult editDistributionState(HttpServletRequest request) throws Exception {
+        ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            if (StringUtils.isEmpty(params.get("id"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数ID");
+                return pr;
+            }
+            if (StringUtils.isEmpty(params.get("distribution_state"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数DISTRIBUTION_STATE");
+                return pr;
+            }
+            Map<String, Object> userMap = this.distributorManageDao.queryUserById(params);
+            if (userMap == null) {
+                pr.setState(false);
+                pr.setMessage("用户不存在");
+                return pr;
+            }
+            if (this.distributorManageDao.updateDistributionStateById(params) > 0) {
+                //封装调用远程接口所需的参数
+                Map<String, Object> sendMap = new HashMap<String, Object>();
+                sendMap.put("ACCOUNT", params.get("id"));
+                sendMap.put("SYS_SWITCH", params.get("distribution_state"));
+                if (Integer.parseInt(params.get("distribution_state").toString()) == 0) {   //关闭状态
+                    sendMap.put("SERVICE_RATE", 0);         //服务费
+                    sendMap.put("POSSHOP_PERMIT", "0");     //POS权限
+                    sendMap.put("WMALL_PERMIT", "0");       //微商城权限
+                }
+                Map<String, Object> resPr = (Map<String, Object>) this.queryForPost(sendMap, retail_service_url+"open/ManageRole/initAgentRelate");
+                if (Integer.parseInt(resPr.get("state").toString()) == 1) {
+                    pr.setState(true);
+                    pr.setMessage("编辑经销商分销状态成功");
+                } else {
+                    pr.setState(false);
+                    pr.setMessage(resPr.get("data").toString());
+                    throw new RuntimeException(resPr.get("data").toString());
+                }
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException("经销商远程服务异常，请稍后重试");
+        }
+        return pr;
+    }
+
+    /**
+     * 编辑经销商的服务费率
+     * @param request
+     * @return
+     * @throws Exception
+     */
+    @Transactional
+    public ProcessResult editServiceRateForDistribution(HttpServletRequest request) throws Exception {
+        ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            if (StringUtils.isEmpty(params.get("id"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数ID");
+                return pr;
+            }
+            Map<String, Object> userMap = this.distributorManageDao.queryUserById(params);
+            if (userMap == null) {
+                pr.setState(false);
+                pr.setMessage("用户不存在");
+                return pr;
+            }
+            if (this.distributorManageDao.updateServiceRateById(params) > 0) {
+                //封装调用远程接口所需的参数
+                Map<String, Object> sendMap = new HashMap<String, Object>();
+                sendMap.put("ACCOUNT", params.get("id"));
+                sendMap.put("SERVICE_RATE", params.get("service_rate"));
+                Map<String, Object> resPr = (Map<String, Object>) this.queryForPost(sendMap, retail_service_url+"open/ManageRole/initAgentRelate");
+                if (Integer.parseInt(resPr.get("state").toString()) == 1) {
+                    pr.setState(true);
+                    pr.setMessage("编辑经销商服务费率成功");
+                } else {
+                    pr.setState(false);
+                    pr.setMessage(resPr.get("data").toString());
+                    throw new RuntimeException(resPr.get("data").toString());
+                }
+
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException("经销商远程服务异常，请稍后重试");
+        }
+        return pr;
+    }
+
+    /**
+     * 设置经销商权限
+     * @param request
+     * @return
+     * @throws Exception
+     */
+    @Transactional
+    public ProcessResult editAuthorityForDistribution(HttpServletRequest request) throws Exception {
+        ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            if (StringUtils.isEmpty(params.get("id"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数ID");
+                return pr;
+            }
+            Map<String, Object> userMap = this.distributorManageDao.queryUserById(params);
+            if (userMap == null) {
+                pr.setState(false);
+                pr.setMessage("用户不存在");
+                return pr;
+            }
+            if (this.distributorManageDao.updateAuthorityForDistribution(params) > 0) {
+                //封装调用远程接口所需的参数
+                Map<String, Object> sendMap = new HashMap<String, Object>();
+                sendMap.put("ACCOUNT", params.get("id"));
+                //判断是修改pos还是微商城
+                if (params.containsKey("is_pos")) {
+                    sendMap.put("POSSHOP_PERMIT", Integer.parseInt(params.get("is_pos").toString()));
+                }
+                if (params.containsKey("is_wechat")) {
+                    sendMap.put("WMALL_PERMIT", Integer.parseInt(params.get("is_wechat").toString()));
+                }
+                Map<String, Object> resPr = (Map<String, Object>) this.queryForPost(sendMap, retail_service_url+"open/ManageRole/initAgentRelate");
+                if (Integer.parseInt(resPr.get("state").toString()) == 1) {
+                    pr.setState(true);
+                    pr.setMessage("经销商权限设置成功");
+                } else {
+                    pr.setState(false);
+                    pr.setMessage(resPr.get("data").toString());
+                    throw new RuntimeException(resPr.get("data").toString());
+                }
+
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException("经销商远程服务异常，请稍后重试");
+        }
+        return pr;
+    }
+
+    /**
+     * 经销商收支记录列表
+     * @param request
+     * @return
+     * @throws Exception
+     */
+    public GridResult queryRevenueListForDistribution(HttpServletRequest request) throws Exception {
+        GridResult gr = new GridResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                gr.setState(false);
+                gr.setMessage("缺少参数");
+                return gr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            if (StringUtils.isEmpty(params.get("AGENT_ID")) && StringUtils.isEmpty(params.get("TRADE_ORDER"))
+                    && StringUtils.isEmpty(params.get("TRADE_STYLE"))) {
+                gr.setState(false);
+                gr.setMessage("缺少参数[AGENT_ID]或[TRADE_ORDER]或[TRADE_STYLE]");
+                return gr;
+            }
+            if(StringUtils.isEmpty(params.get("AGENT_ID")) && StringUtils.isEmpty(params.get("TRADE_ORDER"))){
+                if(!params.containsKey("BEGIN_TIME") || StringUtils.isEmpty(params.get("BEGIN_TIME"))){
+                    gr.setState(false);
+                    gr.setMessage("请填写开始时间");
+                    return gr;
+                }
+                if(!params.containsKey("END_TIME") || StringUtils.isEmpty(params.get("END_TIME"))){
+                    gr.setState(false);
+                    gr.setMessage("请填写结束时间");
+                    return gr;
+                }
+            }
+            /**
+             * 封装参数
+             */
+            Map<String, Object> sendMap = new HashMap<String, Object>();
+            sendMap.put("PAGE_SIZE",params.get("pageSize"));
+            sendMap.put("INDEX",params.get("pageIndex"));
+            if(params.containsKey("AGENT_ID") && !StringUtils.isEmpty(params.get("AGENT_ID"))){
+                sendMap.put("AGENT_ID",params.get("AGENT_ID"));
+            }
+            if(params.containsKey("TRADE_ORDER") && !StringUtils.isEmpty(params.get("TRADE_ORDER"))){
+                sendMap.put("TRADE_ORDER",params.get("TRADE_ORDER"));
+            }
+            if(params.containsKey("TRADE_STYLE") && !StringUtils.isEmpty(params.get("TRADE_STYLE"))){
+                sendMap.put("TRADE_STYLE",params.get("TRADE_STYLE"));
+            }
+            if(params.containsKey("BEGIN_TIME") && !StringUtils.isEmpty(params.get("BEGIN_TIME"))){
+                sendMap.put("BEGIN_TIME",params.get("BEGIN_TIME"));
+            }
+            if(params.containsKey("END_TIME") && !StringUtils.isEmpty(params.get("END_TIME"))){
+                sendMap.put("END_TIME",params.get("END_TIME"));
+            }
+            Map<String, Object> resPr = (Map<String, Object>) this.queryForPost(sendMap, retail_service_url+"open/Agent/agentTrade");
+            if (Integer.parseInt(resPr.get("state").toString()) == 1) {
+                gr.setState(true);
+                gr.setMessage("获取经销商收支记录列表成功");
+                Map<String, Object> data =  (Map<String, Object>)resPr.get("data");
+                gr.setTotal(Integer.parseInt(data.get("total").toString()));
+                gr.setObj(data.get("data"));
+            }else{
+                gr.setState(false);
+                gr.setMessage(resPr.get("msg").toString());
+            }
+        } catch (Exception e) {
+            gr.setState(false);
+            gr.setMessage(e.getMessage());
+        }
+        return gr;
+    }
+
+    /**
+     * 经销商收支支付方式列表数据
+     * @param request
+     * @return
+     * @throws Exception
+     */
+    public ProcessResult queryTradeStyleList(HttpServletRequest request) throws Exception {
+        ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            Map<String, Object> sendMap = new HashMap<String, Object>();
+            sendMap.put("TYPE","true");
+            Map<String, Object> resPr = (Map<String, Object>) this.queryForPost(sendMap, retail_service_url+"open/Agent/agentTrade");
+            if (Integer.parseInt(resPr.get("state").toString()) == 1) {
+                pr.setState(true);
+                pr.setMessage("获取经销商收支记录列表成功");
+                pr.setObj(resPr.get("data"));
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException("经销商远程服务异常，请稍后重试");
+        }
+        return pr;
+    }
+
+    public Object queryForPost(Map<String,Object> obj,String url) throws Exception{
+        String params = "";
+        if(obj != null){
+            Packet packet = Transform.GetResult(obj, EsbConfig.ERP_FORWARD_KEY_NAME);//加密数据
+            params = Jackson.writeObject2Json(packet);//对象转json、字符串
+        }
+        //发送至服务端
+        String json = HttpClientUtil.post(url, params,30000);
+        return Transform.GetPacketJzb(json,Map.class);
+    }
+    
+    
+    /**
+     * 经销商下拉框
+     * @param request
+     * @return
+     */
+    public GridResult queryDistributionInfo(HttpServletRequest request) {
+        GridResult gr = new GridResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                gr.setState(false);
+                gr.setMessage("缺少参数");
+                return gr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            Map<String, Object> sendMap = new HashMap<String, Object>();
+            sendMap.put("ACCOUNT", params.get("ACCOUNT"));
+            Map<String, Object> resPr = (Map<String, Object>) this.queryForPost(sendMap, retail_service_url+"open/Order/findOrderWhereList");
+            if (Integer.parseInt(resPr.get("state").toString()) == 1) {
+            	gr.setObj(resPr);
+                gr.setMessage("获取数据成功");
+                gr.setState(true);
+            }else{
+            	gr.setMessage("无数据");
+                gr.setState(true);
+                gr.setObj("");
+            }
+        } catch (Exception e) {
+            gr.setState(false);
+            gr.setMessage(e.getMessage());
+            e.printStackTrace();
+        }
+        return gr;
+    }
+    
+    /**
+     * 经销商下拉框
+     * @param request
+     * @return
+     */
+    public GridResult queryDistributionOption(HttpServletRequest request) {
+        GridResult gr = new GridResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                gr.setState(false);
+                gr.setMessage("缺少参数");
+                return gr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            List<Map<String, Object>> list = this.distributorManageDao.queryDistributorOption();
+            if (list != null && list.size() > 0) {
+                gr.setMessage("获取经销商列表成功!");
+                gr.setObj(list);
+            } else {
+                gr.setMessage("无数据");
+            }
+            gr.setState(true);
+        } catch (Exception e) {
+            gr.setState(false);
+            gr.setMessage(e.getMessage());
+            e.printStackTrace();
+        }
+        return gr;
+    }
+
+}

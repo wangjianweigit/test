@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.store.statistic.dao.DataStatisticDao">
+	<!-- 查询商家ID -->
+	<select id="queryAgentId" parameterType="java.util.Map" resultType="string">
+		select agent_id
+		  from tbl_user_info
+		 where user_state = 1
+		   and partner_user_id = #{region_id,jdbcType=INTEGER}
+		   <if test="agent_id != null and agent_id != ''">
+		   and id = #{agent_id,jdbcType=INTEGER}
+		   </if>
+	</select>
+	<!-- 查询门店ID -->
+	<select id="queryStoreId" parameterType="java.util.Map" resultType="string">
+		select agent_store_id
+		  from tbl_store_user_manage
+		 where approval_state = 1
+		   and id = #{store_id,jdbcType=INTEGER}
+	</select>
+	<!-- 查询进销存列表 -->
+	<select id="queryPsiList" parameterType="java.util.List" resultType="java.util.Map">
+		select a.*
+		  from (
+			<foreach collection="list" item="item" index="index" separator="union all">
+				select (select user_realname from tbl_sys_user_info where id = (select partner_user_id from tbl_user_info where agent_id=#{item.AGENT_ID,jdbcType=INTEGER})) region_name,
+					   #{item.AGENT_ID,jdbcType=INTEGER} as agent_id,
+					   (select user_manage_name from tbl_user_info where agent_id=#{item.AGENT_ID,jdbcType=INTEGER}) agent_name,
+		               #{item.WAREHOUSE_INFO_ID,jdbcType=INTEGER} as warehouse_info_id,
+		               #{item.STORE_ID,jdbcType=INTEGER} as store_id,
+		               (select store_name from tbl_store_user_manage where agent_store_id = #{item.STORE_ID,jdbcType=INTEGER}) as store_name,
+		               #{item.CREATE_DATE,jdbcType=VARCHAR} as create_date,
+		               #{item.PREV_PLAT_STOCK,jdbcType=INTEGER} as prev_plat_stock,
+		               #{item.PREV_SELF_STOCK,jdbcType=INTEGER} as prev_self_stock,
+		               #{item.LATE_PLAT_STOCK,jdbcType=INTEGER} as late_plat_stock,
+		               #{item.LATE_SELF_STOCK,jdbcType=INTEGER} as late_self_stock,
+		               #{item.PURCHASE_PLAT_IN,jdbcType=INTEGER} as purchase_plat_in,
+		               #{item.PURCHASE_SELF_IN,jdbcType=INTEGER} as purchase_self_in,
+		               #{item.REFUND_PLAT_IN,jdbcType=INTEGER} as refund_plat_in,
+		               #{item.REFUND_SELF_IN,jdbcType=INTEGER} as refund_self_in,
+		               #{item.ALLOT_PLAT_IN,jdbcType=INTEGER} as allot_plat_in,
+		               #{item.ALLOT_SELF_IN,jdbcType=INTEGER} as allot_self_in,
+		               #{item.NORMAL_PLAT_OUT,jdbcType=INTEGER} as normal_plat_out,
+		               #{item.NORMAL_SELF_OUT,jdbcType=INTEGER} as normal_self_out,
+		               #{item.ALLOT_PLAT_OUT,jdbcType=INTEGER} as allot_plat_out,
+		               #{item.ALLOT_SELF_OUT,jdbcType=INTEGER} as allot_self_out,
+		               #{item.SALE_PLAT_OUT,jdbcType=INTEGER} as sale_plat_out,
+		               #{item.SALE_SELF_OUT,jdbcType=INTEGER} as sale_self_out,
+		               #{item.INVENTORY_PLAT_IN,jdbcType=INTEGER} as inventory_plat_in,
+		               #{item.INVENTORY_PLAT_OUT,jdbcType=INTEGER} as inventory_plat_out,
+		               #{item.INVENTORY_SELF_IN,jdbcType=INTEGER} as inventory_self_in,
+		               #{item.INVENTORY_SELF_OUT,jdbcType=INTEGER} as inventory_self_out
+		               from dual
+			</foreach>
+			) a
+		order by a.create_date desc
+	</select>
+	<!-- 查询门店在线支付列表 -->
+	<select id="queryPayOnlineListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+		select temp.*,
+		       case when (select count(1) from tbl_store_trade_divide where clearing_state !=3 and trade_number = temp.trade_number) >0 then 1
+		        else 2 end clearing_state,
+		        nvl((select divide_money from tbl_store_trade_divide where trade_number = temp.trade_number and divide_type = 4),0) as service_charge,
+		        (select user_realname from tbl_sys_user_info where id = temp.partner_user_id) region_name,
+		        (select user_manage_name from tbl_user_info where id = temp.store_id) agent_name,
+		        (select store_name from tbl_store_user_manage where id = temp.md_id) store_name
+		  from (
+			select a.*,rownum rn from (
+				select t.trade_number,
+					   t.trade_type,
+					   to_char(t.create_date, 'yyyy-mm-dd hh24:mi:ss') create_date,
+					   t.payment_way,
+					   t1.ctrb_number,
+		       		   nvl(t.trade_money,0) trade_money,
+		       		   case when nvl(t.trade_payment_money,0) = 0 then nvl(t.trade_money,0)
+                       else nvl(t.trade_payment_money,0) end trade_payment_money,
+		       		   case when t.payment_way = 3 then nvl(t.trade_money,0)-nvl(t.trade_payment_money,0)
+		       		   else 0 end giving_money,
+		       		   t.partner_user_id,
+		       		   t.store_id,
+		       		   t.md_id
+				  from tbl_store_trade t,tbl_store_ctrb_order_detail t1
+				 where t.trade_type in (1,2)
+				   and t.trade_number = t1.trade_number(+)
+				   <if test="trade_number !=null and trade_number !=''">
+				   	  and t.trade_number = #{trade_number,jdbcType=VARCHAR}
+				   </if>
+				   <if test="region_id !=null and region_id !=''">
+				   	  and t.partner_user_id = #{region_id,jdbcType=INTEGER}
+				   </if>
+				   <if test="agent_id !=null and agent_id !=''">
+				   	  and t.store_id = #{agent_id,jdbcType=INTEGER}
+				   </if>
+				   <if test="store_id !=null and store_id !=''">
+				   	  and t.md_id = #{store_id,jdbcType=INTEGER}
+				   </if>
+				   <if test="ctrb_number !=null and ctrb_number !=''">
+				   	  and t1.ctrb_number = #{ctrb_number,jdbcType=VARCHAR}
+				   </if>
+				   <if test="trade_type !=null and trade_type !=''">
+				   	  and t.trade_type = #{trade_type,jdbcType=INTEGER}
+				   </if>
+				   <if test="payment_way !=null and payment_way !=''">
+				   	  and t.payment_way = #{payment_way,jdbcType=INTEGER}
+				   </if>
+				   <if test="start_date != null and start_date != '' ">
+					  and t.create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+				   </if>
+				   <if test="end_date != null and end_date != '' ">
+					  and t.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+				   </if>
+				   <if test="(clearing_state_1 != null and clearing_state_1 != '') or (clearing_state_2 != null and clearing_state_2 != '')">
+				   	and (
+				   	 <if test="clearing_state_1 != null and clearing_state_1 != ''">
+				   		exists (select 1 from tbl_store_trade_divide where trade_number = t.trade_number and clearing_state != 3)
+				   	 </if>
+				   	 <if test="(clearing_state_1 != null and clearing_state_1 != '') and (clearing_state_2 != null and clearing_state_2 != '')">
+					   	or
+				   	 </if>
+					 <if test="clearing_state_2 != null and clearing_state_2 != ''">
+	                 	exists (select 1 from tbl_store_trade_divide where trade_number = t.trade_number and clearing_state = 3)
+	                 </if>
+	                 )
+				   </if>
+		   order by t.create_date desc) a
+		 	where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) temp
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 查询门店在线支付总数 -->
+	<select id="queryPayOnlineCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_store_trade t,tbl_store_ctrb_order_detail t1
+		 where t.trade_type in (1,2)
+		   and t.trade_number = t1.trade_number(+)
+		   <if test="trade_number !=null and trade_number !=''">
+		   	  and t.trade_number = #{trade_number,jdbcType=VARCHAR}
+		   </if>
+		   <if test="region_id !=null and region_id !=''">
+		   	  and t.partner_user_id = #{region_id,jdbcType=INTEGER}
+		   </if>
+		   <if test="agent_id !=null and agent_id !=''">
+		   	  and t.store_id = #{agent_id,jdbcType=INTEGER}
+		   </if>
+		   <if test="store_id !=null and store_id !=''">
+		   	  and t.md_id = #{store_id,jdbcType=INTEGER}
+		   </if>
+		   <if test="ctrb_number !=null and ctrb_number !=''">
+		   	  and t1.ctrb_number = #{ctrb_number,jdbcType=VARCHAR}
+		   </if>
+		   <if test="trade_type !=null and trade_type !=''">
+		   	  and t.trade_type = #{trade_type,jdbcType=INTEGER}
+		   </if>
+		   <if test="payment_way !=null and payment_way !=''">
+		   	  and t.payment_way = #{payment_way,jdbcType=INTEGER}
+		   </if>
+		   <if test="start_date != null and start_date != '' ">
+			  and t.create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+		   </if>
+		   <if test="end_date != null and end_date != '' ">
+			  and t.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+		   </if>
+	</select>
+	
+</mapper>

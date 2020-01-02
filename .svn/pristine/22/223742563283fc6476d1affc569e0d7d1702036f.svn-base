@@ -1,0 +1,84 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+ <head>
+    <meta http-equiv="content-type" content="text/html;charset=utf-8">
+    <title>测试界面</title>
+    <script src="http://apps.bdimg.com/libs/jquery/1.8.0/jquery.min.js"></script>
+    <script src="jquery.form.js"></script>
+    <script src="webtoolkit.md5.js"></script>
+    <script src="t.js"></script>
+    <style type="text/css">
+    	body
+		{
+			font-size:18px;
+		}
+    </style>
+    <script type="text/javascript">
+        // ################################ 常量定义 ################################
+        var BaseURL = "/";
+        var jmURL = BaseURL+"test/encryption";//加密url
+		var jm2URL = BaseURL+"test/decrypt";//解密url
+		/**
+		测试地址，注意,测试地址中的 / 使用两个下划线代替
+		**/
+        var DATA_MAP = {
+            activity__add: {
+                info: '新增促销活动',
+                data: '{"public_user_id":1,"base_info":{"activity_name":"新品大促","activity_type":"1","activity_remark":"测试","activity_qualification":"测试3","activity_regulation":"测试4","activity_image":"http://tkimg2-test.img-cn-hangzhou.aliyuncs.com/658%E7%B3%BB%E5%88%97/658001/1_201608261652475574765.jpg","state":"1","exclusive_flag":"1","apply_begin_date":"2017-04-05 12:00:00","apply_end_date":"2017-04-20 12:00:00","begin_date":"2017-04-21 12:00:00","end_date":"2017-04-25 12:00:00"},"sale_info":{"product_type":"1","custom_discount_flag":"1","activity_max_discount":0.9,"activity_min_discount":0.8,"activity_discount":0.85,"is_add":"1","locked_stock":"1","activity_quit_flag":"1","tag_color":"#606060","tag_name":"促销","apply_product_limit_amount":5}}'
+            },
+            activity__list: {
+                info: '促销活动列表',
+                data: '{"pageIndex":1,"pageSize":10}'
+            },
+            activity__detail: {
+                info: '促销活动详情',
+                data: '{"id":1}'
+            },
+			activity__submit: {
+                info: '促销活动提交审批',
+                data: '{"public_user_id":1,"id":1}'
+            },
+            activity__approve: {
+                info: '促销活动审批通过',
+                data: '{"public_user_id":1,"id":1}'
+            },
+            activity__rejecte: {
+                info: '促销活动审批驳回',
+                data: '{"public_user_id":1,"id":1,"rejected_reason":"活动时间错误"}'
+            },
+            member_logistics_template__detail: {
+                info: '促销活动审批驳回',
+                data: '{"template_id":"-9999"}'
+            },
+            member_logistics_template__list: {
+                info: '促销活动审批驳回',
+                data: '{"template_name":"","create_user_realname":"","create_start_time":"","create_end_time":"","pageIndex":1,"pageSize":20}'
+            },
+        };
+    </script>
+</head>
+<body>
+Action:
+<!-- 
+<input type="radio" name="action" value="http://localhost:8080/esb/" onclick="changeAction(this);" checked="checked"/>localhost
+<input type="radio" name="action" value="http://192.168.0.188:8080/esb/" onclick="changeAction(this);"/>188
+ -->
+<br/>
+<select id="action_select" onchange="h($('#action_select option:selected').attr('value'))" size="8"
+        style="width:40%;">
+</select><br/>
+访问URL:
+<input id="submit_url" onchange="h(this.value)" value=".action" style="width:35%;background-color:pink;height:30"><form id="htmlForm" name="htmlForm" action="" method="post">
+    data:<input type="button" value="提交" onclick="submit_function('data');"/>
+    <input type="button" onclick="javascript: $('#ret').val('');" value="清除"/><br/>
+    <textarea id="data" name="data" style="width:40%;height:100px;font-size: 15px;font-family:monaco" onchange="load_data('data')"></textarea>
+    <input id="req_h_data" type="hidden" value=""/>
+    <input id="res_h_data" type="hidden" value=""/>
+</form>
+<div style="position: fixed;top: 20px;right:30px;width:45%;overflow-y: auto;height:100%;background: #eee;">
+    response:<br/>
+    <span id="ret" style="font-size: 15px;font-family:monaco"></span>
+</div>
+<div id="data_view" style="position: fixed;top:350px;width:40%;overflow-y: auto;height: 400px;background: #eee;font-size: 15px;font-family:monaco"></div>
+</body>
+</html>

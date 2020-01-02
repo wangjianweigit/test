@@ -1,0 +1,512 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.decoration.dao.DecoratePlatformDao">
+	<!--获取装修组件列表-->
+	<resultMap type="java.util.Map" id="baseResultMap">
+        <result property="MODULE_CONTENT" column="MODULE_CONTENT" jdbcType="CLOB" javaType = "java.lang.String"/>
+    </resultMap>
+    <!-- 根据装修组件分组类型，获取该分组下的所有装修组件 -->
+	<select id="queryDecorateModuleList" parameterType="java.util.Map" resultMap="baseResultMap">
+		SELECT  TDM.ID,
+				TDM.MODULE_NAME,
+				TDM.MODULE_ICON,
+				TDM.MODULE_CODE,
+				TDM.MODULE_GROUP_ID,
+				TDM.MODULE_DEFAULT_HEIGTH,
+				TDM.MODULE_WIDTH_TYPES,
+				TDM.MODULE_DIALOG_HEIGTH,
+				TDM.MODULE_DIALOG_WIDTH,
+				TDM.MODULE_CONTENT,
+				TDM.SUPPORT_FLAG,
+				TDM.MODULE_EXTRA_CONFIG,
+				TDM.MODULE_STATE,
+				TO_CHAR(TDM.CREATE_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  CREATE_DATE,
+				TDM.CREATE_USER_ID
+ 		  FROM  TBL_DECORATE_MODULE TDM WHERE 1=1
+		<if test="page_type != null and page_type != '' and page_type != 0">
+			and exists (select 1 from tbl_decorate_page_module_ref where TDM.ID = MODULE_ID and PAGE_TYPE = #{page_type,jdbcType=INTEGER})
+		</if>
+
+ 		  <if test="group_type!=null and group_type!=''">
+ 		  	 AND  EXISTS(
+       				SELECT 1 
+       				  FROM TBL_DECORATE_MODULE_GROUP TDMG 
+       				 WHERE TDMG.GROUP_TYPE = #{group_type,jdbcType=INTEGER}
+       				 	   AND TDMG.GROUP_STATE = '1' 
+       				 	   AND TDMG.ID = TDM.MODULE_GROUP_ID)
+ 		  </if>	
+ 		  <if test="module_type!=null and module_type!=''">
+ 		  	AND  TDM.module_type = #{module_type,jdbcType=VARCHAR}
+ 		  </if>		
+ 		  <if test="support_flag!=null and support_flag!=''">
+ 		  	AND  TDM.SUPPORT_FLAG = #{support_flag,jdbcType=VARCHAR}
+ 		  </if>		
+ 		ORDER BY TDM.ID
+	</select>
+	
+	<!-- 根据装修组件的ID，获取装修组件的详细信息 -->
+	<select id="queryDecorateModuleDetail" parameterType="long" resultMap="baseResultMap">
+		SELECT  TDM.ID,
+				TDM.MODULE_NAME,
+				TDM.MODULE_ICON,
+				TDM.MODULE_CODE,
+				TDM.MODULE_GROUP_ID,
+				TDM.MODULE_DEFAULT_HEIGTH,
+				TDM.MODULE_WIDTH_TYPES,
+				TDM.MODULE_DIALOG_HEIGTH,
+				TDM.MODULE_DIALOG_WIDTH,
+				TDM.MODULE_CONTENT,
+				TDM.SUPPORT_FLAG,
+				TDM.MODULE_EXTRA_CONFIG,
+				TDM.MODULE_STATE,
+				TO_CHAR(TDM.CREATE_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  CREATE_DATE,
+				TDM.CREATE_USER_ID
+ 		  FROM  TBL_DECORATE_MODULE TDM
+ 		 WHERE  TDM.ID = #{model_id,jdbcType=INTEGER}
+	</select>
+	<!--获取装修组件列表-->
+	<resultMap type="java.util.Map" id="queryDecoratePageDetailResultMap">
+        <result property="PAGE_CONTENT" column="PAGE_CONTENT" jdbcType="CLOB" javaType = "java.lang.String"/>
+        <result property="ASIDE_NAV" column="ASIDE_NAV" jdbcType="CLOB" javaType = "java.lang.String"/>
+    </resultMap>
+	<!--获取装修页详情-->
+	<select id="queryDecoratePageDetail" parameterType="java.util.Map" resultMap="queryDecoratePageDetailResultMap">
+ 		   		SELECT
+ 		   		<if test="type!=null">
+ 		   			<if test="type==1">
+		 		   		TDP.PAGE_CONTENT,
+ 		   			</if>
+ 		   			<if test="type==2">
+		 		   		TDP.PAGE_BACKGROUND,
+ 		   			</if>
+ 		   			<if test="type==3">
+						TDP.PAGE_HEAD_BACKGROUND,
+ 		   			</if>
+ 		   			<if test="type==4">
+	  					TDP.ASIDE_NAV,
+ 		   			</if>
+ 		   			<if test="type==5">
+		  				DT.BOTTOM_NAV,
+ 		   			</if>
+ 		   			<if test="type==6">
+		  				DT.TOP_NAV,
+ 		   			</if>
+ 		   		</if>
+ 		   		<if test="type==null">
+		 		   		TDP.PAGE_CONTENT,
+		 		   		TDP.PAGE_BACKGROUND,
+						TDP.PAGE_HEAD_BACKGROUND,
+	  					TDP.ASIDE_NAV,
+		  				DT.BOTTOM_NAV,
+ 		   		</if>
+		  		TDP.ID,
+				TDP.SITE_ID,
+				TDP.TEMPLATE_ID,
+				TDP.PAGE_NAME,
+				TDP.PAGE_STATE,
+				TDP.HOME_PAGE_FLAG,
+				TDP.REMARK,
+				TO_CHAR(TDP.CREATE_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  CREATE_DATE,
+				TDP.CREATE_USER_ID,
+				TO_CHAR(TDP.UPDATE_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  UPDATE_DATE,
+				UPDATE_USER_ID,
+				(select USER_REALNAME from TBL_SYS_USER_INFO where id = TDP.CREATE_USER_ID) CREATE_USER_REALNAME,
+ 		   		DT.SUPPORT_FLAG
+           		FROM  
+           		TBL_DECORATE_PAGE TDP
+           		LEFT JOIN TBL_DECORATE_TEMPLATE DT on DT.ID = TDP.TEMPLATE_ID 
+ 		 		WHERE TDP.id = #{page_id,jdbcType=INTEGER}
+	</select>
+	<!--获取装修页列表-->
+	<select id="queryDecoratePageList" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT  TDP.ID,
+				TDP.SITE_ID,
+				TDP.TEMPLATE_ID,
+				TDP.PAGE_NAME,
+				TDP.PAGE_STATE,
+				TDP.HOME_PAGE_FLAG,
+				TDP.REMARK,
+				TO_CHAR(TDP.CREATE_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  CREATE_DATE,
+				TDP.CREATE_USER_ID,
+				TO_CHAR(TDP.UPDATE_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  UPDATE_DATE,
+				UPDATE_USER_ID,
+				(select USER_REALNAME from TBL_SYS_USER_INFO where id = TDP.CREATE_USER_ID) CREATE_USER_REALNAME,
+ 		   		DT.SUPPORT_FLAG,
+ 		   		TDP.PAGE_BACKGROUND,
+ 		   		TDP.PAGE_TYPE
+           		FROM  TBL_DECORATE_PAGE TDP
+           		LEFT JOIN TBL_DECORATE_TEMPLATE DT on DT.ID = TDP.TEMPLATE_ID 
+ 		 		WHERE  IS_DELETE = '1'
+ 		 		AND TDP.TEMPLATE_ID = #{template_id,jdbcType=INTEGER}
+				<if test="page_type != null and page_type != '' and page_type == 1">
+					AND TDP.PAGE_TYPE = 1 and TDP.HOME_PAGE_FLAG != 3
+				</if>
+				<if test="page_type != null and page_type != '' and page_type == 2">
+					AND TDP.PAGE_TYPE &gt; 1
+				</if>
+ 		 		<if test="home_page_flag != null and home_page_flag != '' ">
+ 		 		AND TDP.HOME_PAGE_FLAG = #{home_page_flag,jdbcType=INTEGER}
+ 		 		</if>
+ 		 ORDER BY TDP.ID
+	</select>
+	
+	<!--获取装修页布局列表-->
+	<select id="queryPageLayoutList" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT  TDPL.ID,
+				TDPL.PAGE_ID,
+				TDPL.LAYOUT_TYPE,
+				TDPL.SORT_ID
+ 		  FROM  TBL_DECORATE_PAGE_LAYOUT TDPL
+ 		 WHERE  TDPL.PAGE_ID = #{page_id,jdbcType=INTEGER}
+ 		 <if test="layout_id!=null and layout_id!=0">
+ 		 	AND ID != #{layout_id,jdbcType=INTEGER}
+ 		 </if>
+ 		 ORDER BY TDPL.SORT_ID ASC
+	</select>
+	
+	<!--获取装修页的布局信息,以及布局中的控件，控件的排序信息-->
+	<select id="queryLayoutModuleDetailByPageId" parameterType="java.util.Map" resultMap="pageModuleResultMap">
+ 		 SELECT TDPL.ID,
+                TDPL.LAYOUT_TYPE,
+                TDPL.SORT_ID LAYOUT_SORT_ID,
+                DP.LAYOUT_ID,
+                DP.ID LAYOUT_PAGE_MODULE_ID,
+                DP.MODULE_ID,
+                DM.MODULE_NAME,
+                DM.MODULE_CODE,
+                DP.SORT_ID MODULE_SORT_ID,
+                DP.LAYOUT_COLUMN_ID,
+                DP.MODULE_BASE_CONF,
+                DP.MODULE_EXTEND_CONF,
+                DP.USER_GROUP_ID
+           FROM  TBL_DECORATE_PAGE_LAYOUT TDPL
+           LEFT JOIN TBL_DECORATE_PAGE_MODULE DP ON TDPL.ID = DP.LAYOUT_ID
+           LEFT JOIN TBL_DECORATE_MODULE DM ON DM.ID = DP.MODULE_ID
+           WHERE  TDPL.PAGE_ID = #{page_id,jdbcType=INTEGER}
+	</select>
+	
+	<!--获取装修页布局组件列表-->
+	<resultMap type="java.util.Map" id="pageModuleResultMap">
+        <result property="MODULE_BASE_CONF" column="MODULE_BASE_CONF" jdbcType="CLOB" javaType = "java.lang.String"/>
+        <result property="MODULE_EXTEND_CONF" column="MODULE_EXTEND_CONF" jdbcType="CLOB" javaType = "java.lang.String"/>
+        <result property="MODULE_CONTENT" column="MODULE_CONTENT" jdbcType="CLOB" javaType = "java.lang.String"/>
+    </resultMap>
+	<select id="queryPageLayoutModuleList" parameterType="java.util.Map" resultMap="pageModuleResultMap">
+		SELECT  TDPM.ID,
+				TDPM.PAGE_ID,
+				TDPM.LAYOUT_ID,
+				TDPM.MODULE_ID,
+				TDPM.MODULE_BASE_CONF,
+				TDPM.MODULE_EXTEND_CONF,
+				TO_CHAR(TDPM.CREATE_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  CREATE_DATE,
+				TDPM.CREATE_USER_ID,
+				TDPM.LAYOUT_COLUMN_ID,
+				TDPM.SORT_ID,
+				TDM.ID,
+				TDM.MODULE_NAME,
+				TDM.MODULE_DEFAULT_HEIGTH,
+				TDM.MODULE_WIDTH_TYPES,
+				TDM.MODULE_DIALOG_HEIGTH,
+				TDM.MODULE_DIALOG_WIDTH,
+				TDM.MODULE_CONTENT,
+				TDM.SUPPORT_FLAG,
+				TDM.MODULE_EXTRA_CONFIG
+ 		  FROM  TBL_DECORATE_PAGE_MODULE TDPM,TBL_DECORATE_MODULE TDM
+ 		 WHERE  TDPM.LAYOUT_ID = #{layout_id,jdbcType=INTEGER}
+ 		 		AND TDPM.PAGE_ID = #{page_id,jdbcType=INTEGER}
+ 		 		AND TDPM.MODULE_ID = TDM.ID
+ 		 ORDER BY TDPM.LAYOUT_COLUMN_ID,TDPM.SORT_ID ASC
+	</select>
+	
+	
+	<!--获取装修页面Id-->
+	<select id="queryPageId" parameterType="java.util.Map" resultType="int">
+		SELECT  SEQ_DECORATE_PAGE.NEXTVAL AS PAGE_ID FROM DUAL
+	</select>
+	<!--验证装修页面名称是否重复-->
+	<select id="countPageByPageName" parameterType="java.util.Map" resultType="int">
+		SELECT  count(1) 
+		FROM TBL_DECORATE_PAGE
+		WHERE TEMPLATE_ID = #{template_id,jdbcType=INTEGER}
+		AND PAGE_NAME = #{page_name,jdbcType=VARCHAR}
+		AND IS_DELETE = '1'
+		<if test="page_id!=null and page_id!=0">
+			AND id!=#{page_id,jdbcType=INTEGER}
+		</if>
+	</select>
+	<!--插入装修页面-->
+	<insert id="insertPage" parameterType="java.util.Map">
+		INSERT INTO TBL_DECORATE_PAGE (ID,
+                               SITE_ID,
+                               TEMPLATE_ID,
+                               PAGE_NAME,
+                               PAGE_STATE,
+                               HOME_PAGE_FLAG,
+                               REMARK,
+                               CREATE_DATE,
+                               CREATE_USER_ID,
+                               PAGE_TYPE
+             )
+		     VALUES (
+		     	 #{page_id,jdbcType=INTEGER},
+			     #{public_user_site_id,jdbcType=INTEGER},
+			     #{template_id,jdbcType=INTEGER},
+			     #{page_name,jdbcType=VARCHAR},
+			     #{page_state,jdbcType=CHAR},
+			     #{home_page_flag,jdbcType=VARCHAR},
+			     #{remark,jdbcType=VARCHAR},
+			     SYSDATE,
+			     #{public_user_id,jdbcType=INTEGER},
+			     #{page_type,jdbcType=INTEGER}
+		     )
+	</insert>
+	
+	<!--获取装修页面布局Id-->
+	<select id="queryPageLayoutId" parameterType="java.util.Map" resultType="int">
+		SELECT  SEQ_DECORATE_PAGE_LAYOUT.NEXTVAL AS LAYOUT_ID FROM DUAL
+	</select>
+	
+	<!--插入装修页面布局-->
+	<insert id="insertPageLayout" parameterType="java.util.Map" >
+		INSERT INTO TBL_DECORATE_PAGE_LAYOUT (ID,
+                                      PAGE_ID,
+                                      LAYOUT_TYPE,
+                                      SORT_ID)
+   		SELECT 
+        #{layout_id,jdbcType=INTEGER} as layout_id,
+        #{page_id,jdbcType=INTEGER} as page_id,
+        #{layout_type,jdbcType=VARCHAR} as layout_type,
+        NVL(max(SORT_ID),-1)+1 as sort_id
+        from TBL_DECORATE_PAGE_LAYOUT where page_id =#{page_id,jdbcType=INTEGER}
+	</insert>
+	
+	<!--删除装修页面布局-->
+	<delete id="deletePageLayout" parameterType="java.util.Map" >
+		DELETE FROM TBL_DECORATE_PAGE_LAYOUT
+		WHERE ID = #{layout_id,jdbcType=INTEGER}
+	</delete>
+	
+	<!--获取装修页面布局组件Id-->
+	<select id="queryPageLayoutModuleId" parameterType="java.util.Map" resultType="int">
+		SELECT  SEQ_DECORATE_PAGE_MODULE.NEXTVAL AS LAYOUT_MODULE_ID FROM DUAL
+	</select>
+	
+	<!--插入装修页面布局组件-->
+	<insert id="insertPageLayoutModule" parameterType="java.util.Map" >
+		INSERT INTO TBL_DECORATE_PAGE_MODULE (ID,PAGE_ID,LAYOUT_ID,MODULE_ID,CREATE_DATE,CREATE_USER_ID,LAYOUT_COLUMN_ID,SORT_ID)
+		VALUES(#{layout_module_id,jdbcType=INTEGER},#{page_id,jdbcType=INTEGER},#{layout_id,jdbcType=INTEGER},#{module_id,jdbcType=INTEGER},SYSDATE,#{public_user_id,jdbcType=INTEGER},
+			   #{layout_column_id,jdbcType=INTEGER},#{sort_id,jdbcType=INTEGER})
+	</insert>
+	
+	<!--删除装修页面布局组件-->
+	<delete id="deletePageLayoutModule" parameterType="java.util.Map" >
+		DELETE FROM TBL_DECORATE_PAGE_MODULE WHERE ID = #{layout_module_id,jdbcType=INTEGER}
+	</delete>
+	
+	<!--装修页面布局组件编辑-->
+	<update id="upatePageLayoutModule" parameterType="java.util.Map" >
+		UPDATE TBL_DECORATE_PAGE_MODULE 
+		   SET MODULE_BASE_CONF = #{module_base_conf,jdbcType=VARCHAR}
+		 WHERE ID = #{layout_module_id,jdbcType=INTEGER}
+	</update>
+	
+	<!--排序-插入装修页面布局组件时更新-->
+	<update id="updateyPageLayoutModuleSortIdWhenInsert" parameterType="java.util.Map" >
+		UPDATE TBL_DECORATE_PAGE_MODULE TDPM 
+		   SET TDPM.SORT_ID = TDPM.SORT_ID + 1 
+		 WHERE TDPM.PAGE_ID = #{page_id,jdbcType=INTEGER} 
+		 	   AND TDPM.LAYOUT_ID = #{layout_id,jdbcType=INTEGER}
+		 	   AND TDPM.LAYOUT_COLUMN_ID = #{layout_column_id,jdbcType=INTEGER}
+		 	   AND TDPM.SORT_ID &gt;= #{SORT_ID,jdbcType=INTEGER}
+	</update>
+	
+	<!--排序-删除装修页面布局组件时更新-->
+	<update id="updateyPageLayoutModuleSortIdWhenDelete" parameterType="java.util.Map" >
+		UPDATE TBL_DECORATE_PAGE_MODULE TDPM 
+		   SET TDPM.SORT_ID = TDPM.SORT_ID - 1 
+		 WHERE TDPM.PAGE_ID = #{page_id,jdbcType=INTEGER} 
+		 	   AND TDPM.LAYOUT_ID = #{layout_id,jdbcType=INTEGER}
+		 	   AND TDPM.LAYOUT_COLUMN_ID = #{layout_column_id,jdbcType=INTEGER}
+		 	   AND TDPM.SORT_ID &gt;= #{SORT_ID,jdbcType=INTEGER}
+	</update>
+	
+	<!--获取装修页布局详情-->
+	<select id="queryPageLayoutDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT ID,PAGE_ID,LAYOUT_TYPE,SORT_ID 
+		  FROM TBL_DECORATE_PAGE_LAYOUT 
+		 WHERE ID = #{layout_id,jdbcType=INTEGER} 
+	</select>
+	
+	<!--排序-页面布局排序值直接更新-->
+	<update id="updatePageLayoutSort" parameterType="java.util.Map" >
+		UPDATE TBL_DECORATE_PAGE_LAYOUT TDPL 
+		   SET TDPL.SORT_ID = #{sort_id,jdbcType=INTEGER}
+		 WHERE TDPL.ID = #{layout_id,jdbcType=INTEGER} 
+	</update>
+	
+	<!--获取装修页布局组件详情-->
+	<select id="queryPageLayoutModuleDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT  dpm.ID,
+				dpm.PAGE_ID,
+				dpm.LAYOUT_ID,
+				dpm.LAYOUT_COLUMN_ID,
+				dpm.SORT_ID,
+				dpm.MODULE_ID,
+				dm.MODULE_NAME 
+		  FROM TBL_DECORATE_PAGE_MODULE dpm
+          LEFT JOIN  TBL_DECORATE_MODULE dm on dpm.MODULE_ID = dm.ID
+		 WHERE dpm.ID = #{layout_module_id,jdbcType=INTEGER} 
+	</select>
+	
+	<!--获取装修页布局组件数量-->
+	<select id="queryPageLayoutModuleCount" parameterType="java.util.Map" resultType="int">
+		SELECT COUNT(1) AS MODULE_COUNT
+		  FROM TBL_DECORATE_PAGE_MODULE 
+		 WHERE LAYOUT_ID = #{layout_id,jdbcType=INTEGER} 
+	</select>
+	
+	<!--排序-页面布局组件排序-->
+	<update id="updatePageLayoutModuleSortId" parameterType="java.util.Map" >
+		UPDATE TBL_DECORATE_PAGE_MODULE TDPM
+		<if test="type!=null and type=='sort'">
+			 	 SET TDPM.SORT_ID = TDPM.SORT_ID  
+			 	   <if test="add!=null">
+			 	   		+1
+			 	   </if>
+			 	   <if test="minus!=null">
+			 	   		-1
+			 	   </if>
+			 	   WHERE TDPM.PAGE_ID = #{page_id,jdbcType=INTEGER} 
+			 	   AND TDPM.LAYOUT_ID = #{layout_id,jdbcType=INTEGER}
+			 	   AND TDPM.SORT_ID &lt;= #{new_sort_id,jdbcType=INTEGER}
+			 	   AND TDPM.SORT_ID &gt;= #{old_sort_id,jdbcType=INTEGER}  
+		</if>
+		<if test="type!=null and type=='add'">
+			SET TDPM.SORT_ID = TDPM.SORT_ID + 1
+			WHERE TDPM.PAGE_ID = #{page_id,jdbcType=INTEGER} 
+			 	   AND TDPM.LAYOUT_ID = #{layout_id,jdbcType=INTEGER}
+			 	   AND TDPM.SORT_ID &gt;= #{new_sort_id,jdbcType=INTEGER}
+		</if>
+		<if test="type!=null and type=='minus'">
+			SET TDPM.SORT_ID = TDPM.SORT_ID - 1
+			WHERE TDPM.PAGE_ID = #{page_id,jdbcType=INTEGER} 
+			 	   AND TDPM.LAYOUT_ID = #{layout_id,jdbcType=INTEGER}
+			 	   AND TDPM.SORT_ID &gt;= #{old_sort_id,jdbcType=INTEGER}
+		</if>
+		<if test="layout_module_id!=null and layout_module_id!=0">
+			 	   AND TDPM.ID != #{layout_module_id,jdbcType=INTEGER}
+		</if>
+	</update>
+	
+	<!--排序-页面布局排序-->
+	<update id="updatePageLayoutSortId" parameterType="java.util.Map" >
+		UPDATE TBL_DECORATE_PAGE_LAYOUT TDPM
+		<if test="type!=null and type=='sort'">
+			 	 SET TDPM.SORT_ID = TDPM.SORT_ID  
+			 	   <if test="add!=null">
+			 	   		+1
+			 	   </if>
+			 	   <if test="minus!=null">
+			 	   		-1
+			 	   </if>
+			 	   WHERE TDPM.PAGE_ID = #{page_id,jdbcType=INTEGER} 
+			 	   AND TDPM.SORT_ID &lt;= #{new_sort_id,jdbcType=INTEGER}
+			 	   AND TDPM.SORT_ID &gt;= #{old_sort_id,jdbcType=INTEGER}  
+		</if>
+		<if test="type!=null and type=='add'">
+			SET TDPM.SORT_ID = TDPM.SORT_ID + 1
+			WHERE TDPM.PAGE_ID = #{page_id,jdbcType=INTEGER} 
+			AND TDPM.SORT_ID &gt;= #{new_sort_id,jdbcType=INTEGER}
+		</if>
+		<if test="type!=null and type=='minus'">
+			SET TDPM.SORT_ID = TDPM.SORT_ID - 1
+			WHERE TDPM.PAGE_ID = #{page_id,jdbcType=INTEGER} 
+		    AND TDPM.SORT_ID &gt;= #{old_sort_id,jdbcType=INTEGER}
+		</if>
+		<if test="layout_id!=null and layout_id!=0">
+			AND TDPM.ID != #{layout_id,jdbcType=INTEGER}
+		</if>
+	</update>
+	
+	
+	<!--排序-页面布局组件排序值直接更新-->
+	<update id="updatePageLayoutModule" parameterType="java.util.Map" >
+		UPDATE TBL_DECORATE_PAGE_MODULE TDPM 
+		<set>
+			<if test="sort_id!=null">
+				TDPM.SORT_ID = #{sort_id,jdbcType=INTEGER},
+			</if>
+			<if test="module_base_conf!=null and module_base_conf!=''">
+				TDPM.module_base_conf = #{module_base_conf,jdbcType=VARCHAR},
+			</if>
+			<if test="module_extend_conf!=null and module_extend_conf!=''">
+				TDPM.module_extend_conf = #{module_extend_conf,jdbcType=VARCHAR},
+			</if>
+			<if test="user_group_id != null and user_group_id !=''">
+				TDPM.user_group_id = #{user_group_id,jdbcType=INTEGER}
+			</if>
+		</set>
+		WHERE TDPM.ID = #{layout_module_id,jdbcType=INTEGER}
+	</update>
+	<!--更新装修页面的变更时间以及变更人-->
+	<update id="updateDecoratePage" parameterType="java.util.Map" >
+		UPDATE TBL_DECORATE_PAGE
+		<set>
+			<if test="public_user_id!=null and public_user_id!=0">
+		      	UPDATE_USER_ID = #{public_user_id,jdbcType=INTEGER},
+			</if>
+			<if test="page_name!=null and page_name!=''">
+		      	PAGE_NAME = #{page_name,jdbcType=VARCHAR},
+			</if>
+			<if test="page_state!=null and page_state!=''">
+		      	PAGE_STATE = #{page_state,jdbcType=VARCHAR},
+			</if>
+			<if test="home_page_flag!=null and home_page_flag!=''">
+		      	HOME_PAGE_FLAG = #{home_page_flag,jdbcType=VARCHAR},
+			</if>
+			<if test="is_delete!=null and is_delete!=''">
+		      	IS_DELETE = '2',
+			</if>
+			<if test="page_background!=null">
+		      	page_background = #{page_background,jdbcType=VARCHAR},
+			</if>
+			<if test="page_head_background!=null">
+		      	page_head_background = #{page_head_background,jdbcType=VARCHAR},
+			</if>
+			<if test="aside_nav!=null">
+		      	aside_nav = #{aside_nav,jdbcType=VARCHAR},
+			</if>
+			UPDATE_DATE = sysdate
+		</set>
+		 WHERE ID = #{page_id,jdbcType=INTEGER} 
+	</update>
+	<!-- 批量更新页面布局信息的排序字段 -->
+	<update id="beachUpdatePageLayoutSort" parameterType="java.util.List">
+	    <foreach collection="list" index="index" item="item" open="(" separator="," close=")">
+	       	UPDATE 
+	       	TBL_DECORATE_PAGE_LAYOUT 
+	       	SET SORT_ID = #{item.sort_id,jdbcType=INTEGER} WHERE id = #{item.id,jdbcType=INTEGER}
+	    </foreach>
+	</update>
+	
+	<!--将当前的首页设置为非首页-->
+	<update id="updateTemplateHomePage" parameterType="java.util.Map" >
+		UPDATE TBL_DECORATE_PAGE
+        set home_page_flag = '1'
+        WHERE TEMPLATE_ID = (
+            select TEMPLATE_ID from TBL_DECORATE_PAGE WHERE ID = #{page_id,jdbcType=INTEGER} 
+        ) and home_page_flag in ('1','2') and PAGE_TYPE = 1
+	</update>
+
+	<!--通过站点ID查询装修用户列表-->
+	<select id="queryDecorateUserListBySiteId" parameterType="java.util.Map" resultType="java.util.Map">
+		select id,login_name,user_manage_name from tbl_user_info where decoration_state = 1 and site_id = #{site_id,jdbcType=INTEGER}
+	</select>
+
+	<!--通过用户ID获取用户信息-->
+	<select id="queryUserInfoById" parameterType="java.util.Map" resultType="java.util.Map">
+		select decoration_state from tbl_user_info where user_name = #{user_name,jdbcType=INTEGER}
+	</select>
+</mapper>

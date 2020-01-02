@@ -1,0 +1,4 @@
+#员工设备绑定
+oa.emp_device_binding=emp/device/binding
+#获取通用验证码
+oa.company_vcode=company/vcode

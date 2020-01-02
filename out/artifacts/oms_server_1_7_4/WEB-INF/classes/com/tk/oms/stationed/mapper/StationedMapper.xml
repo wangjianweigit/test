@@ -1,0 +1,2353 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.stationed.dao.StationedDao">
+	<sql id="apply_all_column">
+		tsua.id,
+		tsua.user_code,
+		tsua.user_number,
+		tsua.user_name,
+		tsua.user_pwd,
+		tsua.create_user_id,
+		to_char(tsua.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+		tsua.user_state,
+		tsua.approval_user_id,
+		to_char(tsua.approval_date,'yyyy-mm-dd hh24:mi:ss') approval_date,
+		tsua.rejected_reason,
+		tsua.business_licence_imgurl,
+		tsua.user_create_ip,
+		tsua.user_login_count,
+		to_char(tsua.user_last_login_date,'yyyy-mm-dd hh24:mi:ss') user_last_login_date,
+		tsua.user_last_login_ip,
+		tsua.company_type,
+		tsua.company_name,
+		tsua.registration_number,
+		nvl(tsua.registration_capital,0) registration_capital,
+		tsua.legal_personality,
+		tsua.legal_personality_id_number,
+		to_char(tsua.established_date,'yyyy-mm-dd') established_date,
+		to_char(tsua.business_start_date,'yyyy-mm-dd') business_start_date,
+		to_char(tsua.business_end_date,'yyyy-mm-dd') business_end_date,
+		tsua.business_scope,
+		tsua.registration_office,
+		to_char(tsua.registration_date,'yyyy-mm-dd') registration_date,
+		tsua.contacts,
+		tsua.contact_phone_number,
+		tsua.month_statement,
+		tsua.supplier_statement,
+		tsua.address_province,
+		tsua.address_city,
+		tsua.address_county,
+		tsua.address,
+		tsua.distribution_period,
+		tsua.company_short_name
+	</sql>
+	<sql id="i_colum">
+		id,
+		user_code,
+		user_number,
+		user_name,
+		user_pwd,
+		create_user_id,
+		to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+		state,
+		approval_user_id,
+		(select user_realname from tbl_sys_user_info where id = approval_user_id) approval_user_name,
+		to_char(approval_date,'yyyy-mm-dd hh24:mi:ss') approval_date,
+		business_licence_imgurl,
+		user_create_ip,
+		company_type,
+		company_name,
+		registration_number,
+		registration_capital,
+		legal_personality,
+		legal_personality_id_number,
+		to_char(established_date,'yyyy-mm-dd') established_date,
+		to_char(business_start_date,'yyyy-mm-dd') business_start_date,
+		to_char(business_end_date,'yyyy-mm-dd') business_end_date,
+		business_scope,
+		registration_office,
+		to_char(registration_date,'yyyy-mm-dd') registration_date,
+		contacts,
+		contact_phone_number,
+		month_statement,
+		supplier_statement,
+		nvl(service_charges,0)*100 service_charges,
+		nvl(member_service_rate,0)*100 member_service_rate,
+		pay_service_rate*100 pay_service_rate,
+		nvl(area_service_rate,0)*100 area_service_rate,
+		stationed_user_type,
+		address_province,
+		address_city,
+		address_county,
+		address,
+		distribution_period,
+		is_open_shop,
+		is_approval_order,
+		company_short_name
+	</sql>
+	<sql id="sup_deduct_colum">
+		id,
+	    sup_deduct_number,
+		stationed_user_id,
+		type,
+		money,
+		deduction_type,
+		remark,
+		approval_user_id,
+		sign_approval_user_id,
+		to_char(approval_date,'yyyy-mm-dd hh24:mi:ss') approval_date,
+		to_char(sign_approval_date,'yyyy-mm-dd hh24:mi:ss') sign_approval_date,
+		state,
+		voucher_img_url,
+		reject_reason,
+		create_user_id,
+		to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+		account_type
+	</sql>
+	<!--生成入驻商ID-->
+	<select id="queryStationedId" resultType="long">
+		select seq_stationed_user_info.nextval from dual
+	</select>
+	<resultMap type="java.util.Map" id="resultDetailMap">
+		<result column="id" property="id" />
+		<result column="user_code" property="user_code" />
+		<result column="user_number" property="user_number"/>
+		<result column="user_name" property="user_name" />
+		<result column="user_pwd" property="user_pwd" />
+		<result column="user_state" property="user_state" />
+		<result column="company_type" property="company_type" />
+		<result column="company_name" property="company_name" />
+		<result column="registration_number" property="registration_number" />
+		<result column="registration_capital" property="registration_capital" />
+		<result column="legal_personality" property="legal_personality" />
+		<result column="legal_personality_id_number" property="legal_personality_id_number" />
+		<result column="established_date" property="established_date" />
+		<result column="business_start_date" property="business_start_date" />
+		<result column="business_end_date" property="business_end_date" />
+		<result column="business_scope" property="business_scope" />
+		<result column="registration_office" property="registration_office" />
+		<result column="registration_date" property="registration_date" />
+		<result column="contacts" property="contacts" />
+		<result column="contact_phone_number" property="contact_phone_number" />
+		<result column="business_licence_imgurl" property="business_licence_imgurl" />
+		<result column="month_statement" property="month_statement" />
+		<result column="supplier_statement" property="supplier_statement" />
+		<result column="address_province" property="address_province"/>
+		<result column="address_city" property="address_city"/>
+		<result column="address_county" property="address_county"/>
+		<result column="address" property="address"/>
+		<result column="distribution_period" property="distribution_period"/>
+		<result column="merchants_type" property="merchants_type"/>
+		<result column="company_short_name" property="company_short_name"/>
+	</resultMap>
+	<!-- 新增入驻商 -->
+	<insert id="insertStationedAudit" parameterType="java.util.Map">
+		insert into tbl_stationed_user_apply
+		   (id,
+		   	user_code,
+		   	user_number,
+			user_name,
+			user_pwd,
+			create_user_id,
+			create_date,
+			business_licence_imgurl,
+			user_state,
+			user_create_ip,
+			company_type,
+			company_name,
+			registration_number,
+			registration_capital,
+			legal_personality,
+			legal_personality_id_number,
+			established_date,
+			business_start_date,
+			business_end_date,
+			business_scope,
+			registration_office,
+			registration_date,
+			contacts,
+			contact_phone_number,
+			month_statement,
+			supplier_statement,
+			address_province,
+			address_city,
+			address_county,
+			address,
+			distribution_period,
+			company_short_name
+			) values(
+			#{stationed_id,jdbcType=INTEGER},
+			#{user_code,jdbcType=VARCHAR},
+			#{user_number,jdbcType=VARCHAR},
+			#{user_name,jdbcType=VARCHAR},
+			#{user_pwd,jdbcType=VARCHAR},
+			#{public_user_id,jdbcType=INTEGER},
+			sysdate,
+			#{business_licence_imgurl,jdbcType=VARCHAR},
+			#{user_state,jdbcType=CHAR},
+			#{user_create_ip,jdbcType=VARCHAR},
+			#{company_type,jdbcType=VARCHAR},
+			#{company_name,jdbcType=VARCHAR},
+			#{registration_number,jdbcType=VARCHAR},
+			#{registration_capital,jdbcType=VARCHAR},
+			#{legal_personality,jdbcType=VARCHAR},
+			#{legal_personality_id_number,jdbcType=VARCHAR},
+			to_date(#{established_date,jdbcType=VARCHAR},'YYYY-MM-DD'),
+			to_date(#{business_start_date,jdbcType=VARCHAR},'YYYY-MM-DD'),
+			to_date(#{business_end_date,jdbcType=VARCHAR},'YYYY-MM-DD'),
+			#{business_scope,jdbcType=VARCHAR},
+			#{registration_office,jdbcType=VARCHAR},
+			to_date(#{registration_date,jdbcType=VARCHAR},'YYYY-MM-DD'),
+			#{contacts,jdbcType=VARCHAR},
+			#{contact_phone_number,jdbcType=VARCHAR},
+			#{month_statement,jdbcType=CHAR},
+			#{supplier_statement,jdbcType=CHAR},
+			#{province,jdbcType=INTEGER},
+			#{city,jdbcType=INTEGER},
+			#{area,jdbcType=INTEGER},
+			#{address,jdbcType=VARCHAR},
+			#{distribution_period,jdbcType=INTEGER},
+			#{company_short_name,jdbcType=VARCHAR}
+			)
+	</insert>
+
+	<!--新增商家类型-->
+	<insert id="insertMerchantsType" parameterType="java.util.Map">
+		insert into tbl_merchants_type
+		select
+			seq_merchants_type.nextval,
+			#{stationed_id,jdbcType=INTEGER},
+			merchants_type
+		from(
+			<foreach collection="merchants_types" item="merchants_type" index="index" separator="UNION">
+				select #{merchants_type,jdbcType=INTEGER} as merchants_type from dual
+			</foreach>
+		)
+	</insert>
+
+	<!--删除商家类型-->
+	<delete id="deleteMerchantsType" parameterType="java.util.Map">
+		delete from tbl_merchants_type where stationed_user_id = #{stationed_user_id,jdbcType=INTEGER} and merchants_type not in(3,4)
+	</delete>
+	<!-- 查询入驻商申请数据总数 -->
+	<select id="queryStationedAuditCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		from tbl_stationed_user_apply
+		<where>
+			user_state != '3'
+			<if test="user_name !=null and user_name !='' ">
+				and user_name like concat(concat('%', #{user_name,jdbcType=VARCHAR}),'%')
+			</if>
+			<if test="company_name !=null and company_name !=''">
+				and company_name like concat(concat('%', #{company_name,jdbcType=VARCHAR}),'%')
+			</if>
+			<if test="contact_phone_number !=null and contact_phone_number !=''">
+				and contact_phone_number = #{contact_phone_number,jdbcType=VARCHAR}
+			</if>
+			<if test="merchants_type != null">
+				and exists(select 1 from tbl_merchants_type mt where mt.stationed_user_id = id and mt.merchants_type in
+				<foreach item="item" collection="merchants_type" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+				)
+			</if>
+		</where>
+	</select>
+	<!-- 查询入驻商申请数据列表 -->
+	<select id="queryStationedAuditList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from
+		(select a.*, rownum rn from
+		(select <include refid="apply_all_column"/>
+		,(select to_char(wm_concat(case when  merchants_type = 1 then '入驻商' when merchants_type = 2 then '供应商' when merchants_type = 3 then '云仓货主' else '私有平台商家' end)) from tbl_merchants_type mt where mt.stationed_user_id = tsua.id) as merchants_type
+		from tbl_stationed_user_apply tsua
+		<where>
+			tsua.user_state != '3'
+			<if test="user_name !=null and user_name !='' ">
+				and tsua.user_name like concat(concat('%', #{user_name,jdbcType=VARCHAR}),'%')
+			</if>
+			<if test="company_name !=null and company_name !=''">
+				and tsua.company_name like concat(concat('%', #{company_name,jdbcType=VARCHAR}),'%')
+			</if>
+			<if test="contact_phone_number !=null and contact_phone_number !=''">
+				and tsua.contact_phone_number = #{contact_phone_number,jdbcType=VARCHAR}
+			</if>
+			<if test="merchants_type != null">
+				and exists(select 1 from tbl_merchants_type mt where mt.stationed_user_id = id and mt.merchants_type in
+				<foreach item="item" collection="merchants_type" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+				)
+			</if>
+		</where>
+		order by tsua.create_date desc) a
+		where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 查询入驻商申请数据详情信息 -->
+	<select id="queryStationedAuditDetail" parameterType="java.util.Map" resultType="java.util.Map" resultMap="resultDetailMap">
+		select <include refid="apply_all_column"/>,
+		(select to_char(wm_concat(merchants_type)) from tbl_merchants_type mt where mt.stationed_user_id = tsua.id) as merchants_type,
+		b.name||c.name||d.name||tsua.address company_address,
+		b.name PROVINCE,c.name CITY,d.name DISTRICT
+		from tbl_stationed_user_apply tsua
+			 left join tbl_dic_region b on tsua.address_province=b.id
+			 left join tbl_dic_region c on tsua.address_city=c.id
+			 left join tbl_dic_region d on tsua.address_county=d.id
+		where tsua.id = #{id,jdbcType=INTEGER}
+	</select>
+	<!-- 更新入驻商申请数据用户审核状态 -->
+	<update id="updateStationedUserApplyUserState" parameterType="java.util.Map">
+		update tbl_stationed_user_apply
+		   set user_state = #{user_state,jdbcType=CHAR},
+		   	   approval_user_id = #{public_user_id,jdbcType=VARCHAR},
+		   	   <if test="rejected_reason !=null and rejected_reason !=''">
+		   	   rejected_reason = #{rejected_reason,jdbcType=VARCHAR},
+		   	   </if>
+		   	   approval_date = sysdate
+		 where id = #{id,jdbcType=INTEGER}
+	</update>
+	<!-- 新增入驻商信息表数据 -->
+	<insert id="insertStationedUserInfo" parameterType="java.util.Map">
+		insert into tbl_stationed_user_info(
+				id,
+				user_code,
+				user_number,
+				user_name,
+				user_pwd,
+				user_realname,
+				create_user_id,
+				create_date,
+				state,
+				approval_user_id,
+				approval_date,
+				business_licence_imgurl,
+				user_create_ip,
+				company_type,
+				company_name,
+				registration_number,
+				registration_capital,
+				legal_personality,
+				legal_personality_id_number,
+				established_date,
+				business_start_date,
+				business_end_date,
+				business_scope,
+				registration_office,
+				registration_date,
+				contacts,
+				contact_phone_number,
+				stationed_user_id,
+				stationed_user_type,
+				month_statement,
+				supplier_statement,
+				address_province,
+				address_city,
+				address_county,
+				address,
+				distribution_period,
+				company_short_name
+				)
+				 select id,
+				 		user_code,
+				 		user_number,
+						user_name,
+						user_pwd,
+						user_realname,
+						create_user_id,
+						create_date,
+						'1',
+						approval_user_id,
+						approval_date,
+						business_licence_imgurl,
+						user_create_ip,
+						company_type,
+						company_name,
+						registration_number,
+						registration_capital,
+						legal_personality,
+						legal_personality_id_number,
+						established_date,
+						business_start_date,
+						business_end_date,
+						business_scope,
+						registration_office,
+						registration_date,
+						contacts,
+						contact_phone_number,
+						id,
+						'2',
+						month_statement,
+						supplier_statement,
+						address_province,
+						address_city,
+						address_county,
+						address,
+						distribution_period,
+						company_short_name
+				from tbl_stationed_user_apply
+			   where id = #{id,jdbcType=INTEGER}
+				 and user_state= '3'
+	</insert>
+
+	<!-- 查询入驻商信息总数 -->
+	<select id="queryStationedCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		from tbl_stationed_user_info sui
+		<where>
+			stationed_user_type = '2'
+			<if test="user_name !=null and user_name !='' ">
+				and user_name like concat(concat('%', #{user_name,jdbcType=VARCHAR}),'%')
+			</if>
+			<if test="company_name !=null and company_name !=''">
+				and company_name like concat(concat('%', #{company_name,jdbcType=VARCHAR}),'%')
+			</if>
+			<if test="company_short_name !=null and company_short_name !=''">
+				and company_short_name like concat(concat('%', #{company_short_name,jdbcType=VARCHAR}),'%')
+			</if>
+			<if test="contact_phone_number !=null and contact_phone_number !=''">
+				and contact_phone_number = #{contact_phone_number,jdbcType=VARCHAR}
+			</if>
+			<if test="contact_phone_number !=null and contact_phone_number !=''">
+				and contact_phone_number = #{contact_phone_number,jdbcType=VARCHAR}
+			</if>
+			<if test="state != null">
+				and state in
+                <foreach item="item" collection="state" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+			</if>
+			<if test="merchants_type != null">
+				and exists(select 1 from tbl_merchants_type mt where mt.stationed_user_id = sui.id and mt.merchants_type in
+				<foreach item="item" collection="merchants_type" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+				)
+			</if>
+			<if test="is_open_shop != null and is_open_shop != ''">
+				and is_open_shop = #{is_open_shop,jdbcType=INTEGER}
+			</if>
+		</where>
+	</select>
+	<!-- 查询入驻商信息列表 -->
+	<select id="queryStationedList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from
+		(select a.*, rownum rn from
+		 (select  <include refid="i_colum"/>
+				 ,(select to_char(wm_concat(case when  merchants_type = 1 then '入驻商' when merchants_type = 2 then '供应商' when merchants_type = 3 then '云仓货主' else '私有商家' end)) from tbl_merchants_type mt where mt.stationed_user_id = sui.id) as merchants_type
+				 ,(select to_char(wm_concat(merchants_type)) from tbl_merchants_type mt where mt.stationed_user_id = sui.id) as merchants_type_id
+			from tbl_stationed_user_info sui
+			<where>
+				stationed_user_type = '2'
+				<if test="user_name !=null and user_name !='' ">
+					and user_name like concat(concat('%', #{user_name,jdbcType=VARCHAR}),'%')
+				</if>
+				<if test="company_name !=null and company_name !=''">
+					and company_name like concat(concat('%', #{company_name,jdbcType=VARCHAR}),'%')
+				</if>
+				<if test="company_short_name !=null and company_short_name !=''">
+					and company_short_name like concat(concat('%', #{company_short_name,jdbcType=VARCHAR}),'%')
+				</if>
+				<if test="contact_phone_number !=null and contact_phone_number !=''">
+					and contact_phone_number = #{contact_phone_number,jdbcType=VARCHAR}
+				</if>
+				<if test="state != null">
+					and state in
+	                <foreach item="item" collection="state" open="(" separator="," close=")">
+						#{item}
+					</foreach>
+				</if>
+				<if test="merchants_type != null">
+					and exists(select 1 from tbl_merchants_type mt where mt.stationed_user_id = sui.id and mt.merchants_type in
+					<foreach item="item" collection="merchants_type" open="(" separator="," close=")">
+						#{item}
+					</foreach>
+					)
+				</if>
+				<if test="is_open_shop != null and is_open_shop != ''">
+					and is_open_shop = #{is_open_shop,jdbcType=INTEGER}
+				</if>
+			</where>
+			order by create_date desc) a
+		where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 获取用户key，用于生产校检码 -->
+	<select id="getUserKey" parameterType="java.util.Map" resultType="java.lang.String">
+		select getUserKey(
+		#{c_user_name,jdbcType=VARCHAR},
+		#{c_typeid,jdbcType=VARCHAR},
+		#{c_user_type,jdbcType=VARCHAR}
+		) from dual
+	</select>
+	<!-- 获取余额校验码 -->
+	<select id="getCheck_Code" parameterType="java.util.Map" resultType="java.lang.String">
+		select getCheck_Code(
+		#{c_user_name,jdbcType=VARCHAR},
+		#{c_money,jdbcType=INTEGER},
+		#{c_user_key,jdbcType=VARCHAR}
+		) from dual
+	</select>
+	<!-- 新增用户key缓存表 -->
+	<insert  id ="insertCacheKey" parameterType ="java.util.Map">
+		insert into TBL_STATIONED_CACHE_KEY (user_name,cache_key,create_time)
+		values (
+			#{user_name,jdbcType=VARCHAR},
+			#{cache_key,jdbcType=VARCHAR},
+			sysdate
+		)
+	</insert>
+	<!-- 新增入驻商关联的银行账户信息 -->
+	<insert id="insertBankAccountInfo" parameterType="java.util.Map">
+		insert into tbl_bank_account
+			(
+				id,
+				user_id,
+				user_type,
+				bank_account,
+				deposit_money,
+				account_balance,
+				account_balance_checkcode,
+				credit_money,
+				credit_money_use,
+				credit_money_balance,
+				credit_checkcode,
+				payment_password,
+				score,
+				update_date,
+				deposit_money_balance,
+				deposit_checkcode,
+				sub_merchant_id
+			)
+			values
+			(
+				seq_bank_account.nextval,
+				#{user_id,jdbcType=INTEGER},
+				#{user_type,jdbcType=VARCHAR},
+				#{bank_account,jdbcType=VARCHAR},
+				#{deposit_money,jdbcType=INTEGER},
+				#{account_balance,jdbcType=FLOAT},
+				#{account_balance_checkcode,jdbcType=VARCHAR},
+				#{credit_money,jdbcType=FLOAT},
+				#{credit_money_use,jdbcType=FLOAT},
+				#{credit_money_balance,jdbcType=FLOAT},
+				#{credit_checkcode,jdbcType=VARCHAR},
+				#{payment_password,jdbcType=VARCHAR},
+				#{score,jdbcType=FLOAT},
+				#{update_date,jdbcType=TIMESTAMP},
+				#{deposit_money_balance,jdbcType=FLOAT},
+				#{deposit_checkcode,jdbcType=VARCHAR},
+				#{sub_merchant_id,jdbcType=VARCHAR}
+			)
+	</insert>
+	<!-- 入驻商删除 -->
+	<delete id="delete" parameterType="java.util.Map">
+		delete from tbl_stationed_user_apply where id = #{id,jdbcType=INTEGER}
+	</delete>
+	<!-- 入驻商审核数据更新 -->
+	<update id="updateStationedAudit" parameterType="java.util.Map">
+		update tbl_stationed_user_apply
+		<set>
+			<if test="user_code !=null and user_code !=''">user_code=#{user_code,jdbcType=VARCHAR},</if>
+			<if test="user_number !=null and user_number !=''">user_number=#{user_number,jdbcType=VARCHAR},</if>
+			<if test="user_name !=null and user_name !=''">user_name=#{user_name,jdbcType=VARCHAR},</if>
+			<if test="user_state !=null and user_state !=''">user_state=#{user_state,jdbcType=CHAR},</if>
+			<if test="company_type !=null and company_type !=''">company_type=#{company_type,jdbcType=CHAR},</if>
+			<if test="company_name !=null and company_name !=''">company_name=#{company_name,jdbcType=VARCHAR},</if>
+			<if test="registration_number !=null and registration_number !=''">registration_number=#{registration_number,jdbcType=VARCHAR},</if>
+			<if test="registration_capital !=null and registration_capital !=''">registration_capital=#{registration_capital,jdbcType=VARCHAR},</if>
+			<if test="legal_personality !=null and legal_personality !=''">legal_personality=#{legal_personality,jdbcType=VARCHAR},</if>
+			<if test="legal_personality_id_number !=null and legal_personality_id_number !=''">legal_personality_id_number=#{legal_personality_id_number,jdbcType=VARCHAR},</if>
+			<if test="established_date !=null and established_date !=''">established_date=to_date(#{established_date,jdbcType=VARCHAR},'YYYY-MM-DD'),</if>
+			<if test="business_start_date !=null and business_start_date !=''">business_start_date=to_date(#{business_start_date,jdbcType=VARCHAR},'YYYY-MM-DD'),</if>
+			<if test="business_end_date !=null and business_end_date !=''">business_end_date=to_date(#{business_end_date,jdbcType=VARCHAR},'YYYY-MM-DD'),</if>
+			<if test="business_scope !=null and business_scope !=''">business_scope=#{business_scope,jdbcType=VARCHAR},</if>
+			<if test="registration_office !=null and registration_office !=''">registration_office=#{registration_office,jdbcType=VARCHAR},</if>
+			<if test="registration_date !=null and registration_date !=''">registration_date=to_date(#{registration_date,jdbcType=VARCHAR},'YYYY-MM-DD'),</if>
+			<if test="contacts !=null and contacts !=''">contacts=#{contacts,jdbcType=VARCHAR},</if>
+			<if test="business_licence_imgurl !=null and business_licence_imgurl !=''">business_licence_imgurl=#{business_licence_imgurl,jdbcType=VARCHAR},</if>
+			<if test="contact_phone_number !=null and contact_phone_number !=''">contact_phone_number=#{contact_phone_number,jdbcType=VARCHAR},</if>
+			<if test="month_statement !=null and month_statement !=''">month_statement=#{month_statement,jdbcType=CHAR},</if>
+			<if test="supplier_statement !=null and supplier_statement !=''">supplier_statement=#{supplier_statement,jdbcType=CHAR},</if>
+			<if test="province !=null and province !=''">address_province=#{province,jdbcType=INTEGER},</if>
+			<if test="city !=null and city !=''">address_city=#{city,jdbcType=INTEGER},</if>
+			<if test="area !=null and area !=''">address_county=#{area,jdbcType=INTEGER},</if>
+			<if test="address !=null and address !=''">address=#{address,jdbcType=VARCHAR},</if>
+			<if test="distribution_period !=null and distribution_period !=''">distribution_period=#{distribution_period,jdbcType=INTEGER},</if>
+			<if test="company_short_name !=null and company_short_name !=''">company_short_name=#{company_short_name,jdbcType=VARCHAR}</if>
+		</set>
+		where id = #{id,jdbcType=INTEGER}
+	</update>
+	<!-- 入驻商更新 -->
+	<update id="updateStationed" parameterType="java.util.Map">
+		update tbl_stationed_user_info
+		<set>
+			<if test="user_number !=null and user_number !=''">user_number=#{user_number,jdbcType=VARCHAR},</if>
+			<if test="user_name !=null and user_name !=''">user_name=#{user_name,jdbcType=VARCHAR},</if>
+			<if test="state !=null and state !=''">state=#{state,jdbcType=CHAR},</if>
+			<if test="company_type !=null and company_type !=''">company_type=#{company_type,jdbcType=CHAR},</if>
+			<if test="company_name !=null and company_name !=''">company_name=#{company_name,jdbcType=VARCHAR},</if>
+			<if test="registration_number !=null and registration_number !=''">registration_number=#{registration_number,jdbcType=VARCHAR},</if>
+			<if test="registration_capital !=null and registration_capital !=''">registration_capital=#{registration_capital,jdbcType=VARCHAR},</if>
+			<if test="legal_personality !=null and legal_personality !=''">legal_personality=#{legal_personality,jdbcType=VARCHAR},</if>
+			<if test="legal_personality_id_number !=null and legal_personality_id_number !=''">legal_personality_id_number=#{legal_personality_id_number,jdbcType=VARCHAR},</if>
+			<if test="established_date !=null and established_date !=''">established_date=to_date(#{established_date,jdbcType=VARCHAR},'YYYY-MM-DD'),</if>
+			<if test="business_start_date !=null and business_start_date !=''">business_start_date=to_date(#{business_start_date,jdbcType=VARCHAR},'YYYY-MM-DD'),</if>
+			<if test="business_end_date !=null and business_end_date !=''">business_end_date=to_date(#{business_end_date,jdbcType=VARCHAR},'YYYY-MM-DD'),</if>
+			<if test="business_scope !=null and business_scope !=''">business_scope=#{business_scope,jdbcType=VARCHAR},</if>
+			<if test="registration_office !=null and registration_office !=''">registration_office=#{registration_office,jdbcType=VARCHAR},</if>
+			<if test="registration_date !=null and registration_date !=''">registration_date=to_date(#{registration_date,jdbcType=VARCHAR},'YYYY-MM-DD'),</if>
+			<if test="contacts !=null and contacts !=''">contacts=#{contacts,jdbcType=VARCHAR},</if>
+			<if test="business_licence_imgurl !=null and business_licence_imgurl !=''">business_licence_imgurl=#{business_licence_imgurl,jdbcType=VARCHAR},</if>
+			<if test="contact_phone_number !=null and contact_phone_number !=''">contact_phone_number=#{contact_phone_number,jdbcType=VARCHAR},</if>
+			<if test="service_charges !=null">service_charges=#{service_charges,jdbcType=DOUBLE},</if>
+			<if test="member_service_rate !=null">member_service_rate=#{member_service_rate,jdbcType=DOUBLE},</if>
+			<if test="pay_service_rate !=null">pay_service_rate=#{pay_service_rate,jdbcType=DOUBLE},</if>
+			<if test="area_service_rate !=null">area_service_rate=#{area_service_rate,jdbcType=DOUBLE},</if>
+			<if test="month_statement !=null and month_statement !=''">month_statement=#{month_statement,jdbcType=CHAR},</if>
+			<if test="supplier_statement !=null and supplier_statement !=''">supplier_statement=#{supplier_statement,jdbcType=CHAR},</if>
+			<if test="province !=null and province !=''">address_province=#{province,jdbcType=INTEGER},</if>
+			<if test="city !=null and city !=''">address_city=#{city,jdbcType=INTEGER},</if>
+			<if test="area !=null and area !=''">address_county=#{area,jdbcType=INTEGER},</if>
+			<if test="address !=null and address !=''">address=#{address,jdbcType=VARCHAR},</if>
+			<if test="is_approval_order != null and is_approval_order != ''">is_approval_order = #{is_approval_order,jdbcType=INTEGER},</if>
+			<if test="distribution_period !=null and distribution_period !=''">distribution_period=#{distribution_period,jdbcType=INTEGER},</if>
+			<if test="default_outstock_warehouse !=null and default_outstock_warehouse !=0">default_outstock_warehouse=#{default_outstock_warehouse,jdbcType=INTEGER},</if>
+			<if test="company_short_name !=null and company_short_name !=''">company_short_name=#{company_short_name,jdbcType=VARCHAR}</if>
+		</set>
+		where id = #{id,jdbcType=INTEGER}
+	</update>
+	<!-- 入驻商详情  -->
+	<select id="queryStationedDetail" parameterType="java.util.Map" resultType="java.util.Map" resultMap="resultDetailMap">
+		select <include refid="i_colum"/>,
+		(select to_char(wm_concat(merchants_type)) from tbl_merchants_type mt where mt.stationed_user_id = tsua.id) as merchants_type
+		from tbl_stationed_user_info tsua
+		where id = #{id,jdbcType=INTEGER}
+	</select>
+
+	<!-- 删除入驻商仓储费 -->
+	<delete id="deleteStorageCharges" parameterType="java.util.Map">
+		delete tbl_stationed_storage_charges where stationed_user_id = #{id,jdbcType=INTEGER}
+	</delete>
+	<!-- 新增入驻商仓储费 -->
+	<insert id="insertStorageCharges" parameterType="java.util.Map">
+		insert into tbl_stationed_storage_charges
+		(stationed_user_id,
+		product_size,
+		storage_charges,
+		create_user_id,
+		create_date,
+		type
+		) values(
+		#{id,jdbcType=INTEGER},
+		#{product_size,jdbcType=VARCHAR},
+		#{storage_charges,jdbcType=INTEGER},
+		#{public_user_id,jdbcType=INTEGER},
+		sysdate,
+		#{type,jdbcType=CHAR}
+		)
+	</insert>
+	<!-- 批量更新或 插入入驻商仓储费设置-->
+    <update id="updateOrInsertStorageCharges" parameterType="java.util.List">
+        merge into tbl_stationed_storage_charges tssc
+        using (
+        <foreach collection="list" item="item" index="index" separator=" UNION ALL ">
+            SELECT
+            #{item.stationed_user_id, jdbcType=INTEGER} stationed_user_id,
+            #{item.product_size, jdbcType=VARCHAR} product_size,
+            #{item.storage_charges, jdbcType=INTEGER} storage_charges,
+            #{item.create_user_id, jdbcType=VARCHAR} create_user_id,
+            #{item.type, jdbcType=CHAR} type
+            from dual
+        </foreach>
+        ) ps
+        on (tssc.stationed_user_id = ps.stationed_user_id
+        	and tssc.product_size = ps.product_size
+        	and tssc.type = ps.type)
+        when matched then
+        update set tssc.storage_charges=ps.storage_charges
+        when not matched then
+        insert (
+            stationed_user_id,
+			product_size,
+			storage_charges,
+			create_user_id,
+			create_date,
+			type
+        ) values (
+            ps.stationed_user_id,
+            ps.product_size,
+            ps.storage_charges,
+            ps.create_user_id,
+            sysdate,
+            ps.type
+        )
+    </update>
+	<!-- 查询入驻商关联的商品尺码对应的仓储费 -->
+	<select id="queryStorageChargesList" parameterType="java.util.Map" resultType="java.util.Map">
+		select '1' type,a.product_size, nvl (b.storage_charges, 0) storage_charges
+		from (select product_size from tbl_dic_product_size where type=#{code,jdbcType=CHAR}) a
+		left join tbl_stationed_storage_charges b
+		on a.product_size = b.product_size and b.stationed_user_id = #{id,jdbcType=INTEGER}
+		order by product_size
+	</select>
+	<!-- 查询入驻商关联的分类对应的仓储费(其他分类) -->
+	<select id="queryStorageChargesTypeList" parameterType="java.util.Map" resultType="java.util.Map">
+		select temp.type ,temp.id,temp.type_name,temp.parent_id,nvl( temp2.storage_charges, 0) storage_charges 
+		  from tbl_dic_product_type temp left join tbl_stationed_storage_charges temp2 on temp.id = temp2.product_size and temp2.stationed_user_id = #{id,jdbcType=INTEGER}
+		 where temp.type = #{type,jdbcType=CHAR}
+		 start with temp.parent_id = #{parent_id,jdbcType=INTEGER}
+		        connect by prior temp.id = temp.parent_id
+	</select>
+	<!-- 删除入驻商品牌授权 -->
+	<delete id="deleteBrandUserRel" parameterType="java.util.Map">
+		delete tbl_brand_user_rel where stationed_user_id = #{id,jdbcType=INTEGER} and brand_id = #{brand_id,jdbcType=INTEGER}
+	</delete>
+	<!-- 新增入驻商品牌授权 -->
+	<insert id="insertBrandUserRel" parameterType="java.util.Map">
+		insert into tbl_brand_user_rel
+		(brand_id,
+		stationed_user_id,
+		create_date
+		) values(
+		#{brand_id,jdbcType=INTEGER},
+		#{id,jdbcType=INTEGER},
+		sysdate
+		)
+	</insert>
+	<!-- 查询已关联入驻商品牌信息 -->
+	<select id="queryBrandUserRel" parameterType="java.util.Map" resultType="java.util.Map">
+		select a.stationed_user_id as id, b.id as brand_id,b.brand_name,b.code,b.logo
+		from tbl_brand_user_rel a,tbl_dic_product_brand b
+		where a.brand_id = b.id
+		and b.state = '2'
+		and a.stationed_user_id = #{id,jdbcType=INTEGER}
+	</select>
+	<!-- 查询品牌信息 -->
+	<select id="queryBrandList" parameterType="java.util.Map" resultType="java.util.Map">
+		select *
+		from tbl_dic_product_brand
+		where state = '2'
+		<if test="count>0">
+			and id not in (select brand_id
+			from tbl_brand_user_rel
+			where stationed_user_id = #{id,jdbcType=INTEGER})
+		</if>
+        <if test="brand_name != null and brand_name != ''">
+            and brand_name like concat(concat('%', #{brand_name,jdbcType=VARCHAR}),'%')
+        </if>
+	</select>
+	<!-- 查询是否存在关联入驻商品牌信息 -->
+	<select id="queryBrandUserRelCount" parameterType="java.util.Map" resultType="int">
+		select count(1) from tbl_brand_user_rel where stationed_user_id = #{id,jdbcType=INTEGER}
+	</select>
+	<!-- 查询是否已存在相同用户名 -->
+	<select id="queryStationedByUserName" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		from tbl_stationed_user_apply
+		where user_name = #{user_name,jdbcType=VARCHAR}
+		<if test="id!=null and id!=0">
+			and id !=#{id,jdbcType=INTEGER}
+		</if>
+	</select>
+	<!-- 生产计划列表 -->
+	<select id="queryProductionPlanList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from
+		(select a.*, rownum rn from (
+		select purchase_number plan_number,
+		po.state,
+		to_char(delivery_date,'yyyy-mm-dd hh24:mi:ss') completion_date,
+		(select brand_name from tbl_dic_product_brand where id = brands_id) product_brand_name,
+		purchase_totality plan_totality,
+		to_char(po.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+		sui.user_name,
+		sui.company_name
+		from ${jdbc_user}.tbl_purchase_order po,tbl_stationed_user_info sui
+		where
+		po.supplier_id = sui.id
+		AND po.supplier_type = '2'
+		<if test="plan_number!=null and plan_number!=''">
+			and purchase_number = #{plan_number,jdbcType=VARCHAR}
+		</if>
+		<if test="start_create_date != null and start_create_date != ''">
+			and create_date &gt;= to_date(#{start_create_date},'YYYY-MM-DD HH24:MI:SS')
+		</if>
+		<if test="end_send_date != null and end_send_date != ''">
+			and create_date &lt;= to_date(#{end_send_date},'YYYY-MM-DD HH24:MI:SS')
+		</if>
+		<if test="state != null and state != ''">
+			<foreach collection="state" open="and (" close=")" item="item" separator=" or ">
+				po.state = #{item,jdbcType=CHAR}
+			</foreach>
+		</if>
+		<if test="user_name != null and user_name != ''">
+			and sui.user_name = #{user_name,jdbcType=VARCHAR}
+		</if>
+		<if test="company_name != null and company_name != ''">
+			and sui.company_name = #{company_name,jdbcType=VARCHAR}
+		</if>
+		order by create_date desc) a
+		where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+
+	<!-- 生产计划数量 -->
+	<select id="queryProductionPlanCount" parameterType="java.util.Map" resultType="int">
+		select
+			count(1)
+		from ${jdbc_user}.tbl_purchase_order po,tbl_stationed_user_info sui
+		where
+		po.supplier_id = sui.id
+		AND po.supplier_type = '2'
+		<if test="plan_number!=null and plan_number!=''">
+			and purchase_number = #{plan_number,jdbcType=VARCHAR}
+		</if>
+		<if test="start_create_date != null and start_create_date != ''">
+			and create_date &gt;= to_date(#{start_create_date},'YYYY-MM-DD HH24:MI:SS')
+		</if>
+		<if test="end_send_date != null and end_send_date != ''">
+			and create_date &lt;= to_date(#{end_send_date},'YYYY-MM-DD HH24:MI:SS')
+		</if>
+		<if test="state != null and state != ''">
+			<foreach collection="state" open="and (" close=")" item="item" separator=" or ">
+				po.state = #{item,jdbcType=CHAR}
+			</foreach>
+		</if>
+		<if test="user_name != null and user_name != ''">
+			and exists (select 1 from tbl_stationed_user_info where po.supplier_id=id and user_name = #{user_name,jdbcType=VARCHAR})
+		</if>
+		<if test="company_name != null and company_name != ''">
+			and exists (select 1 from tbl_stationed_user_info where po.supplier_id=id and company_name = #{company_name,jdbcType=VARCHAR})
+		</if>
+	</select>
+
+	<!-- 分组查询生产计划明细 -->
+	<select id="queryProductionPlanDetailByGroup" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT ppd.purchase_number plan_number,
+			ppd.product_itemnumber,
+			pi.product_name,
+			pi.product_img_url,
+			ppd.product_color,
+			ppd.product_specs,
+			SUM (ppd.purchase_num) AS plan_num
+		FROM ${jdbc_user}.tbl_purchase_detail ppd,
+			tbl_product_info pi,
+			${jdbc_user}.tbl_purchase_order po
+		WHERE ppd.product_itemnumber = pi.itemnumber
+			AND ppd.purchase_number = po.purchase_number
+			AND ppd.purchase_number = #{plan_number,jdbcType=VARCHAR}
+			AND po.supplier_type= '2'
+		GROUP BY ppd.purchase_number, product_itemnumber, product_color, product_specs,pi.product_name,pi.product_img_url
+	</select>
+
+	<!-- 根据生产计划规格参数参数查询计划明细 -->
+	<select id="queryProductionPlanDetailSizeByParam" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT
+            product_sku,
+            SUM (ppd.purchase_num) AS plan_num,
+            product_size
+        FROM ${jdbc_user}.tbl_purchase_detail ppd,
+			${jdbc_user}.tbl_purchase_order po
+        WHERE  ppd.purchase_number = po.purchase_number
+        	AND po.supplier_type= '2'
+        	AND po.purchase_number = #{plan_number,jdbcType=VARCHAR}
+            AND product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+            AND product_color = #{product_color,jdbcType=VARCHAR}
+            AND product_specs = #{product_specs,jdbcType=VARCHAR}
+        GROUP BY product_size,ppd.id,product_sku
+        ORDER BY product_size ASC
+	</select>
+
+	<!-- 入库申请列表 -->
+	<select id="queryInStorageApplyList" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT *
+		FROM (SELECT t.*, ROWNUM rn
+		FROM (
+		SELECT
+		a.state,
+		a.apply_number,
+		a.approver_name,
+		to_char(a.approval_date,'YYYY-MM-DD HH24:MI:SS') as approval_date,
+		b.user_name as create_name,
+		to_char(a.create_date,'YYYY-MM-DD HH24:MI:SS') as create_date,
+		nvl(d.apply_in_storage_count,0) as apply_in_storage_count,
+		nvl (e.already_in_storage_count, 0) as already_in_storage_count
+		FROM tbl_in_storage_apply_order a,
+		tbl_stationed_user_info b,
+		(SELECT COUNT (1) as apply_in_storage_count,apply_number FROM tbl_in_storage_apply_detail group by apply_number) d,
+		(SELECT COUNT (1) as already_in_storage_count,apply_number FROM tbl_in_storage_apply_detail where in_storage_state = 2 group by apply_number) e
+		<where>
+			a.create_user_id = b.id(+)
+			AND a.apply_number = d.apply_number(+)
+			AND a.apply_number = e.apply_number(+)
+			<if test="state != null and state != ''">
+				<foreach collection="state" open="and (" close=")" item="item" separator=" or ">
+					a.state = #{item,jdbcType=CHAR}
+				</foreach>
+			</if>
+			<if test="apply_number != null and apply_number != ''">
+				and a.apply_number = #{apply_number,jdbcType=VARCHAR}
+			</if>
+			<if test="create_start_time != null and create_start_time != ''">
+				and a.create_date &gt;= to_date(#{create_start_time},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+			<if test="create_end_date != null and create_end_date != ''">
+				and a.create_date &lt;= to_date(#{create_end_date},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+		</where>
+		ORDER BY a.create_date DESC) t
+		WHERE ROWNUM &lt; = #{end_rownum,jdbcType=INTEGER})
+		WHERE rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+
+	<!-- 入库申请数量 -->
+	<select id="queryInStorageApplyCount" parameterType="java.util.Map" resultType="int">
+		SELECT
+		count(1)
+		FROM tbl_in_storage_apply_order a,
+		tbl_stationed_user_info b,
+		(SELECT COUNT (1) as apply_in_storage_count,apply_number FROM tbl_in_storage_apply_detail group by apply_number) d,
+		(SELECT COUNT (1) as already_in_storage_count,apply_number FROM tbl_in_storage_apply_detail where in_storage_state = 2 group by apply_number) e
+		<where>
+			a.create_user_id = b.id(+)
+			AND a.apply_number = d.apply_number(+)
+			AND a.apply_number = e.apply_number(+)
+			<if test="state != null and state != ''">
+				<foreach collection="state" open="and (" close=")" item="item" separator=" or ">
+					a.state = #{item,jdbcType=CHAR}
+				</foreach>
+			</if>
+			<if test="apply_number != null and apply_number != ''">
+				and a.apply_number = #{apply_number,jdbcType=VARCHAR}
+			</if>
+			<if test="create_start_time != null and create_start_time != ''">
+				and a.create_date &gt;= to_date(#{create_start_time},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+			<if test="create_end_date != null and create_end_date != ''">
+				and a.create_date &lt;= to_date(#{create_end_date},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+		</where>
+	</select>
+
+	<!-- 分组查询入库申请规格明细列表信息 -->
+	<select id="queryInStorageApplyDetailByGroup" parameterType="java.lang.String" resultType="java.util.Map">
+		SELECT product_itemnumber,
+		pi.product_name,
+		pi.product_img_url,
+		product_color,
+		product_specs,
+		COUNT (1) as apply_count,
+		(SELECT COUNT (1) AS in_storage_count
+		FROM tbl_in_storage_apply_detail
+		WHERE  in_storage_state = '2'
+		AND product_itemnumber = a.product_itemnumber
+		AND product_specs = a.product_specs
+		) AS in_storage_count
+		FROM tbl_in_storage_apply_detail a,tbl_product_info pi
+		WHERE a.product_itemnumber = pi.itemnumber
+		AND apply_number = #{apply_number,jdbcType=VARCHAR}
+		GROUP BY product_itemnumber,
+		product_color,
+		product_specs,
+		pi.product_name,
+		pi.product_img_url
+	</select>
+
+	<!-- 根据入库申请规格参数查询申请明细 -->
+	<select id="queryInStorageApplySizeByParam" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT
+			id,
+			product_unique_code,
+			COUNT (1) AS in_storage_count,
+			product_size
+		FROM tbl_in_storage_apply_detail
+		WHERE  apply_number = #{apply_number,jdbcType=VARCHAR}
+			AND product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+			AND product_color = #{product_color,jdbcType=VARCHAR}
+			AND product_specs = #{product_specs,jdbcType=VARCHAR}
+		GROUP BY id,product_size,product_unique_code
+		ORDER BY product_size ASC
+	</select>
+
+	<!-- 删除入驻商权限节点的相关关联信息 -->
+	<delete id="deleteUserNode"  parameterType="java.util.Map">
+		delete from tbl_stationed_user_node
+		<where>
+			user_id = #{user_id,jdbcType=INTEGER}
+		</where>
+	</delete>
+
+	<!-- 设置入驻商权限节点相关关联信息 -->
+	<insert id="insertUserNode" parameterType="java.util.Map">
+		insert into tbl_stationed_user_node(id,user_id,node_id)
+		select seq_stationed_user_node.nextval,#{user_id} user_id,node_id from (
+		<foreach collection="node_ids" open="(" close=")" item="item" separator="union all">
+			select
+			#{item.node_id,jdbcType=INTEGER} as node_id
+			from dual
+		</foreach>
+		)
+	</insert>
+
+	<resultMap type="java.util.Map" id="roleNodeMap">
+		<result column="id" property="id"/>
+		<result column="node_name" property="name"/>
+		<result column="level" property="pid"/>
+		<result column="chk" property="chk"/>
+	</resultMap>
+
+	<!-- 查询入驻商菜单或按钮节点列表，如果有权限则选中 -->
+	<select id="queryUserNodeList" resultMap="roleNodeMap" parameterType="java.util.Map">
+            select id,
+                  node_name,
+                  level,
+                  nvl (c.node_id, 0) chk
+             from tbl_stationed_node a,
+                  (select node_id, user_id
+                     from tbl_stationed_user_node
+                    where user_id = #{user_id,jdbcType=INTEGER}) c
+            where a.id = c.node_id(+) and is_delete = '0'
+			       start with parent_id = 0
+			       connect by prior id = parent_id
+			order siblings by sort_id asc
+    </select>
+
+	<!-- 根据入驻商用户ID获取入驻商信息以及入驻商账号信息 -->
+	<select id="queryUserAccountById" parameterType="long" resultType="java.util.Map">
+    	SELECT sui.id USER_ID,
+       sui.USER_NAME,
+       sui.COMPANY_NAME,
+       sui.LEGAL_PERSONALITY,
+       sui.LEGAL_PERSONALITY_ID_NUMBER,
+       bc.BANK_ACCOUNT
+       FROM TBL_STATIONED_USER_INFO sui
+       LEFT JOIN TBL_BANK_ACCOUNT bc ON sui.id = bc.user_id and bc.USER_TYPE = 2
+       where sui.id =  #{id,jdbcType=INTEGER}
+    </select>
+	<!-- 根据入驻商用户ID入驻商账号信息 -->
+	<select id="queryBankAccountById" parameterType="long" resultType="java.util.Map">
+       select
+            id,
+		    user_id,
+		    user_type,
+		    bank_account,
+		    nvl(account_balance,0) account_balance,
+		    create_date,
+		    nvl(frozen_balance,0) frozen_balance,
+		    nvl(deposit_money,0) deposit_money,
+		    nvl(deposit_money_balance,0) deposit_money_balance
+        from
+            tbl_bank_account
+        where
+            user_type = '2' and user_id = #{id,jdbcType=INTEGER}
+    </select>
+    <!-- 更新密码 -->
+    <update id="update_pwd" parameterType="java.util.Map">
+         update tbl_stationed_user_info 
+         	<set>
+	           user_pwd = #{user_pwd,jdbcType=INTEGER}
+	       </set>
+         where id = #{id,jdbcType=INTEGER}
+    </update>
+    <!-- 根据ID查询申请表已审核信息 -->
+    <select id="queryStationedApplyById" parameterType="java.util.Map" resultType="int">
+  		select count(1) 
+  		  from tbl_stationed_user_apply 
+  		 where id = #{id,jdbcType=INTEGER}
+  		 <if test="user_state !=null and user_state !=''">
+  		   and user_state = #{user_state,jdbcType=CHAR}
+  		 </if>
+    </select>
+    <!-- 插入入驻商数据到ERP入驻商表 -->
+    <insert id="insertMerchantInfo" parameterType="java.util.Map">
+    	insert into ${jdbc_user}.TBL_MERCHANT_INFO(
+    		id,
+    		code,
+    		name,
+    		fullname,
+    		contacts,
+    		phone,
+    		type,
+    		address_province,
+    		address_city,
+    		address_county,
+    		address
+    	)
+		select id,
+			   user_code,
+			   company_name,
+			   company_name,
+			   contacts,
+			   contact_phone_number,
+			   '1',
+			   address_province,
+			   address_city,
+			   address_county,
+			   address
+		  from tbl_stationed_user_apply
+		 where id = #{id,jdbcType=INTEGER}
+    </insert>
+
+	<!--新增ERP供应商信息表数据-->
+	<insert id="insertErpSupplier" parameterType="java.util.Map">
+		insert into ${jdbc_user}.tbl_supplier_info(
+			id,
+			code,
+			name,
+			fullname,
+			contacts,
+			phone,
+			operation_field,
+			create_date,
+			address_province,
+			address_city,
+			address_county,
+			address
+		) select
+			id,
+			user_code,
+			company_name,
+			company_name,
+			contacts,
+			contact_phone_number,
+			business_scope,
+			sysdate,
+			address_province,
+			address_city,
+			address_county,
+			address
+		from tbl_stationed_user_apply where id = #{id,jdbcType=INTEGER}
+	</insert>
+    <!-- 查询是否存在入驻商代码ERP -->
+    <select id="queryMerchantInfoByCode" parameterType="java.util.Map" resultType="int">
+    	select count(1)
+    	  from ${jdbc_user}.TBL_MERCHANT_INFO
+    	 where code = #{user_code,jdbcType=VARCHAR}
+    </select>
+    <!-- 查询是否存在入驻商代码 -->
+    <select id="queryStationedApplyByCode" parameterType="java.util.Map" resultType="int">
+    	select count(1)
+    	  from tbl_stationed_user_apply
+    	 where user_code = #{user_code,jdbcType=VARCHAR}
+    	 <if test="id!=null and id!=0">
+			and id !=#{id,jdbcType=INTEGER}
+		</if>
+    </select>
+
+	<!--通过申请入驻商的代码查询erp供应商-->
+	<select id="queryErpSupplierByCode" parameterType="java.util.Map" resultType="java.util.Map">
+		select id from ${jdbc_user}.tbl_supplier_info where code = #{user_code,jdbcType=VARCHAR}
+	</select>
+    
+    <!-- 查询是否存在企业注册号 -->
+    <select id="queryRegistrationNumberIsExist" parameterType="java.util.Map" resultType="int">
+    	select count(1)
+    	  from tbl_stationed_user_apply
+    	 where registration_number = #{registration_number,jdbcType=VARCHAR}
+    	 <if test="id!=null and id!=0">
+			and id !=#{id,jdbcType=INTEGER}
+		</if>
+    </select>
+    
+    <!-- 查询是否存在入驻商编号-->
+    <select id="queryStationedApplyByNumber" parameterType="java.util.Map" resultType="int">
+    	select count(1)
+    	  from tbl_stationed_user_apply
+    	 where user_number = #{user_number,jdbcType=VARCHAR}
+    	 <if test="id!=null and id!=0">
+			and id !=#{id,jdbcType=INTEGER}
+		</if>
+    </select>
+    
+    <!-- 查询入驻商主表编号是否存在-->
+    <select id="queryStationedByNumber" parameterType="java.util.Map" resultType="int">
+    	select count(1)
+    	  from tbl_stationed_user_info
+    	 where user_number = #{user_number,jdbcType=VARCHAR}
+    	 <if test="id!=null and id!=0">
+			and id !=#{id,jdbcType=INTEGER}
+		</if>
+    </select>
+    
+    <!-- 保证金配置 -->
+    <update id="editDepositMoney" parameterType="java.util.Map">
+    	update tbl_bank_account
+    	   set deposit_money =  #{deposit_money,jdbcType=INTEGER}
+    	 where user_id = #{id,jdbcType=INTEGER}
+    </update>
+    <!-- 查询保证金 -->
+    <select id="queryDepositMoney" parameterType="java.util.Map" resultType="string">
+    	select deposit_money from tbl_bank_account where user_type = '2' and user_id = #{id,jdbcType=INTEGER}
+    </select>
+    <!-- 公司名称是否重复 -->
+    <select id="queryStationedApplyByCompanyName" parameterType="java.util.Map" resultType="int">
+    	select count(1)
+    	  from tbl_stationed_user_apply
+    	 where company_name = #{company_name,jdbcType=VARCHAR}
+    	 <if test="id!=null and id!=0">
+			and id !=#{id,jdbcType=INTEGER}
+		</if>
+    </select>
+    <!-- 入驻商收支记录数量 -->
+    <select id="queryInExpRecordCount" parameterType="java.util.Map" resultType="int">
+    	select count(1)
+    	  from tbl_stationed_in_exp_record
+    	 <where>
+    	 	    account_flag = 0
+    	 	<if test="stationed_user_id !=null and stationed_user_id !=''">
+    	 		and stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+    	 	</if>
+    	 	<if test="record_number !=null and record_number !=''">
+    	 		and record_number = #{record_number,jdbcType=VARCHAR}
+    	 	</if>
+    	 	<if test="record_type !=null and record_type !=''">
+    	 		and record_type = #{record_type,jdbcType=VARCHAR}
+    	 	</if>
+    	 	<if test="turnover_type !=null and turnover_type !=''">
+    	 		and turnover_type = #{turnover_type,jdbcType=VARCHAR}
+    	 	</if>
+    	 	<if test="turnover_number !=null and turnover_number !=''">
+    	 		and turnover_number = #{turnover_number,jdbcType=VARCHAR}
+    	 	</if>
+    	 	<if test="start_create_date != null and start_create_date != ''">
+				and to_char(create_date,'YYYY-MM-DD HH24:MI:SS') &gt;= #{start_create_date,jdbcType=VARCHAR}
+			</if>
+			<if test="end_create_date != null and end_create_date != ''">
+				and to_char(create_date,'YYYY-MM-DD HH24:MI:SS') &lt;= #{end_create_date,jdbcType=VARCHAR}
+			</if>
+		    <if test="record_channel != null and record_channel != ''">
+			    and record_channel = #{record_channel,jdbcType=VARCHAR}
+		    </if>
+		</where>
+    </select>
+    <!-- 入驻商收支记录列表 -->
+    <select id="queryInExpRecordList" parameterType="java.util.Map" resultType="java.util.Map">
+	    select * from (
+			select a.*, rownum rn from(
+				select id,
+		    		   (select company_name from tbl_stationed_user_info where id = ir.stationed_user_id) as stationed_name,
+		    		   record_number,
+		    		   record_type,
+		    		   remark,
+		    		   nvl(money,0) money,
+		    		   nvl(surplus_money,0) surplus_money,
+		    		   turnover_type,
+		    		   turnover_number,
+		    		   to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date
+		    	  from tbl_stationed_in_exp_record ir
+		    	 <where>
+		    	 	    account_flag = 0
+		    	 	<if test="stationed_user_id !=null and stationed_user_id !=''">
+		    	 		and stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		    	 	</if>
+		    	 	<if test="record_number !=null and record_number !=''">
+		    	 		and record_number = #{record_number,jdbcType=VARCHAR}
+		    	 	</if>
+		    	 	<if test="record_type !=null and record_type !=''">
+		    	 		and record_type = #{record_type,jdbcType=VARCHAR}
+		    	 	</if>
+		    	 	<if test="turnover_type !=null and turnover_type !=''">
+		    	 		and turnover_type = #{turnover_type,jdbcType=VARCHAR}
+		    	 	</if>
+		    	 	<if test="turnover_number !=null and turnover_number !=''">
+		    	 		and turnover_number = #{turnover_number,jdbcType=VARCHAR}
+		    	 	</if>
+		    	 	<if test="start_create_date != null and start_create_date != ''">
+						and to_char(create_date,'YYYY-MM-DD HH24:MI:SS') &gt;= #{start_create_date,jdbcType=VARCHAR}
+					</if>
+					<if test="end_create_date != null and end_create_date != ''">
+						and to_char(create_date,'YYYY-MM-DD HH24:MI:SS') &lt;= #{end_create_date,jdbcType=VARCHAR}
+					</if>
+					 <if test="record_channel != null and record_channel != ''">
+						 and record_channel = #{record_channel,jdbcType=VARCHAR}
+					 </if>
+    	 		</where>
+    	 			order by create_date desc) a
+				where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+			where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+    
+    <!-- 查询入驻商简要信息列表，主要用户选择入驻商，仅查询入驻商名称、入驻商ID-->
+	<select id="querySimpleStationedList" resultType="java.util.Map">
+		SELECT ID,
+       USER_CODE,
+       USER_NUMBER,
+       USER_NAME,
+       COMPANY_NAME
+	   FROM TBL_STATIONED_USER_INFO ui
+	   WHERE STATIONED_USER_TYPE = '2'
+		<if test="is_open_shop != null and is_open_shop != ''">
+		   and state = 2 and (is_open_shop = 2 or exists(select 1 from tbl_merchants_type mt where mt.stationed_user_id = ui.id and mt.merchants_type = 1))
+		</if>
+	</select>
+	<!-- 统计某个入驻商的待结算金额 -->
+    <select id="queryWaitSettlementAmount" parameterType="long" resultType="java.util.Map">
+    	SELECT nvl(sum(case when settlement_amount <![CDATA[ > ]]> settled_amount then settlement_amount - settled_amount else 0 end),0) unliquidated_balance
+  		FROM TBL_BUSS_SETTLEMENT_INFO
+ 		WHERE SETTLEMENT_STATE != 2
+        AND BANK_ACCOUNT_TYPE = 1
+        AND IS_DELETE = '0'
+        and is_private = 0
+        AND SETTLEMENT_USER_ID = #{public_user_stationed_user_id,jdbcType=INTEGER}
+    </select>
+    
+    <!-- 按照单个入驻商锁定操作 add for wangpeng 2017-07-25 -->
+    <update id="lockTable"  parameterType="java.util.Map">
+    	update TBL_STATIONED_USER_APPLY set id = id where id = #{public_user_stationed_user_id,jdbcType=INTEGER}
+    </update>
+    
+    <!-- 查询入驻商下拉列表-->
+	<select id="queryStationedOption" parameterType="java.util.Map" resultType="java.util.Map" resultMap="stationedOptionMap">
+		select id,company_name 
+		  from TBL_STATIONED_USER_INFO 
+		 where state='2' 
+		   and stationed_user_type = '2'
+		   <if test="pvtp_flag != null or sys_pvtp_flag != null">
+		   	and id in (select stationed_user_id from tbl_merchants_type where merchants_type = 4)
+		   </if>
+	</select>
+	<resultMap id="stationedOptionMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="company_name" property="option"/>
+    </resultMap>
+	<!-- 更新入驻商余额 -->
+	<update id="updateAccountBalance" parameterType="java.util.Map">
+		update TBL_BANK_ACCOUNT set ACCOUNT_BALANCE = #{account_balance,jdbcType=INTEGER}
+		where user_id = #{public_user_stationed_user_id,jdbcType=INTEGER}
+	</update>
+
+	<resultMap id="stationedRoleMap" type="java.util.Map">
+		<result column="id" property="id"/>
+		<result column="role_name" property="role_name"/>
+		<result column="remarks" property="remarks"/>
+		<result column="checked" property="checked"/>
+		<result column="merchants_type" property="merchants_type"/>
+	</resultMap>
+
+	<!-- 查询系统入驻商角色列表，如果有权限则选中 -->
+	<select id="queryStationedRoleList" resultMap="stationedRoleMap" parameterType="java.util.Map">
+		select a.id,
+			a.role_name,
+			a.remarks,
+			nvl(c.user_id,0) checked
+		from TBL_SYS_STATIONED_ROLE a, (select user_id,role_id from TBL_SYS_STATIONED_USER_ROLE where user_id = #{user_id,jdbcType=INTEGER}) c
+		where  a.id = c.role_id(+)
+	</select>
+
+	<!-- 移除系统入驻商角色 -->
+	<delete id="deleteStationedRole"  parameterType="java.util.Map">
+		delete from TBL_SYS_STATIONED_USER_ROLE
+		<where>
+			<if test="role_id!=null and role_id!=''">
+				role_id = #{role_id,jdbcType=INTEGER}
+			</if>
+			<if test="user_id!=null and user_id!=''">
+				and user_id = #{user_id,jdbcType=INTEGER}
+			</if>
+		</where>
+	</delete>
+
+	<!-- 配置系统入驻商用户角色 -->
+	<insert id="insertStationedRole" parameterType="java.util.Map">
+		insert into TBL_SYS_STATIONED_USER_ROLE(id,user_id,role_id)
+		select seq_sys_stationed_user_role.nextval,#{user_id,jdbcType=INTEGER},role_id from (
+		<foreach collection="role_ids" open="(" close=")" item="item" separator="union all">
+			select
+			#{item.id,jdbcType=INTEGER} as role_id
+			from dual
+		</foreach>
+		)
+	</insert>
+
+	<!-- 根据条件查询系统入驻商角色列表 -->
+	<select id="querySysStationedRoleList" resultType="java.util.Map" parameterType="java.util.Map">
+		select * from (
+			select a.*, rownum rn from (
+				SELECT id,role_name,remarks,to_char(create_time,'YYYY-MM-DD HH24:MI:SS') as create_time from TBL_SYS_STATIONED_ROLE
+				<where>
+					<if test="keyword!=null and keyword!='' ">
+						role_name like '%'||#{keyword}||'%' or remarks like '%'||#{keyword}||'%'
+					</if>
+					<if test="merchants_type != null and merchants_type != ''">
+						and merchants_type = #{merchants_type,jdbcType=INTEGER}
+					</if>
+					<if test="dateMin!=null and dateMin!='' ">
+						and create_time &gt;= to_date(#{dateMin},'yyyy-mm-dd hh24:mi:ss')
+					</if>
+					<if test="dateMax!=null and dateMax!='' ">
+						and create_time &lt;= to_date(#{dateMax},'yyyy-mm-dd hh24:mi:ss')
+					</if>
+				</where>
+				order by create_time desc
+			) a where rownum &lt;= #{end_rownum})
+		where rn &gt; #{start_rownum}
+	</select>
+
+	<!-- 根据条件查询系统角色数量 -->
+	<select id="querySysStationedRoleCount" resultType="int" parameterType="java.util.Map">
+		SELECT
+			count(1)
+		from TBL_SYS_STATIONED_ROLE
+		<where>
+			<if test="keyword!=null and keyword!='' ">
+				role_name like '%'||#{keyword}||'%' or remarks like '%'||#{keyword}||'%'
+			</if>
+			<if test="dateMin!=null and dateMin!='' ">
+				and create_time &gt;= to_date(#{dateMin},'yyyy-mm-dd hh24:mi:ss')
+			</if>
+			<if test="dateMax!=null and dateMax!='' ">
+				and create_time &lt;= to_date(#{dateMax},'yyyy-mm-dd hh24:mi:ss')
+			</if>
+		</where>
+	</select>
+
+	<resultMap type="java.util.Map" id="stationedRoleDetailMap">
+		<result column="id" property="id"/>
+		<result column="role_name" property="role_name"/>
+		<result column="remarks" property="remarks"/>
+		<result column="create_time" property="create_time"/>
+	</resultMap>
+
+	<!-- 查询系统入驻商角色详情 -->
+	<select id="querySysStationedRoleDetail" resultMap="stationedRoleDetailMap" parameterType="java.util.Map">
+		SELECT id,role_name,remarks,to_char(create_time,'YYYY-MM-DD HH24:MI:SS') as create_time from TBL_SYS_STATIONED_ROLE
+		<where>
+			id = #{role_id}
+		</where>
+	</select>
+
+	<!-- 判断是否有重复的角色名称 -->
+	<select id="queryBySysStationedRoleName" parameterType="java.util.Map"  resultType="int">
+		SELECT count(1) from TBL_SYS_STATIONED_ROLE
+		<where>
+			role_name = #{role_name,jdbcType=VARCHAR}
+			<if test="role_id!=null and role_id!='' ">
+				and id &lt;&gt;#{role_id,jdbcType=INTEGER}
+			</if>
+		</where>
+	</select>
+
+	<!-- 更新系统入驻商角色信息 -->
+	<update id="updateSysStationedRole" parameterType="java.util.Map">
+		update TBL_SYS_STATIONED_ROLE
+		<set>
+			role_name = #{role_name,jdbcType=VARCHAR},
+			remarks = #{remarks,jdbcType=VARCHAR}
+		</set>
+		where id = #{role_id,jdbcType=INTEGER}
+	</update>
+
+	<!-- 删除系统入驻商角色或节点的相关关联信息 -->
+	<delete id="deleteSysStationedRole"  parameterType="java.util.Map">
+		delete from TBL_SYS_STATIONED_ROLE
+		<where>
+			<if test="role_id!=null and role_id!=0 ">
+				id = #{role_id,jdbcType=INTEGER}
+			</if>
+		</where>
+	</delete>
+
+	<!-- 新增系统入驻商角色相关菜单或节点 -->
+	<insert id="insertSysStationedRoleNode" parameterType="java.util.Map">
+		insert into TBL_SYS_STATIONED_ROLE_NODE(id,role_id,node_id)
+		select seq_sys_stationed_role_node.nextval,#{role_id} role_id,node_id from (
+		<foreach collection="role_nodes" open="(" close=")" item="item" separator="union all">
+			select
+			#{item.node_id,jdbcType=INTEGER} as node_id
+			from dual
+		</foreach>
+		)
+	</insert>
+
+	<!-- 删除系统入驻商角色或节点的相关关联信息 -->
+	<delete id="deleteSysStationedRoleNode"  parameterType="java.util.Map">
+		delete from TBL_SYS_STATIONED_ROLE_NODE
+		<where>
+			<if test="role_id!=null and role_id!=0 ">
+				role_id = #{role_id,jdbcType=INTEGER}
+			</if>
+			<if test="node_id!=null and node_id!=0 ">
+				and node_id = #{node_id,jdbcType=INTEGER}
+			</if>
+		</where>
+	</delete>
+
+	<!-- 删除系统入驻商用户角色相关关联信息 -->
+	<delete id="deleteSysStationedUserRole"  parameterType="java.util.Map">
+		delete from TBL_SYS_STATIONED_USER_ROLE
+		<where>
+			<if test="role_id!=null and role_id!=''">
+				role_id = #{role_id,jdbcType=INTEGER}
+			</if>
+			<if test="user_id!=null and user_id!=''">
+				and user_id = #{user_id,jdbcType=INTEGER}
+			</if>
+		</where>
+	</delete>
+
+	<resultMap type="java.util.HashMap" id="stationedRoleNodeMap">
+		<result column="id" property="id"/>
+		<result column="node_name" property="name"/>
+		<result column="level" property="pid"/>
+		<result column="chk" property="chk"/>
+		<result column="merchants_type" property="merchants_type"/>
+	</resultMap>
+
+	<!-- 查询菜单或按钮节点列表，如果有权限则选中 -->
+	<select id="querySysStationedRoleNodeList" resultMap="stationedRoleNodeMap" parameterType="java.util.HashMap">
+		select
+			id,
+			node_name,
+			level,
+			nvl(c.node_id,0) chk,
+			a.merchants_type
+		from tbl_stationed_node a,(select node_id, role_id from tbl_sys_stationed_role_node where role_id = #{role_id,jdbcType=INTEGER}) c
+		where a.id = c.node_id(+)
+		and is_delete = '0' start with parent_id = 0 connect by prior id = parent_id order siblings by sort_id asc
+	</select>
+
+	<resultMap type="java.util.HashMap" id="stationedAllNodeMap">
+		<result column="id" property="id"/>
+		<result column="node_name" property="name"/>
+		<result column="level" property="pid"/>
+		<result column="chk" property="chk"/>
+		<result column="merchants_type" property="merchants_type"/>
+	</resultMap>
+
+	<!-- 查询入驻商所有节点列表-->
+	<select id="queryAllNodeList" resultMap="stationedAllNodeMap" parameterType="java.util.HashMap">
+		select id,node_name,level, 0 chk,merchants_type from TBL_STATIONED_NODE
+		where is_delete = '0'
+		start with parent_id=0
+		connect by prior id=parent_id
+		order siblings by sort_id asc
+	</select>
+
+	<!-- 新增系统入驻商角色信息 -->
+	<insert id="insertSysStationedRole"  parameterType="java.util.HashMap">
+		<selectKey keyProperty="id" resultType="int" order="BEFORE">
+			select SEQ_SYS_STATIONED_ROLE.nextval from dual
+		</selectKey>
+		insert into TBL_SYS_STATIONED_ROLE(
+			id,
+			role_name,
+			remarks,
+			create_time
+		) VALUES
+		(
+			#{id,jdbcType=INTEGER},
+			#{role_name,jdbcType=VARCHAR},
+			#{remarks,jdbcType=VARCHAR},
+			sysdate
+		)
+	</insert>
+	<resultMap id="stationedSupplierMap" type="java.util.Map">
+		<result column="id" property="id"/>
+		<result column="user_name" property="user_name"/>
+		<result column="company_name" property="company_name"/>
+		<result column="contacts" property="contacts"/>
+		<result column="create_date" property="create_date"/>
+		<result column="checked" property="checked"/>
+	</resultMap>
+	<!-- 查询供应商 -->
+	<select id="querySupplierList" parameterType="java.util.Map" resultMap="stationedSupplierMap">
+		select t.id,
+			   t.user_name,
+		       t.company_name,
+		       t.contacts,
+		       to_char (t.create_date, 'yyyy-mm-dd') create_date,
+		       nvl(t1.stationed_user_id,0) checked
+		  from tbl_stationed_user_info t,(select stationed_user_id,supplier_id from tbl_stationed_supplier where stationed_user_id = #{id,jdbcType=INTEGER}) t1
+		 where t.id = t1.supplier_id(+)
+		   and t.supplier_statement = '2'
+		   and t.id != #{id,jdbcType=INTEGER}
+		   <if test="user_name !=null and user_name !=''">
+		   		and t.user_name like concat(concat('%', #{user_name,jdbcType=VARCHAR}),'%')
+		   </if>
+		   <if test="company_name !=null and company_name !=''">
+		   		and t.company_name like concat(concat('%', #{company_name,jdbcType=VARCHAR}),'%')
+		   </if>
+		   <if test="contacts !=null and contacts !=''">
+		   		and t.contacts like concat(concat('%', #{contacts,jdbcType=VARCHAR}),'%')
+		   </if>
+	</select>
+	<!-- 删除入驻商关联的供应商 -->
+	<delete id="deleteSupplier" parameterType="java.util.Map">
+		delete from tbl_stationed_supplier where stationed_user_id = #{id, jdbcType=INTEGER}
+	</delete>
+	<!-- 新增入驻商关联的供应商 -->
+	<insert id="insertSupplier" parameterType="java.util.Map">
+		insert into tbl_stationed_supplier(create_user_id, stationed_user_id, supplier_id)
+		select #{public_user_id,jdbcType=INTEGER}, #{id,jdbcType=INTEGER}, supplier_id from (
+		<foreach collection="supplier_id" open="(" close=")" item="item" separator="union all">
+			select #{item} as supplier_id from dual
+		</foreach>
+		)
+	</insert>
+	
+	<!-- 入驻商认证审批列表 -->
+	 <select id="queryStationedCertificationApprovalList" parameterType="java.util.Map" resultType="java.util.Map">
+	    select a.*,
+	    	(select user_name from tbl_stationed_user_info T where t.id=a.user_id) as user_name,
+	    	(select company_name from tbl_stationed_user_info T where t.id=a.user_id) as company_name,
+	    	(select user_realname from tbl_sys_user_info T where t.id=a.approval_user_id) as approval_manage_name,
+	    	(select name from tbl_dic_region where id = a.user_company_address_province)
+          		||(select name from tbl_dic_region where id = a.user_company_address_city )
+           		||(select name from tbl_dic_region where id = a.user_company_address_county)
+           		||a.user_company_address_deails as address
+		     from (
+			    select t.*,
+			    rownum rn from (
+			        select 
+					t.id,
+					t.user_id,
+					t.user_real_name,
+					t.user_manage_cardid,
+					t.user_manage_cardid_img,
+					t.user_company_address_province,
+					t.user_company_address_city,
+					t.user_company_address_county,
+					t.user_company_address_deails,
+					t.state,
+					t.type,
+					t.rejected_reason,
+					to_char(t.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+					t.user_company_img,
+					t.approval_user_id,
+					to_char(t.approval_date,'yyyy-mm-dd hh24:mi:ss') approval_date
+					from tbl_bank_card_user_info t
+					<where>
+						t.type=2
+						<if test="user_name !=null and user_name != ''">
+						    and exists(select 1 from tbl_stationed_user_info t1 
+						    	where t1.user_name=#{user_name,jdbcType=VARCHAR} and t1.id=t.user_id)
+						</if>
+						<if test="company_name !=null and company_name != ''">
+						    and exists(select 1 from tbl_stationed_user_info t1 
+						    	where t1.company_name=#{company_name,jdbcType=VARCHAR} and t1.id=t.user_id)
+						</if>
+						<if test="contact_phone_number !=null and contact_phone_number != ''">
+						    and exists(select 1 from tbl_user_info t1 
+						    	where t1.contact_phone_number=#{contact_phone_number,jdbcType=VARCHAR} and t1.id=t.user_id)
+						</if>
+						<if test="state != null">
+							and state IN
+				                <foreach item="item" collection="state" open="(" separator="," close=")">
+									#{item}
+								</foreach>
+						</if>
+					</where>
+					order by state asc,create_date desc
+			        ) t where rownum &lt;= #{end_rownum})a
+			where rn &gt; #{start_rownum}
+    </select>
+    <!-- 入驻商认证审批总数 -->
+    <select id="queryStationedCertificationApprovalCount" parameterType="java.util.Map" resultType="int">
+    	 select count(1)
+			from tbl_bank_card_user_info t
+			<where>
+				t.type=2
+				<if test="login_name !=null and login_name != ''">
+				    and exists(select 1 from tbl_user_info t1 
+				    	where t1.login_name=#{login_name,jdbcType=VARCHAR} and t1.id=t.user_id)
+				</if>
+				<if test="user_manage_name !=null and user_manage_name != ''">
+				    and exists(select 1 from tbl_user_info t1 
+				    	where t1.user_manage_name=#{user_manage_name,jdbcType=VARCHAR} and t1.id=t.user_id)
+				</if>
+				<if test="user_manage_mobilephone !=null and user_manage_mobilephone != ''">
+				    and exists(select 1 from tbl_user_info t1 
+				    	where t1.user_manage_mobilephone=#{user_manage_mobilephone,jdbcType=VARCHAR} and t1.id=t.user_id)
+				</if>
+				<if test="state != null">
+					and state IN
+		                <foreach item="item" collection="state" open="(" separator="," close=")">
+							#{item}
+						</foreach>
+				</if>
+			</where>
+    </select>
+    <!-- 入驻商认证审批详情 -->
+	<select id="queryStationedCertificationApprovalDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select 
+		id,
+		user_id,
+		user_real_name,
+		user_manage_cardid,
+		user_manage_cardid_img,
+		user_company_address_province,
+		user_company_address_city,
+		user_company_address_county,
+		user_company_address_deails,
+		state,
+		type,
+		to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+		to_char(approval_date,'yyyy-mm-dd hh24:mi:ss') approval_date,
+		rejected_reason,
+		(select user_realname from tbl_sys_user_info T where t.id=approval_user_id) as approval_manage_name,
+		user_company_img,
+		DECODE(state,0,'待审核',1,'已审核',2,'已驳回') as approval_state,
+		(select name
+             from tbl_dic_region
+            where id = user_company_address_province)
+       || (select name
+             from tbl_dic_region
+            where id = user_company_address_city)
+       || (select name
+             from tbl_dic_region
+            where id = user_company_address_county)
+       || user_company_address_deails
+          as address
+		from tbl_bank_card_user_info where id=#{id,jdbcType=INTEGER}
+		and type=2
+	</select>
+	<!-- 会员账户表更新见证宝相关信息 -->
+    <update id="updateBankAccountInfo" parameterType="java.util.Map">
+    	UPDATE TBL_BANK_ACCOUNT 
+    	   SET bank_account = #{bank_account,jdbcType=VARCHAR},
+    	   sub_merchant_id=#{sub_merchant_id,jdbcType=VARCHAR}
+		where user_id = #{user_id,jdbcType=INTEGER}
+    </update>
+    <!-- 更新银行卡会员资料信息状态-->
+    <update id="updateBankCardUserInfo" parameterType="java.util.Map">
+    	UPDATE TBL_BANK_CARD_USER_INFO 
+    	   <set>
+    	   		<if test="state !=null and state != ''">
+			   		state=#{state,jdbcType=INTEGER},
+				</if>
+				<if test="rejected_reason !=null and rejected_reason != ''">
+			   		rejected_reason=#{rejected_reason,jdbcType=VARCHAR},
+				</if>
+				approval_user_id = #{approval_user_id,jdbcType=INTEGER},
+    	   	    approval_date=sysdate
+    	   </set> 
+		where user_id = #{user_id,jdbcType=INTEGER}
+		and type=2
+    </update>
+    <!-- 查询入驻商补扣款总数 -->
+    <select id="querySupDeductCount" parameterType="java.util.Map" resultType="int">
+    	select count(1)
+    	  from tbl_stationed_sup_deduct t
+    	 <where>
+    	 	<if test="stationed_user_name !=null and stationed_user_name !='' ">
+			    and exists (select 1 from tbl_stationed_user_info where id = t.stationed_user_id and company_name = #{stationed_user_name, jdbcType=VARCHAR})
+		    </if>
+    	 	<if test="sup_deduct_number !=null and sup_deduct_number !=''">
+    	 		and sup_deduct_number = #{sup_deduct_number, jdbcType=VARCHAR}
+    	 	</if>
+    	 	<if test="start_date != null and start_date != ''">
+				and create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+			<if test="end_date != null and end_date != ''">
+				and create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+			<if test="type != null and type != ''">
+				and type = #{type,jdbcType=VARCHAR}
+			</if>
+			<if test="states != null and states != ''">
+				and state in
+				<foreach collection="states" open="(" close=")" item="item" separator=",">
+					#{item,jdbcType=INTEGER}
+				</foreach>
+			</if>
+    	 </where>
+    </select>
+    <!-- 查询入驻商补扣款列表 -->
+    <select id="querySupDeductListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+    	select * 
+    	  from (
+    	  	select a.*, rownum rn 
+    	  	  from (
+    	  	  	select <include refid="sup_deduct_colum"/>,
+    	  	  		   (select company_name from tbl_stationed_user_info where id = t.stationed_user_id) stationed_user_name,
+    	  	  		   (select user_realname from tbl_sys_user_info where id = t.create_user_id) create_user_name,
+    	  	  		   (select user_realname from tbl_sys_user_info where id = t.approval_user_id) approval_user_name,
+    	  	  		   (select user_realname from tbl_sys_user_info where id = t.sign_approval_user_id) sign_approval_user_name
+    	  	  	  from tbl_stationed_sup_deduct t
+    	  	   <where>
+	    	 	  <if test="stationed_user_name !=null and stationed_user_name !='' ">
+					  and exists (select 1 from tbl_stationed_user_info where id = t.stationed_user_id and company_name = #{stationed_user_name, jdbcType=VARCHAR})
+				  </if>
+	    	 	  <if test="sup_deduct_number !=null and sup_deduct_number !=''">
+	    	 		  and sup_deduct_number = #{sup_deduct_number, jdbcType=VARCHAR}
+	    	 	  </if>
+	    	 	  <if test="start_date != null and start_date != ''">
+					  and create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+				  </if>
+				  <if test="end_date != null and end_date != ''">
+					  and create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+				  </if>
+				  <if test="type != null and type != ''">
+					  and type = #{type,jdbcType=VARCHAR}
+				  </if>
+				  <if test="states != null and states != ''">
+					  and state in
+					  <foreach collection="states" open="(" close=")" item="item" separator=",">
+						  #{item,jdbcType=INTEGER}
+					  </foreach>
+				  </if>
+	    	   </where>
+    	  	  order by state asc,create_date desc) a
+    	  where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+    <!-- 新增入驻商补扣款 -->
+    <insert id="insertSupDeduct" parameterType="java.util.Map">
+    	insert into tbl_stationed_sup_deduct
+    		(
+    			id,
+			    sup_deduct_number,
+				stationed_user_id,
+				type,
+				money,
+				<if test="deduction_type != null and deduction_type != ''">
+				deduction_type,
+				</if>
+				remark,
+				<if test="state != null and state != ''">
+				state,
+				</if>
+				voucher_img_url,
+                account_type,
+				create_user_id,
+				create_date
+    		) values (
+    			seq_stationed_sup_deduct.nextVal,
+    			getAutoNumber('SC'),
+    			#{stationed_user_id,jdbcType=INTEGER},
+    			#{type,jdbcType=VARCHAR},
+    			#{money,jdbcType=INTEGER},
+    			<if test="deduction_type != null and deduction_type != ''">
+    			#{deduction_type,jdbcType=INTEGER},
+    			</if>
+    			#{remark,jdbcType=VARCHAR},
+    			<if test="state != null and state != ''">
+				#{state,jdbcType=INTEGER},
+				</if>
+				#{voucher_img_url,jdbcType=VARCHAR},
+				#{account_type, jdbcType=INTEGER},
+				#{public_user_id,jdbcType=INTEGER},
+				sysdate
+    		)
+    </insert>
+    <!-- 删除入驻商补扣款 -->
+    <delete id="deleteSupDeduct" parameterType="java.util.Map">
+    	delete tbl_stationed_sup_deduct where id = #{id,jdbcType=INTEGER}
+    </delete>
+    <!-- 更新入驻商补扣款 -->
+    <update id="updateSupDeduct" parameterType="java.util.Map">
+    	update tbl_stationed_sup_deduct
+		set stationed_user_id = #{stationed_user_id,jdbcType=INTEGER},
+			money = #{money,jdbcType=INTEGER},
+			type = #{type,jdbcType=VARCHAR},
+			account_type = #{account_type,jdbcType=INTEGER},
+			<choose>
+				<when test="deduction_type != null and deduction_type != ''">
+					deduction_type = #{deduction_type,jdbcType=INTEGER},
+				</when>
+				<otherwise>
+					deduction_type = '',
+				</otherwise>
+			</choose>
+			<if test="state != null and state != ''">
+				state = #{state,jdbcType=INTEGER},
+			</if>
+			voucher_img_url = #{voucher_img_url,jdbcType=VARCHAR},
+			remark = #{remark,jdbcType=VARCHAR}
+    	 where id = #{id,jdbcType=INTEGER}
+    </update>
+    <resultMap type="java.util.Map" id="resultSupDeductMap">
+		<result column="sup_deduct_number" property="sup_deduct_number"/>
+		<result column="stationed_user_name" property="stationed_user_name"/>
+		<result column="type" property="type"/>
+		<result column="money" property="money"/>
+		<result column="deduction_type" property="deduction_type"/>
+		<result column="state" property="state"/>
+		<result column="remark" property="remark"/>
+		<result column="create_date" property="create_date"/>
+		<result column="create_user_name" property="create_user_name"/>
+		<result column="approval_user_name" property="approval_user_name"/>
+		<result column="approval_date" property="approval_date"/>
+		<result column="sign_approval_user_name" property="sign_approval_user_name"/>
+		<result column="sign_approval_date" property="sign_approval_date"/>
+		<result column="voucher_img_url" property="voucher_img_url"/>
+		<result column="account_type" property="account_type"/>
+    </resultMap>
+    <!-- 查询入驻商补扣款详情 -->
+    <select id="querySupDeductDetail" parameterType="java.util.Map" resultMap="resultSupDeductMap">
+    	select <include refid="sup_deduct_colum"/>,
+    		   (select company_name from tbl_stationed_user_info where id = t.stationed_user_id) stationed_user_name,
+    		   (select user_realname from tbl_sys_user_info where id = t.create_user_id) create_user_name,
+    	  	   (select user_realname from tbl_sys_user_info where id = t.approval_user_id) approval_user_name,
+    	  	   (select user_realname from tbl_sys_user_info where id = t.sign_approval_user_id) sign_approval_user_name,
+				(select to_char(wm_concat(mt.merchants_type))  from tbl_merchants_type mt where mt.stationed_user_id = t.stationed_user_id ) merchants_types
+    	  from tbl_stationed_sup_deduct t
+    	 where id = #{id,jdbcType=INTEGER}
+    </select>
+
+    <!-- 入驻商补扣款审批 -->
+    <update id="approvalSupDeduct" parameterType="java.util.Map">
+    	update tbl_stationed_sup_deduct
+    	   set approval_user_id = #{public_user_id,jdbcType=INTEGER},
+    		   state = #{state,jdbcType=INTEGER},
+    		   <if test="reject_reason != null and reject_reason != ''">reject_reason = #{reject_reason,jdbcType=VARCHAR},</if>
+    		   approval_date = sysdate
+    	 where id = #{id,jdbcType=INTEGER}
+    </update>
+    
+    <!-- 入驻商补扣款签批 -->
+    <update id="signApprovalSupDeduct" parameterType="java.util.Map">
+    	update tbl_stationed_sup_deduct
+    	   set sign_approval_user_id = #{public_user_id,jdbcType=INTEGER},
+    		   state = #{state,jdbcType=INTEGER},
+    		   sign_approval_date = sysdate
+    	 where id = #{id,jdbcType=INTEGER} 
+    	       and state = 2
+    </update>
+    
+    <!-- 补扣款锁表 add yejingquan -->
+	<update id="supDeductLockTable"  parameterType="java.util.Map">
+		update TBL_STATIONED_USER_APPLY a
+		   set id = id 
+		 where exists (select 1 from tbl_stationed_sup_deduct where id = #{id,jdbcType=INTEGER} and stationed_user_id = a.id)
+	</update>
+	<!-- 查询入驻商账户信息 -->
+	<select id="queryBankAccountInfo" parameterType="java.util.Map" resultType="java.util.Map">
+		select id,nvl(account_balance,0) account_balance,account_balance_checkcode,nvl(deposit_money,0) deposit_money,nvl(deposit_money_balance,0) deposit_money_balance,deposit_checkcode
+		  from tbl_bank_account
+		 where user_id = #{user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 增加入驻商资金流水 add yejingquan -->
+	<insert id="insertStationedCapitalLogsBySupDeductPass" parameterType="java.util.Map">
+		insert into TBL_STATIONED_CAPITAL_LOGS(
+			id,
+			log_number,
+			turnover_number,
+			log_type,
+			tran_amount,
+			account_balance,
+			deposit_balance,
+			unliquidated_balance,
+			record_channel,
+			stationed_user_id,
+			account_id,
+			account_flag
+		)
+		select seq_stationed_capital_logs.nextval,
+			   GETAUTONUMBERSHORT(15),
+			   sup_deduct_number,
+			   #{log_type,jdbcType=VARCHAR},
+			   <choose>
+					<when test="money != null">
+						#{money,jdbcType=INTEGER},
+					</when>
+					<otherwise>
+						money,
+					</otherwise>
+				</choose>
+				<choose>
+					<when test="account_flag == 0">
+						(select account_balance from tbl_bank_account where user_id = t.stationed_user_id),
+						(select deposit_money_balance from tbl_bank_account where user_id = t.stationed_user_id),
+					</when>
+					 <otherwise>
+						 (select account_balance from TBL_PVTP_BANK_ACCOUNT where user_id = t.stationed_user_id),
+						 (select deposit_money_balance from TBL_PVTP_BANK_ACCOUNT where user_id = t.stationed_user_id),
+					 </otherwise>
+				</choose>
+			   (select sum(case when settlement_amount <![CDATA[ > ]]> settled_amount then settlement_amount - settled_amount else 0 end) from TBL_BUSS_SETTLEMENT_INFO where SETTLEMENT_USER_ID = t.stationed_user_id and is_private = t.account_type and SETTLEMENT_STATE != '2' and IS_DELETE = '0'),
+			   #{record_channel,jdbcType=VARCHAR},
+			   stationed_user_id,
+			   #{account_id, jdbcType=INTEGER},
+			   t.account_type
+		  from tbl_stationed_sup_deduct t
+	     where id = #{id,jdbcType=INTEGER}
+	</insert>
+	<!-- 增加入驻商收支记录 add yejingquan -->
+	<insert id="insertStationRecordBySupDeductPass" parameterType="java.util.Map">
+		insert into tbl_stationed_in_exp_record(
+            id,
+            stationed_user_id,
+            record_number,
+            record_channel,
+            record_type,
+            remark,
+            money,
+            surplus_money,
+            turnover_type,
+            turnover_number,
+            create_date,
+			account_id,
+			account_flag
+        )
+        select  SEQ_STATIONED_IN_EXP_RECORD.nextval AS ID,
+				stationed_user_id,
+				GETAUTONUMBER('SZ'),
+				#{record_channel,jdbcType=VARCHAR},
+				#{record_type,jdbcType=VARCHAR},
+			    #{remark,jdbcType=VARCHAR},
+				<choose>
+					<when test="money != null">
+						#{money,jdbcType=INTEGER},
+					</when>
+					<otherwise>
+						money,
+					</otherwise>
+				</choose>
+				#{surplus_money,jdbcType=INTEGER},
+				#{turnover_type,jdbcType=VARCHAR},
+				sup_deduct_number,
+				sysdate,
+				#{account_id, jdbcType=INTEGER},
+				t.account_type
+		   from tbl_stationed_sup_deduct t
+		  where id = #{id,jdbcType=INTEGER}
+	</insert>
+	<!-- 更新入驻商保证金余额信息 -->
+	<update id="updateDepositMoneyBalanceInfo" parameterType="java.util.Map">
+		update tbl_bank_account 
+		   set deposit_money_balance = #{deposit_money_balance,jdbcType=INTEGER}
+         where user_id = #{user_id,jdbcType=INTEGER}
+	</update>
+	<!-- 更新入驻商余额信息 -->
+	<update id="updateAccountBalanceInfo" parameterType="java.util.Map">
+		update tbl_bank_account 
+		   set account_balance = #{account_balance,jdbcType=INTEGER}
+         where user_id = #{user_id,jdbcType=INTEGER}
+	</update>
+	<!-- 校验余额校验码 add by yejingquan -->
+    <select id="queryCheckAccountBalance" parameterType="java.util.Map" resultType="int">
+        select count(1) 
+          from tbl_bank_account
+         where account_balance_checkcode = getcheck_code(user_id,account_balance,getUserKey(user_id,'old','2'))
+           and user_id = #{user_id, jdbcType=INTEGER}
+    </select>
+	<!-- 更新用户账户校验码 -->
+    <update id="updateUserAccountCheckCode" parameterType="java.util.Map">
+        <![CDATA[
+			call PRO_UPDATE_USER_ACCOUNT_CODE(#{user_id,mode=IN,jdbcType=VARCHAR})
+			]]>
+    </update>
+	<!-- 校验保证金余额校验码 -->
+    <select id="queryCheckDepositBalance" parameterType="java.util.Map" resultType="int">
+        select count(1)
+          from tbl_bank_account 
+         where deposit_checkcode = getcheck_code(user_id,deposit_money_balance,getUserKey(user_id,'old','2'))
+           and user_id = #{user_id,jdbcType=INTEGER}
+    </select>
+    <!-- 用户操作日志记录 -->
+    <insert id="insertUserOperationLog"  parameterType="java.util.Map">
+         INSERT INTO TBL_USER_OPERATION_LOG(
+             ID,
+             USER_TYPE,
+             OPERATE_ID,
+             CREATE_USER_ID,
+             CREATE_DATE,
+             REMARK,
+             USER_NAME,
+             USER_REALNAME
+         ) VALUES
+         (
+             SEQ_USER_OPERATION_LOG.NEXTVAL,
+             #{USER_TYPE,jdbcType=INTEGER},
+             #{OPERATE_ID,jdbcType=INTEGER},
+             #{CREATE_USER_ID,jdbcType=INTEGER},
+             sysdate,
+             #{REMARK,jdbcType=VARCHAR},
+             #{USER_NAME,jdbcType=VARCHAR},
+             #{USER_REALNAME,jdbcType=VARCHAR}
+        )
+    </insert>
+
+	<!--根据ID获取入驻商信息-->
+	<select id="getById" parameterType="java.util.Map" resultType="java.util.Map">
+		select id,
+				user_code,
+				user_number,
+				user_name,
+				user_pwd,
+				user_realname,
+				create_user_id,
+				to_char(create_date, 'yyyy-mm-dd hh24:mi:ss') as create_date,
+				'1' as state,
+				approval_user_id,
+				to_char(approval_date, 'yyyy-mm-dd hh24:mi:ss') as approval_date,
+				business_licence_imgurl,
+				user_create_ip,
+				company_type,
+				company_name,
+				registration_number,
+				registration_capital,
+				legal_personality,
+				legal_personality_id_number,
+				to_char(established_date, 'yyyy-mm-dd hh24:mi:ss') as established_date,
+				to_char(business_start_date, 'yyyy-mm-dd hh24:mi:ss') as business_start_date,
+				to_char(business_end_date, 'yyyy-mm-dd hh24:mi:ss') as business_end_date,
+				business_scope,
+				registration_office,
+				to_char(registration_date, 'yyyy-mm-dd hh24:mi:ss') as registration_date,
+				contacts,
+				contact_phone_number,
+				id as stationed_user_id,
+				'2' as stationed_user_type,
+				month_statement,
+				supplier_statement,
+				address_province,
+				address_city,
+				address_county,
+				address,
+				distribution_period,
+				company_short_name
+		from tbl_stationed_user_apply
+	   where id = #{id,jdbcType=INTEGER} and user_state= '3'
+	</select>
+	<!--获取入驻商类型-->
+	<select id="getStationedUserType" resultType="java.lang.Long">
+		select merchants_type from tbl_merchants_type mt where mt.stationed_user_id = #{id, jdbcType=INTEGER}
+	</select>
+	
+	<!--获取入驻商家-私有商家站点相关信息-->
+	<resultMap type="java.util.HashMap" id="stationedSiteInfoMap">
+		<result column="site_id" property="site_id"/>
+		<result column="site_name" property="site_name"/>
+		<result column="site_code" property="site_code"/>
+	</resultMap>
+	<select id="queryStationedSiteInfo" parameterType="java.util.Map" resultMap="stationedSiteInfoMap">
+		 select id as site_id,
+				name as site_name,
+				site_code
+		  from  tbl_site_info
+	     where  platform_type = 2 
+	            and stationed_user_id = #{stat_user_id,jdbcType=INTEGER}
+	</select>
+	
+	<!--获取入驻商家-私有商家站点仓库信息-->
+	<resultMap type="java.util.HashMap" id="stationedSiteWarehouseMap">
+		<result column="warehouse_id" property="warehouse_id"/>
+		<result column="parent_warehouse_id" property="parent_warehouse_id"/>
+		<result column="parent_warehouse_name" property="parent_warehouse_name"/>
+		<result column="is_site_warehouse" property="is_site_warehouse"/>
+	</resultMap>
+	<select id="queryStationedSiteWarehouses" parameterType="java.util.Map" resultMap="stationedSiteWarehouseMap">
+		 select t.warehouse_id,
+		         case when exists
+		                    (select 1
+		                       from tbl_site_warehouse a
+		                      where a.warehouse_id = t.warehouse_id and a.site_id = #{site_id,jdbcType=INTEGER})
+		            then 1 else  0
+		         end as is_site_warehouse,
+		         (select parent_id
+		            from tbl_warehouse_info a
+		           where a.id = t.warehouse_id)
+		            as parent_warehouse_id,
+		         (select b.name
+		            from tbl_warehouse_info a, tbl_warehouse_info b
+		           where a.id = t.warehouse_id and a.parent_id = b.id)
+		            as parent_warehouse_name
+		    from tbl_platform_warehouse t
+		order by id
+	</select>
+	<!--获取入驻商家-商家类型信息数量-->
+	<select id="queryStationedMerchantsTypeCount" parameterType="java.util.Map" resultType="int">
+		 select count(1)
+		    from tbl_merchants_type t
+		   where stationed_user_id = #{stat_user_id,jdbcType=INTEGER}
+		         <if test="merchants_type != null and merchants_type != 0">
+		         and merchants_type =  #{merchants_type,jdbcType=INTEGER}
+		         </if>
+	</select>
+	
+	
+	<!-- 获取私有商家用户key，用于生成校检码 -->
+	<select id="getPvtpUserKey" parameterType="java.util.Map" resultType="java.lang.String">
+		select getUserKey(
+				#{c_user_name,jdbcType=VARCHAR},
+				#{c_typeid,jdbcType=VARCHAR},
+				#{c_user_type,jdbcType=VARCHAR}
+			   )
+		 from dual
+	</select>
+	
+	<!-- 获取私有商家余额校验码 -->
+	<select id="getPvtpCheckCode" parameterType="java.util.Map" resultType="java.lang.String">
+		select getCheck_Code(
+				#{c_user_name,jdbcType=VARCHAR},
+				#{c_money,jdbcType=INTEGER},
+				#{c_user_key,jdbcType=VARCHAR}
+			   ) 
+	      from dual
+	</select>
+	
+	<!-- 新增私有商家用户key缓存表 -->
+	<insert  id ="insertPvtpCacheKey" parameterType ="java.util.Map">
+		insert into tbl_pvtp_stationed_cache_key 
+		       (user_name,cache_key,create_time)
+		values (
+				#{user_name,jdbcType=VARCHAR},
+				#{cache_key,jdbcType=VARCHAR},
+				sysdate
+		       )
+	</insert>
+	
+	<!-- 新增入驻商-私有商家关联的银行账户信息 -->
+	<insert id="insertPvtpBankAccountInfo" parameterType="java.util.Map">
+		insert into tbl_pvtp_bank_account
+			(
+				id,
+				user_id,
+				bank_account,
+				account_balance,
+				account_balance_checkcode,
+				deposit_money,
+				deposit_money_balance,
+				deposit_checkcode,
+				payment_password,
+				update_date,
+				sub_merchant_id
+			)
+			values
+			(
+				seq_bank_account.nextval,
+				#{user_id,jdbcType=INTEGER},
+				#{bank_account,jdbcType=VARCHAR},
+				#{account_balance,jdbcType=FLOAT},
+				#{account_balance_checkcode,jdbcType=VARCHAR},
+				#{deposit_money,jdbcType=INTEGER},
+				#{deposit_money_balance,jdbcType=FLOAT},
+				#{deposit_checkcode,jdbcType=VARCHAR},
+				#{payment_password,jdbcType=VARCHAR},
+				#{update_date,jdbcType=TIMESTAMP},
+				#{sub_merchant_id,jdbcType=VARCHAR}
+			)
+	</insert>
+	
+	 <!-- 用户操作日志记录 -->
+    <insert id="insertPvtpConfig"  parameterType="java.util.Map">
+         INSERT INTO TBL_PVTP_CONFIG(
+             STATIONED_USER_ID,
+             USER_DISCOUNT
+         ) VALUES
+         (
+             #{user_id,jdbcType=INTEGER},
+             0.7
+         )
+    </insert>
+    
+    <!--获取入驻商家-云仓货主配置信息-->
+	<resultMap type="java.util.HashMap" id="cloudWarehouseOwnerSetMap">
+		<result column="id" property="id"/>
+		<result column="external_erp_id" property="external_erp_id"/>
+		<result column="stationed_user_id" property="stationed_user_id"/>
+		<result column="owner_user_id" property="owner_user_id"/>
+		<result column="admin_name" property="admin_name"/>
+		<result column="mobile" property="mobile"/>
+		<result column="partnerid" property="partnerid"/>
+		<result column="patrnerkey" property="patrnerkey"/>
+		<result column="token" property="token"/>
+		<result column="self_shop_id" property="self_shop_id"/>
+		<result column="taobao_appkey" property="taobao_appkey"/>
+		<result column="taobao_appsecret" property="taobao_appsecret"/>
+		<result column="creater_id" property="creater_id"/>
+		<result column="create_date" property="create_date"/>
+		<result column="update_date" property="update_date"/>
+		<result column="state" property="state"/>
+	</resultMap>
+	<select id="queryCloudWarehouseOwnerSet" parameterType="java.util.Map" resultMap="cloudWarehouseOwnerSetMap">
+		select id,
+		       external_erp_id,
+		       stationed_user_id,
+		       owner_user_id,
+		       admin_name,
+		       mobile,
+		       partnerid,
+		       patrnerkey,
+		       token,
+		       self_shop_id,
+		       taobao_appkey,
+		       taobao_appsecret,
+		       creater_id,
+		       create_date,
+		       update_date,
+		       state
+		  from tbl_saas_erp_config
+		 where stationed_user_id = #{stat_user_id,jdbcType=INTEGER}
+	</select>
+	
+	<!--插入入驻商家-云仓货主配置信息-->
+	<insert id="insertCloudWarehouseOwnerSet"  parameterType="java.util.Map">
+         insert into tbl_saas_erp_config(
+               id,
+		       external_erp_id,
+		       stationed_user_id,
+		       owner_user_id,
+		       admin_name,
+		       mobile,
+		       partnerid,
+		       patrnerkey,
+		       token,
+		       self_shop_id,
+		       taobao_appkey,
+		       taobao_appsecret,
+		       creater_id,
+		       create_date,
+		       state
+         ) values
+         (
+         	 seq_saas_erp_config.nextval,
+         	 1,
+             #{stat_user_id,jdbcType=INTEGER},
+             #{owner_user_id,jdbcType=VARCHAR},
+             #{admin_name,jdbcType=VARCHAR},
+             #{mobile,jdbcType=VARCHAR},
+             #{partnerid,jdbcType=VARCHAR},
+             #{patrnerkey,jdbcType=VARCHAR},
+             #{token,jdbcType=VARCHAR},
+             #{self_shop_id,jdbcType=INTEGER},
+             #{taobao_appkey,jdbcType=VARCHAR},
+             #{taobao_appsecret,jdbcType=VARCHAR},
+             #{public_user_id,jdbcType=INTEGER},
+             sysdate,
+             #{state,jdbcType=INTEGER}
+         )
+    </insert>
+    
+    <!--更新入驻商家-云仓货主配置信息-->
+    <insert id="updateCloudWarehouseOwnerSet"  parameterType="java.util.Map">
+         update tbl_saas_erp_config
+         <set>
+         	<if test="owner_user_id != null and owner_user_id != '' ">
+         		owner_user_id =  #{owner_user_id,jdbcType=VARCHAR},
+         	</if>
+         	<if test="admin_name != null and admin_name != '' ">
+         		admin_name =  #{admin_name,jdbcType=VARCHAR},
+         	</if>
+         	<if test="mobile != null and mobile != '' ">
+         		mobile =  #{mobile,jdbcType=VARCHAR},
+         	</if>
+         	<if test="partnerid != null and partnerid != '' ">
+         		partnerid =  #{partnerid,jdbcType=VARCHAR},
+         	</if>
+         	<if test="patrnerkey != null and patrnerkey != '' ">
+         		patrnerkey =  #{patrnerkey,jdbcType=VARCHAR},
+         	</if>
+         	<if test="token != null and token != '' ">
+         		token =  #{token,jdbcType=VARCHAR},
+         	</if>
+         	<if test="self_shop_id != null and self_shop_id != '' ">
+         		self_shop_id =  #{self_shop_id,jdbcType=VARCHAR},
+         	</if>
+         	<if test="taobao_appkey != null and taobao_appkey != '' ">
+         		taobao_appkey =  #{taobao_appkey,jdbcType=VARCHAR},
+         	</if>
+         	<if test="taobao_appsecret != null and taobao_appsecret != '' ">
+         		taobao_appsecret =  #{taobao_appsecret,jdbcType=VARCHAR},
+         	</if>
+         	<if test="state != null and state != '' ">
+         		state =  #{state,jdbcType=VARCHAR},
+         	</if>
+         	update_date = sysdate
+         </set>
+         where stationed_user_id = #{stat_user_id,jdbcType=INTEGER}
+    </insert>
+</mapper>

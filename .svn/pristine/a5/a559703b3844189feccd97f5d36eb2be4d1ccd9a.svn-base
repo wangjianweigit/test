@@ -1,0 +1,125 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+ <head>
+    <meta http-equiv="content-type" content="text/html;charset=utf-8">
+    <title>测试界面</title>
+    <script src="http://apps.bdimg.com/libs/jquery/1.8.0/jquery.min.js"></script>
+    <script src="jquery.form.js"></script>
+    <script src="webtoolkit.md5.js"></script>
+    <script src="t.js"></script>
+    <style type="text/css">
+    	body
+		{
+			font-size:18px;
+		}
+    </style>
+    <script type="text/javascript">
+        // ################################ 常量定义 ################################
+        var BaseURL = "/";
+        var jmURL = BaseURL+"test/encryption";//加密url
+		var jm2URL = BaseURL+"test/decrypt";//解密url
+		/**
+		测试地址，注意,测试地址中的 / 使用两个下划线代替
+		**/
+        
+        var DATA_MAP = {
+        	decorate_platform__module_list:{
+        		info: '控件列表',
+                data: '{"group_type":1}'
+        	},
+        	decorate_platform__page_detail:{
+        		info: '页面详情',
+                data: '{"page_id":1}'
+        	},
+        	decorate_platform__page_layout:{
+        		info: '页面布局',
+                data: '{"page_id":1}'
+        	},
+        	decorate_platform__page_layout_add:{
+        		info: '新增页面布局',
+                data: '{"page_id":1,"layout_type":"1"}'
+        	}, 
+        	decorate_platform__page_layout_delete:{
+        		info: '删除页面布局',
+                data: '{"layout_id":5}'
+        	},
+        	decorate_platform__page_layout_sort:{
+        		info: '页面布局排序',
+                data: '{"layout_id":5,"sort_id":5}'
+        	},
+        	decorate_platform__page_layout_module_add:{
+        		info: '页面布局中添加组件',
+                data: '{"page_id":1,"layout_id":5,"module_id":1,"layout_column_id":1,"layout_sort_id":1}'
+        	},
+        	decorate_platform__page_layout_module_delete:{
+        		info: '页面布局中删除组件',
+                data: '{"layout_module_id":1}'
+        	},
+        	decorate_platform__page_layout_module_edit:{
+        		info: '编辑装修组件内容',
+                data: '{"layout_module_id":171,"module_base_conf":"123123123","module_extend_conf":"123123123"}'
+        	},
+        	decorate_platform__page_layout_module_sort:{
+        		info: '页面布局内的组件排序',
+                data: '{"layout_module_id":1,"sort_id":2}'
+        	},
+        	decorate_platform__page_add:{
+        		info: '添加装修页面',
+                data: '{"page_name":"测试页面12345","template_id":11,"layout_type":"1","public_user_id":1}'
+        	},
+        	decorate_platform__page_list:{
+        		info: '装修页面列表',
+                data: '{"template_id":1,"home_page_flag":"1"}'
+        	},
+        	product_type__options:{
+        		info: '获取所有商品分类信息',
+        		data: '{}'
+        	},
+        	decorate_platform__product_list:{
+        		info: '根据关键字查询商品列表',
+        		data: '{"product_type_id":"","keyword":"","pageIndex":1,"pageSize":5,"site_id":"1"}'
+        	},
+        	product_group__list:{
+        		info: '商品分组信息',
+        		data: '{}'
+        	},
+        	decorate_platform__product_by_itemnumbers:{
+        		info: '根据货号查询商品信息',
+        		data: '{"itemnumbers":"29506001,29506002"}'
+        	},
+        	decorate_platform__page_details:{
+        		info: '装修页面详情',
+        		data: '{"page_id":101}'
+        	},
+        	decorate_platform__page_edit:{
+        		info: '编辑装修页面',
+        		data: '{"bottom_nav":{"startDate":"2017-09-11 18:14:32","endDate":"2017-09-12 18:14:34","imgurl":"http://tkimg2-test.img-cn-hangzhou.aliyuncs.com/201706/20170615/ca42ce8a1ffb0badb020.png"},"page_id":214}'
+        	}
+        };
+    </script>
+</head>
+<body>
+Action:
+<!-- 
+<input type="radio" name="action" value="http://localhost:8080/esb/" onclick="changeAction(this);" checked="checked"/>localhost
+<input type="radio" name="action" value="http://192.168.0.188:8080/esb/" onclick="changeAction(this);"/>188
+ -->
+<br/>
+<select id="action_select" onchange="h($('#action_select option:selected').attr('value'))" size="8"
+        style="width:40%;">
+</select><br/>
+访问URL:
+<input id="submit_url" onchange="h(this.value)" value=".action" style="width:35%;background-color:pink;height:30"><form id="htmlForm" name="htmlForm" action="" method="post">
+    data:<input type="button" value="提交" onclick="submit_function('data');"/>
+    <input type="button" onclick="javascript: $('#ret').val('');" value="清除"/><br/>
+    <textarea id="data" name="data" style="width:40%;height:100px;font-size: 15px;font-family:monaco" onchange="load_data('data')"></textarea>
+    <input id="req_h_data" type="hidden" value=""/>
+    <input id="res_h_data" type="hidden" value=""/>
+</form>
+<div style="position: fixed;top: 20px;right:30px;width:45%;overflow-y: auto;height:100%;background: #eee;">
+    response:<br/>
+    <span id="ret" style="font-size: 15px;font-family:monaco"></span>
+</div>
+<div id="data_view" style="position: fixed;top:350px;width:40%;overflow-y: auto;height: 400px;background: #eee;font-size: 15px;font-family:monaco"></div>
+</body>
+</html>

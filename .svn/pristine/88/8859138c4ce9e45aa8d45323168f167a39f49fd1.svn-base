@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.product.dao.ProductAnalyseDao">
+   
+	<!-- 商品信息分析查询列表 -->
+	<select id="queryProductAnalyseListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+	     select t.*,(select count(1) 
+	                   from tbl_product_images 
+	     			  where product_itemnumber = t.itemnumber and is_primary = 2 and type = 1 and regexp_like (image_url, 'http')) main_img_count,
+	     			(select count(1)
+					   from tbl_product_images
+					  where product_itemnumber = t.itemnumber and is_primary != 2 and type = 1 and regexp_like (image_url, 'http')) color_img_count,
+	     			(select count(1)
+  					   from tbl_product_images
+ 					  where product_itemnumber = t.itemnumber and type = 2 and regexp_like (image_url, 'https')) video_count,
+					case when (select count(1) from ${jdbc_user}.tbl_in_storage_detail t where exists (
+					select 1 from  ${jdbc_user}.tbl_in_storage_order where  in_storage_number =  t.in_storage_number and IN_STORAGE_TYPE = '1' and state = '2')
+										and product_itemnumber = t.itemnumber) > 0 then '是' else '否' end is_in_stock
+	       from (
+	     	select a.*,rownum as rn
+	     	  from(select distinct pi.itemnumber,
+	     				pi.state,
+	     				decode(pi.is_outstock,0,'否',1,'是') is_outstock,
+	     				(
+                            case when pi.is_brand_custom = 1 or pi.is_common_custom = 1 then '是'
+                            else '否' end
+                        ) is_custom,
+	     				decode(pi.is_presale,0,'否','','否',1,'是') is_presale,
+	     				to_char(pi.product_content) product_content,
+                        (
+                            select to_char(wm_concat(a.name))
+                            from tbl_site_info a , tbl_site_product_delay d
+                            where a.id = d.site_id and d.product_id = pi.id  and a.state = 2
+                            group by pi.id
+                        ) site_name
+                from tbl_product_info pi
+                left join tbl_site_product_delay pd on pi.id = pd.product_id
+                <where>
+					pi.product_type = 0
+			        <if test="itemnumber !=null and itemnumber != ''">     
+			            and itemnumber like '%'||#{itemnumber,jdbcType=VARCHAR}||'%'
+					</if>
+			        <if test="year !=null and year !=''">
+			            and year = #{year,jdbcType=INTEGER}
+			        </if>     
+					<if test="brand_id != null and brand_id != ''">
+						and brand_id = #{brand_id,jdbcType=INTEGER}
+					</if>
+					<if test="season_id != null and season_id != '' ">
+						and	season_id = #{season_id,jdbcType=INTEGER}
+					</if>
+                    <if test="site_id != null and site_id != '' ">
+                        and pd.site_id IN
+                        <foreach item="item" collection="site_id" open="(" separator="," close=")">
+                            #{item}
+                        </foreach>
+                    </if>
+			    </where>
+				order by pi.itemnumber) a
+		 		 where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) t
+		 where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+    <!-- 商品信息分析查询数量 -->
+    <select id="queryProductAnalyseCount" parameterType="java.util.Map" resultType="int">
+    	select count(1)
+    	  from (select distinct pi.itemnumber,
+	     			   pi.state,
+	     			   decode(pi.is_outstock,0,'否',1,'是') is_outstock,
+     				   (case when pi.is_brand_custom = 1 or pi.is_common_custom = 1 then '是'
+                           else '否' end
+                       ) is_custom,
+     				   decode(pi.is_presale,0,'否','','否',1,'是') is_presale,
+	     			   to_char(pi.product_content) product_content,
+	                   (   select to_char(wm_concat(a.name))
+	                           from tbl_site_info a , tbl_site_product_delay d
+	                           where a.id = d.site_id and d.product_id = pi.id  and a.state = 2
+	                           group by pi.id
+	                   ) site_name
+				from tbl_product_info pi
+		        left join tbl_site_product_delay pd on pi.id = pd.product_id
+				<where>
+					pi.product_type = 0   
+			        <if test="itemnumber !=null and itemnumber != ''">     
+			            and itemnumber like '%'||#{itemnumber,jdbcType=VARCHAR}||'%'
+					</if>
+			        <if test="year !=null and year !=''">
+			            and year = #{year,jdbcType=INTEGER}
+			        </if>     
+					<if test="brand_id != null and brand_id != ''">
+						and brand_id = #{brand_id,jdbcType=INTEGER}
+					</if>
+					<if test="season_id != null and season_id != '' ">
+						and	season_id = #{season_id,jdbcType=INTEGER}
+					</if>
+		            <if test="site_id != null and site_id != '' ">
+		                and pd.site_id IN
+		                <foreach item="item" collection="site_id" open="(" separator="," close=")">
+		                    #{item}
+		                </foreach>
+		            </if>
+			    </where>)
+    </select>
+</mapper>

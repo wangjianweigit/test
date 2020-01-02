@@ -1,0 +1,88 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+ <head>
+    <meta http-equiv="content-type" content="text/html;charset=utf-8">
+    <title>测试界面</title>
+    <script src="http://apps.bdimg.com/libs/jquery/1.8.0/jquery.min.js"></script>
+    <script src="jquery.form.js"></script>
+    <script src="webtoolkit.md5.js"></script>
+    <script src="t.js"></script>
+    <style type="text/css">
+    	body
+		{
+			font-size:18px;
+		}
+    </style>
+    <script type="text/javascript">
+        // ################################ 常量定义 ################################
+        var BaseURL = "/oms_server/";
+        var jmURL = BaseURL+"test/encryption";//加密url
+		var jm2URL = BaseURL+"test/decrypt";//解密url
+		/**
+		测试地址，注意,测试地址中的 / 使用两个下划线代替
+		**/
+        var DATA_MAP = {
+            stationed__apply_add: {
+                info: '新增入驻商申请数据',
+                data: '{"create_user_id":1,"user_name":"测试","user_pwd":"123456","company_type":"私营企业","company_name":"九天","registration_number":"44190000169440","registration_capital":"1亿","legal_personality":"龙一","business_scope":"全球"}'
+            },
+            stationed__apply_list: {
+                info: '查询入驻商申请数据列表',
+                data: '{"pageIndex":1,"pageSize":10,"user_state":"2"}'
+            },
+            stationed__apply_query: {
+                info: '查询入驻商申请数据详情',
+                data: '{"id":90000003}'
+            },
+            stationed__apply_audit: {
+                info: '审核入驻商申请数据',
+                data: '{"id":90000003}'
+            },
+            stationed__info_list: {
+                info: '查询入驻商列表',
+                data: '{"pageIndex":1,"pageSize":10}'
+            },
+            stationed__service_charges: {
+                info: '入驻商服务费率设置',
+                data: '{"id":90000003,"service_charges":80}'
+            },
+            stationed__storage_charges: {
+                info: '入驻商仓储费设置',
+                data: '{"create_user_id":1,"stationed_user_id":90000003,"dataList":[{"storage_charges":10,"product_size":"26"},{"storage_charges":11,"product_size":"27"}]}'
+            },
+            stationed__storage_charges_query: {
+                info: '查询入驻商仓储费',
+                data: '{"stationed_user_id":90000003}'
+            },
+            stationed__brand_user_rel: {
+                info: '入驻商品牌授权',
+                data: '{"stationed_user_id":90000003,"dataList":[{"brand_id":1},{"brand_id":2}]}'
+            }
+        };
+    </script>
+</head>
+<body>
+Action:
+<!-- 
+<input type="radio" name="action" value="http://localhost:8080/esb/" onclick="changeAction(this);" checked="checked"/>localhost
+<input type="radio" name="action" value="http://192.168.0.188:8080/esb/" onclick="changeAction(this);"/>188
+ -->
+<br/>
+<select id="action_select" onchange="h($('#action_select option:selected').attr('value'))" size="8"
+        style="width:40%;">
+</select><br/>
+访问URL:
+<input id="submit_url" onchange="h(this.value)" value=".action" style="width:35%;background-color:pink;height:30"><form id="htmlForm" name="htmlForm" action="" method="post">
+    data:<input type="button" value="提交" onclick="submit_function('data');"/>
+    <input type="button" onclick="javascript: $('#ret').val('');" value="清除"/><br/>
+    <textarea id="data" name="data" style="width:40%;height:100px;font-size: 15px;font-family:monaco" onchange="load_data('data')"></textarea>
+    <input id="req_h_data" type="hidden" value=""/>
+    <input id="res_h_data" type="hidden" value=""/>
+</form>
+<div style="position: fixed;top: 20px;right:30px;width:45%;overflow-y: auto;height:100%;background: #eee;">
+    response:<br/>
+    <span id="ret" style="font-size: 15px;font-family:monaco"></span>
+</div>
+<div id="data_view" style="position: fixed;top:350px;width:40%;overflow-y: auto;height: 400px;background: #eee;font-size: 15px;font-family:monaco"></div>
+</body>
+</html>

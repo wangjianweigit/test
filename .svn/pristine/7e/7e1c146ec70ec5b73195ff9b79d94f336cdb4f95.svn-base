@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.pvtp.stationed.dao.PvtpStationedDao">
+	<sql id="i_colum">
+		id,
+		user_code,
+		user_number,
+		user_name,
+		user_pwd,
+		create_user_id,
+		to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+		state,
+		approval_user_id,
+		(select user_realname from tbl_sys_user_info where id = approval_user_id) approval_user_name,
+		to_char(approval_date,'yyyy-mm-dd hh24:mi:ss') approval_date,
+		business_licence_imgurl,
+		user_create_ip,
+		company_type,
+		company_name,
+		registration_number,
+		registration_capital,
+		legal_personality,
+		legal_personality_id_number,
+		to_char(established_date,'yyyy-mm-dd') established_date,
+		to_char(business_start_date,'yyyy-mm-dd') business_start_date,
+		to_char(business_end_date,'yyyy-mm-dd') business_end_date,
+		business_scope,
+		registration_office,
+		to_char(registration_date,'yyyy-mm-dd') registration_date,
+		contacts,
+		contact_phone_number,
+		month_statement,
+		supplier_statement,
+		nvl(service_charges,0)*100 service_charges,
+		nvl(member_service_rate,0)*100 member_service_rate,
+		nvl(pay_service_rate,0)*100 pay_service_rate,
+		nvl(area_service_rate,0)*100 area_service_rate,
+		stationed_user_type,
+		address_province,
+		address_city,
+		address_county,
+		address,
+		distribution_period,
+		is_open_shop,
+		is_approval_order
+	</sql>
+	<!-- 查询私有平台商家列表 -->
+	<select id="queryPvtpStationedList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		select * from
+		(select a.*, rownum rn from
+		(select <include refid="i_colum"/>
+		,(select to_char(wm_concat(case when  merchants_type = 1 then '入驻商' when merchants_type = 2 then '供应商' when merchants_type = 3 then '云仓货主' else '私有平台商家' end)) from tbl_merchants_type mt where mt.stationed_user_id = sui.id) as merchants_type
+		,(select to_char(wm_concat(merchants_type)) from tbl_merchants_type mt where mt.stationed_user_id = sui.id) as merchants_type_id
+		from tbl_stationed_user_info sui
+		<where>
+			stationed_user_type = '2'
+			and exists(select 1 from tbl_merchants_type mt where mt.stationed_user_id = sui.id and mt.merchants_type=4)
+			<if test="user_name !=null and user_name !='' ">
+				and user_name like concat(concat('%', #{user_name,jdbcType=VARCHAR}),'%')
+			</if>
+			<if test="company_name !=null and company_name !=''">
+				and company_name like concat(concat('%', #{company_name,jdbcType=VARCHAR}),'%')
+			</if>
+			<if test="contact_phone_number !=null and contact_phone_number !=''">
+				and contact_phone_number = #{contact_phone_number,jdbcType=VARCHAR}
+			</if>
+			<if test="state != null">
+				and state in
+                <foreach item="item" collection="state" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+			</if>
+			<if test="is_open_shop != null and is_open_shop != ''">
+				and is_open_shop = #{is_open_shop,jdbcType=INTEGER}
+			</if>
+		</where>
+		order by create_date desc) a
+		where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	
+	<!--查询私有平台商家列表数量 -->
+	<select id="queryPvtpStationedCount" parameterType="java.util.Map" resultType="int">
+		    select count(1)
+		from tbl_stationed_user_info sui
+		<where>
+			stationed_user_type = '2'
+			and exists(select 1 from tbl_merchants_type mt where mt.stationed_user_id = sui.id and mt.merchants_type=4)
+			<if test="user_name !=null and user_name !='' ">
+				and user_name like concat(concat('%', #{user_name,jdbcType=VARCHAR}),'%')
+			</if>
+			<if test="company_name !=null and company_name !=''">
+				and company_name like concat(concat('%', #{company_name,jdbcType=VARCHAR}),'%')
+			</if>
+			<if test="contact_phone_number !=null and contact_phone_number !=''">
+				and contact_phone_number = #{contact_phone_number,jdbcType=VARCHAR}
+			</if>
+			<if test="contact_phone_number !=null and contact_phone_number !=''">
+				and contact_phone_number = #{contact_phone_number,jdbcType=VARCHAR}
+			</if>
+			<if test="state != null">
+				and state in
+                <foreach item="item" collection="state" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+			</if>
+			<if test="is_open_shop != null and is_open_shop != ''">
+				and is_open_shop = #{is_open_shop,jdbcType=INTEGER}
+			</if>
+		</where>
+	</select>
+</mapper>
+

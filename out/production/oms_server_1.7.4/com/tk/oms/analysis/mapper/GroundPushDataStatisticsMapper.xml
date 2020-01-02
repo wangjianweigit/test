@@ -1,0 +1,663 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tk.oms.analysis.dao.GroundPushDataStatisticsDao">
+	
+	<!--查询业务人员列表 -->
+	<select id="queryYwryList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+		select b.*, rownum rn from (
+			select id,user_name from (
+				select  id,user_name
+			  		from  tbl_sys_user_info sui,
+		  		(select id as store_id,
+	                       manager_user_id as user_id,
+	                       4 as user_type
+	                  from tbl_store_info
+	                union
+	                select id as store_id,
+	                       shopkeeper_user_id as user_id,
+	                       5 as user_type
+	                  from tbl_store_info
+	                union
+	                select store_id, 
+	                		user_id, 
+	                		type as user_type
+	                  from tbl_store_user_rel
+	               ) su
+			 	<where>
+			 		sui.state=2
+			 		and sui.user_type in(3,4,5,6)
+			 		and sui.id = su.user_id
+			 		<if test="ywjl_user_id != null and ywjl_user_id != ''">
+						 and sui.id = #{ywjl_user_id,jdbcType=INTEGER}
+					</if>
+					<if test="md_id != null and md_id != ''">
+						 and su.store_id = #{md_id,jdbcType=INTEGER}
+					</if>
+			 		<if test="ywy_user_id != null and ywy_user_id != ''">
+						 and sui.id = #{ywy_user_id,jdbcType=INTEGER}
+					</if>
+					<if test="public_user_type==2">
+						and exists (
+							select 1
+							  from tbl_sys_user_store a
+							 where a.user_id = #{public_user_id,jdbcType=INTEGER}
+							 	   and a.store_id = su.store_id
+						)
+					</if>
+			        <if test="public_user_type==3">
+			        	and sui.user_type in(3)
+						and sui.id = #{public_user_id,jdbcType=INTEGER}
+					</if>
+					<if test="public_user_type==4">
+						and	exists (select 1 
+									  from tbl_store_info tsi 
+						             where tsi.manager_user_id = #{public_user_id,jdbcType=INTEGER} 
+						                   and tsi.id = su.store_id)
+					</if>
+					<if test="public_user_type==5">
+						and sui.user_type in(3,5,6)
+						and	exists (select 1 
+						              from tbl_store_info tsi 
+						             where tsi.shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER} 
+						                   and tsi.id = su.store_id)
+					</if>
+					<if test="public_user_type==6">
+						and sui.user_type in(3,5,6)
+						and	exists (select 1 
+						              from tbl_store_user_rel tsui 
+						             where tsui.user_id = #{public_user_id,jdbcType=INTEGER} 
+						                   and tsui.store_id = su.store_id)
+					</if>
+					<if test="public_user_type==9">
+					 	and exists (select 1 
+					 	              from tbl_store_info tsi 
+					 	             where exists( select 1 
+					 	                             from tbl_sys_user_info b 
+					 	                            where organization_id in(
+													           select id 
+													             from tbl_sys_organization_info 
+													            where connect_by_isleaf=1
+													            start with parent_id = #{public_user_organization_id,jdbcType=INTEGER} 
+													            connect by prior id = parent_id)
+											              and b.user_type = 4
+											              and b.id = tsi.manager_user_id
+										   )
+										   and tsi.id = su.store_id
+							)
+					</if>
+				</where>
+			)group by id,user_name
+		) b where
+		rownum &lt;= #{end_rownum})
+		where rn &gt; #{start_rownum}
+	</select>
+	
+	<!--查询业务人员列表 总数-->
+	<select id="queryYwryCount" parameterType="java.util.Map" resultType="int">
+			select  count(1)
+				from (
+					select id,user_name from (
+						select  id,user_name
+					  		from  tbl_sys_user_info sui,
+				  		(select id as store_id,
+			                       manager_user_id as user_id,
+			                       4 as user_type
+			                  from tbl_store_info
+			                union
+			                select id as store_id,
+			                       shopkeeper_user_id as user_id,
+			                       5 as user_type
+			                  from tbl_store_info
+			                union
+			                select store_id, 
+			                		user_id, 
+			                		type as user_type
+			                  from tbl_store_user_rel
+			               ) su
+					 	<where>
+					 		sui.state=2
+					 		and sui.user_type in(3,4,5,6)
+					 		and sui.id = su.user_id
+					 		<if test="ywjl_user_id != null and ywjl_user_id != ''">
+								 and sui.id = #{ywjl_user_id,jdbcType=INTEGER}
+							</if>
+							<if test="md_id != null and md_id != ''">
+								 and su.store_id = #{md_id,jdbcType=INTEGER}
+							</if>
+					 		<if test="ywy_user_id != null and ywy_user_id != ''">
+								 and sui.id = #{ywy_user_id,jdbcType=INTEGER}
+							</if>
+							<if test="public_user_type==2">
+								and exists (
+									select 1
+									  from tbl_sys_user_store a
+									 where a.user_id = #{public_user_id,jdbcType=INTEGER}
+									 	   and a.store_id = su.store_id
+								)
+							</if>
+					        <if test="public_user_type==3">
+					        	and sui.user_type in(3)
+								and sui.id = #{public_user_id,jdbcType=INTEGER}
+							</if>
+							<if test="public_user_type==4">
+								and	exists (select 1 
+											  from tbl_store_info tsi 
+								             where tsi.manager_user_id = #{public_user_id,jdbcType=INTEGER} 
+								                   and tsi.id = su.store_id)
+							</if>
+							<if test="public_user_type==5">
+								and sui.user_type in(3,5,6)
+								and	exists (select 1 
+								              from tbl_store_info tsi 
+								             where tsi.shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER} 
+								                   and tsi.id = su.store_id)
+							</if>
+							<if test="public_user_type==6">
+								and sui.user_type in(3,5,6)
+								and	exists (select 1 
+								              from tbl_store_user_rel tsui 
+								             where tsui.user_id = #{public_user_id,jdbcType=INTEGER} 
+								                   and tsui.store_id = su.store_id)
+							</if>
+							<if test="public_user_type==9">
+							 	and exists (select 1 
+							 	              from tbl_store_info tsi 
+							 	             where exists( select 1 
+							 	                             from tbl_sys_user_info b 
+							 	                            where organization_id in(
+															           select id 
+															             from tbl_sys_organization_info 
+															            where connect_by_isleaf=1
+															            start with parent_id = #{public_user_organization_id,jdbcType=INTEGER} 
+															            connect by prior id = parent_id)
+													              and b.user_type = 4
+													              and b.id = tsi.manager_user_id
+												   )
+												   and tsi.id = su.store_id
+									)
+							</if>
+						</where>
+					)group by id,user_name
+				)
+	</select>
+
+	<!-- 将新用户存放到临时表-->
+	<insert id="insertNewUser" parameterType="java.util.Map">
+		insert into tmp_user_info(
+			USER_ID,
+			TYPE
+		)
+		 select user_name,
+		 		1 
+			 	from tbl_user_info t
+			 where CREATE_DATE >= to_date(#{begin_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss') 
+			 and CREATE_DATE &lt; to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss') 
+			 and t.referee_user_id in
+			 <foreach collection="user_list" index="index" item="item" open="(" separator="," close=")">
+		           #{item.ID}
+		      </foreach>
+	</insert>
+	
+	<!-- 将沉睡用户存放到临时表-->
+	<insert id="insertSleepUser" parameterType="java.util.Map">
+		insert into tmp_user_info(
+			USER_ID,
+			TYPE
+		)
+		 select c.user_name,
+		 		2 
+		 	from tbl_user_info c,tbl_order_info d 
+		  		where c.USER_NAME = d.USER_NAME
+                   and d.PAYMENT_STATE = '2' 
+                   and d.PAYMENT_DATE >= to_date(#{begin_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss') 
+                   and d.PAYMENT_DATE &lt; to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+                   and c.referee_user_id in
+					 <foreach collection="user_list" index="index" item="item" open="(" separator="," close=")">
+				           #{item.ID}
+				      </foreach>
+				   and d.YWY_USER_NAME in
+					 <foreach collection="user_list" index="index" item="item" open="(" separator="," close=")">
+				           #{item.USER_NAME}
+				      </foreach>
+                   and exists( 
+                       select 1 from 
+                       		tbl_order_info f 
+                       where f.PAYMENT_DATE &lt; to_date(#{begin_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss') 
+                       	and d.user_name = f.user_name 
+                       group by f.user_name
+                       having 
+                       case when max(f.PAYMENT_DATE) is not null then 
+                           add_months(max(f.PAYMENT_DATE),3) - d.PAYMENT_DATE
+                       else
+                          add_months(c.create_date,3) -  d.PAYMENT_DATE
+                       end  &lt;0
+                   )
+	</insert>
+	
+	<!--业务人员地推数据查询-->
+	<select id="queryYwryGroundPushDataStatistics" parameterType="java.util.Map" resultType="java.util.Map">
+		select tt.REFEREE_USER_ID,
+			(select user_realname from tbl_sys_user_info t where t.id=tt.REFEREE_USER_ID)as REFEREE_USER_REALNAME,
+			nvl(new_user_count,0) as new_user_count,
+			nvl(new_user_order_money,0) as new_user_order_money,
+			nvl(sleep_user_count,0) as sleep_user_count,
+			nvl(sleep_user_order_money,0) as sleep_user_order_money,
+			nvl(old_user_count,0) as old_user_count,
+			nvl(old_user_order_money,0) as old_user_order_money
+		 from (
+		select A.REFEREE_USER_ID,
+			   B.NEW_USER_COUNT,
+               B.NEW_USER_ORDER_MONEY,
+               B.SLEEP_USER_COUNT,
+               B.SLEEP_USER_ORDER_MONEY,
+               B.OLD_USER_COUNT,
+               B.OLD_USER_ORDER_MONEY
+	       	   from (
+	       <foreach collection="user_list"  item="itm" separator="UNION">
+	            SELECT #{itm.ID,jdbcType=INTEGER} AS REFEREE_USER_ID
+	            FROM DUAL
+	       </foreach>
+	       ) A
+	       left join 
+		   (select REFEREE_USER_ID,
+		   		  REFEREE_USER_REALNAME,
+		   		  sum(new_user_count) new_user_count,
+		   		  sum(new_user_order_money) new_user_order_money,
+		   		  sum(sleep_user_count) sleep_user_count,
+		   		  sum(sleep_user_order_money) sleep_user_order_money,
+		   		  sum(old_user_count) old_user_count,
+		   		  sum(old_user_order_money) old_user_order_money
+		     from (
+		        select REFEREE_USER_ID,
+		        	   REFEREE_USER_REALNAME,
+		        	   count(*) new_user_count,
+		        	   0 new_user_order_money,
+		        	   0 sleep_user_count,
+		        	   0 sleep_user_order_money,
+		        	   0 old_user_count,
+		        	   0 old_user_order_money 
+		         from tbl_user_info
+		        	 where  CREATE_DATE >= to_date(#{begin_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss') 
+		        	 	and CREATE_DATE &lt; to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss') 
+		        	 	and referee_user_id in
+						  <foreach collection="user_list" index="index" item="item" open="(" separator="," close=")">
+					           #{item.ID}
+					      </foreach>
+		            group by REFEREE_USER_ID,REFEREE_USER_REALNAME
+		        union all 
+		        select b.REFEREE_USER_ID,
+				        b.REFEREE_USER_REALNAME,
+				        0 new_user_count,
+				        sum(PAYMENT_MONEY) new_user_order_money,
+				        0 sleep_user_count,
+				        0 sleep_user_order_money,
+				        0 old_user_count,
+				        0 old_user_order_money 
+		        from tbl_order_info a ,tbl_user_info b
+		        	 where a.USER_NAME = b.user_name 
+		            and a.PAYMENT_STATE = '2' and a.PAYMENT_DATE >= to_date(#{begin_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss') 
+		            	and a.PAYMENT_DATE &lt; to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss') 
+		            	and b.REFEREE_USER_ID in
+								  <foreach collection="user_list" index="index" item="item" open="(" separator="," close=")">
+							           #{item.ID}
+							      </foreach>
+						and b.user_name in(select user_id from tmp_user_info where type=1)
+		            group by b.REFEREE_USER_ID,b.REFEREE_USER_REALNAME
+		        union all 
+		        select REFEREE_USER_ID,
+				        REFEREE_USER_REALNAME,
+				        0 new_user_count,
+				        0 new_user_order_money,count(*) sleep_user_count,
+				        sum(total_PAYMENT_MONEY) sleep_user_order_money,
+				        0 old_user_count,
+				        0 old_user_order_money
+		         from (
+		            select REFEREE_USER_ID,
+		            	REFEREE_USER_REALNAME,
+		            	a.user_name,
+		            	sum(PAYMENT_MONEY) total_PAYMENT_MONEY 
+		            from tbl_user_info a,tbl_order_info b 
+		            	where a.USER_NAME = b.USER_NAME
+		                and b.PAYMENT_STATE = '2' and b.PAYMENT_DATE >= to_date(#{begin_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss') and b.PAYMENT_DATE &lt; to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+		                and b.user_name in (select user_id from tmp_user_info where type=2)
+		                and a.user_name not in (select user_id from tmp_user_info where type=1)
+		                and a.referee_user_id in
+								  <foreach collection="user_list" index="index" item="item" open="(" separator="," close=")">
+							           #{item.ID}
+							      </foreach>
+		                group by REFEREE_USER_ID,REFEREE_USER_REALNAME,a.user_name,a.USER_MANAGE_NAME
+		        ) group by  REFEREE_USER_ID,REFEREE_USER_REALNAME
+		        union all 
+		        select REFEREE_USER_ID,
+		        	REFEREE_USER_REALNAME,
+		        	0 new_user_count,
+		        	0 new_user_order_money,
+		        	0 sleep_user_count,
+		        	0 sleep_user_order_money,
+		        	count(*) old_user_count,
+		        	sum(total_PAYMENT_MONEY) old_user_order_money from (
+				        select REFEREE_USER_ID,
+					        REFEREE_USER_REALNAME,
+					        a.user_name,sum(PAYMENT_MONEY) total_PAYMENT_MONEY 
+					        from tbl_user_info a,tbl_order_info b 
+					        	where a.USER_NAME = b.USER_NAME
+					            and b.PAYMENT_STATE = '2' and b.PAYMENT_DATE >= to_date(#{begin_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss') and b.PAYMENT_DATE &lt; to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+					            and b.user_name not in (select user_id from tmp_user_info where type=2)
+					            and a.user_name not in (select user_id from tmp_user_info where type=1)
+					            and a.referee_user_id in
+										  <foreach collection="user_list" index="index" item="item" open="(" separator="," close=")">
+									           #{item.ID}
+									      </foreach>
+					            group by REFEREE_USER_ID,REFEREE_USER_REALNAME,a.user_name,a.USER_MANAGE_NAME
+		        ) group by REFEREE_USER_ID,REFEREE_USER_REALNAME
+		    ) group by REFEREE_USER_ID,REFEREE_USER_REALNAME)B
+		    on A.REFEREE_USER_ID=B.REFEREE_USER_ID)tt
+	</select>
+	
+	<!--推荐人列表查询-->
+	<select id="queryTjrList" parameterType="java.util.Map" resultType="java.util.Map">
+	   select * from (
+		select b.*, rownum rn from (
+			select id,user_name from
+				(
+				select  id,user_name
+			  		from  tbl_sys_user_info sui,
+		  		(select id as store_id,
+	                       manager_user_id as user_id,
+	                       4 as user_type
+	                  from tbl_store_info
+	                union
+	                select id as store_id,
+	                       shopkeeper_user_id as user_id,
+	                       5 as user_type
+	                  from tbl_store_info
+	                union
+	                select 0 as store_id,
+	                       id as user_id,
+	                       user_type
+	                  from tbl_sys_user_info where user_type=9
+	                union
+	                select store_id, 
+	                		user_id, 
+	                		type as user_type
+	                  from tbl_store_user_rel
+	               ) su
+			 	<where>
+			 		sui.state=2
+			 		and sui.user_type in(3,4,5,6,9)
+			 		and sui.id = su.user_id
+			 		<if test="ywjl_user_id != null and ywjl_user_id != ''">
+						 and sui.id = #{ywjl_user_id,jdbcType=INTEGER}
+					</if>
+					<if test="md_id != null and md_id != ''">
+						 and su.store_id = #{md_id,jdbcType=INTEGER}
+					</if>
+			 		<if test="tjr_user_id != null and tjr_user_id != ''">
+						 and sui.id = #{tjr_user_id,jdbcType=INTEGER}
+					</if>
+					<if test="public_user_type==2">
+						and exists (
+							select 1
+							  from tbl_sys_user_store a
+							 where a.user_id = #{public_user_id,jdbcType=INTEGER}
+							 	   and a.store_id = su.store_id
+						)
+					</if>
+			        <if test="public_user_type==3">
+			        	and sui.user_type in(3)
+						and sui.id = #{public_user_id,jdbcType=INTEGER}
+					</if>
+					<if test="public_user_type==4">
+						and	exists (select 1 
+									  from tbl_store_info tsi 
+						             where tsi.manager_user_id = #{public_user_id,jdbcType=INTEGER} 
+						                   and tsi.id = su.store_id)
+					</if>
+					<if test="public_user_type==5">
+						and sui.user_type in(3,5,6)
+						and	exists (select 1 
+						              from tbl_store_info tsi 
+						             where tsi.shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER} 
+						                   and tsi.id = su.store_id)
+					</if>
+					<if test="public_user_type==6">
+						and sui.user_type in(3,5,6)
+						and	exists (select 1 
+						              from tbl_store_user_rel tsui 
+						             where tsui.user_id = #{public_user_id,jdbcType=INTEGER} 
+						                   and tsui.store_id = su.store_id)
+					</if>
+					<if test="public_user_type==9">
+					 	and exists (select 1 
+					 	              from tbl_store_info tsi 
+					 	             where exists( select 1 
+					 	                             from tbl_sys_user_info b 
+					 	                            where organization_id in(
+													           select id 
+													             from tbl_sys_organization_info 
+													            where connect_by_isleaf=1
+													            start with parent_id = #{public_user_organization_id,jdbcType=INTEGER} 
+													            connect by prior id = parent_id)
+											              and b.user_type = 4
+											              and b.id = tsi.manager_user_id
+										   )
+										   and tsi.id = su.store_id
+							)
+					</if>
+				</where>
+			)group by id,user_name
+		) b where
+		rownum &lt;= #{end_rownum})
+		where rn &gt; #{start_rownum}
+	</select>
+	
+	<!--查询推荐人列表 总数-->
+	<select id="queryTjrCount" parameterType="java.util.Map" resultType="int">
+			select  count(1)
+		  		from  (
+		  			select id,user_name from
+				(
+				select  id,user_name
+			  		from  tbl_sys_user_info sui,
+		  		(select id as store_id,
+	                       manager_user_id as user_id,
+	                       4 as user_type
+	                  from tbl_store_info
+	                union
+	                select id as store_id,
+	                       shopkeeper_user_id as user_id,
+	                       5 as user_type
+	                  from tbl_store_info
+	                union
+	                select 0 as store_id,
+	                       id as user_id,
+	                       user_type
+	                  from tbl_sys_user_info where user_type=9
+	                union
+	                select store_id, 
+	                		user_id, 
+	                		type as user_type
+	                  from tbl_store_user_rel
+	               ) su
+			 	<where>
+			 		sui.state=2
+			 		and sui.user_type in(3,4,5,6,9)
+			 		and sui.id = su.user_id
+			 		<if test="ywjl_user_id != null and ywjl_user_id != ''">
+						 and sui.id = #{ywjl_user_id,jdbcType=INTEGER}
+					</if>
+					<if test="md_id != null and md_id != ''">
+						 and su.store_id = #{md_id,jdbcType=INTEGER}
+					</if>
+			 		<if test="tjr_user_id != null and tjr_user_id != ''">
+						 and sui.id = #{tjr_user_id,jdbcType=INTEGER}
+					</if>
+					<if test="public_user_type==2">
+						and exists (
+							select 1
+							  from tbl_sys_user_store a
+							 where a.user_id = #{public_user_id,jdbcType=INTEGER}
+							 	   and a.store_id = su.store_id
+						)
+					</if>
+			        <if test="public_user_type==3">
+			        	and sui.user_type in(3)
+						and sui.id = #{public_user_id,jdbcType=INTEGER}
+					</if>
+					<if test="public_user_type==4">
+						and	exists (select 1 
+									  from tbl_store_info tsi 
+						             where tsi.manager_user_id = #{public_user_id,jdbcType=INTEGER} 
+						                   and tsi.id = su.store_id)
+					</if>
+					<if test="public_user_type==5">
+						and sui.user_type in(3,5,6)
+						and	exists (select 1 
+						              from tbl_store_info tsi 
+						             where tsi.shopkeeper_user_id = #{public_user_id,jdbcType=INTEGER} 
+						                   and tsi.id = su.store_id)
+					</if>
+					<if test="public_user_type==6">
+						and sui.user_type in(3,5,6)
+						and	exists (select 1 
+						              from tbl_store_user_rel tsui 
+						             where tsui.user_id = #{public_user_id,jdbcType=INTEGER} 
+						                   and tsui.store_id = su.store_id)
+					</if>
+					<if test="public_user_type==9">
+					 	and exists (select 1 
+					 	              from tbl_store_info tsi 
+					 	             where exists( select 1 
+					 	                             from tbl_sys_user_info b 
+					 	                            where organization_id in(
+													           select id 
+													             from tbl_sys_organization_info 
+													            where connect_by_isleaf=1
+													            start with parent_id = #{public_user_organization_id,jdbcType=INTEGER} 
+													            connect by prior id = parent_id)
+											              and b.user_type = 4
+											              and b.id = tsi.manager_user_id
+										   )
+										   and tsi.id = su.store_id
+							)
+					</if>
+				</where>
+			)group by id,user_name
+		  		)
+	</select>
+	
+	<!--推荐人地推数据查询-->
+	<select id="queryTjrGroundPushDataStatistics" parameterType="java.util.Map" resultType="java.util.Map">
+	select tt.recommend_user_id,
+			(select user_realname from tbl_sys_user_info t where t.id=tt.recommend_user_id)as RECOMMEND_USER_REALNAME,
+			nvl(new_user_count,0) as new_user_count,
+			nvl(new_user_order_money,0) as new_user_order_money,
+			nvl(sleep_user_count,0) as sleep_user_count,
+			nvl(sleep_user_order_money,0) as sleep_user_order_money,
+			nvl(old_user_count,0) as old_user_count,
+			nvl(old_user_order_money,0) as old_user_order_money
+		 from (
+		select A.RECOMMEND_USER_ID,
+			   B.NEW_USER_COUNT,
+               B.NEW_USER_ORDER_MONEY,
+               B.SLEEP_USER_COUNT,
+               B.SLEEP_USER_ORDER_MONEY,
+               B.OLD_USER_COUNT,
+               B.OLD_USER_ORDER_MONEY
+	       	   from (
+	       <foreach collection="user_list"  item="itm" separator="UNION">
+	            SELECT #{itm.ID,jdbcType=INTEGER} AS recommend_user_id
+	            FROM DUAL
+	       </foreach>
+	       ) A
+	       left join (
+	   select recommend_user_id,
+	   		  (select user_realname from tbl_sys_user_info tsui where tsui.id=recommend_user_id) as recommend_user_realname,
+	   		  sum(new_user_count) new_user_count,
+	   		  sum(new_user_order_money) new_user_order_money,
+	   		  sum(sleep_user_count) sleep_user_count,
+	   		  sum(sleep_user_order_money) sleep_user_order_money,
+	   		  sum(old_user_count) old_user_count,
+	   		  sum(old_user_order_money) old_user_order_money
+	     from (
+	        select RECOMMEND_USER_ID,
+	        	   count(*) new_user_count,
+	        	   0 new_user_order_money,
+	        	   0 sleep_user_count,
+	        	   0 sleep_user_order_money,
+	        	   0 old_user_count,
+	        	   0 old_user_order_money 
+	         from tbl_user_info
+	        	 where  CREATE_DATE >= to_date(#{begin_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss') and CREATE_DATE &lt; to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss') 
+	        	 and RECOMMEND_USER_ID in
+	        	 <foreach collection="user_list" index="index" item="item" open="(" separator="," close=")">
+			           #{item.ID}
+			      </foreach>
+	            group by RECOMMEND_USER_ID
+	        union all 
+	        select b.RECOMMEND_USER_ID,
+			        0 new_user_count,
+			        sum(PAYMENT_MONEY) new_user_order_money,
+			        0 sleep_user_count,
+			        0 sleep_user_order_money,
+			        0 old_user_count,
+			        0 old_user_order_money 
+	        from tbl_order_info a ,tbl_user_info b
+	        	 where a.USER_NAME = b.user_name 
+	            and a.PAYMENT_STATE = '2' and a.PAYMENT_DATE >= to_date(#{begin_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss') and a.PAYMENT_DATE &lt; to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss') 
+	            and b.RECOMMEND_USER_ID in
+						  <foreach collection="user_list" index="index" item="item" open="(" separator="," close=")">
+					           #{item.ID}
+					      </foreach>
+				and b.user_name in(select user_id from tmp_user_info where type=1)
+	            group by b.RECOMMEND_USER_ID
+	        union all 
+	        select RECOMMEND_USER_ID,
+			        0 new_user_count,
+			        0 new_user_order_money,count(*) sleep_user_count,
+			        sum(total_PAYMENT_MONEY) sleep_user_order_money,
+			        0 old_user_count,
+			        0 old_user_order_money
+	         from (
+	            select RECOMMEND_USER_ID,
+	            	   a.user_name,
+	            	   sum(PAYMENT_MONEY) total_PAYMENT_MONEY 
+	            from tbl_user_info a,tbl_order_info b 
+	            	where a.USER_NAME = b.USER_NAME
+	                and b.PAYMENT_STATE = '2' and b.PAYMENT_DATE >= to_date(#{begin_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss') and b.PAYMENT_DATE &lt; to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+	                and b.user_name in (select user_id from tmp_user_info where type=2)
+	                and a.user_name not in (select user_id from tmp_user_info where type=1)
+                 	and a.RECOMMEND_USER_ID in
+							  <foreach collection="user_list" index="index" item="item" open="(" separator="," close=")">
+						           #{item.ID}
+						      </foreach>
+	                group by RECOMMEND_USER_ID,a.user_name,a.USER_MANAGE_NAME
+	        ) group by  RECOMMEND_USER_ID
+	        union all 
+	        select RECOMMEND_USER_ID,
+	        	0 new_user_count,
+	        	0 new_user_order_money,
+	        	0 sleep_user_count,
+	        	0 sleep_user_order_money,
+	        	count(*) old_user_count,
+	        	sum(total_PAYMENT_MONEY) old_user_order_money from (
+			        select RECOMMEND_USER_ID,
+				        a.user_name,sum(PAYMENT_MONEY) total_PAYMENT_MONEY 
+				        from tbl_user_info a,tbl_order_info b 
+				        	where a.USER_NAME = b.USER_NAME
+				            and b.PAYMENT_STATE = '2' and b.PAYMENT_DATE >= to_date(#{begin_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss') and b.PAYMENT_DATE &lt; to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+				            and b.user_name not in (select user_id from tmp_user_info where type=2)
+				            and a.user_name not in (select user_id from tmp_user_info where type=1)
+				            and a.RECOMMEND_USER_ID in
+										  <foreach collection="user_list" index="index" item="item" open="(" separator="," close=")">
+									           #{item.ID}
+									      </foreach>
+				            group by RECOMMEND_USER_ID,a.user_name,a.USER_MANAGE_NAME
+	        ) group by RECOMMEND_USER_ID
+	    ) group by RECOMMEND_USER_ID)B
+	    on A.RECOMMEND_USER_ID=B.RECOMMEND_USER_ID)tt
+	</select>
+	
+</mapper>

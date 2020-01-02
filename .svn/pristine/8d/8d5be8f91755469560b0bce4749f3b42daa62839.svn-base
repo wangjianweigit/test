@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+			http://www.springframework.org/schema/aop 
+			http://www.springframework.org/schema/aop/spring-aop-4.2.xsd">
+			
+	<!-- 定义AOP切面处理器 -->
+    <bean class="com.tk.sys.interceptor.DataSourceAspect" id="dataSourceAspect" />		
+			
+	<aop:config>
+        <!-- 定义切面，拦截方法  begin for  wangpeng -->
+        
+        <aop:pointcut id="member_Pointcut" expression="execution(* com.tk.oms.member.dao.*.*(..))" />
+        <aop:pointcut id="analysis_Pointcut" expression="execution(* com.tk.oms.analysis.dao.*.*(..))" />
+        
+        <!-- 定义切面，拦截方法  end for  wangpeng -->
+ 
+        <!-- 将切面应用到自定义的切面处理器上，-9999保证该切面优先级最高执行 -->
+        <aop:aspect ref="dataSourceAspect" order="-9999">
+        
+        	<!-- 定义拦截方法是使用读库还是写库  begin for  wangpeng -->
+        	
+            <aop:before method="before" pointcut-ref="member_Pointcut" />
+            <aop:after method="after" pointcut-ref="member_Pointcut" />
+            
+            <aop:before method="before" pointcut-ref="analysis_Pointcut" />
+            <aop:after method="after" pointcut-ref="analysis_Pointcut" />
+            
+            <!-- 定义拦截方法是使用读库还是写库  end for  wangpeng -->
+            
+        </aop:aspect>
+    </aop:config>
+
+</beans>

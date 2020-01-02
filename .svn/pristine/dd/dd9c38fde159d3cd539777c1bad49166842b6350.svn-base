@@ -1,0 +1,56 @@
+package com.tk.oms.product.dao;
+
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.stereotype.Repository;
+
+import com.tk.sys.common.BaseDao;
+
+
+
+@Repository
+public interface ProductTypeDao extends BaseDao<Map<String, Object>>{
+
+    /**
+     * 查询商品分类信息
+     * @param map
+     * @return
+     */
+    public List<Map<String, Object>> queryProductTypeList(Map<String, Object> map);
+
+    /**
+     * 根据id或者名称判断当前的商品分类是否存在
+     * @param map
+     * @return
+     */
+    public int isExist(Map<String, Object> map);
+
+    /**
+     * 根据父节点ID查询所有的子节点
+     * @return
+     */
+    public Map<String,Object> queryChildrenByParentId(Map<String, Object> map);
+    /**
+     * 批量更新
+     * @param updateList
+     * @return
+     */
+	public int batchUpdate(List<Map<String, Object>> updateList);
+	/**
+	 * 删除商品分类信息
+	 * @param params
+	 * @return
+	 */
+	public int delete(Map<String, Object> params);
+	/**
+	 * 分类下拉框列表
+	 * @return
+	 */
+	public List<Map<String, Object>> queryTypeList();
+	/**
+	 * 查询大类
+	 * @return
+	 */
+	public List<Map<String, Object>> queryMainTypeList();
+}

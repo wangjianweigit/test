@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.marketing.dao.RecommendedDao">
+<sql id="all">
+		id,
+		name,
+		to_char(start_date,'yyyy-mm-dd hh24:mi:ss') start_date,
+		state,
+		DECODE(type,'1','随机展示','2','顺序展示') type,
+		remark,
+		to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+		create_user_id
+	</sql>
+	<!-- 查询推荐列表 -->
+	<select id="queryRecommendedList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+            select a.*, rownum num from (
+                select
+                <include refid="all"/>,
+                (select count(1) from tbl_recommended_product where recommended_id = ri.id) product_amount
+				from  tbl_recommended_info ri
+				<where>
+					site_id=#{public_user_site_id,jdbcType=INTEGER}
+					<if test="name!=null and name!=''">
+		    			and name LIKE CONCAT(CONCAT('%', #{name,jdbcType=VARCHAR}),'%')
+		    		</if>
+					<if test="start_create_date!=null and start_create_date!=''">
+						and to_char(start_date,'yyyy-mm-dd hh24:mi:ss') &gt;=#{start_create_date,jdbcType=VARCHAR}
+					</if>
+					<if test="end_create_date!=null and end_create_date!=''">
+						and to_char(start_date,'yyyy-mm-dd hh24:mi:ss') &lt;=#{end_create_date,jdbcType=VARCHAR}
+					</if>
+					<if test="state != null">
+						and state IN
+			                <foreach item="item" collection="state" open="(" separator="," close=")">
+								#{item}
+							</foreach>
+				 	</if>
+				 	order by create_date desc
+				</where>
+            ) a where rownum  &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where num &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	
+	<!-- 查询推荐总数 -->
+	<select id="queryRecommendedCount" parameterType="java.util.Map" resultType="int">
+         select
+                COUNT(1)
+				from  tbl_recommended_info
+				<where>
+					site_id=#{public_user_site_id,jdbcType=INTEGER}
+					<if test="name!=null and name!=''">
+		    			and name LIKE CONCAT(CONCAT('%', #{name,jdbcType=VARCHAR}),'%')
+		    		</if>
+					<if test="start_create_date!=null and start_create_date!=''">
+						and to_char(create_date,'yyyy-mm-dd') &gt;=#{start_create_date,jdbcType=VARCHAR}
+					</if>
+					<if test="end_send_date!=null and end_send_date!=''">
+						and to_char(create_date,'yyyy-mm-dd') &lt;=#{end_create_date,jdbcType=VARCHAR}
+					</if>
+					<if test="state != null">
+						and state IN
+			                <foreach item="item" collection="state" open="(" separator="," close=")">
+								#{item}
+							</foreach>
+				 	</if>
+				</where>
+	</select>
+	<!-- 新增推荐信息 -->
+	<insert id="insert"  parameterType="java.util.Map">
+            <selectKey keyProperty="id" resultType="int" order="BEFORE">
+                SELECT seq_recommended_info.nextval FROM DUAL
+            </selectKey>
+            insert into tbl_recommended_info(
+                    id,
+					name,
+					start_date,
+					type,
+					remark,
+					create_date,
+					create_user_id,
+					site_id,
+					state
+            ) VALUES
+            (
+                #{id,jdbcType=INTEGER},
+                #{name,jdbcType=VARCHAR},
+                to_date(#{start_date},'YYYY-MM-DD HH24:MI:SS'),
+                #{type,jdbcType=VARCHAR},
+                #{remark,jdbcType=VARCHAR},
+                sysdate,
+                #{public_user_id,jdbcType=INTEGER},
+                #{public_user_site_id,jdbcType=INTEGER},
+                #{state,jdbcType=INTEGER}
+           )
+    </insert>
+    
+    <!-- 新增推荐信息 -->
+	<insert id="insertNew"  parameterType="java.util.Map">
+            <selectKey keyProperty="id" resultType="int" order="BEFORE">
+                SELECT seq_recommended_info.nextval FROM DUAL
+            </selectKey>
+            insert into tbl_recommended_info(
+                    id,
+					name,
+					start_date,
+					type,
+					remark,
+					create_date,
+					create_user_id,
+					site_id,
+					state
+            ) VALUES
+            (
+                #{id,jdbcType=INTEGER},
+                #{name,jdbcType=VARCHAR},
+                to_date(#{start_date},'YYYY-MM-DD HH24:MI:SS'),
+                #{type,jdbcType=VARCHAR},
+                #{remark,jdbcType=VARCHAR},
+                to_date(#{create_date},'YYYY-MM-DD HH24:MI:SS'),
+                #{public_user_id,jdbcType=INTEGER},
+                #{public_user_site_id,jdbcType=INTEGER},
+                #{state,jdbcType=INTEGER}
+           )
+    </insert>
+    <!-- 启用禁用推荐信息 -->
+    <update id="updateState" parameterType="java.util.Map">
+    	update tbl_recommended_info
+    	<set>
+    		<if test="state!=null and state!=0">
+    			state = #{state,jdbcType=INTEGER},
+    		</if>
+    	</set>
+    	WHERE id = #{id,jdbcType=INTEGER}
+    	  and site_id= #{public_user_site_id,jdbcType=INTEGER}
+    </update>
+    <!-- 更新推荐信息 -->
+    <update id="update" parameterType="java.util.Map">
+    	update tbl_recommended_info
+    	<set>
+    		<if test="NAME!=null and NAME!=''">
+    			name = #{NAME,jdbcType=VARCHAR},
+    		</if>
+    		<if test="START_DATE!=null">
+    			start_date = to_date(#{START_DATE},'YYYY-MM-DD HH24:MI:SS'),
+    		</if>
+    		<if test="REMARK!=null and REMARK!=''">
+    			remark = #{REMARK,jdbcType=VARCHAR},
+    		</if>
+    		<if test="TYPE!=null and TYPE!=0">
+    			type = #{TYPE,jdbcType=INTEGER}
+    		</if>
+    	</set>
+    	WHERE id = #{id,jdbcType=INTEGER}
+    </update>
+	<!-- 删除推荐信息 -->
+    <delete id="delete" parameterType="java.util.Map">
+    	delete from tbl_recommended_info WHERE id = #{id,jdbcType=INTEGER}
+    </delete>
+	<!-- 检测推荐名称是否重复 -->
+	<select id="checkRecommendedName" parameterType="java.util.Map" resultType="int">
+		select count(1) from tbl_recommended_info where 
+		name = #{name,jdbcType=VARCHAR}
+	</select>
+	<!-- 批量插入推荐商品信息 -->
+	<insert id ="batchInsertRecommendedProduct" parameterType ="java.util.List">
+        insert into tbl_recommended_product (recommended_id,product_itemnumber,sort)
+        select A.* from(
+        <foreach collection="list" item="item" index="index"
+                 separator="UNION">
+            select
+            #{item.recommended_id,jdbcType=INTEGER},
+            #{item.product_itemnumber,jdbcType=INTEGER},
+            #{item.sort,jdbcType=INTEGER}
+            from dual
+        </foreach>
+        ) A
+    </insert>
+    <!-- 删除推荐关联商品信息 -->
+    <delete id="deleteRecommendedProductByRid" parameterType="java.util.Map">
+    	delete from tbl_recommended_product where recommended_id = #{id,jdbcType=INTEGER}
+    </delete>
+    <!-- 获取一个推荐策略下的商品列表 -->
+    <select id="queryProductListByRId" parameterType="java.util.Map" resultType="java.util.Map">
+    	select rp.*,pi.product_img_url from tbl_recommended_product rp
+		left join tbl_product_info pi on rp.product_itemnumber = pi.itemnumber
+		 where recommended_id =#{id,jdbcType=INTEGER}
+		 order by rp.sort asc
+    </select>
+    <!-- 查询推荐详情 -->
+    <select id="queryRecommendDetailById" resultType="java.util.Map" parameterType="java.util.Map">
+		select
+        id,
+		name,
+		to_char(start_date,'yyyy-mm-dd hh24:mi:ss') start_date,
+		state,
+		type,
+		remark,
+		to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+		create_user_id
+        from tbl_recommended_info where id = #{id,jdbcType=INTEGER}
+	</select>
+	 <!-- 查询关联商品单号联 -->
+    <select id="queryProductItemnumbers" resultType="java.util.Map" parameterType="java.util.Map">
+		select
+		a.product_itemnumber,b.product_img_url
+        from tbl_recommended_product a
+        left join tbl_product_info b on a.product_itemnumber=b.itemnumber
+         where a.recommended_id = #{id,jdbcType=INTEGER}
+         order by a.sort
+	</select>
+</mapper>

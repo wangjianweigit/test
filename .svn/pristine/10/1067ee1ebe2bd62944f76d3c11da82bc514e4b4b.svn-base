@@ -1,0 +1,1173 @@
+package com.tk.oms.basicinfo.service;
+
+import com.tk.oms.basicinfo.dao.ProductSpecsesDao;
+import com.tk.oms.product.dao.ProductDao;
+import com.tk.sys.util.GridResult;
+import com.tk.sys.util.HttpUtil;
+import com.tk.sys.util.PageUtil;
+import com.tk.sys.util.ProcessResult;
+import com.tk.sys.util.Transform;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+import java.util.*;
+
+/**
+ *
+ * Copyright (c), 2017, Tongku
+ * FileName : ProductSpecsesService
+ * 商品规格业务操作
+ *
+ * @author wangjianwei
+ * @version 1.00
+ * @date 2017/4/18 10:14
+ */
+@Service("ProductSpecsesService")
+public class ProductSpecsesService {
+	private Log logger = LogFactory.getLog(this.getClass());
+    @Resource
+    private ProductSpecsesDao productSpecsesDao;//商品规格数据访问接口
+    @Resource
+	private ProductDao productDao;
+
+    /**
+     * 查询商品规格分组信息
+     *
+     * @param request
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+	public ProcessResult queryGroupList(HttpServletRequest request){
+        ProcessResult pr = new ProcessResult();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+            // 查询规格分组列表
+            List<Map<String, Object>> specGrouplist = productSpecsesDao.queryProductSpecGroupList(paramMap);
+            if (specGrouplist != null && !specGrouplist.isEmpty()) {
+                pr.setState(true);
+                pr.setMessage("获取成功");
+                pr.setObj(specGrouplist);
+            } else {
+                pr.setState(true);
+                pr.setMessage("无数据");
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+    }
+    /**
+     * 查询商品规格列表信息，展示
+     *
+     * @param request
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+	public ProcessResult querySpecList(HttpServletRequest request){
+    	ProcessResult pr = new ProcessResult();
+    	try {
+    		// 获取传入参数
+    		String json = HttpUtil.getRequestInputStream(request);
+    		// 解析传入参数
+    		Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+    		if(paramMap==null
+    				||StringUtils.isEmpty(paramMap.get("parent_id"))){
+    			pr.setState(false);
+    			pr.setMessage("缺少参数");
+    		}
+    		List<Map<String, Object>> specList = productSpecsesDao.queryProductSpecListByParentId(Long.parseLong(paramMap.get("parent_id").toString()));//指定分组所有规格信息
+    		if (specList != null) {
+    			pr.setState(true);
+    			pr.setMessage("获取成功");
+    			pr.setObj(specList);
+    		} else {
+    			pr.setState(true);
+    			pr.setMessage("无数据");
+    		}
+    	} catch (Exception e) {
+    		pr.setState(false);
+    		pr.setMessage(e.getMessage());
+    	}
+    	return pr;
+    }
+
+    /**
+     * 查询商品规格信息
+     *
+     * @param request
+     * @return
+     */
+    public ProcessResult queryProductSpecsesInfo(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        /*try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            // 解析传入参数
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if (!paramMap.containsKey("group_name") || StringUtils.isEmpty(paramMap.get("group_name"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数group_name");
+                return pr;
+            }
+            if (!paramMap.containsKey("group_code") || StringUtils.isEmpty(paramMap.get("group_code"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数group_code");
+                return pr;
+            }
+
+            //商品规格数据信息
+            List<Map<String, Object>> list = productSpecsesDao.queryProductSpecsesByParam(paramMap);
+            Map dataMap = new HashMap();//需要返回的数据
+            if (list.size() > 0) {
+                //商品规格id
+                List<Map<String, Object>> ids = new ArrayList<Map<String, Object>>();
+                //商品规格
+                List<Map<String, Object>> product_specs = new ArrayList<Map<String, Object>>();
+                //商品规格
+                List<Map<String, Object>> create_user_ids = new ArrayList<Map<String, Object>>();
+                //商品规格分组名称
+                dataMap.put("GROUP_NAME", list.get(0).get("GROUP_NAME"));
+                //商品规格分组代码
+                dataMap.put("GROUP_CODE", list.get(0).get("GROUP_CODE"));
+
+                //循环取商品规格、商品规格id数据
+                for (Map map : list) {
+                    Map id = new HashMap();
+                    Map product_spec = new HashMap();
+                    Map create_user_id = new HashMap();
+                    id.put("ID", Long.parseLong(map.get("ID").toString()));
+                    product_spec.put("PRODUCT_SPECS", map.get("PRODUCT_SPECS").toString());
+                    create_user_id.put("CREATE_USER_ID", Long.parseLong(map.get("CREATE_USER_ID").toString()));
+                    //取商品规格id
+                    ids.add(id);
+                    //取商品规格
+                    product_specs.add(product_spec);
+                    //取创建用户id
+                    create_user_ids.add(create_user_id);
+                }
+                //商品规格id
+                dataMap.put("ID", ids);
+                //商品规格
+                dataMap.put("PRODUCT_SPECS", product_specs);
+                //创建用户id
+                dataMap.put("CREATE_USER_ID", create_user_ids);
+            }
+
+            if (dataMap != null) {
+                pr.setState(true);
+                pr.setMessage("获取成功");
+                pr.setObj(dataMap);
+            } else {
+                pr.setState(false);
+                pr.setMessage("无该分组数据");
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }*/
+        return pr;
+    }
+
+    /**
+     * 新增规格分组
+     * @param request
+     * @return
+     */
+    public ProcessResult addProductSpecGroup(HttpServletRequest request){
+        ProcessResult pr = new ProcessResult();
+        try{
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+
+            // 解析传入参数
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if (!paramMap.containsKey("product_specs") || StringUtils.isEmpty(paramMap.get("product_specs"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数product_specs");
+                return pr;
+            }
+            if (!paramMap.containsKey("product_type_id") || StringUtils.isEmpty(paramMap.get("product_type_id"))) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数product_type_id");
+            	return pr;
+            }
+            if (!paramMap.containsKey("public_user_id") || StringUtils.isEmpty(paramMap.get("public_user_id"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数public_user_id");
+                return pr;
+            }else{
+                paramMap.put("create_user_id", paramMap.get("public_user_id"));
+            }
+            paramMap.put("parent_id", 0);//新增分组父级id为0
+
+            // 插入商品规格信息
+            if (productSpecsesDao.insertProductSpecses(paramMap) > 0) {
+                Map<String, Object> productSpecGroup = productSpecsesDao.queryProductSpecById(Long.parseLong(paramMap.get("id").toString()));
+                pr.setState(true);
+                pr.setMessage("新增成功");
+                pr.setObj(productSpecGroup);
+            } else {
+                pr.setState(false);
+                pr.setMessage("新增失败");
+            }
+        }catch (Exception e){
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+    }
+
+    /**
+     * 删除规格分组
+     * @param request
+     * @return
+     */
+    public ProcessResult removeProductSpecGroup(HttpServletRequest request) throws Exception{
+        ProcessResult pr = new ProcessResult();
+        try{
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+
+            // 解析传入参数
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if (!paramMap.containsKey("id") || StringUtils.isEmpty(paramMap.get("id"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数id");
+                return pr;
+            }
+
+
+            //规格分组
+            Map data = productSpecsesDao.queryProductSpecById(Long.parseLong(paramMap.get("id").toString()));
+            if(data == null){
+                pr.setState(false);
+                pr.setMessage("规格分组不存在");
+                return pr;
+            }
+
+            long id = Long.parseLong(data.get("ID").toString());//分组id
+            //查询该分组下所有规格
+            List<Map<String,Object>> specsList= productSpecsesDao.queryProductSpecListByParentId(id);
+            for(Map map : specsList){
+                // 检查商品规格是否为可删除状态
+                Map param = new HashMap();
+                param.put("product_specs", map.get("PRODUCT_SPECS"));
+                param.put("specs_group_id", id);
+                if(productSpecsesDao.queryProductSpecsesByEditable(param) > 0){
+                    pr.setState(false);
+                    pr.setMessage("存在已使用的规格分组["+data.get("PRODUCT_SPECS").toString()+"]不可删除");
+                    return pr;
+                }
+            }
+            /**删除规格分组所有信息 先删规格再删分组**/
+            //删除分组规格
+            productSpecsesDao.deleteProductSpecsesByParentId(id);
+            //删除分组
+            if (productSpecsesDao.deleteProductSpecGroupById(id) > 0) {
+                pr.setState(true);
+                pr.setMessage("删除成功");
+            } else {
+                throw new RuntimeException("删除失败");
+            }
+        }catch (Exception e){
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+    }
+
+    /**
+     * 编辑规格分组
+     * @param request
+     * @return
+     */
+    public ProcessResult editProductSpecGroup(HttpServletRequest request){
+        ProcessResult pr = new ProcessResult();
+        try{
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+
+            // 解析传入参数
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if (!paramMap.containsKey("product_specs") || StringUtils.isEmpty(paramMap.get("product_specs"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数product_specs");
+                return pr;
+            }
+            if (!paramMap.containsKey("id") || StringUtils.isEmpty(paramMap.get("id"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数id");
+                return pr;
+            }
+
+            if(productSpecsesDao.queryProductSpecByGroup(paramMap)>0){
+                pr.setState(false);
+                pr.setMessage("分组名称重复,请重新输入");
+                return pr;
+            }
+
+            // 修改商品规格信息
+            if (productSpecsesDao.updateProductSpecses(paramMap) > 0) {
+                pr.setState(true);
+                pr.setMessage("修改成功");
+            } else {
+                pr.setState(false);
+                pr.setMessage("修改失败");
+            }
+        }catch (Exception e){
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+    }
+
+    /**
+     * 新增商品规格信息
+     *
+     * @param request
+     * @return
+     */
+    @Transactional
+    public ProcessResult addSpec(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+
+            // 解析传入参数
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if (!paramMap.containsKey("product_specs") || StringUtils.isEmpty(paramMap.get("product_specs"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数product_specs");
+                return pr;
+            }
+            if (!paramMap.containsKey("parent_id") || StringUtils.isEmpty(paramMap.get("parent_id"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数parent_id");
+                return pr;
+            }
+            if (!paramMap.containsKey("public_user_id") || StringUtils.isEmpty(paramMap.get("public_user_id"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数public_user_id");
+                return pr;
+            }else{
+                paramMap.put("create_user_id", paramMap.get("public_user_id"));
+            }
+          //规格分组
+            Map<String,Object> data = productSpecsesDao.queryProductSpecById(Long.parseLong(paramMap.get("parent_id").toString()));
+            if(data == null){
+                pr.setState(false);
+                pr.setMessage("规格分组不存在");
+                return pr;
+            }
+            //指定分组规格数据
+            List<Map<String,Object>> list = productSpecsesDao.queryProductSpecsesByGroupParentId(Long.parseLong(paramMap.get("parent_id").toString()));
+            //查询分组数据,如果是鞋类（type = 290），则以以下方式处理 
+            if(!StringUtils.isEmpty(data.get("PRODUCT_TYPE_ID")) && "290".equals(data.get("PRODUCT_TYPE_ID").toString())){
+            	//加入即将添加的规格 以便判断
+            	Map<String,Object> newProductSpecMap = new HashMap<String, Object>();
+            	newProductSpecMap.put("PRODUCT_SPECS", paramMap.get("product_specs").toString());
+            	list.add(newProductSpecMap);
+            	
+            	//判断商品规格是否有误
+            	Map map = ifErrorByProductSpecs(list);
+            	if(!Boolean.parseBoolean(map.get("state").toString())){
+            		pr.setState(false);
+            		pr.setMessage(map.get("message").toString());
+            		return pr;
+            	}
+            	 // 插入商品规格信息
+                if (productSpecsesDao.insertProductSpecses(paramMap) > 0) {
+                    pr.setState(true);
+                    pr.setMessage("新增成功");
+                } else {
+                    pr.setState(false);
+                    pr.setMessage("新增失败");
+                }
+            }else{
+            	/**
+            	 * 不是鞋类，则添加规格的时候，一次添加一个规格，需要是否已存在
+            	 * songwangwen 2017.08.15
+            	 * */
+            	String product_specs = paramMap.get("product_specs").toString();//参数
+            	boolean existsFlag = false;//已存在标志位
+            	if(list!=null && !list.isEmpty()){
+            		//判断是否已存在相同的规格，如果已存在则直接报错
+            		for(Map<String,Object> old_specs:list){
+            			if(product_specs.equals(old_specs.get("PRODUCT_SPECS").toString())){
+        					existsFlag = true;
+        				}
+            		}
+            		if(existsFlag){
+            			pr.setState(false);
+                		pr.setMessage("分组【"+data.get("PRODUCT_SPECS")+"】中已存在当前规格，请重新输入");
+                		return pr;
+            		}
+            	}
+            	 // 插入商品规格信息
+                if (productSpecsesDao.insertProductSpecses(paramMap) > 0) {
+                	//查询列表
+                    pr.setState(true);
+                    pr.setMessage("新增成功");
+                } else {
+                    pr.setState(false);
+                    pr.setMessage("新增失败");
+                }
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+
+        return pr;
+    }
+
+    /**
+     * 修改商品规格信息
+     *
+     * @param request 修改内容
+     * @return
+     */
+    @Transactional
+    public ProcessResult editProductSpecses(HttpServletRequest request) throws Exception{
+        ProcessResult pr = new ProcessResult();
+
+        /*try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            // 解析传入参数
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if (!paramMap.containsKey("group_name") || StringUtils.isEmpty(paramMap.get("group_name"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数group_name");
+                return pr;
+            }
+            if (!paramMap.containsKey("group_code") || StringUtils.isEmpty(paramMap.get("group_code"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数group_code");
+                return pr;
+            }
+            if (!paramMap.containsKey("product_speces") || StringUtils.isEmpty(paramMap.get("product_speces"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数product_speces");
+                return pr;
+            }
+            if (!paramMap.containsKey("public_user_id") || StringUtils.isEmpty(paramMap.get("public_user_id"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数public_user_id");
+                return pr;
+            }else{
+                paramMap.put("create_user_id", paramMap.get("public_user_id"));
+            }
+
+            //检查商品规格是否存在
+            List<Map<String, Object>> list = productSpecsesDao.queryProductSpecsesByParam(paramMap);
+            if (list.size() == 0) {
+                pr.setState(false);
+                pr.setMessage("不存在该规格分组数据");
+                return pr;
+            }
+            //商品规格
+            String[] product_speces = Utils.removeNull(paramMap.get("product_speces").toString().split(","));
+            //创建用户id
+            String[] create_user_ids = Utils.removeNull(paramMap.get("create_user_ids").toString().split(","));
+            //商品规格数据
+            List<Map<String, Object>> productSpecesList = new ArrayList<Map<String, Object>>();
+            //检查商品规格是否为可更改状态
+            for(String product_spece : product_speces){
+                if(productSpecsesDao.queryProductSpecsesByEditable(product_spece) > 0){
+                    pr.setState(true);
+                    pr.setMessage("存在已使用的商品规格："+product_spece+",不可修改");
+                    return pr;
+                }
+                //加入即将添加的规格 以便判断
+                Map<String,Object> newProductSpecMap = new HashMap<String, Object>();
+                newProductSpecMap.put("PRODUCT_SPECS", product_spece);
+                productSpecesList.add(newProductSpecMap);
+            }
+
+            //判断商品规格是否有误
+            Map map = ifErrorByProductSpecs(productSpecesList);
+            if(!Boolean.parseBoolean(map.get("state").toString())){
+                pr.setState(false);
+                pr.setMessage(map.get("message").toString());
+                return pr;
+            }
+
+            //判断是否有商品规格数据存在
+            //存在则删除全部
+            //删除全部商品规格
+            if(productSpecsesDao.queryProductSpecsesCount(paramMap) > 0 && productSpecsesDao.deleteProductSpecsesByBatch(paramMap) == 0){
+                throw new RuntimeException("更新失败");
+            }
+
+            //删除成功之后重新新增商品规格
+            //待添加商品规格数据
+            List<Map<String, Object>> detailList = new ArrayList<Map<String, Object>>();
+            for(int i=0,l=product_speces.length;i<l;i++){
+                Map<String,Object> detail = new HashMap<String, Object>();
+                detail.put("product_spece", product_speces[i]);//商品规格
+                detail.put("create_user_id", create_user_ids[i]);//创建用户
+                detail.put("group_name", paramMap.get("group_name").toString());//分组名称
+                detail.put("group_code", paramMap.get("group_code").toString());//分组代码
+                detailList.add(detail);
+            }
+            //批量新增商品规格
+            if(productSpecsesDao.insertProductSpecsesByBatch(detailList) > 0){
+                pr.setState(true);
+                pr.setMessage("更新成功");
+            }else{
+                pr.setState(false);
+                pr.setMessage("更新失败");
+                throw new RuntimeException("更新失败");
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException("更新失败");
+        }*/
+
+        return pr;
+    }
+
+    /**
+     * 判断商品规格是否有误
+     *
+     * @param list
+     * @return
+     */
+    public static Map ifErrorByProductSpecs(List<Map<String, Object>> list){
+        Map map = new HashMap();
+        //规格尺码list
+        List<Map> produtSpecesList = new ArrayList<Map>();
+        //存储规格尺码开始及结束位置
+        for(Map<String,Object> data : list){
+            Map param = new HashMap();
+            String[] product_size = (data.get("PRODUCT_SPECS").toString().split("-"));
+            //判读商品规格尺码区间起止位置是否有误
+            if(Integer.parseInt(product_size[0]) > Integer.parseInt(product_size[1])){
+                map.put("message", "商品规格尺码区间起止位置有误");
+                map.put("state", false);
+                return map;
+            }
+            param.put("start", product_size[0]);
+            param.put("end", product_size[1]);
+            produtSpecesList.add(param);
+        }
+        //排序list
+        Collections.sort(produtSpecesList, new Comparator<Map>() {
+            public int compare(Map o1, Map o2) {
+                Integer start = Integer.parseInt(o1.get("start").toString());
+                Integer start2 = Integer.parseInt(o2.get("start").toString());
+                return start.compareTo(start2);
+            }
+        });
+
+        //循环判断商品规格尺码区间填写是否有误(重叠)
+        //方法 ： 1：获取循环第一个规格尺码开始位置  2：获取循环第二个规格尺码结束位置 如 第一个规格尺码开始位置大于等于第二个规格尺码结束位置 则有误
+        for(int i =0; i < produtSpecesList.size() -1; i++){
+            Map firstMap = produtSpecesList.get(i);
+            Map secondMap = produtSpecesList.get(i+1);
+            if(Integer.parseInt(firstMap.get("end").toString()) >= Integer.parseInt(secondMap.get("start").toString())){
+                map.put("message", "存储区间规格尺码重叠:["+ secondMap.get("start").toString() + "-" +secondMap.get("end").toString() +"],["+ firstMap.get("start").toString() + "-" +firstMap.get("end").toString() +"]");
+                map.put("state", false);
+                return map;
+            }
+        }
+        map.put("state", true);
+        return map;
+    }
+
+    /**
+     * 删除商品规格
+     *
+     * @param request 删除内容
+     * @return
+     */
+    @Transactional
+    public ProcessResult removeSpec(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            // 解析传入参数
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if (!paramMap.containsKey("id") || StringUtils.isEmpty(paramMap.get("id"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数id");
+                return pr;
+            }
+
+            // 查询商品规格是否存在
+            Map<String, Object> productSpecses = productSpecsesDao.queryProductSpecById(Long.parseLong(paramMap.get("id").toString()));
+            if (productSpecses.size() == 0) {
+                pr.setState(false);
+                pr.setMessage("不存在该规格数据");
+                return pr;
+            }
+
+            // 检查规格数据是否存在
+            if(!productSpecses.containsKey("PRODUCT_SPECS") || productSpecses.get("PRODUCT_SPECS").equals("")){
+                pr.setState(false);
+                pr.setMessage("删除失败");
+                return pr;
+            }
+
+            // 检查商品规格是否为可删除状态
+            Map param = new HashMap();
+            param.put("product_specs", productSpecses.get("PRODUCT_SPECS"));
+            param.put("specs_group_id", Long.parseLong(productSpecses.get("PARENT_ID").toString()));
+            if(productSpecsesDao.queryProductSpecsesByEditable(param) > 0){
+                pr.setState(false);
+                pr.setMessage("存在已使用的商品规格["+productSpecses.get("PRODUCT_SPECS").toString()+"]不可删除");
+                return pr;
+            }
+
+            // 删除商品规格
+            if (productSpecsesDao.deleteProductSpecsesById(Long.parseLong(paramMap.get("id").toString())) > 0) {
+                pr.setState(true);
+                pr.setMessage("删除成功");
+            } else {
+                pr.setState(false);
+                pr.setMessage("删除失败");
+            }
+
+        } catch (Exception e) {
+            throw new RuntimeException(e.getMessage());
+        }
+
+        return pr;
+    }
+    
+    
+    
+    /**
+     * 配码管理查询
+     * @param request
+     * @return
+     */
+	@Transactional
+	public ProcessResult withCodeList(HttpServletRequest request) throws Exception {
+		GridResult gr = new GridResult();
+        try {
+        	Map<String, Object> paramMap = new HashMap<String, Object>();
+    	    String json = HttpUtil.getRequestInputStream(request);
+    	    if(!StringUtils.isEmpty(json)) {
+    	    	paramMap = (Map<String, Object>) Transform.GetPacket(json,
+    					Map.class);
+            	GridResult pageParamResult = PageUtil.handlePageParams(paramMap);
+    			if(pageParamResult!=null){
+    				return pageParamResult;
+    			}
+            }
+			int count= productSpecsesDao.queryWithCodeCount(paramMap);
+            List<Map<String,Object>> list = productSpecsesDao.queryWithCodeList(paramMap);
+            if (list != null && list.size() > 0) {
+            	gr.setState(true);
+            	gr.setMessage("查询成功!");
+            	gr.setObj(list);
+            	gr.setTotal(count);
+			} else {
+				gr.setState(true);
+				gr.setMessage("无数据");
+			}
+        } catch (Exception e) {
+        	gr.setState(false);
+        	gr.setMessage(e.getMessage());
+            throw new RuntimeException(e);
+        }
+        return gr;
+	}
+	
+	/**
+     * 配码管理新增
+     * @param request
+     * @return
+     */
+	@Transactional
+	public ProcessResult withCodeAdd(HttpServletRequest request) throws Exception {
+		ProcessResult pr = new ProcessResult();
+        try {
+        	Map<String, Object> paramMap = new HashMap<String, Object>();
+    	    String json = HttpUtil.getRequestInputStream(request);
+    	    if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+    	    paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if(productSpecsesDao.insertWithCodeInfo(paramMap)>0){
+            	pr.setState(true);
+                pr.setMessage("添加成功！");
+            }else{
+            	pr.setState(false);
+                pr.setMessage("添加失败！");
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e);
+        }
+        return pr;
+	}
+	
+	/**
+     * 配码管理详情新增
+     * @param request
+     * @return
+     */
+	@Transactional
+	public ProcessResult withCodeDetailAdd(HttpServletRequest request) throws Exception {
+		ProcessResult pr = new ProcessResult();
+        try {
+        	Map<String, Object> paramMap = new HashMap<String, Object>();
+    	    String json = HttpUtil.getRequestInputStream(request);
+    	    if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+    	    paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+    	    if(StringUtils.isEmpty(paramMap.get("id"))||StringUtils.isEmpty(paramMap.get("spec"))){
+				pr.setMessage("缺少参数");
+				pr.setState(false);
+				return pr;
+			}
+    	    //先删除原有数据
+    	    productSpecsesDao.removeWithCodeDetail(paramMap);
+    	    String code_specs=paramMap.get("spec")+"";
+    	    Integer id=Integer.parseInt(paramMap.get("id")+"");
+    	    List<Map<String,Object>> dataList=(List<Map<String,Object>>)paramMap.get("data");
+    	    for(Map<String,Object> temp:dataList){
+    	    	Integer num=Integer.parseInt(temp.get("num")+"");
+				temp.put("code_specs", code_specs);
+				temp.put("code_id", id);
+				temp.put("num", num);
+			}
+            if(productSpecsesDao.insertWithCodeDetail(dataList)>0){
+            	pr.setState(true);
+                pr.setMessage("添加成功！");
+            }else{
+            	pr.setState(false);
+                pr.setMessage("添加失败！");
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.info(e.getMessage());
+            throw new RuntimeException(e);
+        }
+        return pr;
+	}
+	
+	/**
+     * 配码管理编辑
+     * @param request
+     * @return
+     */
+	@Transactional
+	public ProcessResult withCodeEdit(HttpServletRequest request) throws Exception {
+		ProcessResult pr = new ProcessResult();
+        try {
+        	Map<String, Object> paramMap = new HashMap<String, Object>();
+    	    String json = HttpUtil.getRequestInputStream(request);
+    	    if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+    	    paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+    	    if(StringUtils.isEmpty(paramMap.get("id"))){
+				pr.setMessage("缺少参数id");
+				pr.setState(false);
+				return pr;
+			}
+            if(productSpecsesDao.editWithCodeInfo(paramMap)>0){
+            	pr.setState(true);
+                pr.setMessage("修改成功！");
+            }else{
+            	pr.setState(true);
+                pr.setMessage("修改成功！");
+            }
+
+            
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e);
+        }
+        return pr;
+	}
+	
+	
+	
+	/**
+     * 配码管理删除
+     * @param request
+     * @return
+     */
+	@Transactional
+	public ProcessResult withCodeRemove(HttpServletRequest request) throws Exception {
+		ProcessResult pr = new ProcessResult();
+        try {
+        	Map<String, Object> paramMap = new HashMap<String, Object>();
+    	    String json = HttpUtil.getRequestInputStream(request);
+    	    if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+    	    paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+			if(StringUtils.isEmpty(paramMap.get("id"))){
+				pr.setMessage("缺少参数id");
+				pr.setState(false);
+				return pr;
+			}
+			//判断当前配码是否被关联
+			int count=productDao.queryProductWithCodeCount(paramMap);
+			if(count>0){
+				pr.setMessage("当前配码被关联不能删除");
+				pr.setState(false);
+				return pr;
+			}
+            int num = productSpecsesDao.removeWithCodeInfo(paramMap);
+            paramMap.put("code_id", paramMap.get("id"));
+            List<String> code_specs=productSpecsesDao.queryWithCodeSpecsByCodeId(paramMap);
+            if(num>0 && code_specs.size()==0){
+            	pr.setState(true);
+                pr.setMessage("删除成功!");
+                return pr;
+            }
+            if(num>0 && code_specs.size()>0){
+            	if(productSpecsesDao.removeWithCodeDetail(paramMap)>0){
+            		pr.setState(true);
+                    pr.setMessage("删除成功!");
+            	}else{
+                	pr.setState(false);
+                    pr.setMessage("删除失败!");
+                }
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e);
+        }
+        return pr;
+	}
+	
+	/**
+     * 配码管理详情
+     * @param request
+     * @return
+     */
+	@Transactional
+	public ProcessResult withCodeDetail(HttpServletRequest request) throws Exception {
+		ProcessResult pr = new ProcessResult();
+        try {
+        	Map<String, Object> paramMap = new HashMap<String, Object>();
+    	    String json = HttpUtil.getRequestInputStream(request);
+    	    if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+    	    paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+			if(StringUtils.isEmpty(paramMap.get("id"))){
+				pr.setMessage("缺少参数id");
+				pr.setState(false);
+				return pr;
+			}
+            Map<String,Object> detail=productSpecsesDao.queryWithCodeDetail(paramMap);
+            if(null!=detail){
+            	pr.setObj(detail);
+            }else{
+            	pr.setObj("");
+            }
+            pr.setState(true);
+            pr.setMessage("获取数据成功");
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e);
+        }
+        return pr;
+	}
+	
+	/**
+     * 配码管理详情
+     * @param request
+     * @return
+     */
+	@Transactional
+	public ProcessResult withCodeSpecsDetail(HttpServletRequest request) throws Exception {
+		ProcessResult pr = new ProcessResult();
+        try {
+        	Map<String, Object> paramMap = new HashMap<String, Object>();
+    	    String json = HttpUtil.getRequestInputStream(request);
+    	    if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+    	    paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+			if(StringUtils.isEmpty(paramMap.get("code_specs"))||StringUtils.isEmpty(paramMap.get("code_id"))){
+				pr.setMessage("缺少参数");
+				pr.setState(false);
+				return pr;
+			}
+            List<Map<String,Object>> specsDetail=productSpecsesDao.queryWithCodeSpecsDetail(paramMap);
+            if(null!=specsDetail){
+            	pr.setObj(specsDetail);
+            }else{
+            	pr.setObj("");
+            }
+            pr.setState(true);
+            pr.setMessage("获取数据成功");
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e);
+        }
+        return pr;
+	}
+	
+	/**
+     * 配码管理查询规格
+     * @param request
+     * @return
+     */
+	@Transactional
+	public ProcessResult withCodeSpecs(HttpServletRequest request) throws Exception {
+		ProcessResult pr = new ProcessResult();
+        try {
+        	Map<String, Object> paramMap = new HashMap<String, Object>();
+    	    String json = HttpUtil.getRequestInputStream(request);
+    	    if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+    	    paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+    	    if(StringUtils.isEmpty(paramMap.get("specses_group_id"))){
+				pr.setMessage("缺少参数specses_group_id");
+				pr.setState(false);
+				return pr;
+			}
+    	    Map<String, Object> resMap = new HashMap<String, Object>();
+    	    //查询所有配码规格
+            List<String> specesList=productSpecsesDao.queryWithCodeSpecs(paramMap);
+            resMap.put("specesList", specesList);
+          //查询当前配码所用规格
+            List<String> codeSpecesList=productSpecsesDao.queryWithCodeSpecsByCodeId(paramMap);
+            Object[] codeSpecesArray = codeSpecesList.toArray();
+            resMap.put("codeSpecesArray", codeSpecesArray);
+            pr.setObj(resMap);
+            pr.setState(true);
+            pr.setMessage("获取数据成功");
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e);
+        }
+        return pr;
+	}
+
+	/**
+     * 规格下拉框
+     * @param request
+     * @return
+     */
+	@Transactional
+	public ProcessResult specsOption(HttpServletRequest request) throws Exception {
+		ProcessResult pr = new ProcessResult();
+        try {
+        	Map<String, Object> paramMap = new HashMap<String, Object>();
+    	    String json = HttpUtil.getRequestInputStream(request);
+    	    if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+    	    paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            List<Map<String,Object>> specsOption=productSpecsesDao.querySpecsOption(paramMap);
+            pr.setObj(specsOption);
+            pr.setState(true);
+            pr.setMessage("获取数据成功");
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e);
+        }
+        return pr;
+	}
+	
+	/**
+     * 配码模板下拉框
+     * @param request
+     * @return
+     */
+	@Transactional
+	public ProcessResult withCodeOption(HttpServletRequest request) throws Exception {
+		ProcessResult pr = new ProcessResult();
+        try {
+        	Map<String, Object> paramMap = new HashMap<String, Object>();
+    	    String json = HttpUtil.getRequestInputStream(request);
+    	    if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+    	    paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            List<Map<String,Object>> specsOption=productSpecsesDao.queryWithCodeOption(paramMap);
+            pr.setObj(specsOption);
+            pr.setState(true);
+            pr.setMessage("获取数据成功");
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e);
+        }
+        return pr;
+	}
+
+    /**
+     * 查询商品规格列表
+     * @param request
+     * @return
+     */
+    public ProcessResult queryProductSpecsList(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        try {
+            List<Map<String, Object>> specsOption = productSpecsesDao.listProductSpecs();
+            pr.setObj(specsOption);
+            pr.setState(true);
+            pr.setMessage("获取数据成功");
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e);
+        }
+        return pr;
+    }
+    /**
+     * 查询所有的鞋类商品规格信息，用于为商家进行可用的商品规格进行授权
+	 * 同时根据商家ID返回该规格是否已经勾选的标志
+     * @param request
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+	public ProcessResult getAllShoesProductSpecs(HttpServletRequest request) {
+    	ProcessResult pr = new ProcessResult();
+    	try {
+        	Map<String, Object> paramMap = new HashMap<String, Object>();
+    	    String json = HttpUtil.getRequestInputStream(request);
+    	    if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+    	    paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+    	    if(paramMap==null
+    	    		||paramMap.isEmpty()
+    	    		||StringUtils.isEmpty(paramMap.get("stationed_user_id"))){
+    	    	 pr.setState(false);
+                 pr.setMessage("缺少参数【stationed_user_id】");
+                 return pr;
+    	    }
+            List<Map<String,Object>> list=productSpecsesDao.getAllShoesProductSpecs(paramMap);
+            pr.setObj(list);
+            pr.setState(true);
+            pr.setMessage("获取数据成功");
+    	} catch (Exception e) {
+    		pr.setState(false);
+    		pr.setMessage(e.getMessage());
+    		throw new RuntimeException(e);
+    	}
+    	return pr;
+    }
+    /**
+     * 配置 商家可以的使用的 商品规格信息 数据
+     * @param request
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+    @Transactional
+    public ProcessResult setStationedProductSpecs(HttpServletRequest request) throws Exception{
+    	ProcessResult pr = new ProcessResult();
+
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		String json = HttpUtil.getRequestInputStream(request);
+		if(StringUtils.isEmpty(json)) {
+			pr.setState(false);
+			pr.setMessage("缺少参数");
+			return pr;
+		}
+		paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+		if(paramMap==null
+				||paramMap.isEmpty()
+				||StringUtils.isEmpty(paramMap.get("stationed_user_id"))){
+			pr.setState(false);
+			pr.setMessage("缺少参数【stationed_user_id】");
+			return pr;
+		}
+		//清除已有数据
+		productSpecsesDao.deleteSpecsByStaId(paramMap);
+		if(!StringUtils.isEmpty(paramMap.get("specses_ids"))){//此次关联的规格ID集合，多个ID之间以英文逗号分隔
+			String specses_ids = paramMap.get("specses_ids").toString();
+			paramMap.put("specses_id_list",Arrays.asList(specses_ids.split(",")));
+			if(productSpecsesDao.batchInsertStaProductSpecs(paramMap)<=0){
+				throw new RuntimeException("新增商家可用的商品规格信息成失败");
+			};
+		}
+		pr.setState(true);
+		pr.setMessage("配置商家可用的商品规格信息成功");
+    	return pr;
+    }
+}

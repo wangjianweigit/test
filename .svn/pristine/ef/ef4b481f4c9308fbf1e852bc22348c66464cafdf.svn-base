@@ -1,0 +1,235 @@
+package com.tk.oms.sysuser.dao;
+
+import java.util.List;
+import java.util.Map;
+
+import org.apache.ibatis.annotations.Param;
+import org.springframework.stereotype.Repository;
+
+import com.tk.oms.sysuser.entity.SysUserInfo;
+
+/**
+* Copyright (c), 2016, Tongku
+* FileName : LoginControl.java
+* ERP用户管理
+* @author  wangpeng
+* @date 2016-06-07
+* @version1.00
+*/
+@Repository
+public interface SysUserInfoDao{
+    /**
+     *根据用户名查找用户信息
+     * @param user_name 用户名
+     * @return SysUserInfo
+     */
+    public SysUserInfo querySysUserInfoByUserName(String user_name);
+    
+    /**
+     * 新增管理用户
+     * @param userinfo
+     */
+    public int insert(Map<String, Object> params);
+    
+    /**
+     * 禁用启用管理用户
+     * @param userinfo
+     */
+    public int update_state(Map<String, Object> params);
+    
+    /**
+     * 管理用户密码重置
+     * @param userinfo
+     */
+    public int update_pwd(Map<String, Object> params);
+    
+    /**
+     * 修改管理用户
+     * @param userinfo
+     */
+    public int update(Map<String, Object> params);
+
+    /**
+     * 查询管理用户列表
+     * @param params
+     * @return
+     */
+    public List<SysUserInfo> queryList(Map<String, Object> params);
+    
+    /**
+     * 查询管理用户列表总数
+     * @param params
+     * @return
+     */
+    public int queryCount(Map<String, Object> params);
+    
+    /**
+     * 查询管理用户详情
+     * @param userinfo
+     * @return
+     */
+    public SysUserInfo queryById(Map<String, Object> params);
+    
+    /**
+     * 查询管理用户详情
+     * @param userinfo
+     * @return
+     */
+    public SysUserInfo queryByUserId(long user_id);
+    /**
+     * 查询管理用户详情
+     * @param userinfo
+     * @return
+     */
+	public SysUserInfo queryBy(Map<String, Object> params);
+	 /**
+     * 查询业务员或者业务经理
+     * @param login_name
+     * @return
+     */
+    public  List<Map<String,Object>> querytypeList (Map<String,Object> param);
+
+    /**
+     * 更新业务员验证码
+     * @param param
+     * @return
+     */
+    public int updateUserVerifyCode(Map<String,Object> param);
+
+    /**
+     * 查询公司所在地大区ID
+     * @param id
+     */
+    public long  queryBigAreaID(long id);
+    
+    /**
+     * 查询用户关联的门店信息（业务经理、店长） 【用户变更类型校验时专用】
+     * @param login_name
+     * @return
+     */
+    public  List<Map<String,Object>> queryMd1ForUserId (Map<String,Object> param);
+    
+    /**
+     * 查询用户关联的门店信息（营业员、业务员）  【用户变更类型校验时专用】
+     * @param login_name
+     * @return
+     */
+    public  List<Map<String,Object>> queryMd2ForUserId (Map<String,Object> param);
+    
+    /**
+     * 查询用户关联的会员信息(待审核)  【用户变更类型校验时专用】
+     * @param login_name
+     * @return
+     */
+    public  List<Map<String,Object>> queryMember1ForUserId (Map<String,Object> param);
+    
+    /**
+     * 查询用户关联的会员信息(已审核)  【用户变更类型校验时专用】
+     * @param login_name
+     * @return
+     */
+    public  List<Map<String,Object>> queryMember2ForUserId (Map<String,Object> param);
+    
+    /**
+     * 【通用下拉框】查询【业务经理】下拉
+     * @param login_name
+     * @return
+     */
+    public  List<Map<String,Object>> querySysUserYwjlList (Map<String,Object> param);
+    
+    /**
+     * 【通用下拉框】查询【门店】下拉
+     * @param login_name
+     * @return
+     */
+    public  List<Map<String,Object>> querySysStoreList (Map<String,Object> param);
+    
+    /**
+     * 【通用下拉框】查询【业务员】下拉
+     * @param login_name
+     * @return
+     */
+    public  List<Map<String,Object>> querySysUserYwyList (Map<String,Object> param);
+    /**
+     * 【通用下拉框】查询【业务人员（销售人员：业务经理、店长、业务员、营业员）】下拉  20181127 shif
+     * @param login_name
+     * @return
+     */
+    public  List<Map<String,Object>> querySysUserYwryList (Map<String,Object> param);
+    /**
+     * 查询用户默认登录验证码
+     * @return
+     */
+	public String queryLoginVerifyCode();
+	/**
+     * 用户更新ip
+     * @return
+     */
+	public int updateUserIp(Map<String,Object> param);
+	/**
+     * 白名单列表
+     * @param request
+     * @return
+     */
+	public String queryWhiteIpList(String user_name);
+	/**
+     * 创建系统用户key
+     * @param paramMap
+     * @return
+     */
+	public int insertSysUserCacheKey(Map<String, Object> paramMap);
+	/**
+     * 创建系统用户帐号信息
+     * @param paramMap
+     * @return
+     */
+	public int insertSysBankAccount(Map<String, Object> paramMap);
+	/**
+     * 获取当前业务经理 、当前门店下业务员、业务经理、店长、营业员数据
+     * @param login_name
+     * @return
+     */
+    public  List<Map<String,Object>> querySysUserList (Map<String,Object> param);
+    /**
+     * 获取用户OA系统登录OpenId
+     * @param userId
+     * @return
+     */
+	String getSysUserOAOpenIdById(@Param("userId") Long userId);
+    /**
+     * 查询指定门店下的【业务员、业务经理、店长、营业员】
+     * @param login_name
+     * @return
+     */
+    public  List<Map<String,Object>> querySalersList (Map<String,Object> param);
+    /**
+     *  按用户类型查询指定用户列表
+     * @param login_name
+     * @return
+     */
+    public  List<Map<String,Object>> queryUserList (Map<String,Object> param);
+    /**
+     * 创建自定义用户系统账户
+     * @param paramMap
+     * @return
+     */
+    int insertCustomUserAccount(Map<String, Object> paramMap);
+    /**
+     *  查询推介人列表
+     * @param login_name
+     * @return
+     */
+    public  List<Map<String,Object>> queryGroundPushList (Map<String,Object> param);
+    /**
+     * 设置会员账号预审是否全部查看
+     * @param login_name
+     * @return
+     */
+    int updateAccountApprovalState(Map<String,Object> param);
+    /**
+     * 记录用户操作日志
+     * @param login_name
+     * @return
+     */
+    int insertUserOperationLog(Map<String,Object> param);
+}

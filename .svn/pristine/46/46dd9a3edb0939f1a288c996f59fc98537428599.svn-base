@@ -1,0 +1,511 @@
+package com.tk.oms.marketing.service;
+
+import com.tk.oms.marketing.dao.UserGroupDao;
+import com.tk.sys.util.*;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Copyright (c), 2017, TongKu
+ * FileName : UserGroupService
+ * 用户分组管理业务操作类
+ *
+ * @author zhenghui
+ * @version 1.00
+ * @date 2017/09/21
+ */
+@Service("UserGroupService")
+public class UserGroupService {
+
+    @Resource
+    private UserGroupDao userGroupDao;
+
+    /**
+     * 分页获取分组列表
+     * @param request
+     * @return
+     */
+    public GridResult queryUserGroupListForPage(HttpServletRequest request) {
+        GridResult gr = new GridResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+
+            if (StringUtils.isEmpty(json)) {
+                gr.setState(false);
+                gr.setMessage("缺少参数");
+                return gr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            GridResult pageParamResult = PageUtil.handlePageParams(paramMap);
+            if (pageParamResult != null) {
+                return pageParamResult;
+            }
+            //查询分组列表总数
+            int total = this.userGroupDao.queryCountForPage(paramMap);
+            //查询分组列表
+            List<Map<String, Object>> list = this.userGroupDao.queryListForPage(paramMap);
+            if (list != null && list.size() > 0) {
+                gr.setState(true);
+                gr.setMessage("获取分组列表成功!");
+                gr.setObj(list);
+            } else {
+                gr.setMessage("无数据");
+            }
+            gr.setState(true);
+            gr.setTotal(total);
+        } catch (Exception e) {
+            gr.setState(false);
+            gr.setMessage(e.getMessage());
+            e.printStackTrace();
+        }
+        return gr;
+    }
+
+    /**
+     * 获取分组列表数据
+     * @param request
+     * @return
+     */
+    public ProcessResult queryUserGroupList(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            //获取分组
+            List<Map<String, Object>> user_group_list = this.userGroupDao.queryUserGroupList(paramMap);
+            pr.setState(true);
+            pr.setMessage("获取分组列表成功");
+            pr.setObj(user_group_list);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            e.printStackTrace();
+        }
+        return pr;
+    }
+
+    /**
+     * 获取分组详细信息
+     * @param request
+     * @return
+     */
+    public ProcessResult queryUserGroupDetail(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            if (StringUtils.isEmpty(paramMap.get("group_id"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[group_id]");
+                return pr;
+            }
+            //获取分组
+            Map<String, Object> userGroup = this.userGroupDao.queryById(Long.parseLong(paramMap.get("group_id").toString()));
+            if (userGroup == null) {
+                pr.setState(false);
+                pr.setMessage("分组不存在");
+                return pr;
+            }
+            pr.setState(true);
+            pr.setMessage("获取分组详细信息成功");
+            pr.setObj(userGroup);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            e.printStackTrace();
+        }
+        return pr;
+    }
+
+    /**
+     * 分页获取分组用户列表
+     * @param request
+     * @return
+     */
+    public GridResult queryUserListForPage(HttpServletRequest request) {
+        GridResult gr = new GridResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                gr.setState(false);
+                gr.setMessage("缺少参数");
+                return gr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            if (StringUtils.isEmpty(paramMap.get("group_id"))) {
+                gr.setState(false);
+                gr.setMessage("缺少参数[group_id]");
+                return gr;
+            }
+            GridResult pageParamResult = PageUtil.handlePageParams(paramMap);
+            if (pageParamResult != null) {
+                return pageParamResult;
+            }
+            //查询分组的用户列表总数
+            int userTotal = this.userGroupDao.queryUserCountById(paramMap);
+            //查询分组的用户列表
+            List<Map<String, Object>> userList = this.userGroupDao.queryUserListById(paramMap);
+            if (userList != null && userList.size() > 0) {
+                gr.setState(true);
+                gr.setMessage("获取分组的用户列表成功!");
+                gr.setObj(userList);
+            } else {
+                gr.setMessage("无数据");
+            }
+            gr.setState(true);
+            gr.setTotal(userTotal);
+        } catch (Exception e) {
+            gr.setState(false);
+            gr.setMessage(e.getMessage());
+            e.printStackTrace();
+        }
+        return gr;
+    }
+
+    /**
+     * 添加分组
+     * @param request
+     * @return
+     * @throws Exception
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public ProcessResult addUserGroup(HttpServletRequest request) throws Exception {
+        ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            //必填项 分组名称
+            if (StringUtils.isEmpty(paramMap.get("group_name"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[group_name]");
+                return pr;
+            }
+            if (paramMap.get("group_name").toString().length() > 20) {
+                pr.setState(false);
+                pr.setMessage("分组名称文字过长");
+                return pr;
+            }
+            if (!StringUtils.isEmpty(paramMap.get("remark"))) {
+                if (paramMap.get("remark").toString().length() > 200) {
+                    pr.setState(false);
+                    pr.setMessage("分组备注文字过长");
+                    return pr;
+                }
+            }
+            //判断是否有重复名称
+            if (this.userGroupDao.queryUserGroupCountByName(paramMap) > 0) {
+                pr.setState(false);
+                pr.setMessage("分组名称已存在");
+                return pr;
+            }
+            //添加分组
+            if (this.userGroupDao.insert(paramMap) > 0) {
+                pr.setState(true);
+                pr.setMessage("添加分组成功");
+                pr.setObj(paramMap.get("id"));
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e.getMessage());
+        }
+        return pr;
+    }
+
+    /**
+     * 添加分组用户
+     * @param request
+     * @return
+     * @throws Exception
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public ProcessResult addUserGroupForUser(HttpServletRequest request) throws Exception {
+        ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            //必填项 分组ID
+            if (StringUtils.isEmpty(paramMap.get("group_id"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[group_id]");
+                return pr;
+            }
+            //必填项 用户ID
+            if (!StringUtils.isEmpty(paramMap.get("user_id"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[user_id]");
+                return pr;
+            }
+            List<Map<String, Object>> user_list = (List<Map<String, Object>>) paramMap.get("user_list");
+            for (Map<String, Object> map : user_list) {
+                map.put("group_id", paramMap.get("group_id"));
+                map.put("user_id", map.get("user_id"));
+                //添加分组用户
+                this.userGroupDao.insertUserGroupDetail(map);
+            }
+            pr.setState(true);
+            pr.setMessage("添加分组用户成功");
+            pr.setObj(null);
+
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e.getMessage());
+        }
+        return pr;
+    }
+
+    /**
+     * 编辑分组
+     * @param request
+     * @return
+     * @throws Exception
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public ProcessResult editUserGroup(HttpServletRequest request) throws Exception {
+        ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            //必填项 分组ID
+            if (StringUtils.isEmpty(paramMap.get("group_id"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[group_id]");
+                return pr;
+            }
+            //必填项 分组名称
+            if (StringUtils.isEmpty(paramMap.get("group_name"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[group_name]");
+                return pr;
+            }
+            if (paramMap.get("group_name").toString().length() > 20) {
+                pr.setState(false);
+                pr.setMessage("用户组名称过长");
+                return pr;
+            }
+            if (!StringUtils.isEmpty(paramMap.get("remark"))) {
+                if (paramMap.get("remark").toString().length() > 200) {
+                    pr.setState(false);
+                    pr.setMessage("用户组备注过长");
+                    return pr;
+                }
+            }
+            //获取分组
+            Map<String, Object> user_group = this.userGroupDao.queryById(Long.parseLong(paramMap.get("group_id").toString()));
+            if(user_group == null){
+                pr.setState(false);
+                pr.setMessage("分组不存在");
+                return pr;
+            }
+            //判断是否有重复名称
+            if (this.userGroupDao.queryUserGroupCountByName(paramMap) > 0) {
+                pr.setState(false);
+                pr.setMessage("分组名称已存在");
+                return pr;
+            }
+            //修改分组
+            if (this.userGroupDao.update(paramMap) > 0) {
+                pr.setState(true);
+                pr.setMessage("编辑分组成功");
+                pr.setObj(paramMap.get("group_id"));
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e.getMessage());
+        }
+        return pr;
+    }
+
+    /**
+     * 编辑分组状态
+     * @param request
+     * @return
+     * @throws Exception
+     */
+    @Transactional
+    public ProcessResult editUserGroupSate(HttpServletRequest request) throws Exception {
+        ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            if (StringUtils.isEmpty(paramMap.get("group_id"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[group_id]");
+                return pr;
+            }
+            //获取分组
+            Map<String, Object> user_group = this.userGroupDao.queryById(Long.parseLong(paramMap.get("group_id").toString()));
+            if(user_group == null){
+                pr.setState(false);
+                pr.setMessage("不存在");
+                return pr;
+            }
+            //编辑分组状态
+            if (this.userGroupDao.update(paramMap) > 0) {
+                pr.setState(true);
+                pr.setMessage("编辑分组状态成功");
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e.getMessage());
+        }
+        return pr;
+    }
+
+    /**
+     * 删除分组
+     * @param request
+     * @return
+     * @throws Exception
+     */
+    @Transactional
+    public ProcessResult removeUserGroup(HttpServletRequest request) throws Exception {
+        ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            if (StringUtils.isEmpty(paramMap.get("group_id"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[group_id]");
+                return pr;
+            }
+            //获取分组
+            Map<String, Object> user_group = this.userGroupDao.queryById(Long.parseLong(paramMap.get("group_id").toString()));
+            if(user_group == null){
+                pr.setState(false);
+                pr.setMessage("不存在");
+                return pr;
+            }
+            //判断当前用户组状态(启用状态不允许删除)
+            if(Integer.parseInt(user_group.get("state").toString())==2){
+                pr.setState(false);
+                pr.setMessage("启用状态用户组不允许删除");
+                return pr;
+            }
+            //判断是否已被订货会活动占用
+            if (this.userGroupDao.queryActivityCountById(paramMap) > 0) {
+                pr.setState(false);
+                pr.setMessage("已被活动占用，不允许删除");
+                return pr;
+            }
+            //判断是否已被装修导航占用
+            if (this.userGroupDao.queryDecorateNavCountById(paramMap) > 0) {
+                pr.setState(false);
+                pr.setMessage("已被装修导航占用，不允许删除");
+                return pr;
+            }
+            //判断是否已被装修组件占用
+            if (this.userGroupDao.queryPageModuleCountById(paramMap) > 0) {
+                pr.setState(false);
+                pr.setMessage("已被装修组件占用，不允许删除");
+                return pr;
+            }
+            //删除分组，以及用户列表
+            if (this.userGroupDao.delete(paramMap) > 0) {
+                this.userGroupDao.deleteUserGroupDetail(paramMap);
+                pr.setState(true);
+                pr.setMessage("删除分组成功");
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e.getMessage());
+        }
+        return pr;
+    }
+
+    /**
+     * 删除分组的用户
+     * @param request
+     * @return
+     * @throws Exception
+     */
+    public ProcessResult removeUserGroupForUser(HttpServletRequest request) throws Exception {
+        ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            if (StringUtils.isEmpty(paramMap.get("group_id"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[group_id]");
+                return pr;
+            }
+            if (StringUtils.isEmpty(paramMap.get("user_list"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数[user_list]");
+                return pr;
+            }
+            //获取分组
+            Map<String, Object> user_group = this.userGroupDao.queryById(Long.parseLong(paramMap.get("group_id").toString()));
+            if(user_group == null){
+                pr.setState(false);
+                pr.setMessage("不存在");
+                return pr;
+            }
+            List<Map<String, Object>> user_list = (List<Map<String, Object>>)paramMap.get("user_list");
+            for (Map<String, Object> map : user_list) {
+                map.put("group_id", paramMap.get("group_id"));
+                map.put("user_id", map.get("user_id"));
+                //删除分组的用户
+                this.userGroupDao.deleteUserGroupForUser(map);
+            }
+            pr.setState(true);
+            pr.setMessage("删除分组的用户成功");
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e.getMessage());
+        }
+        return pr;
+    }
+}

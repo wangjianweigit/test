@@ -1,0 +1,431 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tk.oms.finance.dao.ServerBusinessWithdrawalDao">
+
+    <!--通用条件查询-->
+    <sql id="currency_select_condition">
+        <if test="withdrawal_number != null and withdrawal_number != ''">
+            and t1.withdrawal_number like '%'||#{withdrawal_number,jdbcType=VARCHAR}||'%'
+        </if>
+        <if test="state != null and state != ''">
+            <foreach collection="state" open="and (" close=")" item="item" separator=" or ">
+                t1.state = #{item,jdbcType=INTEGER}
+            </foreach>
+        </if>
+        <if test="bank_card != null and bank_card != ''">
+            and t1.bank_card like '%'||#{bank_card,jdbcType=VARCHAR}||'%'
+        </if>
+        <if test="apply_start_time!=null and apply_start_time!=''">
+            and t1.create_date &gt;= to_date(#{apply_start_time},'YYYY-MM-DD HH24:MI:SS')
+        </if>
+        <if test="apply_end_time!=null and apply_end_time!=''">
+            and t1.create_date &lt;= to_date(#{apply_end_time},'YYYY-MM-DD HH24:MI:SS')
+        </if>
+        <if test="owner_name!=null and owner_name!=''">
+            and t1.owner_name = #{owner_name,jdbcType=VARCHAR}
+        </if>
+    </sql>
+
+    <!-- 获取公司类型 -->
+    <sql id="user_where">
+        <if test="user_type==3">
+            <!-- 平台服务 -->
+            and sp_user_id = (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'platform_user_id')
+        </if>
+        <if test="user_type==4">
+            <!-- 仓储服务 -->
+            and sp_user_id = (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'storage_user_id')
+        </if>
+        <if test="user_type==5">
+            <!-- 新零售 -->
+            and sp_user_id = (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'new_retail_user_id')
+        </if>
+        <if test="user_type==6">
+            <!-- 汇总子账户 -->
+            and sp_user_id = (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'summary_account_user_id')
+        </if>
+    </sql>
+
+    <sql id="balanceOfPaymentsFoWhere">
+        <where>
+            <!-- 收支单号 -->
+            <if test="record_number != null and record_number != ''">
+                AND record_number = #{record_number, jdbcType=VARCHAR}
+            </if>
+            <!-- 收支类型：收款、付款 -->
+            <if test="record_type != null and record_type != ''">
+                AND record_type in
+                <foreach item="item" index="index" collection="record_type" open="(" separator="," close=")">
+                    #{item, jdbcType=VARCHAR}
+                </foreach>
+            </if>
+            <!-- 收付类型，产生收支记录的来源：结算、提现 -->
+            <if test="turnover_type != null and turnover_type != ''">
+                AND turnover_type in
+                <foreach item="item" index="index" collection="turnover_type" open="(" separator="," close=")">
+                    #{item, jdbcType=VARCHAR}
+                </foreach>
+            </if>
+            <!-- 备注 -->
+            <if test="remark != null and remark != ''">
+                AND remark LIKE '%'||#{remark, jdbcType=VARCHAR}||'%'
+            </if>
+            <if test="create_start_time != null and create_start_time != ''">
+                AND r.create_date &gt;= to_date(#{create_start_time, jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+            </if>
+            <if test="create_end_time != null and create_end_time != ''">
+                AND r.create_date &lt;= to_date(#{create_end_time, jdbcType=VARCHAR}, 'yyyy-mm-dd hh24:mi:ss')
+            </if>
+            <if test="user_type != '' and user_type != null">
+                <if test="user_type==3">
+                    AND sp_user_id = (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'platform_user_id')
+                </if>
+                <if test="user_type==4">
+                    AND sp_user_id = (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'storage_user_id')
+                </if>
+                <if test="user_type==5">
+                    AND sp_user_id = (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'new_retail_user_id')
+                </if>
+            </if>
+        </where>
+    </sql>
+
+    <!--获取提现申请单数据-->
+    <select id="queryListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select a.*,rownum num from (
+                select
+                    t1.id,
+                    t1.withdrawal_number,
+                    t2.user_name apply_user_name,
+                    t3.user_name approval_user_name,
+                    CASE
+                      to_char(t1.sp_user_id)
+                        WHEN (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'platform_user_id') THEN (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'platform_bank_account')
+                        WHEN (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'storage_user_id') THEN (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'storage_bank_account')
+                        WHEN (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'new_retail_user_id') THEN (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'new_retail_bank_account')
+                    END as account,
+                    t1.withdrawal_amount,
+                    t1.state,
+                    t1.remark,
+                    to_char(t1.create_date,'yyyy-mm-dd hh24:mi:ss') apply_date,
+                    t1.bank_card,
+                    to_char(t1.approval_date,'yyyy-mm-dd hh24:mi:ss') approval_date
+                from tbl_sp_withdrawal_apply t1
+                left join tbl_sys_user_info t2 on t1.create_user_id = t2.id
+                left join tbl_sys_user_info t3 on t1.approval_user_id = t3.id
+                where t1.is_delete = '1'
+                    <include refid="user_where" />
+                    <include refid="currency_select_condition"/>
+                    order by t1.create_date desc
+            ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where num &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--获取提现申请单数量-->
+    <select id="queryListForCount" parameterType="java.util.Map" resultType="int">
+        select
+          count(1)
+        from
+        tbl_sp_withdrawal_apply t1
+        where t1.is_delete = '1'
+            <include refid="user_where" />
+            <include refid="currency_select_condition"/>
+    </select>
+
+    <!--获取服务商提现审批数据-->
+    <select id="queryWithdrawalApprovalList" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select a.*,rownum num from (
+                select
+                    t1.id,
+                    t1.reject_reason,
+                    t1.withdrawal_number,
+                    t1.state,
+                    t2.user_name apply_user_name,
+                    to_char(t1.create_date,'yyyy-mm-dd hh24:mi:ss') apply_date,
+                    t1.withdrawal_amount,
+                    t1.bank_name,
+                    t1.bank_card,
+                    t1.remark,
+                    t3.user_name approval_user_name,
+                    CASE
+                    to_char(t1.sp_user_id)
+                        WHEN (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'platform_user_id') THEN (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'platform_bank_account')
+                        WHEN (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'storage_user_id') THEN (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'storage_bank_account')
+                        WHEN (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'new_retail_user_id') THEN (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'new_retail_bank_account')
+                    END as account,
+                    case to_char(t1.sp_user_id)
+                        WHEN (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'platform_user_id') THEN 3
+                        WHEN (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'storage_user_id') THEN 4
+                        WHEN (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'new_retail_user_id') THEN 5
+                    END as user_type,
+                    to_char(t1.approval_date,'yyyy-mm-dd hh24:mi:ss') approval_date
+                from tbl_sp_withdrawal_apply t1
+                left join tbl_sys_user_info t2 on t1.create_user_id = t2.id
+                left join tbl_sys_user_info t3 on t1.approval_user_id = t3.id
+                where t1.is_delete = '1'
+                <include refid="user_where" />
+                <include refid="currency_select_condition"/>
+                order by t1.create_date desc
+            ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where num &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--获取服务商提现审批数量-->
+    <select id="queryWithdrawalApprovalCount" parameterType="java.util.Map" resultType="int">
+        select
+        count(1)
+        from
+        tbl_sp_withdrawal_apply t1
+        where t1.is_delete = '1'
+        <include refid="user_where" />
+        <include refid="currency_select_condition"/>
+    </select>
+
+    <!--获取服务商已提现金额-->
+    <select id="queryWithdrawalAmount" parameterType="java.util.Map" resultType="float">
+        select
+            nvl(sum(withdrawal_amount),0) withdrawal_amount
+        from
+            TBL_SP_WITHDRAWAL_APPLY
+        where
+            state in ('1','2')
+            <if test="user_type==3">
+                and sp_user_id = (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'platform_user_id')
+            </if>
+            <if test="user_type==4">
+                and sp_user_id = (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'storage_user_id')
+            </if>
+            <if test="user_type==5">
+                and sp_user_id = (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'new_retail_user_id')
+            </if>
+    </select>
+
+    <!--通过ID查询提现申请单-->
+    <select id="queryById" parameterType="long" resultType="java.util.Map">
+        select
+            t1.id,
+            t1.withdrawal_number,
+            t2.user_name user_name,
+            t1.withdrawal_amount,
+            t1.state,
+            t1.remark,
+            to_char(t1.create_date,'yyyy-mm-dd hh24:mi:ss') apply_date,
+            t3.bank_card,
+            to_char(t1.approval_date) approval_date,
+            t3.user_id,
+            t3.bind_type,
+            t1.tran_logno,
+            t1.PLAYMONEY_VOUCHER_URL
+        from tbl_sp_withdrawal_apply t1
+            left join tbl_sys_user_info t2 on t1.create_user_id = t2.id
+            left join tbl_sp_bank_card t3 on t1.buss_bank_card_id = t3.id
+        where t1.id = #{id,jdbcType=INTEGER} and t1.is_delete = '1'
+    </select>
+
+    <!--服务商添加提现申请单-->
+    <insert id="insert" parameterType="java.util.Map">
+        <selectKey keyProperty="id" resultType="int" order="BEFORE">
+            select seq_sp_withdrawal_apply.nextval from dual
+        </selectKey>
+        insert into tbl_sp_withdrawal_apply (
+            id,
+            withdrawal_number,
+            create_date,
+            create_user_id,
+            buss_bank_card_id,
+            withdrawal_amount,
+            sp_user_id,
+            remark,
+            state,
+            tran_logno,
+            bank_card,
+            bank_name,
+            owner_name
+        ) values (
+            #{id,jdbcType=INTEGER},
+            getAutoNumberShort('12'),
+            sysdate,
+            #{public_user_id,jdbcType=INTEGER},
+            #{buss_bank_card_id,jdbcType=INTEGER},
+            #{withdrawal_amount,jdbcType=FLOAT},
+            #{user_id,jdbcType=INTEGER},
+            #{remark,jdbcType=VARCHAR},
+            1,
+            GETTHIRDLOGNUMBER('1'),
+            #{bank_card,jdbcType=VARCHAR},
+            #{bank_name,jdbcType=VARCHAR},
+            #{owner_name,jdbcType=VARCHAR}
+        )
+    </insert>
+
+    <!--服务商提现审批、驳回-->
+    <update id="update" parameterType="java.util.Map">
+        update
+        tbl_sp_withdrawal_apply
+        <set>
+            <if test="type == 'approve'">
+                <!-- 审批 -->
+                state = 2,
+                approval_user_id = #{public_user_id,jdbcType=INTEGER},
+                approval_date = sysdate
+            </if>
+            <if test="type == 'reject'">
+                <!-- 驳回 -->
+                state = 10,
+                reject_reason = #{reject_reason,jdbcType=VARCHAR},
+                approval_user_id = #{public_user_id,jdbcType=INTEGER},
+                approval_date = sysdate
+            </if>
+        </set>
+        where
+            id = #{id,jdbcType=INTEGER}
+    </update>
+
+    <!--保存提现收支记录-->
+    <insert id="insertRevenueRecord" parameterType="java.util.Map">
+        <selectKey keyProperty="id" resultType="int" order="BEFORE">
+            select seq_sp_in_exp_record.nextval from dual
+        </selectKey>
+        insert into tbl_sp_in_exp_record(
+            id,
+            sp_user_id,
+            record_number,
+            record_channel,
+            record_type,
+            turnover_type,
+            remark,
+            money,
+            surplus_money,
+            turnover_number,
+            create_date
+        )values (
+            #{id,jdbcType=INTEGER},
+            #{user_id,jdbcType=INTEGER},
+            getautonumber('SZ'),
+            '余额',
+            #{record_type,jdbcType=VARCHAR},
+            #{turnover_type,jdbcType=VARCHAR},
+            #{remark,jdbcType=VARCHAR},
+            #{money,jdbcType=FLOAT},
+            #{surplus_money,jdbcType=FLOAT},
+            #{turnover_number,jdbcType=VARCHAR},
+            sysdate
+        )
+    </insert>
+
+    <!--获取服务商提现审批明细 -->
+    <select id="queryWithdrawalApprovalDetail" parameterType="long" resultType="java.util.Map">
+        select
+            t1.id,
+            t1.sp_user_id,
+            t1.withdrawal_number,
+            t1.state,
+            t2.user_name apply_user_name,
+            to_char(t1.create_date,'yyyy-mm-dd hh24:mi:ss') apply_date,
+            t1.withdrawal_amount,
+            t1.bank_name,
+            t7.user_name approval_user_name,
+            (SELECT value FROM TBL_SYS_PARAM_CONFIG where key = 'service_providers_mobile_phone') as service_providers_mobile_phone,
+            <!-- 获取开户账户start-->
+            t1.owner_name as open_account_user_name,
+            <!-- 获取开户账户end-->
+            t1.bank_card,
+            t1.remark,
+            CASE
+            to_char(t1.sp_user_id)
+                WHEN (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'platform_user_id') THEN (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'platform_bank_account')
+                WHEN (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'storage_user_id') THEN (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'storage_bank_account')
+                WHEN (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'new_retail_user_id') THEN (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'new_retail_bank_account')
+            END as account,
+            case to_char(t1.sp_user_id)
+                WHEN (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'platform_user_id') THEN 3
+                WHEN (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'storage_user_id') THEN 4
+                WHEN (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'new_retail_user_id') THEN 5
+            END as user_type,
+            to_char(t1.approval_date ,'yyyy-mm-dd hh24:mi:ss') approval_date,
+            to_char(t1.remit_date ,'yyyy-mm-dd hh24:mi:ss') remit_date,
+            t6.user_name remit_user_name,
+            t1.PLAYMONEY_VOUCHER_URL
+        FROM tbl_sp_withdrawal_apply t1
+            LEFT JOIN tbl_sys_user_info t2 on t1.create_user_id = t2.id
+            LEFT JOIN tbl_sys_user_info t6 on t6.id = t1.remit_user_id
+            LEFT JOIN tbl_sys_user_info t7 on t7.id = t1.approval_user_id
+        where t1.id = #{id,jdbcType=INTEGER}
+    </select>
+
+    <!--服务商提现审批通过,进行打款操作-->
+    <update id="withdrawPay" parameterType="java.util.Map">
+        UPDATE tbl_sp_withdrawal_apply tl SET
+    	tl.state = #{state,jdbcType=VARCHAR},
+    	tl.remit_user_id =  #{public_user_id,jdbcType=INTEGER},
+    	tl.remit_date =   sysdate,
+    	tl.PLAYMONEY_VOUCHER_URL = #{voucher_img_url,jdbcType=VARCHAR}
+        WHERE tl.IS_DELETE = '1' AND tl.id = #{id,jdbcType=INTEGER}
+    </update>
+
+    <!--根据银行卡号查询提现记录数-->
+    <select id="queryWithdrawalApprovalCountByBankCardId" parameterType="long" resultType="int">
+        SELECT count(1) from TBL_SP_WITHDRAWAL_APPLY where BUSS_BANK_CARD_ID = #{bank_card_id,jdbcType=INTEGER}
+    </select>
+    
+    <!-- 分页查询服务商收支列表 -->
+    <select id="queryBalanceOfPaymentsForList" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT *
+          FROM (SELECT t.*, ROWNUM rn
+                  FROM (  SELECT sp_user_id,
+                                 record_number,
+                                 record_channel,
+                                 record_type,
+                                 remark,
+                                 money,
+                                 surplus_money,
+                                 turnover_type,
+                                 turnover_number,
+                                 TO_CHAR (r.create_date, 'yyyy-mm-dd hh24:mi:ss') AS create_date
+                            FROM tbl_sp_in_exp_record r <include refid="balanceOfPaymentsFoWhere" /> ORDER BY r.create_date DESC) t
+                 WHERE ROWNUM &lt;= #{end_rownum,jdbcType=INTEGER})
+         WHERE rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!-- 查询服务商收支记录数 -->
+    <select id="queryBalanceOfPaymentsForCount" parameterType="java.util.Map" resultType="int">
+        SELECT COUNT (1) FROM tbl_sp_in_exp_record r <include refid="balanceOfPaymentsFoWhere" />
+    </select>
+
+    <resultMap id="facilitator" type="java.util.Map">
+        <result column="user_id" property="user_id"/>
+        <result column="account_balance" property="account_balance"/>
+        <result column="bank_account" property="bank_account"/>
+        <result column="user_type" property="user_type"/>
+    </resultMap>
+    <!-- 获取服务商账户数据 -->
+    <select id="queryFacilitator" parameterType="java.util.Map" resultMap="facilitator">
+        select user_id,user_type,account_balance,bank_account,sub_merchant_id from TBL_BANK_ACCOUNT
+        where 1 = 1
+        <if test="user_type==3">
+            <!-- 平台服务 -->
+            and user_id = (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'platform_user_id')
+        </if>
+        <if test="user_type==4">
+            <!-- 仓储服务 -->
+            and user_id = (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'storage_user_id')
+        </if>
+        <if test="user_type==5">
+            <!-- 新零售 -->
+            and user_id = (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'new_retail_user_id')
+        </if>
+        <if test="user_type==6">
+            <!-- 汇总子账户 -->
+            and user_id = (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'summary_account_user_id')
+        </if>
+    </select>
+    <!-- 根据user_id获取服务商账户数据 -->
+    <select id="queryFacilitatorByUserId" parameterType="long" resultMap="facilitator">
+        select user_id,user_type,account_balance,bank_account,sub_merchant_id from TBL_BANK_ACCOUNT
+        where user_id = #{user_id,jdbcType=INTEGER}
+    </select>
+    
+</mapper>

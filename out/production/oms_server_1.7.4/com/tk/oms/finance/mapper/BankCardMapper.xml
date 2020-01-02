@@ -1,0 +1,337 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.finance.dao.BankCardDao">
+    <sql id="user_where">
+        <if test="user_type==3">
+            <!-- 平台服务 -->
+            and user_id = (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'platform_user_id')
+        </if>
+        <if test="user_type==4">
+            <!-- 仓储服务 -->
+            and user_id = (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'storage_user_id')
+        </if>
+        <if test="user_type==5">
+            <!-- 新零售 -->
+            and user_id = (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'new_retail_user_id')
+        </if>
+        <if test="user_type==6">
+            <!-- 汇总子账户 -->
+            and user_id = (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'summary_account_user_id')
+        </if>
+    </sql>
+
+    <!--分页查询银行卡-->
+    <select id="queryBankCardList" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select a.*, rownum num from (
+                select
+                    a.id,
+                    a.bank_card,
+                    b.bank_name,
+                    a.owner_name,
+                    a.default_flag,
+                    a.bind_state,
+                    TO_CHAR(a.bind_date,'YYYY-MM-DD HH24:MI:SS') bind_date,
+                    a.bind_type,
+                   (select sub_merchant_id from TBL_BANK_ACCOUNT ba where ba.USER_ID = a.USER_ID) as sub_merchant_id
+                from
+                    tbl_sp_bank_card a
+                left join
+                    tbl_dic_bank b on a.bank_clscode = b.bank_clscode
+                where
+                a.is_delete = '1'
+                <include refid="user_where"/>
+                order by a.create_date desc
+            ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where num &gt;#{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--查询银行卡记录数-->
+    <select id="queryBankCardCount" parameterType="java.util.Map" resultType="int">
+        select
+          count(1)
+        from
+          tbl_sp_bank_card a
+        where
+        is_delete = '1'
+        <include refid="user_where"/>
+    </select>
+
+    <!--查询服务公司银行卡列表-->
+    <select id="queryBankCardListForServerCompany" resultType="java.util.Map">
+        select
+            a.id,
+            '平台服务公司' as full_name,
+            a.bank_card,
+            a.default_flag,
+            a.bind_state,
+            c.logo_url
+        from
+            tbl_sp_bank_card a
+            left join
+                tbl_dic_bank c on a.bank_clscode = c.bank_clscode
+        where
+            a.user_id = (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'platform_user_id')
+            and a.bind_type = '2'
+            and a.is_delete = '1'
+        order by a.create_date desc
+    </select>
+
+    <!--查询仓储公司银行卡列表-->
+    <select id="queryBankCardListForStorageCompany" resultType="java.util.Map">
+        select
+            a.id,
+            (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'storage_company_name') company_name,
+            a.bank_card,
+            a.default_flag,
+            a.bind_state,
+            '仓储公司' full_name,
+            c.logo_url
+        from
+            tbl_sp_bank_card a
+            left join
+                tbl_dic_bank c on a.bank_clscode = c.bank_clscode
+        where
+            a.user_id = (SELECT value FROM TBL_SYS_PARAM_CONFIG WHERE key = 'storage_user_id')
+            and a.bind_type = '2'
+            and a.is_delete = '1'
+        order by a.create_date desc
+    </select>
+
+    <!--通过ID查询银行卡信息-->
+    <select id="queryById" parameterType="long" resultType="java.util.Map">
+        select
+            a.id,
+            a.bank_card,
+            a.bind_state,
+            a.user_id,
+            a.default_flag,
+            a.bank_code,
+            b.bank_name,
+            a.owner_name,
+            TO_CHAR(a.bind_date,'YYYY-MM-DD HH24:MI:SS') bind_date,
+            a.bind_type,
+            (select sub_merchant_id from TBL_BANK_ACCOUNT ba where ba.USER_ID = a.USER_ID) as sub_merchant_id
+        from
+            tbl_sp_bank_card a
+        left join
+            tbl_dic_bank b on a.bank_clscode = b.bank_clscode
+        where
+            a.id = #{id,jdbcType=INTEGER}
+    </select>
+
+    <!--通过银行卡号获取银行卡信息-->
+    <select id="queryBankCardByName" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            id,
+            user_id,
+            bind_state,
+            is_delete,
+            bind_type,
+            bank_card,
+            bank_code,
+            default_flag
+        from
+            tbl_sp_bank_card a
+        where
+            bank_card = #{bank_card,jdbcType=VARCHAR}
+            and is_delete = '1'
+            and bind_type = #{bind_type,jdbcType=CHAR}
+            <include refid="user_where"/>
+    </select>
+
+    <!--通过bank_code获取银行信息（短信）-->
+    <select id="queryBankForNote" parameterType="java.lang.String" resultType="java.util.Map">
+        select
+            bank_name,
+            logo_url,
+            bank_code,
+            bank_clscode
+        from
+            tbl_dic_bank
+        where
+            bank_code = #{bank_code,jdbcType=VARCHAR} and is_display = '1'
+    </select>
+    <!--通过bank_clscode获取银行信息-->
+    <select id="queryBankByClscode" parameterType="java.lang.String" resultType="java.util.Map">
+        select
+        bank_name,
+        logo_url,
+        bank_code,
+        bank_clscode
+        from
+        tbl_dic_bank
+        where
+        bank_clscode = #{bank_clscode,jdbcType=VARCHAR} and is_display = '1'
+    </select>
+    <!--查询银行列表-->
+    <select id="queryBankList" resultType="java.util.Map">
+        select
+            min(bank_name) bank_name,
+            min(bank_code) bank_code,
+            min(logo_url) logo_url,
+            bank_clscode
+        from
+            tbl_dic_bank
+        where
+            is_display = '1'
+        group by bank_clscode
+        having count(bank_clscode)=1
+        order by bank_clscode
+    </select>
+
+    <!--获取银行信息-->
+    <select id="queryBankByCode" parameterType="java.lang.String" resultType="java.util.Map">
+        select
+            bank_name,
+            bank_clscode
+        from
+            tbl_dic_cnaps_bank
+        where
+            bank_no = #{bank_code,jdbcType=VARCHAR} and status = '1'
+    </select>
+
+    <!--获取默认银行卡信息-->
+    <select id="queryDefaultForBankCard" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            id,
+            default_flag
+        from
+            tbl_sp_bank_card a
+        where
+            default_flag = '2'
+        <include refid="user_where"/>
+    </select>
+
+    <!--新增银行卡-->
+    <insert id="insert" parameterType="java.util.Map">
+        <selectKey keyProperty="id" resultType="int" order="BEFORE">
+            select SEQ_BANK_CARD.nextval from dual
+        </selectKey>
+        insert into tbl_sp_bank_card (
+            id,
+            user_id,
+            bank_card,
+            bank_code,
+            create_date,
+            default_flag,
+            bind_state,
+            create_user_id,
+            owner_name,
+            bind_type,
+            bank_clscode,
+            <if test="bind_state ==1">
+                bind_date,
+            </if>
+            is_delete
+        ) values (
+            #{id,jdbcType=INTEGER},
+            #{user_id,jdbcType=INTEGER},
+            #{bank_card,jdbcType=VARCHAR},
+            #{bank_code,jdbcType=VARCHAR},
+            sysdate,
+            #{default_flag,jdbcType=CHAR},
+            #{bind_state,jdbcType=CHAR},
+            #{public_user_id,jdbcType=INTEGER},
+            #{owner_name,jdbcType=VARCHAR},
+            #{bind_type,jdbcType=CHAR},
+            #{bank_clscode,jdbcType=VARCHAR},
+            <if test="bind_state ==1">
+                sysdate,
+            </if>
+            '1'
+        )
+    </insert>
+
+    <!--修改绑定状态-->
+    <update id="updateBindState" parameterType="java.util.Map">
+        update
+            tbl_sp_bank_card
+        set
+            bind_state = #{bind_state,jdbcType=CHAR},
+        <if test="bind_state == '0'">
+            unbind_date = sysdate
+        </if>
+        <if test="bind_state == '1'">
+            bind_date = sysdate
+        </if>
+        where id = #{id,jdbcType=INTEGER}
+    </update>
+
+    <!--删除(解绑)银行卡-->
+    <delete id="deleted" parameterType="java.util.Map">
+        delete tbl_sp_bank_card WHERE id = #{id,jdbcType=INTEGER}
+    </delete>
+
+    <!--设置默认银行卡-->
+    <update id="updateDefaultFlag" parameterType="java.util.Map">
+        update tbl_sp_bank_card set default_flag = #{DEFAULT_FLAG,jdbcType=CHAR} where id = #{ID,jdbcType=INTEGER}
+    </update>
+
+    <!--查询所有的省(第一级)-->
+    <select id="queryPayProvince" resultType="java.util.Map">
+        select
+            node_nodecode node_code,
+            node_nodename node_name
+        from
+            tbl_dic_pay_node
+    </select>
+
+    <!--通过城市代码查询相对应的市(第二级)-->
+    <select id="queryPayCity" parameterType="java.lang.String" resultType="java.util.Map">
+        select
+            city_areacode node_code,
+            city_areaname node_name,
+            city_oraareacode city_code
+        from
+            tbl_dic_pay_city
+        where
+            city_nodecode = #{node_code,jdbcType=VARCHAR}
+            and city_areatype = '2'
+    </select>
+
+    <!--通过城市代码查询相对应的市或县(第三级)-->
+    <select id="queryPayArea" parameterType="java.lang.String" resultType="java.util.Map">
+        select
+            city_areacode node_code,
+            city_areaname node_name,
+            city_oraareacode city_code
+        from
+            tbl_dic_pay_city
+        where
+            city_topareacode2 = #{node_code,jdbcType=VARCHAR}
+            and city_areatype in ('2','3')
+    </select>
+
+    <!--获取银行列表（精确每个位置）-->
+    <select id="queryCnapsBankList" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            bank_no,
+            bank_name
+        from
+            tbl_dic_cnaps_bank
+        where
+            status ='1'
+        <if test="bank_code != null and bank_code != ''">
+            and bank_clscode = #{bank_code,jdbcType=VARCHAR}
+        </if>
+        <if test="city_code != null and city_code != ''">
+            and city_code = #{city_code,jdbcType=VARCHAR}
+        </if>
+        <if test="bank_name != null and bank_name != ''">
+            and bank_name like '%'||#{bank_name,jdbcType=VARCHAR}||'%'
+        </if>
+    </select>
+
+    <!-- 获取服务、仓储公司参数信息 -->
+    <select id="queryCompanyParamByKey" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT * FROM TBL_SYS_PARAM_CONFIG where key = #{key,jdbcType=VARCHAR}
+    </select>
+
+    <!--修改银行卡綁卡验证状态-->
+    <update id="updateBankCardByPhoneCheckState" parameterType="java.util.Map">
+        update tbl_bank_card set bind_state = #{bind_state, jdbcType=CHAR} where id = #{id,jdbcType=INTEGER}
+    </update>
+</mapper>

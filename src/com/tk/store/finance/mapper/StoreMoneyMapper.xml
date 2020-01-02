@@ -1,0 +1,453 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.store.finance.dao.StoreMoneyDao">
+	<!-- 门店资金列表总数 -->
+	<select id="queryStoreMoneyCount" parameterType="java.util.Map" resultType="int">
+		select count(1) from tbl_store_bank_account t
+        <where>
+		 	<if test="store_id !=null and store_id !=''">
+		 		and t.user_id = #{store_id,jdbcType=INTEGER}
+		 	</if>
+		 	<if test="region_id !=null and region_id !=''">
+		 		and exists(select 1 from tbl_user_info tui 
+								where t.user_id=tui.id and exists
+										(select 1 from tbl_sys_user_info tsui 
+											where tsui.id=tui.partner_user_id and tsui.id=#{region_id,jdbcType=INTEGER}))
+		 	</if>
+			and exists(
+		   	   select 1 from tbl_user_info tui 
+		   	   <where>
+	   	  		    1=1
+	   	  		    and tui.id = t.user_id
+		        <if test="public_user_type != null and public_user_type == 3">
+		            and 1=2
+		        </if>
+		        <if test="public_user_type != null and public_user_type == 4">
+		            and tui.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+		        </if>
+		        <if test="public_user_type != null and public_user_type == 5">
+		            and 1=2
+		        </if>
+		        <if test="public_user_type != null and public_user_type == 6">
+		            and 1=2
+		        </if>
+		        <if test="public_user_type != null and public_user_type == 7">
+					and tui.supervisor_user_id = #{public_user_id,jdbcType=INTEGER}
+		        </if>
+		        <if test="public_user_type != null and public_user_type == 9">
+		            and tui.partner_user_id = #{public_user_id,jdbcType=INTEGER}
+		        </if>
+	   	   	</where>)
+	  </where>
+	</select>
+	<!-- 门店资金查询列表 -->
+	<select id="queryStoreMoneyListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+			select a.*,rownum rn from (
+				select
+				id,
+				user_id,
+				(select user_manage_name from tbl_user_info where user_name=t.user_id) as store_name, 
+				(select user_realname from tbl_sys_user_info where id=(select partner_user_id from tbl_user_info where user_name=t.user_id) ) as user_realname,
+				nvl(ACCOUNT_BALANCE,0) as ACCOUNT_BALANCE ,
+				nvl((select sum(case when PAYMENT_TYPE=1 then to_number( '-' ||decode(trade_type,5,trade_payment_money,trade_money))
+                    when PAYMENT_TYPE=2 then decode(trade_type,5,trade_payment_money,trade_money)  end ) TRADE_MONEY from TBL_STORE_TRADE tst where tst.store_id=t.user_id 
+                    and tst.TRADE_NUMBER in(select TRADE_NUMBER from TBL_STORE_TRADE_DIVIDE tstd where CLEARING_STATE=2 and tst.TRADE_NUMBER=tstd.TRADE_NUMBER) ),0) as wait_settle_money,
+				nvl(GOODS_DEPOSIT_BALANCE,0) as GOODS_DEPOSIT_BALANCE,
+				nvl(GOODS_DEPOSIT,0) as GOODS_DEPOSIT,
+				nvl(STORE_DEPOSIT,0) as STORE_DEPOSIT,
+				nvl((select sum(case when PAYMENT_TYPE=1 then to_number( '-' ||TRADE_MONEY )
+                    when PAYMENT_TYPE=2 then TRADE_MONEY end ) TRADE_MONEY from TBL_STORE_TRADE where store_id=t.user_id and PAYMENT_WAY=2 and PAYMENT_STATE=1),0) as wait_payment_MONEY
+                  from tbl_store_bank_account t
+                  <where>
+					 	<if test="store_id !=null and store_id !=''">
+					 		and t.user_id = #{store_id,jdbcType=INTEGER}
+					 	</if>
+					 	<if test="region_id !=null and region_id !=''">
+					 		and exists(select 1 from tbl_user_info tui 
+											where t.user_id=tui.id and exists
+													(select 1 from tbl_sys_user_info tsui 
+														where tsui.id=tui.partner_user_id and tsui.id=#{region_id,jdbcType=INTEGER}))
+					 	</if>
+						and exists(
+					   	   select 1 from tbl_user_info tui 
+					   	   <where>
+				   	  		    1=1
+				   	  		    and tui.id = t.user_id
+					        <if test="public_user_type != null and public_user_type == 3">
+					            and 1=2
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 4">
+					            and tui.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 5">
+					            and 1=2
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 6">
+					            and 1=2
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 7">
+								and tui.supervisor_user_id = #{public_user_id,jdbcType=INTEGER}
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 9">
+					            and tui.partner_user_id = #{public_user_id,jdbcType=INTEGER}
+					        </if>
+				   	   	</where>)
+				  </where>) a
+		 	where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 查询账户余额详情列表 -->
+	<select id="queryStoreAccountDetailList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+			select a.*,rownum rn from (
+				select 
+				decode(t.record_type,1,'收款',2,'付款') record_type,
+				t.docket_type,
+				t.record_number,
+				t.money,
+				to_char(t.create_date,'yyyy-mm-dd hh24:mi:ss')  as  create_date,
+				docket_number
+				from 
+				tbl_store_account_record t
+                  <where>
+                  		t.record_channel=#{record_channel,jdbcType=VARCHAR}
+                  		and t.collect_user_id=#{store_id,jdbcType=INTEGER}
+					 	<if test="docket_type !=null and docket_type !=''">
+					 		and t.docket_type = #{docket_type,jdbcType=VARCHAR}
+					 	</if>
+						<if test="start_date != null and start_date != '' ">
+						    and	t.create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+						</if>
+						<if test="end_date != null and end_date != '' ">
+						    and	t.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+						</if>
+				  </where>
+				order by t.create_date desc,t.id desc) a
+		 	where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!--  查询账户余额详情列表总数 -->
+	<select id="queryStoreAccountDetailCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		from tbl_store_account_record t
+              <where>
+              		t.record_channel=#{record_channel,jdbcType=VARCHAR}
+              		and t.collect_user_id=#{store_id,jdbcType=INTEGER}
+	 			<if test="docket_type !=null and docket_type !=''">
+	 				and t.docket_type = #{docket_type,jdbcType=VARCHAR}
+	 			</if>
+				<if test="start_date != null and start_date != '' ">
+		   			 and	t.create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+				</if>
+				<if test="end_date != null and end_date != '' ">
+		    		and	t.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+				</if>
+  		</where>
+	</select>
+	<!-- 查询收支记录收入支出金额 -->
+	<select id="queryStoreIncomeSpendMoney" parameterType="java.util.Map" resultType="java.util.Map">
+		select nvl(sum(money),0) money
+			from tbl_store_account_record
+		where record_channel=#{record_channel,jdbcType=VARCHAR}
+        and collect_user_id=#{store_id,jdbcType=INTEGER}
+        and record_type=#{record_type,jdbcType=INTEGER}
+	</select>
+	<!-- 查询待结算金额记录 -->
+	<select id="queryStoreWaitSettleDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+			select a.*,rownum rn from (
+				select 
+				trade_number,
+				payment_type,
+				case when payment_type=1 then to_number( '-' ||decode(trade_type,5,trade_payment_money,trade_money) )
+                     when payment_type=2 then decode(trade_type,5,trade_payment_money,trade_money)  
+                 end trade_money,
+				product_count,
+				to_char(t.trade_create_date,'yyyy-mm-dd hh24:mi:ss')  as  trade_create_date
+				from 
+				tbl_store_trade t
+                  <where>
+                  		t.trade_number in
+                  			(select trade_number from tbl_store_trade_divide tstd where tstd.trade_number=t.trade_number and tstd.clearing_state=2 and divide_user_id=#{store_id,jdbcType=INTEGER} )
+                  		and t.store_id=#{store_id,jdbcType=INTEGER}
+					 	<if test="trade_number !=null and trade_number !=''">
+					 		and t.trade_number = #{trade_number,jdbcType=VARCHAR}
+					 	</if>
+						<if test="start_date != null and start_date != '' ">
+						    and	t.create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+						</if>
+						<if test="end_date != null and end_date != '' ">
+						    and	t.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+						</if>
+				  </where>
+				  order by t.trade_create_date desc) a
+		 	where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!--  查询待结算列表数量 -->
+	<select id="queryStoreWaitSettleDetailCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+			 from 
+		tbl_store_trade t
+         <where>
+       		t.trade_number in
+       			(select trade_number from tbl_store_trade_divide tstd where tstd.trade_number=t.trade_number and tstd.clearing_state=2 and divide_user_id=#{store_id,jdbcType=INTEGER} )
+       		and t.store_id=#{store_id,jdbcType=INTEGER}
+		 	<if test="trade_number !=null and trade_number !=''">
+		 		and t.trade_number = #{trade_number,jdbcType=VARCHAR}
+		 	</if>
+			<if test="start_date != null and start_date != '' ">
+			    and	t.create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+			<if test="end_date != null and end_date != '' ">
+			    and	t.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+	    </where>
+	</select>
+	<!-- 新增押金记录-->
+    <insert id="insertStoreDepositRecharge" parameterType="java.util.Map">
+        insert into TBL_STORE_DEPOSIT_RECHARGE(
+            id,
+            store_id,
+            money,
+            vouchar_img_url,
+            remark,
+            state,
+            create_date,
+            create_user_id
+        )values (
+            SEQ_STORE_DEPOSIT_RECHARGE.nextval,
+            #{store_id,jdbcType=INTEGER},
+            #{money,jdbcType=INTEGER},
+            #{voucher_img_url,jdbcType=VARCHAR},
+            #{remark,jdbcType=VARCHAR},
+            1,
+            sysdate,
+            #{public_user_id,jdbcType=VARCHAR}
+        )
+    </insert>
+    <!-- 押金记录列表 -->
+	<select id="queryStoreMoneyDepositRechargeRecordList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+			select a.*,rownum rn from (
+				select 
+				id,
+				state,
+				(select login_name from tbl_user_info where id=t.store_id) as store_login_name,
+				(select user_manage_name from tbl_user_info where id=t.store_id) as store_manage_name,
+				t.money,
+				t.rejected_reason,
+				(select user_realname from tbl_sys_user_info where id=t.create_user_id) as create_user_realname,
+				(select user_realname from tbl_sys_user_info where id=t.approval_user_id) as approval_user_realname,
+				to_char(t.create_date,'yyyy-mm-dd hh24:mi:ss')  as  create_date,
+				to_char(t.approval_date,'yyyy-mm-dd hh24:mi:ss')  as  approval_date
+				from TBL_STORE_DEPOSIT_RECHARGE t
+                  <where>
+                  		1=1
+                  		<if test="store_id !=null and store_id !=''">
+					 		and store_id = #{store_id,jdbcType=INTEGER}
+					 	</if>
+					 	<if test="store_login_name !=null and store_login_name !=''">
+					 		and exists(select 1 from tbl_user_info tui where t.store_id=tui.id and tui.login_name=#{store_login_name,jdbcType=VARCHAR} )
+					 	</if>
+					 	<if test="store_manage_name !=null and store_manage_name !=''">
+					 		and exists(select 1 from tbl_user_info tui where t.store_id=tui.id and tui.user_manage_name=#{store_manage_name,jdbcType=VARCHAR} )
+					 	</if>
+						<if test="start_date != null and start_date != '' ">
+						    and	t.create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+						</if>
+						<if test="end_date != null and end_date != '' ">
+						    and	t.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+						</if>
+						<if test="state != null">
+							and t.state IN
+				                <foreach item="item" collection="state" open="(" separator="," close=")">
+									#{item}
+								</foreach>
+						</if>
+				  </where> order by t.state,t.create_date desc) a
+		 	where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!--  押金记录列表总数-->
+	<select id="queryStoreMoneyDepositRechargeRecordCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		from TBL_STORE_DEPOSIT_RECHARGE t
+                <where>
+                		1=1
+                <if test="store_id !=null and store_id !=''">
+					and store_id = #{store_id,jdbcType=INTEGER}
+				</if>		
+			 	<if test="store_login_name !=null and store_login_name !=''">
+			 		and exists(select 1 from tbl_user_info tui where t.store_id=tui.id and tui.login_name=#{store_login_name,jdbcType=VARCHAR} )
+			 	</if>
+			 	<if test="store_manage_name !=null and store_manage_name !=''">
+			 		and exists(select 1 from tbl_user_info tui where t.store_id=tui.id and tui.user_manage_name=#{store_manage_name,jdbcType=VARCHAR} )
+			 	</if>
+				<if test="start_date != null and start_date != '' ">
+				    and	t.create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+				</if>
+				<if test="end_date != null and end_date != '' ">
+				    and	t.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+				</if>
+				<if test="state != null">
+					and t.state IN
+		                <foreach item="item" collection="state" open="(" separator="," close=")">
+							#{item}
+						</foreach>
+				</if>
+		  </where>
+	</select>
+	<!--  押金审批详情-->
+	<select id="queryStoreMoneyDepositRechargeApprovalDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select 
+			id,
+			store_id,
+			state,
+			vouchar_img_url,
+			(select login_name from tbl_user_info where id=t.store_id) as store_login_name,
+			(select user_manage_name from tbl_user_info where id=t.store_id) as store_manage_name,
+			t.money,
+			t.remark,
+			(select user_realname from tbl_sys_user_info where id=t.create_user_id) as create_user_realname,
+			(select user_realname from tbl_sys_user_info where id=t.approval_user_id) as approval_user_realname,
+			to_char(t.create_date,'yyyy-mm-dd hh24:mi:ss')  as  create_date,
+			to_char(t.approval_date,'yyyy-mm-dd hh24:mi:ss')  as  approval_date
+		from tbl_store_deposit_recharge t where id= #{id,jdbcType=INTEGER}
+	</select>
+	<!--押金充值审批-->
+	<update id="updateStoreDepositRechargeState" parameterType="java.util.Map">
+		  update tbl_store_deposit_recharge 
+		  	<set>
+		  		<if test="state != null and state  != '' ">
+				    state=#{state,jdbcType=INTEGER},
+				</if>
+				<if test="rejected_reason != null and rejected_reason  != '' ">
+				    rejected_reason=#{rejected_reason,jdbcType=VARCHAR},
+				</if>
+				approval_date=sysdate,
+				approval_user_id=#{public_user_id,jdbcType=INTEGER}
+		  	</set>
+		  where id=#{id,jdbcType=INTEGER}
+	</update>
+	<!--更新店铺账户余额-->
+	<update id="updateStoreBankAccountBalance" parameterType="java.util.Map">
+		  update tbl_store_bank_account 
+		  	set goods_deposit=nvl(goods_deposit,0)+#{recharge_money,jdbcType=INTEGER},
+		  		goods_deposit_balance=nvl(goods_deposit_balance,0)+#{recharge_money,jdbcType=INTEGER},
+		  		store_goods_deposit_balance=nvl(store_goods_deposit_balance,0)+#{store_goods_deposit,jdbcType=INTEGER},
+		  		account_balance_checkcode=getCheck_Code(#{user_id,jdbcType=VARCHAR},#{account_balance,jdbcType=INTEGER},#{c_user_key,jdbcType=VARCHAR}),
+		  		goods_deposit_bal_checkcode=getCheck_Code(#{user_id,jdbcType=VARCHAR},(#{goods_deposit_balance,jdbcType=INTEGER}+#{recharge_money,jdbcType=INTEGER}),#{c_user_key,jdbcType=VARCHAR}),
+		  		store_goods_dpst_bal_checkcode=getCheck_Code(#{user_id,jdbcType=VARCHAR},(#{store_goods_deposit_balance,jdbcType=INTEGER}+#{store_goods_deposit,jdbcType=INTEGER}),#{c_user_key,jdbcType=VARCHAR}),
+		  		store_deposit_checkcode=getCheck_Code(#{user_id,jdbcType=VARCHAR},#{store_deposit,jdbcType=INTEGER},#{c_user_key,jdbcType=VARCHAR}),
+		  		shelf_deposit_checkcode=getCheck_Code(#{user_id,jdbcType=VARCHAR},#{shelf_deposit,jdbcType=INTEGER},#{c_user_key,jdbcType=VARCHAR})
+		  where user_id=#{user_id,jdbcType=INTEGER}
+	</update>
+	<!-- 新增店铺货品押金充值记录-->
+    <insert id="insertStoreGoodsDepositAccountRecord" parameterType="java.util.Map">
+        insert into tbl_store_account_record(
+            id,
+            record_number,
+            record_channel,
+            record_type,
+            remark,
+            collect_user_id,
+            collect_user_manager_name,
+            collect_store_name,
+            collect_user_partner_id,
+            money,
+            count,
+            surplus_money,
+            docket_number,
+            docket_type,
+            create_date
+        )values (
+            seq_store_account_record.nextval,
+            getAutoNumber('CZ'),
+            '货品押金',
+            1,
+            '押金充值',
+            #{collect_user_id,jdbcType=INTEGER},
+            #{collect_user_manager_name,jdbcType=VARCHAR},
+            #{collect_store_name,jdbcType=VARCHAR},
+            #{collect_user_partner_id,jdbcType=INTEGER},
+            #{recharge_money,jdbcType=INTEGER},
+            0,
+            #{recharge_money,jdbcType=INTEGER}+#{goods_deposit_balance,jdbcType=INTEGER},
+            getAutoNumber('DJH'),
+            '充值',
+            sysdate
+        )
+    </insert>
+    <!-- 新增货品押金充值记录-->
+    <insert id="insertGoodsDepositAccountRecord" parameterType="java.util.Map">
+        insert into tbl_store_account_record(
+            id,
+            record_number,
+            record_channel,
+            record_type,
+            remark,
+            collect_user_id,
+            collect_user_manager_name,
+            collect_store_name,
+            collect_user_partner_id,
+            money,
+            count,
+            surplus_money,
+            docket_number,
+            docket_type,
+            create_date
+        )values (
+            seq_store_account_record.nextval,
+            getAutoNumber('CZ'),
+            '店铺货品押金',
+            1,
+            '店铺货品押金充值',
+            #{collect_user_id,jdbcType=INTEGER},
+            #{collect_user_manager_name,jdbcType=VARCHAR},
+            #{collect_store_name,jdbcType=VARCHAR},
+            #{collect_user_partner_id,jdbcType=INTEGER},
+            #{recharge_money,jdbcType=INTEGER}*#{store_goods_deposit_rate,jdbcType=INTEGER},
+            0,
+            #{store_goods_deposit_balance,jdbcType=INTEGER}+(#{recharge_money,jdbcType=INTEGER}*#{store_goods_deposit_rate,jdbcType=INTEGER}),
+            getAutoNumber('DJH'),
+            '充值',
+            sysdate
+        )
+    </insert>
+    <!-- 查询店铺账户信息 -->
+	<select id="queryStoreBankAccountForUpdate" parameterType="java.util.Map" resultType="java.util.Map">
+		select id,
+			account_balance,
+			goods_deposit,
+			goods_deposit_balance,
+			store_goods_deposit_balance,
+			store_deposit,
+			shelf_deposit,
+			store_goods_deposit_rate,
+			goods_deposit_bal_checkcode,
+			store_goods_dpst_bal_checkcode
+		from tbl_store_bank_account where user_id = #{user_id,jdbcType=INTEGER} for update
+	</select>
+	<!-- 获取用户KEY -->
+	<select id="queryUserKey" parameterType="java.util.Map" resultType="string">
+		select getUserKey(#{user_id,jdbcType=VARCHAR},#{c_user_type,jdbcType=VARCHAR},'5') from dual
+	</select>
+	<!-- 获取授信校验码 -->
+	<select id="getCheck_Code" parameterType="java.util.Map" resultType="java.util.Map">
+		select 
+			getCheck_Code(#{user_id,jdbcType=VARCHAR},#{goods_deposit_balance,jdbcType=INTEGER},#{user_key,jdbcType=VARCHAR}) as goods_deposit_bal_checkcode,
+			getCheck_Code(#{user_id,jdbcType=VARCHAR},#{store_goods_deposit_balance,jdbcType=INTEGER},#{user_key,jdbcType=VARCHAR}) as store_goods_dpst_bal_checkcode
+		from dual
+	</select>
+	<!-- 更新账户账户key-->
+    <update id="updateSysUserCacheKey" parameterType="java.util.Map">
+    	update tbl_store_cache_key 
+    	   set cache_key = #{c_user_key,jdbcType=VARCHAR},
+    	       create_time=sysdate 
+    	 where user_name = #{user_id,jdbcType=VARCHAR}
+    </update>
+</mapper>

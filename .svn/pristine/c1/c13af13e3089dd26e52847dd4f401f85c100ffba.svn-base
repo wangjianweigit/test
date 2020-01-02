@@ -1,0 +1,434 @@
+package com.tk.oms.basicinfo.service;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import com.tk.oms.basicinfo.dao.MemberLogisticsTemplateDao;
+import com.tk.sys.util.GridResult;
+import com.tk.sys.util.HttpUtil;
+import com.tk.sys.util.PageUtil;
+import com.tk.sys.util.ProcessResult;
+import com.tk.sys.util.Transform;
+
+/**
+ * 会员物流模板管理
+ * @author liujialong
+ * @date 2018-9-10
+ */
+@Service("MemberLogisticsTemplateService")
+public class MemberLogisticsTemplateService {
+	
+	@Resource
+    private MemberLogisticsTemplateDao memberLogisticsTemplateDao;
+	
+	/**
+     * 获取会员物流模板列表
+     * @param request
+     * @return
+     */
+    public GridResult queryMemberLogisticsTemplateList(HttpServletRequest request) {
+        GridResult gr = new GridResult();
+        Map<String, Object> tempMap=new HashMap<String,Object>();
+        Map<String, Object> tempMap1=new HashMap<String,Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                gr.setState(false);
+                gr.setMessage("缺少参数");
+                return gr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            GridResult pageParamResult = PageUtil.handlePageParams(paramMap);
+            if (pageParamResult != null) {
+                return pageParamResult;
+            }
+
+            //获取分类信息
+            int total = memberLogisticsTemplateDao.queryMemberLogisticsTemplateCount(paramMap);
+            List<Map<String, Object>> list = memberLogisticsTemplateDao.queryMemberLogisticsTemplateList(paramMap);
+            if (list != null && list.size() > 0) {
+            	for(Map<String, Object> map :list){
+            		String template_content="";
+                	tempMap.clear();
+                	tempMap1.clear();
+            		if(!StringUtils.isEmpty(map.get("LOGISTICS_WAREHOUSE"))){
+            			String [] logistics_warehouse_arr=map.get("LOGISTICS_WAREHOUSE").toString().split(",");
+            			for(int i=0;i<logistics_warehouse_arr.length;i++){
+            				String logistics_name= logistics_warehouse_arr[i].split("_")[0];
+            				String warehouse_name= logistics_warehouse_arr[i].split("_")[1];
+            				if(!tempMap.containsKey(warehouse_name)){
+            					tempMap.put(warehouse_name, "["+warehouse_name+"]"+" 普通物流："+logistics_name);
+            				}else{
+            					tempMap.put(warehouse_name, tempMap.get(warehouse_name)+"、"+logistics_name);
+            				}
+                        }
+            		}
+            		if(!StringUtils.isEmpty(map.get("DF_LOGISTICS_WAREHOUSE"))){
+            			String [] df_logistics_warehouse_arr=map.get("DF_LOGISTICS_WAREHOUSE").toString().split(",");
+            			for(int i=0;i<df_logistics_warehouse_arr.length;i++){
+            				String df_logistics_name= df_logistics_warehouse_arr[i].split("_")[0];
+            				String df_warehouse_name= df_logistics_warehouse_arr[i].split("_")[1];
+            				if(!tempMap1.containsKey(df_warehouse_name)){
+            					tempMap1.put(df_warehouse_name, "["+df_warehouse_name+"]"+" 代发物流："+df_logistics_name);
+            				}else{
+            					tempMap1.put(df_warehouse_name, tempMap1.get(df_warehouse_name)+"、"+df_logistics_name);
+            				}
+                        }
+            		}
+            		for(Object tem:tempMap.values()){
+            			template_content+=tem+",";
+            		}
+            		for(Object tem1:tempMap1.values()){
+            			template_content+=tem1+",";
+            		}
+            		if(!StringUtils.isEmpty(template_content)){
+            			template_content = template_content.substring(0, template_content.length()- 1);
+            		}
+            		map.put("TEMPLATE_CONTENT", template_content);
+            	}	
+                gr.setMessage("获取会员物流模板列表成功");
+                gr.setObj(list);
+            } else {
+                gr.setMessage("无数据");
+            }
+            gr.setState(true);
+            gr.setTotal(total);
+        } catch (Exception e) {
+            gr.setState(false);
+            gr.setMessage(e.getMessage());
+            e.printStackTrace();
+        }
+        return gr;
+    }
+    
+    /**
+     * 查询仓库物流信息
+     * @param request
+     * @return
+     */
+    public GridResult queryWarehouseLogistics(HttpServletRequest request) {
+        GridResult gr = new GridResult();
+        Map<String, Object> resMap=new HashMap<String,Object>();
+        Map<String, Object> tempMap=new HashMap<String,Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                gr.setState(false);
+                gr.setMessage("缺少参数");
+                return gr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            
+            List<Map<String, Object>> resList = new ArrayList<Map<String, Object>>();
+            //查询平台仓库列表
+            List<Map<String, Object>> warehouse_list = memberLogisticsTemplateDao.queryPlatformWarehouseList(paramMap);
+            resMap.put("warehouse_list", warehouse_list);
+            //查询普通物流信息logisticsList
+            tempMap.put("type", 1);
+            List<Map<String, Object>> logistics_list = memberLogisticsTemplateDao.queryLogisticsCompanyByType(tempMap);
+            resMap.put("logistics_list", logistics_list);
+           //查询代发物流信息logisticsList
+            tempMap.put("type", 2);
+            List<Map<String, Object>> df_logistics_list = memberLogisticsTemplateDao.queryLogisticsCompanyByType(tempMap);
+            resMap.put("df_logistics_list", df_logistics_list);
+            gr.setObj(resMap);
+            gr.setState(true);
+            gr.setMessage("查询数据成功");
+        } catch (Exception e) {
+            gr.setState(false);
+            gr.setMessage(e.getMessage());
+            e.printStackTrace();
+        }
+        return gr;
+    }
+    
+    /**
+     * 新增会员物流模板
+     * @param request
+     * @return
+     */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult addMemberLogisticsTemplate(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if (StringUtils.isEmpty(json)) {
+				pr.setState(false);
+				pr.setMessage("缺少参数");
+				return pr;
+			}
+			Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			if(StringUtils.isEmpty(paramMap.get("template_name"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数template_name");
+				return pr;
+			}
+			Map<String, List<Integer>> logistics_info=(Map<String,  List<Integer>>)paramMap.get("logistics_info");
+			if(logistics_info==null){
+				pr.setState(false);
+				pr.setMessage("缺少物流信息");
+				return pr;
+			}
+			int count=memberLogisticsTemplateDao.insertUserLogisticsTemplate(paramMap);
+			if(count<0){
+				pr.setState(false);
+				throw new RuntimeException("新增主表失败");
+			}
+			for (Entry<String,List<Integer>> entry : logistics_info.entrySet()) {
+				int warehouse_id=Integer.parseInt(entry.getKey());
+				List<Integer> logistics_id=entry.getValue();
+				if(logistics_id!=null && logistics_id.size()>0){
+					paramMap.put("template_id", paramMap.get("id"));
+					paramMap.put("warehouse_id", warehouse_id);
+					paramMap.put("logistics_id", logistics_id);
+					int num =memberLogisticsTemplateDao.insertUserLogisticsTemplateDetail(paramMap);
+					if(num<0){
+						pr.setState(false);
+						throw new RuntimeException("新增详表失败");
+					}
+				}
+			}
+			pr.setState(true);
+			pr.setMessage("新增成功");
+		} catch (Exception e) {
+			pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+	
+	/**
+     * 编辑会员物流模板
+     * @param request
+     * @return
+     */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult editMemberLogisticsTemplate(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if (StringUtils.isEmpty(json)) {
+				pr.setState(false);
+				pr.setMessage("缺少参数");
+				return pr;
+			}
+			Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			if(StringUtils.isEmpty(paramMap.get("template_id"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数template_id");
+				return pr;
+			}
+			if(StringUtils.isEmpty(paramMap.get("template_name"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数template_name");
+				return pr;
+			}
+			Map<String, List<Integer>> logistics_info=(Map<String,  List<Integer>>)paramMap.get("logistics_info");
+			if(logistics_info==null){
+				pr.setState(false);
+				pr.setMessage("缺少物流信息");
+				return pr;
+			}
+			//判断当前模板名称是否已被使用
+			if(memberLogisticsTemplateDao.queryUserLogisticsTemplateNameCount(paramMap)>0){
+				pr.setState(false);
+				pr.setMessage("当前模板名称已存在，请更改！");
+				return pr;
+			}
+			int count=memberLogisticsTemplateDao.updateUserLogisticsTemplate(paramMap);
+			if(count<0){
+				pr.setState(false);
+				throw new RuntimeException("编辑主表失败");
+			}
+			//删除详表信息
+			memberLogisticsTemplateDao.deleteUserLogisticsTemplateDetail(paramMap);
+			for (Entry<String,List<Integer>> entry : logistics_info.entrySet()) {
+				int warehouse_id=Integer.parseInt(entry.getKey());
+				List<Integer> logistics_id=entry.getValue();
+				if(logistics_id!=null && logistics_id.size()>0){
+					paramMap.put("warehouse_id", warehouse_id);
+					paramMap.put("logistics_id", logistics_id);
+					int num =memberLogisticsTemplateDao.insertUserLogisticsTemplateDetail(paramMap);
+					if(num<0){
+						pr.setState(false);
+						throw new RuntimeException("编辑详表失败");
+					}
+				}
+				
+			}
+			pr.setState(true);
+			pr.setMessage("编辑成功");
+		} catch (Exception e) {
+			pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+	
+	/**
+     * 删除会员物流模板
+     * @param request
+     * @return
+     */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult deleteMemberLogisticsTemplate(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if (StringUtils.isEmpty(json)) {
+				pr.setState(false);
+				pr.setMessage("缺少参数");
+				return pr;
+			}
+			Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			if(StringUtils.isEmpty(paramMap.get("template_id"))){
+				pr.setState(false);
+				pr.setMessage("缺少参数template_id");
+				return pr;
+			}
+			//判断当前模板名称是否被关联
+			if(memberLogisticsTemplateDao.queryIsRelatedByUser(paramMap)>0){
+				pr.setState(false);
+				pr.setMessage("当前模板已被关联无法删除！");
+				return pr;
+			}
+			int count=memberLogisticsTemplateDao.deleteUserLogisticsTemplate(paramMap);
+			if(count<=0){
+				pr.setState(false);
+				throw new RuntimeException("删除主表信息失败");
+			}
+			//删除详表信息
+			int num=memberLogisticsTemplateDao.deleteUserLogisticsTemplateDetail(paramMap);
+			if(num<=0){
+				pr.setState(false);
+				throw new RuntimeException("删除详表信息失败");
+			}
+			pr.setState(true);
+			pr.setMessage("删除成功");
+		} catch (Exception e) {
+			pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+	
+	/**
+	 * 会员物流模板详情
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryMemberLogisticsTemplateDetail(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		Map<String, Object> resMap = new HashMap<String, Object>();
+		Map<String, Object> tempMap=new HashMap<String,Object>();
+        Map<String, Object> tempMap1=new HashMap<String,Object>();
+        String template_content="";
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        }
+            // 会员物流模板详情
+        	Map<String, Object> info = memberLogisticsTemplateDao.queryMemberLogisticsTemplateDetail(paramMap);
+        	if(info==null){
+        		pr.setState(false);
+        		pr.setMessage("未找到当前会员物流模板信息");
+        		return pr;
+        	}
+        	if(!StringUtils.isEmpty(info.get("LOGISTICS_WAREHOUSE"))){
+    			String [] logistics_warehouse_arr=info.get("LOGISTICS_WAREHOUSE").toString().split(",");
+    			for(int i=0;i<logistics_warehouse_arr.length;i++){
+    				String logistics_name= logistics_warehouse_arr[i].split("_")[0];
+    				String warehouse_name= logistics_warehouse_arr[i].split("_")[1];
+    				if(!tempMap.containsKey(warehouse_name)){
+    					tempMap.put(warehouse_name, "["+warehouse_name+"]"+" 普通物流："+logistics_name);
+    				}else{
+    					tempMap.put(warehouse_name, tempMap.get(warehouse_name)+"、"+logistics_name);
+    				}
+                }
+    		}
+    		if(!StringUtils.isEmpty(info.get("DF_LOGISTICS_WAREHOUSE"))){
+    			String [] df_logistics_warehouse_arr=info.get("DF_LOGISTICS_WAREHOUSE").toString().split(",");
+    			for(int i=0;i<df_logistics_warehouse_arr.length;i++){
+    				String df_logistics_name= df_logistics_warehouse_arr[i].split("_")[0];
+    				String df_warehouse_name= df_logistics_warehouse_arr[i].split("_")[1];
+    				if(!tempMap1.containsKey(df_warehouse_name)){
+    					tempMap1.put(df_warehouse_name, "["+df_warehouse_name+"]"+" 代发物流："+df_logistics_name);
+    				}else{
+    					tempMap1.put(df_warehouse_name, tempMap1.get(df_warehouse_name)+"、"+df_logistics_name);
+    				}
+                }
+    		}
+    		for(Object tem:tempMap.values()){
+    			template_content+=tem+",";
+    		}
+    		for(Object tem1:tempMap1.values()){
+    			template_content+=tem1+",";
+    		}
+    		template_content = template_content.substring(0, template_content.length()- 1);
+    		info.put("TEMPLATE_CONTENT", template_content);
+        	resMap.put("info", info);
+        	List<Map<String, Object>> detail_list=memberLogisticsTemplateDao.queryMemberLogisticsTemplateDetailList(paramMap);
+        	resMap.put("detail", detail_list);
+            pr.setState(true);
+            pr.setMessage("查询成功");
+            pr.setObj(resMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+	}
+	
+	/**
+	 * 会员物流模板下拉数据
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryOption(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        }
+	        if(paramMap.containsKey("platform_type") && !StringUtils.isEmpty(paramMap.get("platform_type"))){
+				paramMap.put("platform_type",paramMap.get("platform_type"));
+			}else {
+				paramMap.put("platform_type",1);
+			}
+	        pr.setObj(memberLogisticsTemplateDao.queryMemberLogisticsTemplateOption(paramMap));
+            pr.setState(true);
+            pr.setMessage("查询成功");
+
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+
+        return pr;
+	}
+	
+
+}

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.store.finance.dao.AccountBalanceDao">
+	<!-- 账户余额 -->
+	<select id="queryAccountBalance" parameterType="java.util.Map" resultType="java.util.Map">
+		select account_balance
+		  from tbl_sys_bank_account
+		 where user_id = #{public_user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 收支记录数量 -->
+	<select id="queryAccountRecordCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_sys_account_record
+		 where collect_user_id = #{public_user_id,jdbcType=INTEGER}
+		 	<if test="docket_type !=null and docket_type !=''">
+		 		and docket_type = #{docket_type,jdbcType=VARCHAR}
+		 	</if>
+		 	<if test="record_type != null">
+			    and record_type in
+                   <foreach item="item" collection="record_type" open="(" separator="," close=")">
+					   #{item}
+				   </foreach>
+		    </if>
+			<if test="start_date != null and start_date != '' ">
+				and create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+			</if>
+			<if test="end_date != null and end_date != '' ">
+				and create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+			</if>
+			<if test="docket_number != null and docket_number !=''">
+				and docket_number = #{docket_number,jdbcType=VARCHAR}
+			</if>
+	</select>
+	<!-- 收支记录列表 -->
+	<select id="queryAccountRecordListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+			select a.*,rownum rn from (
+				select record_type,
+					   money,
+					   docket_number,
+					   docket_type,
+					   to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date
+				  from tbl_sys_account_record
+				 where collect_user_id = #{public_user_id,jdbcType=INTEGER}
+				 	<if test="docket_type !=null and docket_type !=''">
+				 		and docket_type = #{docket_type,jdbcType=VARCHAR}
+				 	</if>
+				 	<if test="record_type != null">
+					    and record_type in
+		                   <foreach item="item" collection="record_type" open="(" separator="," close=")">
+							   #{item}
+						   </foreach>
+				    </if>
+					<if test="start_date != null and start_date != '' ">
+						and create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+					</if>
+					<if test="end_date != null and end_date != '' ">
+						and create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+					</if>
+					<if test="docket_number != null and docket_number !=''">
+						and docket_number = #{docket_number,jdbcType=VARCHAR}
+					</if>
+					order by create_date desc,id desc) a
+		 	where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 银行卡信息 -->
+	<select id="queryBankInfo" parameterType="java.util.Map" resultType="java.util.Map">
+		select bank_card,
+			   (select bank_name from tbl_dic_bank where bank_clscode = t.bank_clscode) bank_name
+		  from tbl_sys_bank_card t
+		 where user_id = #{public_user_id,jdbcType=INTEGER}
+	</select>
+	
+</mapper>

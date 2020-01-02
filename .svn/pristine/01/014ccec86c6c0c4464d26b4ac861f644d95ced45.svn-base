@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.sys.dao.SysConfigDao">
+   
+	
+   <!-- 查询系统配置列表 -->
+	<select id="querySysConfigList" parameterType="java.util.Map" resultType="java.util.Map" resultMap="sysConfigMap">
+	   select ID,MEMBER_SERVICE_RATE*100 MEMBER_SERVICE_RATE,PC_COPYRIGHT,PC_LOGIN_COPYRIGHT,WX_COPYRIGHT,
+	         PAGE_TITLE,PAGE_KEYWORDS,PAGE_DESCRIPTION,PC_SERVICE_PHONE,WX_SERVICE_PHONE from tbl_sys_config
+	</select>
+	<!-- clob封装成varchar -->
+	<resultMap type="java.util.Map" id="sysConfigMap">
+        <result property="PC_COPYRIGHT" column="pc_copyright" jdbcType="CLOB" javaType = "java.lang.String"/>
+        <result property="PC_LOGIN_COPYRIGHT" column="pc_login_copyright" jdbcType="CLOB" javaType = "java.lang.String"/>
+        <result property="WX_COPYRIGHT" column="wx_copyright" jdbcType="CLOB" javaType = "java.lang.String"/>
+    </resultMap>
+	<select id="querySysConfigCount" parameterType="java.util.Map" resultType="int">
+	select count(1) from tbl_sys_config
+	</select>
+	<!--系统配置新增-->
+	<insert id="insertSysConfig" parameterType="java.util.Map" >
+		insert into tbl_sys_config
+			(id,
+			member_service_rate,
+			create_date,
+			create_user_id
+			) 
+		values(
+			SEQ_SYS_CONFIG.nextval,
+			#{member_service_rate,jdbcType=INTEGER},
+			sysdate,
+			#{create_user_id,jdbcType=INTEGER}
+			
+		)
+	</insert>
+	
+	<!--系统配置编辑更新-->
+	<update  id="updateSysConfig" parameterType="java.util.Map" >
+		update tbl_sys_config
+		<set>
+			<if test="MEMBER_SERVICE_RATE != null and MEMBER_SERVICE_RATE != ''">
+				MEMBER_SERVICE_RATE=#{MEMBER_SERVICE_RATE,jdbcType=VARCHAR},
+			</if>
+			<if test="PC_COPYRIGHT !=null and PC_COPYRIGHT !=''">
+				PC_COPYRIGHT=#{PC_COPYRIGHT,jdbcType=VARCHAR},
+			</if>
+			<if test="PC_LOGIN_COPYRIGHT !=null and PC_LOGIN_COPYRIGHT !=''">
+				PC_LOGIN_COPYRIGHT=#{PC_LOGIN_COPYRIGHT,jdbcType=VARCHAR},
+			</if>
+			<if test="WX_COPYRIGHT !=null and WX_COPYRIGHT !=''">
+				WX_COPYRIGHT=#{WX_COPYRIGHT,jdbcType=VARCHAR},
+			</if>
+			<if test="PAGE_TITLE !=null and PAGE_TITLE !=''">
+				PAGE_TITLE=#{PAGE_TITLE,jdbcType=VARCHAR},
+			</if>
+			<if test="PAGE_KEYWORDS !=null and PAGE_KEYWORDS !=''">
+				PAGE_KEYWORDS=#{PAGE_KEYWORDS,jdbcType=VARCHAR},
+			</if>
+			<if test="PAGE_DESCRIPTION !=null and PAGE_DESCRIPTION !=''">
+				PAGE_DESCRIPTION=#{PAGE_DESCRIPTION,jdbcType=VARCHAR},
+			</if>
+			<if test="PC_SERVICE_PHONE !=null and PC_SERVICE_PHONE !=''">
+				PC_SERVICE_PHONE=#{PC_SERVICE_PHONE,jdbcType=VARCHAR},
+			</if>
+			<if test="WX_SERVICE_PHONE !=null and WX_SERVICE_PHONE !=''">
+				WX_SERVICE_PHONE=#{WX_SERVICE_PHONE,jdbcType=VARCHAR},
+			</if>
+		</set> 	
+		where id=#{id,jdbcType=INTEGER}
+	</update>
+	
+	<!--系统配置删除-->
+	<delete id="deleteSysConfig" parameterType="java.util.Map" >
+		delete from tbl_sys_config
+		where id=#{id,jdbcType=INTEGER}
+	</delete>
+
+	<!-- 获取系统配置参数信息 -->
+	<select id="querySysParamConfig" parameterType="java.lang.String" resultType="java.lang.String">
+		select value from TBL_SYS_PARAM_CONFIG where key = #{key,jdbcType=VARCHAR}
+	</select>
+</mapper>

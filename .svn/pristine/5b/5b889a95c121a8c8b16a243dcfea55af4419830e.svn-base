@@ -1,0 +1,8 @@
+#ERP地址库同步
+common_sync_region =common/sync_region
+#OA地址库同步
+sys_dictionary_sync_region = sys_dictionary/sync_region
+#OA供应商同步
+sys_dictionary_sync_supplier_customer = sys_dictionary/sync_supplier_customer
+#OA商品分类同步
+sys_dictionary_sync_product_type = sys_dictionary/sync_product_type

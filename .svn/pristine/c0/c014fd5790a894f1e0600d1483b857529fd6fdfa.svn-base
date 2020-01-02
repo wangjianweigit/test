@@ -1,0 +1,982 @@
+package com.tk.oms.marketing.service;
+
+import com.tk.oms.marketing.dao.*;
+import com.tk.sys.util.*;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+/**
+ * 促销活动
+ * @author Administrator
+ *
+ */
+@Service("ActivityService")
+public class ActivityService {
+
+	@Resource
+	private ActivityDao activityDao;
+	@Resource
+	private SaleActivityDao saleActivityDao;
+	@Resource
+	private PreorderActivityDao preorderActivityDao;
+
+	@Resource
+	private PresellActivityDao presellActivityDao;
+
+	@Resource
+    private ActivitySiteLinkDao activitySiteLinkDao;
+
+	@Resource
+	private ClearActivityDao clearActivityDao;
+
+	/**
+	 * 获取促销活动列表
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryActivityList(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			GridResult pageParamResult = PageUtil.handlePageParams(paramMap);
+			if(pageParamResult!=null){
+				return pageParamResult;
+			}
+			if((!StringUtils.isEmpty(paramMap.get("start_state")))&&paramMap.get("start_state") instanceof String){
+				paramMap.put("start_state",(paramMap.get("start_state")+"").split(","));
+			}
+			if((!StringUtils.isEmpty(paramMap.get("activity_state")))&&paramMap.get("activity_state") instanceof String){
+				paramMap.put("activity_state",(paramMap.get("activity_state")+"").split(","));
+			}
+			if((!StringUtils.isEmpty(paramMap.get("onoff_state")))&&paramMap.get("onoff_state") instanceof String){
+				paramMap.put("onoff_state",(paramMap.get("onoff_state")+"").split(","));
+			}
+			List<Map<String, Object>> list = activityDao.queryActivityList(paramMap);
+			int count = activityDao.queryActivityCount(paramMap);
+			if (list != null && list.size() > 0) {
+				gr.setMessage("获取数据成功");
+				gr.setObj(list);
+			} else {
+				gr.setMessage("无数据");
+			}
+			gr.setState(true);
+			gr.setTotal(count);
+		} catch (Exception e) {
+			e.printStackTrace();
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+		}
+		return gr;
+	}
+	
+	/**
+	 * 获取促销活动详情
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryActivityDetail(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			Map<String,Object> resultMap = new HashMap<String,Object>();
+			//获取促销活动基本信息
+			Map<String,Object> detail = activityDao.queryActivityDetail(paramMap);
+			if(detail!=null){
+				int activity_type = 0;
+				if(!StringUtils.isEmpty(detail.get("ACTIVITY_TYPE"))){
+					activity_type = Integer.parseInt(detail.get("ACTIVITY_TYPE").toString());
+				}
+                if (activity_type != 1 && activity_type != 2
+                        && activity_type != 4 && activity_type != 5) {
+                    pr.setState(false);
+                    pr.setMessage("获取活动详情失败，活动类型异常");
+                    return pr;
+                }
+
+				int activityId = Integer.parseInt(paramMap.get("id").toString());
+				//获取促销活动-限时折扣信息
+				if (activity_type == 1) {
+					Map<String, Object> saleDetail = saleActivityDao.querySaleActivityDetail(paramMap);
+					if (saleDetail != null) {
+						detail.putAll(saleDetail);
+					}
+				}
+				//获取促销活动-订货会信息
+				if (activity_type == 2) {
+					Map<String, Object> preorderDetail = preorderActivityDao.queryPreorderActivityDetail(paramMap);
+					if (preorderDetail != null) {
+						detail.putAll(preorderDetail);
+					}
+				}
+				//获取促销活动-订货会信息
+				if (activity_type == 4) {
+					Map<String, Object> preSellActivityDetail = presellActivityDao.queryPreSellActivityDetail(paramMap);
+					if (preSellActivityDetail != null) {
+						detail.putAll(preSellActivityDetail);
+					}
+				}
+				//获取促销活动-一口清信息
+				if (ActivityTypeEnum.CLEAR_ACTIVITY.value.equals(String.valueOf(activity_type))) {
+					Map<String, Object> clearActivityDetail = this.clearActivityDao.getClearActivityByActivityId(activityId);
+					if (clearActivityDetail != null) {
+						detail.putAll(clearActivityDetail);
+					}
+				}
+
+                List<Map<String, Object>> list =  activitySiteLinkDao.queryList(activityId);
+                resultMap.put("site_link", list);
+
+				resultMap.put("base_info", detail);
+				pr.setMessage("获取数据成功");
+				pr.setObj(resultMap);
+			}else {
+				pr.setMessage("无数据");
+			}
+			pr.setState(true);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+		}
+		return pr;
+	}
+	
+	/**
+	 * 促销活动审批通过
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult activityApproved(HttpServletRequest request) throws Exception {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			if(StringUtils.isEmpty(paramMap.get("id"))||StringUtils.isEmpty(paramMap.get("public_user_id"))){
+				pr.setMessage("缺少参数");
+				pr.setState(false);
+				return pr;
+			}
+			//2.验证当前操作待审批记录状态是否正常
+			Map<String,Object> activityDetailMap=activityDao.queryActivityDetail(paramMap);
+			if(activityDetailMap==null){
+				pr.setMessage("操作记录不存在，请检查");
+				pr.setState(false);
+				return pr;
+			}
+			if(!"2".equals(activityDetailMap.get("ACTIVITY_STATE"))){
+				pr.setMessage("操作记录状态异常，请检查");
+				pr.setState(false);
+				return pr;
+			}
+			//3.更新待审批记录为审批通过
+			paramMap.put("activity_state", "3");
+			int num = activityDao.updatePendingApprovalActivityState(paramMap);
+			if(num <= 0){
+				throw new RuntimeException("操作失败");
+			}
+			pr.setMessage("操作成功");
+			pr.setState(true);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+
+	/**
+	 * 待审批促销活动审批驳回
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult activityRejected(HttpServletRequest request) throws Exception{
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			if(StringUtils.isEmpty(paramMap.get("id"))||StringUtils.isEmpty(paramMap.get("public_user_id"))
+			   ||StringUtils.isEmpty(paramMap.get("rejected_reason"))){
+				pr.setMessage("缺少参数");
+				pr.setState(false);
+				return pr;
+			}
+			//2.验证当前操作待审批记录状态是否正常
+			Map<String,Object> activityDetailMap=activityDao.queryActivityDetail(paramMap);
+			if(activityDetailMap==null){
+				pr.setMessage("操作记录不存在，请检查");
+				pr.setState(false);
+				return pr;
+			}
+			if(!"2".equals(activityDetailMap.get("ACTIVITY_STATE"))){
+				pr.setMessage("操作记录状态异常，请检查");
+				pr.setState(false);
+				return pr;
+			}
+			//3.更新待审批记录为审批驳回
+			paramMap.put("activity_state", "4");
+			int num = activityDao.updatePendingApprovalActivityState(paramMap);
+			if(num <= 0){
+				throw new RuntimeException("操作失败");
+			}
+			pr.setMessage("操作成功");
+			pr.setState(true);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+	
+	/**
+	 * 促销活动提交审批
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult activitySubmitted(HttpServletRequest request) throws Exception{
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			if(StringUtils.isEmpty(paramMap.get("id"))||StringUtils.isEmpty(paramMap.get("public_user_id"))){
+				pr.setMessage("缺少参数");
+				pr.setState(false);
+				return pr;
+			}
+			//2.验证当前操作待审批记录状态是否正常
+			Map<String,Object> activityDetailMap=activityDao.queryActivityDetail(paramMap);
+			if(activityDetailMap==null){
+				pr.setMessage("操作记录不存在，请检查");
+				pr.setState(false);
+				return pr;
+			}
+			if(!"1".equals(activityDetailMap.get("ACTIVITY_STATE"))){
+				pr.setMessage("操作记录状态异常，请检查");
+				pr.setState(false);
+				return pr;
+			}
+			//3.更新记录为待审批
+			paramMap.put("activity_state", "2");
+			int num = activityDao.updateActivityStateForApproval(paramMap);
+			if(num <= 0){
+				throw new RuntimeException("操作失败");
+			}
+			pr.setMessage("操作成功");
+			pr.setState(true);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+	
+	/**
+	 * 促销活动删除
+	 * @param request
+	 * @return
+	 */
+//	@SuppressWarnings("unchecked")
+//	@Transactional
+//	public ProcessResult activityDelete(HttpServletRequest request) throws Exception{
+//		ProcessResult pr = new ProcessResult();
+//		Map<String, Object> paramMap = new HashMap<String, Object>();
+//		try {
+//			String json = HttpUtil.getRequestInputStream(request);
+//			if(!StringUtils.isEmpty(json)){
+//				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+//			}
+//			if(StringUtils.isEmpty(paramMap.get("id"))||StringUtils.isEmpty(paramMap.get("public_user_id"))){
+//				pr.setMessage("缺少参数");
+//				pr.setState(false);
+//				return pr;
+//			}
+//			//TODO 20170411-002 1.验证操作用户是否存在
+////			Map<String,Object> operateUserMap=userDao.queryUserDetail(paramMap);
+////			if(operateUserMap==null){
+////				pr.setMessage("操作用户不存在，请检查");
+////				pr.setState(false);
+////				return pr;
+////			}
+//			//2.验证当前操作待审批记录状态是否正常
+//			Map<String,Object> activityDetailMap=activityDao.queryActivityDetail(paramMap);
+//			if(activityDetailMap==null){
+//				pr.setMessage("操作记录不存在，请检查");
+//				pr.setState(false);
+//				return pr;
+//			}
+//			if(!("1".equals(activityDetailMap.get("ACTIVITY_STATE"))||"4".equals(activityDetailMap.get("ACTIVITY_STATE")))){
+//				pr.setMessage("操作记录状态异常，请检查");
+//				pr.setState(false);
+//				return pr;
+//			}
+//			//3.删除记录
+//			
+//			int num = activityDao.deleteActivity(paramMap);
+//			if(num <= 0){
+//				throw new RuntimeException("操作失败");
+//			}
+//			num = saleActivityDao.deleteSaleActivity(paramMap);
+//			if(num <= 0){
+//				throw new RuntimeException("操作失败");
+//			}
+//			pr.setMessage("操作成功");
+//			pr.setState(true);
+//		} catch (Exception e) {
+//			pr.setState(false);
+//			pr.setMessage(e.getMessage());
+//			throw new RuntimeException(e.getMessage());
+//		}
+//		return pr;
+//	}
+	
+	/**
+	 * 促销活动逻辑删除
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult activityRemove(HttpServletRequest request) throws Exception{
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			if(StringUtils.isEmpty(paramMap.get("id"))||StringUtils.isEmpty(paramMap.get("public_user_id"))){
+				pr.setMessage("缺少参数");
+				pr.setState(false);
+				return pr;
+			}
+			Map<String,Object> activityDetailMap=activityDao.queryActivityDetail(paramMap);
+			if(activityDetailMap==null){
+				pr.setMessage("操作记录不存在，请检查");
+				pr.setState(false);
+				return pr;
+			}
+			if("1".equals(activityDetailMap.get("STATE"))||"2".equals(activityDetailMap.get("START_STATE"))
+			   ||"1".equals(activityDetailMap.get("ACTIVITY_STATE"))||"4".equals(activityDetailMap.get("ACTIVITY_STATE"))){
+				int num = activityDao.updateActivityIsDelete(paramMap);
+				if(num>0){
+					pr.setMessage("操作成功");
+					pr.setState(true);
+				}
+			}else{
+				pr.setMessage("操作记录状态异常，请检查");
+				pr.setState(false);
+				return pr;
+			}
+
+            int activity_id = Integer.parseInt(paramMap.get("id").toString());
+            //清空对应活动站点链接
+            activitySiteLinkDao.deleteByActivityId(activity_id);
+			
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+	
+	/**
+	 *  促销活动创建
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult addActivity(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			//参数校验
+			ProcessResult prCheck = addParamCheck(paramMap);
+			if(prCheck.getState()){
+				pr.setState(false);
+				pr.setMessage(prCheck.getMessage());
+				return pr;
+			}
+			
+			//活动站点特殊处理转数组
+			if((!StringUtils.isEmpty(paramMap.get("SITE")))&&paramMap.get("SITE") instanceof String){
+				paramMap.put("SITE",(paramMap.get("SITE")+"").split(","));
+			}
+			
+			//活动报名数量限制设置默认值
+			if("2".equals(paramMap.get("APPLY_PRODUCT_LIMIT_FLAG"))){
+				paramMap.put("APPLY_PRODUCT_LIMIT_AMOUNT", StringUtils.isEmpty(paramMap.get("APPLY_PRODUCT_LIMIT"))?999:(paramMap.get("APPLY_PRODUCT_LIMIT")+""));
+			}
+			
+			//当为短期活动时，不需要设置活动周期
+			if("1".equals(paramMap.get("ACTIVITY_CONFIG"))){
+				paramMap.remove("ACTIVITY_PRODUCT_CYCLE");
+			}
+			//生成活动id
+			int activity_id=activityDao.queryActivityId(paramMap);
+			paramMap.put("ACTIVITY_ID", activity_id);
+			//插入促销活动主表信息
+			int num=activityDao.insertActivity(paramMap);
+			if(num <= 0){
+				throw new RuntimeException("活动基本信息保存失败");
+			}
+			//活动站点信息保存
+			activityDao.deleteActivitySite(paramMap);
+			num=activityDao.insertActivitySite(paramMap);
+			if(num <= 0){
+				throw new RuntimeException("活动站点信息保存失败");
+			}
+			
+			if("1".equals(paramMap.get("CUSTOM_DISCOUNT_FLAG"))){
+				paramMap.put("ACTIVITY_DISCOUNT",paramMap.get("ACTIVITY_MIN_DISCOUNT"));
+				paramMap.put("ACTIVITY_MIN_DISCOUNT",1);
+				paramMap.put("ACTIVITY_MAX_DISCOUNT",1);
+			}
+			
+			//【限时折扣】类型活动
+			if (ActivityTypeEnum.SALE_ACTIVITY.value.equals(paramMap.get("ACTIVITY_TYPE"))) {
+				//限时折扣默认非预售商品
+				paramMap.put("PRODUCT_TYPE", 1);
+				//插入限时折扣类活动表中
+				num = saleActivityDao.insertSaleActivity(paramMap);
+			}
+			//【订货会】活动
+			if (ActivityTypeEnum.PREORDER_ACTIVITY.value.equals(paramMap.get("ACTIVITY_TYPE"))) {
+				//插入订货会活动表中
+				num = preorderActivityDao.insertPreorderActivity(paramMap);
+			}
+			//【预售】活动
+			if (ActivityTypeEnum.PRESELL_ACTIVITY.value.equals(paramMap.get("ACTIVITY_TYPE"))) {
+				//插入订货会活动表中
+				num = presellActivityDao.insertPreSellActivity(paramMap);
+			}
+			//【一口清】活动
+			if (ActivityTypeEnum.CLEAR_ACTIVITY.value.equals(paramMap.get("ACTIVITY_TYPE"))) {
+				//插入订货会活动表中
+				num = this.clearActivityDao.insertClearActivity(paramMap);
+			}
+			if (num < 1) {
+				throw new RuntimeException("活动具体信息保存失败");
+			}
+			if("1".equals(paramMap.get("recommen_social_home").toString())) {
+                //新增站点链接
+                List<Map<String,Object>> linkMap = (List<Map<String,Object>>) paramMap.get("site_link_detail");
+                if(linkMap.size() > 0) {
+                    int count = activitySiteLinkDao.batchInsert(paramMap);
+                    if(count != linkMap.size()) {
+                        throw new RuntimeException("活动站点链接信息保存失败");
+                    }
+                }
+            }
+            pr.setMessage("保存成功");
+			pr.setState(true);
+			pr.setObj(activity_id);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+	/**
+	 * 活动添加参数校验
+	 * @param paramMap
+	 * @return
+	 */
+	@SuppressWarnings("unused")
+	private ProcessResult addParamCheck(Map<String,Object> paramMap){
+		ProcessResult pr = new ProcessResult();
+		if(paramMap==null||paramMap.isEmpty()){
+			pr.setState(true);
+			pr.setMessage("参数为空");
+			return pr;
+		}
+		//当为订货会活动时，活动默认为短期活动,方便下面校验
+		if("2".equals(paramMap.get("ACTIVITY_TYPE"))){
+			paramMap.put("ACTIVITY_CONFIG", "1");
+		}
+		//活动基本信息校验
+		if(StringUtils.isEmpty(paramMap.get("ACTIVITY_REMARK"))||StringUtils.isEmpty(paramMap.get("ACTIVITY_QUALIFICATION"))||StringUtils.isEmpty(paramMap.get("ACTIVITY_REGULATION"))
+				||StringUtils.isEmpty(paramMap.get("ACTIVITY_TYPE"))||StringUtils.isEmpty(paramMap.get("ACTIVITY_IMAGE"))||StringUtils.isEmpty(paramMap.get("APPLY_BEGIN_DATE"))
+				||StringUtils.isEmpty(paramMap.get("APPLY_END_DATE"))||StringUtils.isEmpty(paramMap.get("BEGIN_DATE"))||StringUtils.isEmpty(paramMap.get("END_DATE"))
+				||StringUtils.isEmpty(paramMap.get("ACTIVITY_NAME"))||StringUtils.isEmpty(paramMap.get("public_user_id"))||StringUtils.isEmpty(paramMap.get("SITE"))
+				||StringUtils.isEmpty(paramMap.get("ACTIVITY_CONFIG"))){
+			pr.setMessage("缺少活动基本参数");
+			pr.setState(true);
+			return pr;
+		}
+		//具体活动通用信息校验
+		if(StringUtils.isEmpty(paramMap.get("CUSTOM_DISCOUNT_FLAG"))||StringUtils.isEmpty(paramMap.get("IS_ADD"))
+				||StringUtils.isEmpty(paramMap.get("ACTIVITY_MIN_DISCOUNT"))||StringUtils.isEmpty(paramMap.get("TAG_NAME"))
+				||StringUtils.isEmpty(paramMap.get("ACTIVITY_QUIT_FLAG"))||StringUtils.isEmpty(paramMap.get("TAG_COLOR"))||StringUtils.isEmpty(paramMap.get("TAG_LEVEL"))
+				||StringUtils.isEmpty(paramMap.get("ACTIVITY_SERVICE_DISCOUNT"))||StringUtils.isEmpty(paramMap.get("BACKGROUND_IMG_DISPLAY"))){
+			pr.setMessage("缺少活动参数");
+			pr.setState(true);
+			return pr;
+		}
+		if("2".equals(paramMap.get("ACTIVITY_CONFIG"))&&StringUtils.isEmpty(paramMap.get("ACTIVITY_PRODUCT_CYCLE"))){
+			pr.setMessage("缺少活动周期配置");
+			pr.setState(true);
+			return pr;
+		}
+		if("1".equals(paramMap.get("BACKGROUND_IMG_DISPLAY"))&&(StringUtils.isEmpty(paramMap.get("TAG_ADVANCE_IMG"))||StringUtils.isEmpty(paramMap.get("TAG_ADVANCE_IMG")))){
+			pr.setMessage("缺少活动横条背景");
+			pr.setState(true);
+			return pr;
+		}
+		if("1".equals(paramMap.get("TAG_LEVEL"))&&(StringUtils.isEmpty(paramMap.get("TAG_IMG_PC"))||StringUtils.isEmpty(paramMap.get("TAG_IMG_WX")))){
+			pr.setMessage("缺少活动标签图片");
+			pr.setState(true);
+			return pr;
+		}
+		//自定义折扣
+		if("2".equals(paramMap.get("CUSTOM_DISCOUNT_FLAG"))&&(StringUtils.isEmpty(paramMap.get("ACTIVITY_MAX_DISCOUNT")))){
+			pr.setMessage("缺少活动参数");
+			pr.setState(true);
+			return pr;
+		}
+		//入驻商报名商品数量限制
+		if("1".equals(paramMap.get("APPLY_PRODUCT_LIMIT_FLAG"))&&StringUtils.isEmpty(paramMap.get("APPLY_PRODUCT_LIMIT_AMOUNT"))){
+			pr.setMessage("缺少活动参数");
+			pr.setState(true);
+			return pr;
+		}
+		//限时折扣类活动特定参数校验
+		if("1".equals(paramMap.get("ACTIVITY_TYPE"))){
+			if(StringUtils.isEmpty(paramMap.get("LOCKED_STOCK"))){
+				pr.setMessage("缺少限时折扣活动参数");
+				pr.setState(true);
+				return pr;
+			}
+		}
+		//订货会活动特定参数校验
+		if("2".equals(paramMap.get("ACTIVITY_TYPE"))){
+			if(StringUtils.isEmpty(paramMap.get("DEPOSIT_PERCENT"))||StringUtils.isEmpty(paramMap.get("USER_GROUP_ID"))
+					||StringUtils.isEmpty(paramMap.get("TIERED_DISCOUNT_FLAG"))){
+				pr.setMessage("缺少订货会活动参数");
+				pr.setState(true);
+				return pr;
+			}
+		}
+		return pr;
+	}
+	
+	/**
+	 *  促销活动编辑
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult editActivity(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			if(StringUtils.isEmpty(paramMap.get("ID"))||StringUtils.isEmpty(paramMap.get("public_user_id"))){
+				pr.setMessage("缺少参数");
+				pr.setState(false);
+				return pr;
+			}
+			//编辑参数校验
+			ProcessResult prCheck = editParamCheck(paramMap);
+			if(prCheck.getState()){
+				pr.setState(false);
+				pr.setMessage(prCheck.getMessage());
+				return pr;
+			}
+			//活动站点特殊处理转数组
+			if((!StringUtils.isEmpty(paramMap.get("SITE")))&&paramMap.get("SITE") instanceof String){
+				paramMap.put("SITE",(paramMap.get("SITE")+"").split(","));
+			}
+			paramMap.put("id", paramMap.get("ID"));
+			Map<String,Object> activityDetailMap=activityDao.queryActivityDetail(paramMap);
+			if(activityDetailMap==null){
+				pr.setMessage("活动不存在或已删除");
+				pr.setState(false);
+				return pr;
+			}
+			if(!("1".equals(activityDetailMap.get("ACTIVITY_STATE").toString())||"4".equals(activityDetailMap.get("ACTIVITY_STATE").toString()))){
+				pr.setMessage("活动状态异常，请检查");
+				pr.setState(false);
+				return pr;
+			}
+			if("4".equals(activityDetailMap.get("ACTIVITY_STATE").toString())){
+				paramMap.put("activity_state", "1");
+				activityDao.updatePendingApprovalActivityState(paramMap);
+			}
+			//更新促销活动主表信息
+			int num=activityDao.updateActivity(paramMap);
+			if(num <= 0){
+				throw new RuntimeException("活动基本信息保存失败");
+			}
+			//活动站点信息保存
+			paramMap.put("ACTIVITY_ID", paramMap.get("ID"));
+			activityDao.deleteActivitySite(paramMap);
+			num = activityDao.insertActivitySite(paramMap);
+			if (num <= 0) {
+				throw new RuntimeException("活动站点信息保存失败");
+			}
+
+			if ("1".equals(paramMap.get("CUSTOM_DISCOUNT_FLAG").toString())) {
+				paramMap.put("ACTIVITY_DISCOUNT", paramMap.get("ACTIVITY_MIN_DISCOUNT"));
+				paramMap.remove("ACTIVITY_MIN_DISCOUNT");
+				paramMap.remove("ACTIVITY_MAX_DISCOUNT");
+			}
+
+			if (ActivityTypeEnum.SALE_ACTIVITY.value.equals(activityDetailMap.get("ACTIVITY_TYPE").toString())) {
+				//更新限时折扣类活动表中
+				num = saleActivityDao.updateSaleActivity(paramMap);
+			}
+			if (ActivityTypeEnum.PREORDER_ACTIVITY.value.equals(activityDetailMap.get("ACTIVITY_TYPE").toString())) {
+				//更新订货会活动表
+				num = preorderActivityDao.updatePreorderActivity(paramMap);
+			}
+			if (ActivityTypeEnum.PRESELL_ACTIVITY.value.equals(activityDetailMap.get("ACTIVITY_TYPE").toString())) {
+				//更新预售活动表
+				num = presellActivityDao.updatePreSellActivity(paramMap);
+			}
+			if (ActivityTypeEnum.PRESELL_ACTIVITY.value.equals(activityDetailMap.get("ACTIVITY_TYPE").toString())) {
+				//更新一口清活动表
+				num = this.clearActivityDao.updateClearActivity(paramMap);
+			}
+			if (num < 1) {
+				throw new RuntimeException("活动具体信息保存失败");
+			}
+			int activityId = Integer.parseInt(paramMap.get("ID").toString());
+			//清空对应活动站点链接
+			activitySiteLinkDao.deleteByActivityId(activityId);
+			paramMap.put("ACTIVITY_ID", activityId);
+			//新增站点链接
+			if ("1".equals(paramMap.get("recommen_social_home").toString())) {
+				List<Map<String, Object>> linkMap = (List<Map<String, Object>>) paramMap.get("site_link_detail");
+				if (linkMap.size() > 0) {
+					int count = activitySiteLinkDao.batchInsert(paramMap);
+					if (count != linkMap.size()) {
+						throw new RuntimeException("活动站点链接信息保存失败");
+					}
+				}
+			}
+
+			pr.setMessage("保存成功");
+			pr.setState(true);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+	
+	/**
+	 * 活动编辑参数校验
+	 * @param paramMap
+	 * @return
+	 */
+	@SuppressWarnings("unused")
+	private ProcessResult editParamCheck(Map<String,Object> paramMap){
+		ProcessResult pr = new ProcessResult();
+		if(paramMap==null||paramMap.isEmpty()){
+			pr.setState(true);
+			pr.setMessage("参数为空");
+			return pr;
+		}
+		//当为订货会活动时，活动默认为短期活动,方便下面校验
+		if("2".equals(paramMap.get("ACTIVITY_TYPE"))){
+			paramMap.put("ACTIVITY_CONFIG", "1");
+		}
+		//活动基本参数校验
+		if(StringUtils.isEmpty(paramMap.get("ACTIVITY_REMARK"))||StringUtils.isEmpty(paramMap.get("ACTIVITY_QUALIFICATION"))||StringUtils.isEmpty(paramMap.get("ACTIVITY_REGULATION"))
+				||StringUtils.isEmpty(paramMap.get("ACTIVITY_TYPE"))||StringUtils.isEmpty(paramMap.get("ACTIVITY_IMAGE"))
+				||StringUtils.isEmpty(paramMap.get("APPLY_BEGIN_DATE"))||StringUtils.isEmpty(paramMap.get("APPLY_END_DATE"))||StringUtils.isEmpty(paramMap.get("BEGIN_DATE"))
+				||StringUtils.isEmpty(paramMap.get("END_DATE"))||StringUtils.isEmpty(paramMap.get("ACTIVITY_NAME"))||StringUtils.isEmpty(paramMap.get("SITE"))
+				||StringUtils.isEmpty(paramMap.get("ACTIVITY_CONFIG"))){
+			pr.setMessage("缺少活动基本参数");
+			pr.setState(false);
+			return pr;
+		}
+		//活动参数校验
+		if(StringUtils.isEmpty(paramMap.get("CUSTOM_DISCOUNT_FLAG"))||StringUtils.isEmpty(paramMap.get("IS_ADD"))
+				||StringUtils.isEmpty(paramMap.get("ACTIVITY_MIN_DISCOUNT"))||StringUtils.isEmpty(paramMap.get("TAG_NAME"))
+				||StringUtils.isEmpty(paramMap.get("ACTIVITY_QUIT_FLAG"))||StringUtils.isEmpty(paramMap.get("TAG_COLOR"))||StringUtils.isEmpty(paramMap.get("TAG_LEVEL"))){
+			pr.setMessage("缺少活动参数");
+			pr.setState(false);
+			return pr;
+		}
+		if("2".equals(paramMap.get("ACTIVITY_CONFIG"))&&StringUtils.isEmpty(paramMap.get("ACTIVITY_PRODUCT_CYCLE"))){
+			pr.setMessage("缺少活动周期配置");
+			pr.setState(false);
+			return pr;
+		}
+		//自定义折扣
+		if("2".equals(paramMap.get("CUSTOM_DISCOUNT_FLAG"))&&(StringUtils.isEmpty(paramMap.get("ACTIVITY_MAX_DISCOUNT")))){
+			pr.setMessage("缺少活动参数");
+			pr.setState(false);
+			return pr;
+		}
+		//入驻商报名商品数量限制
+		if("1".equals(paramMap.get("APPLY_PRODUCT_LIMIT_FLAG"))&&StringUtils.isEmpty(paramMap.get("APPLY_PRODUCT_LIMIT_AMOUNT"))){
+			pr.setMessage("缺少活动参数");
+			pr.setState(false);
+			return pr;
+		}
+		if("2".equals(paramMap.get("APPLY_PRODUCT_LIMIT_FLAG"))){
+			paramMap.put("APPLY_PRODUCT_LIMIT_AMOUNT", StringUtils.isEmpty(paramMap.get("APPLY_PRODUCT_LIMIT"))?999:(paramMap.get("APPLY_PRODUCT_LIMIT")+""));
+		}
+		//限时折扣类活动特定参数校验
+		if("1".equals(paramMap.get("ACTIVITY_TYPE"))){
+			if(StringUtils.isEmpty(paramMap.get("LOCKED_STOCK"))){
+				pr.setMessage("缺少限时折扣活动参数");
+				pr.setState(true);
+				return pr;
+			}
+		}
+		//订货会活动特定参数校验
+		if("2".equals(paramMap.get("ACTIVITY_TYPE"))){
+			if(StringUtils.isEmpty(paramMap.get("DEPOSIT_PERCENT"))||StringUtils.isEmpty(paramMap.get("USER_GROUP_ID"))
+					||StringUtils.isEmpty(paramMap.get("TIERED_DISCOUNT_FLAG"))){
+				pr.setMessage("缺少订货会活动参数");
+				pr.setState(true);
+				return pr;
+			}
+		}
+		return pr;
+	}
+	
+	
+	/**
+	 *  促销活动编辑
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult editDecorate(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			if(StringUtils.isEmpty(paramMap.get("ID"))||StringUtils.isEmpty(paramMap.get("public_user_id"))){
+				pr.setMessage("缺少参数");
+				pr.setState(false);
+				return pr;
+			}
+			if(StringUtils.isEmpty(paramMap.get("ACTIVITY_REMARK"))||StringUtils.isEmpty(paramMap.get("ACTIVITY_QUALIFICATION"))||StringUtils.isEmpty(paramMap.get("ACTIVITY_REGULATION"))
+					||StringUtils.isEmpty(paramMap.get("ACTIVITY_IMAGE"))){
+				pr.setMessage("缺少活动基本参数");
+				pr.setState(false);
+				return pr;
+			}
+			if(StringUtils.isEmpty(paramMap.get("TAG_NAME"))||StringUtils.isEmpty(paramMap.get("TAG_COLOR"))||StringUtils.isEmpty(paramMap.get("TAG_LEVEL"))){
+				pr.setMessage("缺少活动参数");
+				pr.setState(false);
+				return pr;
+			}
+			paramMap.put("id", paramMap.get("ID"));
+			Map<String,Object> activityDetailMap=activityDao.queryActivityDetail(paramMap);
+			if(activityDetailMap==null){
+				pr.setMessage("操作记录不存在，请检查");
+				pr.setState(false);
+				return pr;
+			}
+			//更新促销活动主表信息
+			int num=activityDao.updateActivityDecorate(paramMap);
+			if(num <= 0){
+				throw new RuntimeException("活动基本信息保存失败");
+			}
+			if (ActivityTypeEnum.SALE_ACTIVITY.value.equals(activityDetailMap.get("ACTIVITY_TYPE"))) {
+				//更新限时折扣类活动表中
+				num = saleActivityDao.updateSaleActivityDecorate(paramMap);
+			}
+			if (ActivityTypeEnum.PREORDER_ACTIVITY.value.equals(activityDetailMap.get("ACTIVITY_TYPE"))) {
+				//更新订货会活动表中
+				num = preorderActivityDao.updatePreorderActivityDecorate(paramMap);
+			}
+			if (ActivityTypeEnum.PRESELL_ACTIVITY.value.equals(activityDetailMap.get("ACTIVITY_TYPE"))) {
+				//更新预售活动表中
+				num = presellActivityDao.updatePreSellActivityDecorate(paramMap);
+			}
+			if (ActivityTypeEnum.CLEAR_ACTIVITY.value.equals(activityDetailMap.get("ACTIVITY_TYPE"))) {
+				//更新一口清活动信息
+				num = this.clearActivityDao.updateClearActivityDecorate(paramMap);
+			}
+			if(num<1){
+				throw new RuntimeException("活动具体信息保存失败");
+			}
+            int activity_id = Integer.parseInt(paramMap.get("ID").toString());
+            //清空对应活动站点链接
+            activitySiteLinkDao.deleteByActivityId(activity_id);
+            paramMap.put("ACTIVITY_ID", activity_id);
+            //新增站点链接
+            if("1".equals(paramMap.get("recommen_social_home").toString())) {
+                List<Map<String,Object>> linkMap = (List<Map<String,Object>>) paramMap.get("site_link_detail");
+                if(linkMap.size() > 0) {
+                    int count = activitySiteLinkDao.batchInsert(paramMap);
+                    if(count != linkMap.size()) {
+                        throw new RuntimeException("活动站点链接信息保存失败");
+                    }
+                }
+            }
+			pr.setMessage("保存成功");
+			pr.setState(true);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+	
+	/**
+	 * 促销活动启停用
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult activityUpdateState(HttpServletRequest request) throws Exception{
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			if(StringUtils.isEmpty(paramMap.get("id"))||StringUtils.isEmpty(paramMap.get("public_user_id"))||StringUtils.isEmpty(paramMap.get("state"))){
+				pr.setMessage("缺少参数");
+				pr.setState(false);
+				return pr;
+			}
+			//TODO 20170411-002 1.验证操作用户是否存在
+//			Map<String,Object> operateUserMap=userDao.queryUserDetail(paramMap);
+//			if(operateUserMap==null){
+//				pr.setMessage("操作用户不存在，请检查");
+//				pr.setState(false);
+//				return pr;
+//			}
+			//2.验证当前操作待审批记录状态是否正常
+			Map<String,Object> activityDetailMap=activityDao.queryActivityDetail(paramMap);
+			if(activityDetailMap==null){
+				pr.setMessage("操作记录不存在，请检查");
+				pr.setState(false);
+				return pr;
+			}
+			//3.更新启停用状态
+			
+			int num = activityDao.updateActivityState(paramMap);
+			if(num <= 0){
+				throw new RuntimeException(("1".equals(paramMap.get("state")+"")?"停用":"启用")+"活动失败");
+			}
+			pr.setMessage(("1".equals(paramMap.get("state")+"")?"停用":"启用")+"活动成功");
+			pr.setState(true);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+	
+	/**
+	 * 获取促销活动站点列表
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryActivitySites(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			Map<String,Object> resultMap = new HashMap<String,Object>();
+			List<Map<String,Object>> activitySitesList=activityDao.queryActivitySitesList(paramMap);
+			if(activitySitesList!=null &&activitySitesList.size()>0){
+				resultMap.put("site_list", activitySitesList);
+				pr.setMessage("获取数据成功");
+				pr.setObj(resultMap);
+			}else {
+				pr.setMessage("无数据");
+			}
+			pr.setState(true);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+		}
+		return pr;
+	}
+
+	/**
+	 * 编辑限时折扣活动是否推荐至首页
+	 * @param request
+	 * @return
+	 * @throws Exception
+	 */
+	@Transactional(rollbackFor = Exception.class)
+	public ProcessResult editRecommendHomeState(HttpServletRequest request) throws Exception {
+		ProcessResult pr = new ProcessResult();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if (StringUtils.isEmpty(json)) {
+				pr.setMessage("缺少参数");
+				pr.setState(false);
+				return pr;
+
+			}
+			Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			if (StringUtils.isEmpty(paramMap.get("activity_id"))) {
+				pr.setMessage("缺少参数【activity_id】");
+				pr.setState(false);
+				return pr;
+			}
+			int num = this.saleActivityDao.updateSaleActivityRecommen(paramMap);
+			if (num <= 0) {
+				throw new RuntimeException("活动推荐至首页失败");
+			}
+			pr.setMessage("活动推荐至首页成功");
+			pr.setState(true);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+	
+}

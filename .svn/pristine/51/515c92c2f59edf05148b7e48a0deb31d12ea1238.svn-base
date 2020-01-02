@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.oauth2.dao.UserAuthorDao">
+   <sql id="all_column">
+		  	id,
+			user_id,
+			oa_open_id,
+			create_date,
+			delete_flag
+	</sql>
+	<!-- 创建ERP用户与OA用户的关联关系 -->
+    <insert id="insertForOA" parameterType="com.tk.oms.oauth2.entity.UserAuthor">
+    	 <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT SEQ_USER_AUTHOR.nextval FROM DUAL
+        </selectKey>
+        insert into TBL_USER_AUTHOR
+        (
+            id,
+			user_id,
+			oa_open_id,
+			create_date,
+			delete_flag
+        )
+        values
+        (
+            #{id,jdbcType=INTEGER},
+            #{user_id,jdbcType=INTEGER},
+            #{oa_open_id,jdbcType=VARCHAR},
+            sysdate,
+            0
+        )
+	</insert>
+    <!-- 根据OA系统用户的openId查询，ERP中的用户是否已经与OA用户关联 -->
+    <select id="getByOAOpenId" resultType="int" parameterType="string">
+    	select
+    	count(1)
+    	from TBL_USER_AUTHOR
+    	WHERE oa_open_id = #{oa_open_id,jdbcType=VARCHAR}
+    	AND delete_flag = 0
+    </select>
+    <!-- 根据OA系统用户的openId查询，ERP中的用户是否已经与OA用户关联 -->
+    <select id="countByOAOpenId" resultType="int">
+    	select
+    	count(1)
+    	from TBL_USER_AUTHOR
+    	WHERE oa_open_id = #{oa_open_id,jdbcType=VARCHAR} or user_id = #{user_id, jdbcType=INTEGER}
+    	AND delete_flag = 0
+    </select>
+    <!-- 通过OA的openID查询关联的用户信息  -->
+    <select id="querySysUserInfoByOAOpenId" resultType="com.tk.oms.sysuser.entity.SysUserInfo" parameterType="string">
+            SELECT * from tbl_sys_user_info ui where exists (
+            	select 1 from TBL_USER_AUTHOR ua where ua.user_id = ui.id and ua.oa_open_id = #{open_id,jdbcType=VARCHAR}
+            ) and rownum &lt;=1
+    </select>
+</mapper>

@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.basicinfo.dao.AfterSaleAddressDao">
+	<!-- 查询售后地址列表 -->
+	<select id="queryAfterSaleAddressList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (select T.*,rownum as rn from (
+		         select tasai.*,
+						(select name from tbl_warehouse_info wi where wi.id = tasai.warehouse_id) warehouse_name
+		            from tbl_after_sale_address_info  tasai
+		            <where>
+					 	<if test="after_sale_name !=null and after_sale_name !=''">
+					 		and after_sale_name like concat(concat('%', #{after_sale_name,jdbcType=VARCHAR}),'%')
+					 	</if>
+					 	<if test="after_sale_mobile !=null and after_sale_mobile !=''">
+					 		and after_sale_mobile =#{after_sale_mobile, jdbcType=INTEGER}
+					 	</if>
+					 	<if test="after_sale_address !=null and after_sale_address !=''">
+					 		and after_sale_address like concat(concat('%', #{after_sale_address,jdbcType=VARCHAR}),'%')
+					 	</if>
+					 	<if test="state !=null and state !=''">
+					 		and state =#{state, jdbcType=CHAR}
+					 	</if>
+					 	<if test="platform_type !=null and platform_type == 1">
+		 					and exists(select 1 from tbl_stationed_after_address tsaa where tsaa.after_sale_address_id = tasai.id and tsaa.stationed_user_id = 0 )
+		 				</if>
+					 	<if test="stationed_user_id !=null and stationed_user_id !=''">
+					 		and stationed_user_id =#{stationed_user_id, jdbcType=INTEGER}
+					 	</if>
+					 </where>
+		                 order by create_date desc) T 
+				where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	 <!-- 查询售后地址总数量 -->
+	<select id="queryAfterSaleAddressCount" parameterType="java.util.Map" resultType="int">
+		select count(1) cnt
+		  from tbl_after_sale_address_info tasai
+		  <where>
+		  	<if test="after_sale_name !=null and after_sale_name !=''">
+		 		and after_sale_name like concat(concat('%', #{after_sale_name,jdbcType=VARCHAR}),'%')
+		 	</if>
+		 	<if test="after_sale_mobile !=null and after_sale_mobile !=''">
+		 		and after_sale_mobile =#{after_sale_mobile, jdbcType=INTEGER}
+		 	</if>
+		 	<if test="after_sale_address !=null and after_sale_address !=''">
+		 		and after_sale_address like concat(concat('%', #{after_sale_address,jdbcType=VARCHAR}),'%')
+		 	</if>
+		 	<if test="state !=null and state !=''">
+		 		and state =#{state, jdbcType=CHAR}
+		 	</if>
+		 	<if test="platform_type !=null and platform_type == 1">
+		 		and exists(select 1 from tbl_stationed_after_address tsaa where tsaa.after_sale_address_id = tasai.id and tsaa.stationed_user_id = 0 )
+		 	</if>
+		 	<if test="stationed_user_id !=null and stationed_user_id !=''">
+		 		and stationed_user_id =#{stationed_user_id, jdbcType=INTEGER}
+		 	</if>
+		  </where>
+	</select>
+	
+	<!-- 查询售后地址详情 -->
+	<select id="queryAfterSaleAddressDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from tbl_after_sale_address_info where id=#{id, jdbcType=INTEGER}
+	</select>
+	
+	<!-- 售后地址新增 -->
+	<insert id="addAfterSaleAddress" parameterType="java.util.Map">
+		<selectKey keyProperty="after_sale_address_id" resultType="int" order="BEFORE">
+			select seq_after_sale_address_info.nextval from DUAL
+		</selectKey>
+		insert into tbl_after_sale_address_info
+		(
+			id,
+			after_sale_name,
+			after_sale_address,
+			after_sale_mobile,
+			state,
+			warehouse_id,
+			create_date,
+			create_user_id		
+		) values
+		(
+			#{after_sale_address_id, jdbcType=INTEGER},
+			#{after_sale_name, jdbcType=INTEGER},
+			#{after_sale_address, jdbcType=VARCHAR},
+			#{after_sale_mobile, jdbcType=VARCHAR},
+			#{state, jdbcType=CHAR},
+			#{warehouse_id, jdbcType=INTEGER},
+			sysdate,
+			#{public_user_id, jdbcType=INTEGER}
+		)
+	</insert>
+
+	<!--删除商家售后地址-->
+	<delete id="deleteStationedAfterAddress" parameterType="java.util.Map">
+		delete from tbl_stationed_after_address where after_sale_address_id = #{after_sale_address_id,jdbcType=INTEGER} and stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+	</delete>
+
+	<!--新增商家售后地址-->
+	<update id="insertStationedAfterAddress" parameterType="java.util.Map">
+		insert into tbl_stationed_after_address(
+			id,
+			stationed_user_id,
+			after_sale_address_id
+		) values (
+			seq_stationed_after_address.nextval,
+			#{stationed_user_id,jdbcType=INTEGER},
+			#{after_sale_address_id,jdbcType=INTEGER}
+		)
+	</update>
+
+	<!-- 查询入驻商下拉列表-->
+	<select id="listStationedUser" parameterType="java.util.Map" resultType="java.util.Map">
+		select aa.* from (
+			select
+				id,
+				company_name || '（私有商家）' as company_name
+			from tbl_stationed_user_info sui
+			where state='2' and stationed_user_type = '2'
+			and exists (select 1 from tbl_merchants_type mt where sui.id = mt.stationed_user_id and mt.merchants_type = 4)
+			UNION ALL
+			select
+				0 as id,
+				'童库平台（平台）' as company_name
+			from dual
+		) aa where 1 = 1
+		<if test="select_type != null and select_type == 1">
+			and exists (select 1 from tbl_stationed_after_address saa where saa.stationed_user_id = aa.id and saa.after_sale_address_id = #{after_sale_address_id,jdbcType=INTEGER} )
+		</if>
+		<if test="select_type != null and select_type == 2">
+			and not exists (select 1 from tbl_stationed_after_address saa where saa.stationed_user_id = aa.id and saa.after_sale_address_id = #{after_sale_address_id,jdbcType=INTEGER})
+		</if>
+		order by aa.id asc
+	</select>
+	
+	<!-- 售后地址修改-->
+	<update id="editAfterSaleAddress" parameterType="java.util.Map">
+		UPDATE TBL_AFTER_SALE_ADDRESS_INFO
+		<set>
+			<if test="AFTER_SALE_NAME !=null and AFTER_SALE_NAME !=''">
+				AFTER_SALE_NAME=#{AFTER_SALE_NAME, jdbcType=INTEGER},
+			</if>
+			<if test="AFTER_SALE_ADDRESS !=null and AFTER_SALE_ADDRESS !=''">
+				AFTER_SALE_ADDRESS=#{AFTER_SALE_ADDRESS, jdbcType=INTEGER},
+			</if>
+			<if test="AFTER_SALE_MOBILE !=null and AFTER_SALE_MOBILE !=''">
+				AFTER_SALE_MOBILE=#{AFTER_SALE_MOBILE, jdbcType=INTEGER},
+			</if>
+			<if test="WAREHOUSE_ID !=null and WAREHOUSE_ID !=''">
+				WAREHOUSE_ID = #{WAREHOUSE_ID, jdbcType=INTEGER},
+			</if>
+			<if test="STATE !=null and STATE !=''">
+				STATE=#{STATE, jdbcType=CHAR}
+			</if>
+		</set>
+		WHERE ID=#{id, jdbcType=INTEGER}
+	</update>
+	
+	<!-- 售后地址删除-->
+	<delete id="removeAfterSaleAddress" parameterType="java.util.Map">
+		delete from tbl_after_sale_address_info where id=#{id, jdbcType=INTEGER}
+	</delete>
+	
+	<!-- 售后地址更新状态-->
+	<update id="editAfterSaleAddressState" parameterType="java.util.Map">
+		update tbl_after_sale_address_info
+			set state=#{state, jdbcType=CHAR}
+		where id=#{id, jdbcType=INTEGER}
+	</update>
+</mapper>

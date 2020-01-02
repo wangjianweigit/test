@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.notice.dao.NewsDao">
+	
+	<resultMap type="java.util.Map" id="resultNewsDetail">
+		<result column="id" property="id"/>
+		<result column="name" property="name"/>
+		<result column="content" property="content" jdbcType="CLOB" javaType = "string"/>
+		<result column="label_color" property="label_color"/>
+		<result column="label_text" property="label_text"/>
+		<result column="img_url" property="img_url"/>
+	</resultMap>
+	<!-- 新闻数量 -->
+	<select id="queryNewsCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+	      from tbl_news_info
+	      <where>
+	      	is_delete = '1'
+	      	<if test="name != null and name !=''">
+	      		and name like concat(concat('%', #{name,jdbcType=VARCHAR}),'%')
+	      	</if>
+	      	<if test="start_create_date!=null and start_create_date!=''">
+				and to_char(create_date,'yyyy-mm-dd hh24:mi:ss') &gt;=#{start_create_date,jdbcType=VARCHAR}
+			</if>
+			<if test="end_create_date!=null and end_create_date!=''">
+				and to_char(create_date,'yyyy-mm-dd hh24:mi:ss') &lt;=#{end_create_date,jdbcType=VARCHAR}
+			</if>
+	      </where>
+	</select>
+	<!-- 新闻列表 -->
+	<select id="queryNewsList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+			select a.*, rownum rn from (
+				select id,
+					   name,
+					   state,
+					   to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date
+			      from tbl_news_info
+			     <where>
+			     	is_delete = '1'
+			      	<if test="name != null and name !=''">
+			      		and name like concat(concat('%', #{name,jdbcType=VARCHAR}),'%')
+			      	</if>
+			      	<if test="start_create_date!=null and start_create_date!=''">
+						and to_char(create_date,'yyyy-mm-dd hh24:mi:ss') &gt;=#{start_create_date,jdbcType=VARCHAR}
+					</if>
+					<if test="end_create_date!=null and end_create_date!=''">
+						and to_char(create_date,'yyyy-mm-dd hh24:mi:ss') &lt;=#{end_create_date,jdbcType=VARCHAR}
+					</if>
+			      </where>
+			     order by sort_id desc) a
+			where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	     
+	</select>
+	
+	<!-- 新闻详情 -->
+	<select id="queryNewsDetail" parameterType="java.util.Map" resultMap="resultNewsDetail">
+		select id,
+			   name,
+			   content,
+			   label_color,
+			   label_text,
+			   img_url
+	      from tbl_news_info
+	     where is_delete = '1' and id = #{id,jdbcType=INTEGER}
+	</select>
+	<!-- 新闻标题是否重复 -->
+	<select id="isExist" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_news_info
+		 where name=#{name,jdbcType=VARCHAR}
+		 	<if test="id!=null and id!=0">
+		 		and id!=#{id,jdbcType=INTEGER}
+		 	</if>
+	</select>
+	<!-- 新增新闻 -->
+	<insert id="insertNews" parameterType="java.util.Map">
+		insert into tbl_news_info
+		(
+			id,
+			name,
+			content,
+			label_color,
+			label_text,
+			img_url,
+			craete_user_id,
+			sort_id
+		) 
+		values
+		(
+			seq_news_info.nextval,
+			#{name,jdbcType=VARCHAR},
+			#{content,jdbcType=CLOB},
+			#{label_color,jdbcType=VARCHAR},
+			#{label_text,jdbcType=VARCHAR},
+			#{img_url,jdbcType=VARCHAR},
+			#{public_user_id,jdbcType=INTEGER},
+			(select nvl(max(sort_id),0) + 1 from tbl_news_info)
+		)
+	</insert>
+	<!-- 编辑新闻 -->
+	<update id="updateNews" parameterType="java.util.Map">
+		update tbl_news_info
+		   <set>
+		   		last_edit_user_id = #{public_user_id,jdbcType=INTEGER},
+		   		last_edit_date = sysdate,
+    	   		<if test="name !=null and name !=''">name = #{name,jdbcType=VARCHAR},</if>
+    	   		<if test="content !=null and content !=''">content = #{content,jdbcType=CLOB},</if>
+    	   		<if test="label_color !=null and label_color !=''">label_color = #{label_color,jdbcType=VARCHAR},</if>
+    	   		<if test="label_text !=null and label_text !=''">label_text = #{label_text,jdbcType=VARCHAR},</if>
+    	   		<if test="img_url !=null and img_url !=''">img_url = #{img_url,jdbcType=VARCHAR}</if>
+    	   		<if test="state !=null and state !=''">state = #{state,jdbcType=CHAR}</if>
+    	   		<if test="is_delete != null and is_delete !=''">is_delete = #{is_delete,jdbcType=CHAR}</if>
+    	   	</set>
+    	 where id = #{id,jdbcType=INTEGER}
+	</update>
+	
+	<!-- 更新排序 -->
+	<update id="updateSort" parameterType="java.util.Map">
+		update tbl_news_info
+		   <set>
+		    last_edit_user_id = #{public_user_id,jdbcType=INTEGER},
+		   	last_edit_date = sysdate,
+		   	<if test="sort_id!=null">
+				sort_id = #{sort_id,jdbcType=INTEGER}
+			</if>
+			<if test="type == 'top'">
+				sort_id = (select max(sort_id) + 1 from tbl_news_info )
+			</if>
+			<if test="type == 'bottom'">
+				sort_id = (select min(sort_id) - 1 from tbl_news_info)
+			</if>
+		   </set> 
+		 where is_delete = '1' and id = #{id,jdbcType=INTEGER}
+	</update>
+	
+	<select id="queryById" parameterType="long" resultType="java.util.Map">
+		select sort_id
+		  from tbl_news_info
+		 where id = #{id,jdbcType=INTEGER}
+	</select>
+	
+</mapper>

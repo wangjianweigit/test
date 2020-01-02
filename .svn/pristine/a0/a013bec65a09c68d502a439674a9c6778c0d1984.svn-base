@@ -1,0 +1,23 @@
+package com.tk.oms.finance.dao;
+
+import java.util.Map;
+
+import org.springframework.stereotype.Repository;
+
+import com.tk.sys.common.BaseDao;
+
+@Repository
+public interface RetailExtractDao  extends BaseDao<Map<String,Object>> {
+	/**
+	 * 对新零售商家提现操作记录进行审批
+	 * @param param
+	 * @return
+	 */
+	int approval(Map<String,Object> param);
+	/**
+	 * 对新零售商家提现操作记录进行打款
+	 * @param param
+	 * @return
+	 */
+	int pay(Map<String,Object> param);
+}

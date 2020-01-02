@@ -1,0 +1,343 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.analysis.dao.UserDailyStatisticsDao">
+
+    <!--查询每日统计数据列表-->
+    <select id="queryUserDilyStatisicsList_Flow" resultType="java.util.Map" parameterType="java.util.Map">
+        select * from (
+                select '新增用户数' type_name,count(1) cnt,TO_CHAR (a.CREATE_DATE, 'YYYY-MM-DD') create_date from tbl_user_info a
+                    <where>
+                            create_date is not null
+                        <if test="start_time != null and start_time != ''">
+                            and a.create_date &gt;= TO_DATE(#{start_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+                        </if>
+                        <if test="end_time != null and end_time != ''">
+                            and a.create_date &lt;= TO_DATE(#{end_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+                        </if>
+                        <if test="resource != null and resource != ''">
+                            and a.user_resource =#{resource,jdbcType=CHAR}
+                        </if>
+                        <if test="user_name != null and user_name != ''">
+                            and a.user_name = #{user_name,jdbcType=VARCHAR}
+                        </if>
+                        <if test="user_manage_name != null and user_manage_name != ''">
+                            and a.user_manage_name = #{user_manage_name,jdbcType=VARCHAR}
+                        </if>
+                        <if test="manager_user_id != null and manager_user_id !=0">
+                            and a.market_supervision_user_id = #{manager_user_id,jdbcType=INTEGER}
+                        </if>
+                        <if test="referee_user_id != null and referee_user_id !=0">
+                            and a.referee_user_id = #{referee_user_id,jdbcType=INTEGER}
+                        </if>
+                        <if test="store_id != null and store_id !=0">
+                            and a.store_id = #{store_id,jdbcType=INTEGER}
+                        </if>
+                        <if test="public_user_type != null and public_user_type == 2">
+                            and EXISTS (SELECT 1 FROM TBL_SYS_USER_STORE TSUS WHERE TSUS.STORE_ID = a.STORE_ID AND TSUS.USER_ID = #{public_user_id,jdbcType=INTEGER})
+                        </if>
+                        <if test="public_user_type != null and public_user_type == 3">
+                            and a.referee_user_id = #{public_user_id,jdbcType=INTEGER}
+                        </if>
+                        <if test="public_user_type != null and public_user_type == 4">
+                            and a.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+                        </if>
+                        <if test="public_user_type != null and public_user_type == 5">
+                            and EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID = a.STORE_ID AND TSI.SHOPKEEPER_USER_ID = #{public_user_id,jdbcType=INTEGER})
+                        </if>
+                        <if test="public_user_type != null and public_user_type == 6">
+                            and EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUI WHERE TSUI.STORE_ID = a.STORE_ID AND TSUI.USER_ID = #{public_user_id,jdbcType=INTEGER})
+                        </if>
+                        <if test="public_user_type != null and public_user_type == 9">
+                            and EXISTS(SELECT 1 FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.USER_TYPE = 4
+                            AND TSUI.ORGANIZATION_ID IN (
+                            SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+                            START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER}
+                            CONNECT BY PRIOR ID = PARENT_ID
+                            )
+                            AND TSUI.id = a.market_supervision_user_id)
+                        </if>
+                    </where>
+                group by TO_CHAR (a.CREATE_DATE, 'YYYY-MM-DD')
+
+                union all
+
+                select '日志访问数' type_name,count(1) cnt,TO_CHAR (a.CREATE_DATE, 'YYYY-MM-DD') create_date from TBL_USER_LOG_INFO a,tbl_user_info b
+                <where>
+                    b.user_name = a.create_user_name
+                    <if test="start_time != null and start_time != ''">
+                        and a.CREATE_DATE &gt;= TO_DATE(#{start_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+                    </if>
+                    <if test="end_time != null and end_time != ''">
+                        and a.CREATE_DATE &lt;= TO_DATE(#{end_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+                    </if>
+                    <if test="resource != null and resource != ''">
+                        and b.user_resource =#{resource,jdbcType=CHAR}
+                    </if>
+                    <if test="user_name != null and user_name != ''">
+                        and create_user_name = #{user_name,jdbcType=VARCHAR}
+                    </if>
+                    <if test="user_manage_name != null and user_manage_name != ''">
+                        and create_user_realname = #{user_manage_name,jdbcType=VARCHAR}
+                    </if>
+                    <if test="manager_user_id != null and manager_user_id !=0">
+                        and b.market_supervision_user_id = #{manager_user_id,jdbcType=INTEGER}
+                    </if>
+                    <if test="referee_user_id != null and referee_user_id !=0">
+                        and b.referee_user_id = #{referee_user_id,jdbcType=INTEGER}
+                    </if>
+                    <if test="store_id != null and store_id !=0">
+                        and b.store_id = #{store_id,jdbcType=INTEGER}
+                    </if>
+                    <if test="public_user_type != null and public_user_type == 2">
+                        and EXISTS (SELECT 1 FROM TBL_SYS_USER_STORE TSUS WHERE TSUS.STORE_ID = b.STORE_ID AND TSUS.USER_ID = #{public_user_id,jdbcType=INTEGER})
+                    </if>
+                    <if test="public_user_type != null and public_user_type == 3">
+                        and b.referee_user_id = #{public_user_id,jdbcType=INTEGER}
+                    </if>
+                    <if test="public_user_type != null and public_user_type == 4">
+                        and b.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+                    </if>
+                    <if test="public_user_type != null and public_user_type == 5">
+                        and EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID = b.STORE_ID AND TSI.SHOPKEEPER_USER_ID = #{public_user_id,jdbcType=INTEGER})
+                    </if>
+                    <if test="public_user_type != null and public_user_type == 6">
+                        and EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUI WHERE TSUI.STORE_ID = b.STORE_ID AND TSUI.USER_ID = #{public_user_id,jdbcType=INTEGER})
+                    </if>
+                    <if test="public_user_type != null and public_user_type == 9">
+                        and EXISTS(SELECT 1 FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.USER_TYPE = 4
+                        AND TSUI.ORGANIZATION_ID IN (
+                        SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+                        START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER}
+                        CONNECT BY PRIOR ID = PARENT_ID
+                        )
+                        AND TSUI.id = b.market_supervision_user_id)
+                    </if>
+                </where>
+                group by TO_CHAR (a.CREATE_DATE, 'YYYY-MM-DD')
+
+                union all
+
+                select '访客数' type_name,sum(cc) cnt,create_date from (
+                    select 1 cc,TO_CHAR (a.CREATE_DATE, 'YYYY-MM-DD') create_date from TBL_USER_LOG_INFO a,tbl_user_info b
+                    <where>
+                        b.user_name = a.create_user_name
+                        <if test="start_time != null and start_time != ''">
+                            and a.CREATE_DATE &gt;= TO_DATE(#{start_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+                        </if>
+                        <if test="end_time != null and end_time != ''">
+                            and a.CREATE_DATE &lt;= TO_DATE(#{end_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+                        </if>
+                        <if test="resource != null and resource != ''">
+                            and exists (select 1 from tbl_user_info where user_name=a.create_user_name and user_resource =#{resource,jdbcType=CHAR})
+                        </if>
+                        <if test="user_name != null and user_name != ''">
+                            and create_user_name = #{user_name,jdbcType=VARCHAR}
+                        </if>
+                        <if test="user_manage_name != null and user_manage_name != ''">
+                            and create_user_realname = #{user_manage_name,jdbcType=VARCHAR}
+                        </if>
+                        <if test="manager_user_id != null and manager_user_id !=0">
+                            and b.market_supervision_user_id = #{manager_user_id,jdbcType=INTEGER}
+                        </if>
+                        <if test="referee_user_id != null and referee_user_id !=0">
+                            and b.referee_user_id = #{referee_user_id,jdbcType=INTEGER}
+                        </if>
+                        <if test="store_id != null and store_id !=0">
+                            and b.store_id = #{store_id,jdbcType=INTEGER}
+                        </if>
+                        <if test="public_user_type != null and public_user_type == 2">
+                            and EXISTS (SELECT 1 FROM TBL_SYS_USER_STORE TSUS WHERE TSUS.STORE_ID = b.STORE_ID AND TSUS.USER_ID = #{public_user_id,jdbcType=INTEGER})
+                        </if>
+                        <if test="public_user_type != null and public_user_type == 3">
+                            and b.referee_user_id = #{public_user_id,jdbcType=INTEGER}
+                        </if>
+                        <if test="public_user_type != null and public_user_type == 4">
+                            and b.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+                        </if>
+                        <if test="public_user_type != null and public_user_type == 5">
+                            and EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID = b.STORE_ID AND TSI.SHOPKEEPER_USER_ID = #{public_user_id,jdbcType=INTEGER})
+                        </if>
+                        <if test="public_user_type != null and public_user_type == 6">
+                            and EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUI WHERE TSUI.STORE_ID = b.STORE_ID AND TSUI.USER_ID = #{public_user_id,jdbcType=INTEGER})
+                        </if>
+                        <if test="public_user_type != null and public_user_type == 9">
+                            and EXISTS(SELECT 1 FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.USER_TYPE = 4
+                            AND TSUI.ORGANIZATION_ID IN (
+                            SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+                            START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER}
+                            CONNECT BY PRIOR ID = PARENT_ID
+                            )
+                            AND TSUI.id = b.market_supervision_user_id)
+                        </if>
+                    </where>
+                    group by a.create_user_name,TO_CHAR (a.CREATE_DATE, 'YYYY-MM-DD')
+                )
+                group by create_date
+        ) order by create_date
+    </select>
+    
+    <!-- 订单数-订单商品数-所有支付金额 -->
+  	<select id="queryUserDilyStatisicsList_OrderInfo" parameterType="java.util.Map" resultType="java.util.Map">
+  		select count(1) order_count,sum(PRODUCT_COUNT) product_count,sum(PRODUCT_money+df_money+LOGISTICS_MONEY) order_money,TO_CHAR (a.PAYMENT_DATE, 'YYYY-MM-DD') create_date from tbl_order_info a,tbl_user_info b
+        <where>
+            b.user_name = a.user_name
+            and a.PAYMENT_STATE = 2
+            <if test="start_time != null and start_time != ''">
+                and a.PAYMENT_DATE &gt;= TO_DATE(#{start_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+            </if>
+            <if test="end_time != null and end_time != ''">
+                and a.PAYMENT_DATE &lt;= TO_DATE(#{end_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+            </if>
+            <if test="resource != null and resource != ''">
+                and a.order_source =#{resource,jdbcType=VARCHAR}
+            </if>
+            <if test="user_name != null and user_name != ''">
+                and b.login_name = #{user_name,jdbcType=VARCHAR}
+            </if>
+            <if test="user_manage_name != null and user_manage_name != ''">
+                and a.user_manage_name = #{user_manage_name,jdbcType=VARCHAR}
+            </if>
+            <if test="manager_user_id != null and manager_user_id !=0">
+                and b.market_supervision_user_id = #{manager_user_id,jdbcType=INTEGER}
+            </if>
+            <if test="referee_user_id != null and referee_user_id !=0">
+                and b.referee_user_id = #{referee_user_id,jdbcType=INTEGER}
+            </if>
+            <if test="public_user_type != null and public_user_type == 2">
+                and EXISTS (SELECT 1 FROM TBL_SYS_USER_STORE TSUS WHERE TSUS.STORE_ID = b.STORE_ID AND TSUS.USER_ID = #{public_user_id,jdbcType=INTEGER})
+            </if>
+            <if test="public_user_type != null and public_user_type == 3">
+                and b.referee_user_id = #{public_user_id,jdbcType=INTEGER}
+            </if>
+            <if test="public_user_type != null and public_user_type == 4">
+                and b.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+            </if>
+            <if test="public_user_type != null and public_user_type == 5">
+                and EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID = b.STORE_ID AND TSI.SHOPKEEPER_USER_ID = #{public_user_id,jdbcType=INTEGER})
+            </if>
+            <if test="public_user_type != null and public_user_type == 6">
+                and EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUI WHERE TSUI.STORE_ID = b.STORE_ID AND TSUI.USER_ID = #{public_user_id,jdbcType=INTEGER})
+            </if>
+            <if test="public_user_type != null and public_user_type == 9">
+                and EXISTS(SELECT 1 FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.USER_TYPE = 4
+                AND TSUI.ORGANIZATION_ID IN (
+                SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+                START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER}
+                CONNECT BY PRIOR ID = PARENT_ID
+                )
+                AND TSUI.id = b.market_supervision_user_id)
+            </if>
+        </where>
+    	group by TO_CHAR (a.PAYMENT_DATE, 'YYYY-MM-DD')
+  	</select>
+    
+    <!-- 预订支付的首款 -->
+  	<select id="queryUserDilyStatisicsList_PreFirstMoney" parameterType="java.util.Map" resultType="java.util.Map">
+  		select to_char(PAYMENT_DATE,'yyyy-mm-dd') CREATE_DATE,nvl(sum(a.EARNEST_MONEY),0) CNT from TBL_PRE_ORDER_INFO a,tbl_user_info b
+		<where>
+			 a.PAYMENT_STATE = 2 and a.user_id = b.id 
+			<if test="start_time != null and start_time != ''">
+				and a.PAYMENT_DATE >= to_date(#{start_time,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+			</if>
+	        <if test="end_time != null and end_time != ''">
+				and a.PAYMENT_DATE &lt;= to_date(#{end_time,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+			</if>
+			<if test="resource != null and resource != ''">
+                and a.order_source =#{resource,jdbcType=VARCHAR}
+            </if>
+            <if test="user_name != null and user_name != ''">
+                and b.login_name = #{user_name,jdbcType=VARCHAR}
+            </if>
+            <if test="user_manage_name != null and user_manage_name != ''">
+                and a.user_manage_name = #{user_manage_name,jdbcType=VARCHAR}
+            </if>
+            <if test="manager_user_id != null and manager_user_id !=0">
+                and b.market_supervision_user_id = #{manager_user_id,jdbcType=INTEGER}
+            </if>
+            <if test="referee_user_id != null and referee_user_id !=0">
+                and b.referee_user_id = #{referee_user_id,jdbcType=INTEGER}
+            </if>
+            <if test="public_user_type != null and public_user_type == 2">
+                and EXISTS (SELECT 1 FROM TBL_SYS_USER_STORE TSUS WHERE TSUS.STORE_ID = b.STORE_ID AND TSUS.USER_ID = #{public_user_id,jdbcType=INTEGER})
+            </if>
+            <if test="public_user_type != null and public_user_type == 3">
+                and b.referee_user_id = #{public_user_id,jdbcType=INTEGER}
+            </if>
+            <if test="public_user_type != null and public_user_type == 4">
+                and b.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+            </if>
+            <if test="public_user_type != null and public_user_type == 5">
+                and EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID = b.STORE_ID AND TSI.SHOPKEEPER_USER_ID = #{public_user_id,jdbcType=INTEGER})
+            </if>
+            <if test="public_user_type != null and public_user_type == 6">
+                and EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUI WHERE TSUI.STORE_ID = b.STORE_ID AND TSUI.USER_ID = #{public_user_id,jdbcType=INTEGER})
+            </if>
+            <if test="public_user_type != null and public_user_type == 9">
+                and EXISTS(SELECT 1 FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.USER_TYPE = 4
+                AND TSUI.ORGANIZATION_ID IN (
+                SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+                START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER}
+                CONNECT BY PRIOR ID = PARENT_ID
+                )
+                AND TSUI.id = b.market_supervision_user_id)
+            </if>
+		</where>
+		group by to_char(PAYMENT_DATE,'yyyy-mm-dd')
+  	</select>
+  	
+  	<!-- 尾款订单的定金金额 -->
+  	<select id="queryUserDilyStatisicsList_PreOrderFirstMoney" parameterType="java.util.Map" resultType="java.util.Map">
+  		select to_char(a.PAYMENT_DATE,'yyyy-mm-dd') CREATE_DATE,nvl(sum(f.EARNEST_MONEY),0) CNT from TBL_ORDER_INFO a,TBL_PRE_ORDER_RELATE f,tbl_user_info b
+		<where>
+			a.order_number = f.order_number and a.PAYMENT_STATE = 2 and b.user_name = a.user_name
+			<if test="start_time != null and start_time != ''">
+				and a.PAYMENT_DATE >= to_date(#{start_time,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+			</if>
+	        <if test="end_time != null and end_time != ''">
+				and a.PAYMENT_DATE &lt;= to_date(#{end_time,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+			</if>
+			<if test="resource != null and resource != ''">
+                and a.order_source =#{resource,jdbcType=VARCHAR}
+            </if>
+            <if test="user_name != null and user_name != ''">
+                and b.login_name = #{user_name,jdbcType=VARCHAR}
+            </if>
+            <if test="user_manage_name != null and user_manage_name != ''">
+                and a.user_manage_name = #{user_manage_name,jdbcType=VARCHAR}
+            </if>
+            <if test="manager_user_id != null and manager_user_id !=0">
+                and b.market_supervision_user_id = #{manager_user_id,jdbcType=INTEGER}
+            </if>
+            <if test="referee_user_id != null and referee_user_id !=0">
+                and b.referee_user_id = #{referee_user_id,jdbcType=INTEGER}
+            </if>
+            <if test="public_user_type != null and public_user_type == 2">
+                and EXISTS (SELECT 1 FROM TBL_SYS_USER_STORE TSUS WHERE TSUS.STORE_ID = b.STORE_ID AND TSUS.USER_ID = #{public_user_id,jdbcType=INTEGER})
+            </if>
+            <if test="public_user_type != null and public_user_type == 3">
+                and b.referee_user_id = #{public_user_id,jdbcType=INTEGER}
+            </if>
+            <if test="public_user_type != null and public_user_type == 4">
+                and b.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+            </if>
+            <if test="public_user_type != null and public_user_type == 5">
+                and EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID = b.STORE_ID AND TSI.SHOPKEEPER_USER_ID = #{public_user_id,jdbcType=INTEGER})
+            </if>
+            <if test="public_user_type != null and public_user_type == 6">
+                and EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUI WHERE TSUI.STORE_ID = b.STORE_ID AND TSUI.USER_ID = #{public_user_id,jdbcType=INTEGER})
+            </if>
+            <if test="public_user_type != null and public_user_type == 9">
+                and EXISTS(SELECT 1 FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.USER_TYPE = 4
+                AND TSUI.ORGANIZATION_ID IN (
+                SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+                START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER}
+                CONNECT BY PRIOR ID = PARENT_ID
+                )
+                AND TSUI.id = b.market_supervision_user_id)
+            </if>
+		</where>
+		group by to_char(a.PAYMENT_DATE,'yyyy-mm-dd')
+  	</select>
+</mapper>

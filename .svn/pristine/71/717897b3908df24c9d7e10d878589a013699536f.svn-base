@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.sysuser.dao.SysUserLogsDao">
+    
+    <!-- 插入系统用户日志记录 -->
+    <insert id="addSysUserLogs" parameterType="com.tk.oms.sysuser.entity.SysUserLogs">
+		insert into tbl_sys_user_logs
+		(
+			id,
+			user_id,
+			user_name,
+			query_url,
+			query_type,
+			post_param,
+			get_param,
+			query_ip,
+			remark,
+			create_date
+		) 
+		values 
+		(
+			seq_sys_user_logs_id.nextval,
+			#{user_id,jdbcType=BIGINT},
+			#{user_name,jdbcType=VARCHAR},
+			#{query_url,jdbcType=VARCHAR},
+			#{query_type,jdbcType=VARCHAR},
+			#{post_param,jdbcType=VARCHAR},
+			#{get_param,jdbcType=VARCHAR},
+			#{query_ip,jdbcType=VARCHAR},
+			#{remark,jdbcType=VARCHAR},
+			sysdate
+		)
+    </insert>
+    
+    <select id="queryUserLogsForPage" resultType="java.util.Map" parameterType="java.util.Map">
+		
+		SELECT *
+		FROM (SELECT A.*, ROWNUM num
+		FROM (
+			SELECT  ID,USER_ID,USER_NAME,QUERY_URL,QUERY_TYPE,POST_PARAM,
+					GET_PARAM,QUERY_IP,REMARK,CREATE_DATE,
+					TO_CHAR(CREATE_DATE,'YYYY-MM-DD HH24:MI:SS') CRADATE 
+			FROM 
+			TBL_SYS_USER_LOGS
+	    <where>
+			<if test="USER_NAME != null and USER_NAME != ''">
+				AND USER_NAME = #{USER_NAME,jdbcType=VARCHAR}
+			</if>
+			<if test="QUERY_TYPE != null and QUERY_TYPE != ''">
+				AND  QUERY_TYPE = #{QUERY_TYPE,jdbcType=VARCHAR}
+			</if>
+			<if test="QUERY_IP != null and QUERY_IP != ''">
+				AND QUERY_IP = #{QUERY_IP,jdbcType=VARCHAR}
+			</if>
+			<if test="REMARK != null and REMARK != ''">
+				AND  REMARK LIKE CONCAT('%',CONCAT(#{REMARK,jdbcType=VARCHAR},'%')) 
+			</if>
+			<if test="START_CRADATE != null and START_CRADATE != ''">
+				AND  CREATE_DATE &gt; to_date(#{START_CRADATE,jdbcType=VARCHAR},'YYYY-MM-DD HH24 MI SS')
+			</if>
+			<if test="END_CRADATE != null and END_CRADATE != ''">
+				AND  CREATE_DATE &lt;= to_date(#{END_CRADATE,jdbcType=VARCHAR},'YYYY-MM-DD HH24 MI SS')
+			</if>
+		</where>
+		ORDER BY ID
+		) A
+		WHERE ROWNUM  &lt; = #{end_row_num,jdbcType=INTEGER})
+		WHERE num &gt;#{start_row_num,jdbcType=INTEGER}
+	</select>
+	<select id="queryUserLogsCount" resultType="INTEGER" parameterType="java.util.Map">
+		
+		SELECT COUNT(ID)  
+		    FROM
+			TBL_SYS_USER_LOGS
+	     <where>
+			<if test="USER_NAME != null and USER_NAME != ''">
+				AND USER_NAME = #{USER_NAME,jdbcType=VARCHAR}
+			</if>
+			<if test="QUERY_TYPE != null and QUERY_TYPE != ''">
+				AND  QUERY_TYPE = #{QUERY_TYPE,jdbcType=VARCHAR}
+			</if>
+			<if test="QUERY_IP != null and QUERY_IP != ''">
+				AND QUERY_IP = #{QUERY_IP,jdbcType=VARCHAR}
+			</if>
+			<if test="REMARK != null and REMARK != ''">
+				AND  REMARK LIKE CONCAT('%',CONCAT(#{REMARK,jdbcType=VARCHAR},'%')) 
+			</if>
+			<if test="START_CRADATE != null and START_CRADATE != ''">
+				AND  CREATE_DATE &gt; to_date(#{START_CRADATE,jdbcType=VARCHAR},'YYYY-MM-DD HH24 MI SS')
+			</if>
+			<if test="END_CRADATE != null and END_CRADATE != ''">
+				AND  CREATE_DATE &lt;= to_date(#{END_CRADATE,jdbcType=VARCHAR},'YYYY-MM-DD HH24 MI SS')
+			</if>
+		</where>
+	</select>
+</mapper>

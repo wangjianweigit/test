@@ -1,0 +1,423 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.basicinfo.dao.AreaProductControlSetDao">
+
+    <!-- 分页查询控货类型记录 -->
+    <select id="queryTypeListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT *
+        FROM (SELECT a.*, rownum num
+              FROM
+                (SELECT t1.*
+                     FROM
+                        (SELECT ID,
+                                COLOR_CODE,
+                                TYPE_NAME
+                            FROM TBL_PRODUCT_CONTROL_TYPE
+                          ORDER BY ID desc
+                      ) t1
+                )a
+              WHERE rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+        WHERE num &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!-- 查询控货类型记录数 -->
+    <select id="queryTypeCountForPage" parameterType="java.util.Map" resultType="int">
+        SELECT count(1) from tbl_product_control_type
+    </select>
+
+    <!-- 根据id查询控货类型数据信息 -->
+    <select id="queryTypeInfoById" parameterType="long" resultType="java.util.Map" >
+        SELECT ID,COLOR_CODE,TYPE_NAME FROM tbl_product_control_type WHERE id = #{id, jdbcType=INTEGER}
+    </select>
+
+    <!-- 修改控货类型数据信息 -->
+    <update id="updateTypeInfo" parameterType="java.util.Map">
+        UPDATE TBL_PRODUCT_CONTROL_TYPE
+        <set>
+            <if test="color_code != null and color_code !=''">
+                color_code = #{color_code, jdbcType=VARCHAR},
+            </if>
+            <if test="type_name != null and type_name != ''">
+                type_name = #{type_name, jdbcType=VARCHAR},
+            </if>
+        </set>
+        WHERE id = #{id, jdbcType=INTEGER}
+    </update>
+
+    <!--查询区域控货配置列表（业务员，业务经理）-->
+    <select id="queryAreaControlSetListForBusiness" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select rownum rn, tt.* from (
+                select
+                    t1.id,
+                    t1.user_realname,
+                    t1.user_type,
+                    t1.state,
+                    t2.area_name
+                from
+                    tbl_sys_user_info t1
+                left join (
+                    select
+                        a.user_id,
+                        to_char(wm_concat(b.name)) area_name
+                    from
+                        tbl_agent_control_area_conf a
+                    left join
+                        tbl_dic_region b on a.city_id = b.id
+                    group by a.user_id
+                ) t2 on t1.id = t2.user_id
+                <where>
+                    <if test="user_type == ''">
+                        t1.user_type in(3,4)
+                    </if>
+                    <if test="user_type != null and user_type == 3">
+                        and t1.user_type = 3
+                    </if>
+                    <if test="user_type != null and user_type == 4">
+                        and t1.user_type = 4
+                    </if>
+                    <if test="user_realname != null and user_realname !=''">
+                        and t1.user_realname like '%'|| #{user_realname,jdbcType=VARCHAR} ||'%'
+                    </if>
+                    <if test="state != null and state !=''">
+                        and t1.state = #{state,jdbcType=VARCHAR}
+                    </if>
+                </where>
+                order by t1.user_type desc,t1.id desc
+            ) tt where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+        where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--查询区域控货配置列表总数量（业务员，业务经理）-->
+    <select id="queryAreaControlSetCountForBusiness" parameterType="java.util.Map" resultType="int">
+        select
+            count(t1.id)
+        from
+            tbl_sys_user_info t1
+        <where>
+            <if test="user_type == ''">
+                t1.user_type in(3,4)
+            </if>
+            <if test="user_type != null and user_type == 3">
+                and t1.user_type = 3
+            </if>
+            <if test="user_type != null and user_type == 4">
+                and t1.user_type = 4
+            </if>
+            <if test="user_realname != null and user_realname !=''">
+                and t1.user_realname like '%'|| #{user_realname,jdbcType=VARCHAR} ||'%'
+            </if>
+            <if test="state != null and state !=''">
+                and t1.state = #{state,jdbcType=VARCHAR}
+            </if>
+        </where>
+    </select>
+
+    <!--查询区域控货配置区域列表（业务经理）-->
+    <select id="queryAreaListForBusiness" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            a.id,
+            a.name,
+            a.parent_id,
+            case when b.city_id is null then 0 else 1 end check_flag
+        from(
+            select
+                t.id,
+                0 as parent_id,
+                name
+            from
+                tbl_dic_region t
+            where
+                parent_id in (
+                    select id from tbl_dic_region where parent_id = 0 and id  != 800000
+                )
+                and t.is_display = 1
+            union
+            select
+                t.id,
+                parent_id,
+                name
+            from
+                tbl_dic_region t
+            where
+                id  = 800000 and t.is_display = 1
+            union
+            select
+                t.id,
+                parent_id,
+                name
+            from
+                tbl_dic_region t
+            where
+                parent_id in (
+                    select id from tbl_dic_region where parent_id in (
+                        select id from tbl_dic_region where parent_id = 0
+                    )
+                ) or parent_id  = 800000 and t.is_display = 1
+        ) a left join tbl_agent_control_area_conf b on a.id = b.city_id and b.user_id = #{user_id,jdbcType=INTEGER} order by a.id
+    </select>
+    <!--查询区域控货配置区域列表（业务员）-->
+    <select id="queryAreaListForBusinessByManager" parameterType="java.util.Map" resultType="java.util.Map">
+       select
+            a.id,
+            a.name,
+            a.parent_id,
+            case when b.city_id is null then 0 else 1 end check_flag
+        from(
+            select t.id, 0 as parent_id,name
+            from tbl_dic_region t
+            where id in (
+                    select parent_id from tbl_dic_region tdr where exists (
+                            select 1 from tbl_agent_control_area_conf where user_id in (
+                                select MANAGER_USER_ID from TBL_STORE_INFO where id in (
+                                    select STORE_ID from TBL_STORE_USER_REL where type=3 and USER_ID = #{user_id,jdbcType=INTEGER}
+                                )
+                            ) and city_id = tdr.id
+                        )
+            ) and t.is_display = 1
+            union
+            select t.id, parent_id,name
+            from tbl_dic_region t where exists (
+                            select 1 from tbl_agent_control_area_conf where user_id in (
+                                select MANAGER_USER_ID from TBL_STORE_INFO where id in (
+                                    select STORE_ID from TBL_STORE_USER_REL where type=3 and USER_ID = #{user_id,jdbcType=INTEGER}
+                                )
+                            ) and city_id = t.id
+             ) 
+             and t.is_display = 1
+        ) a left join tbl_agent_control_area_conf b on a.id = b.city_id and b.user_id = #{user_id,jdbcType=INTEGER} order by a.id
+    </select>
+  	<!--获取区域控货配置（业务员，业务经理）-->
+    <select id="queryAreaControlSetForBusiness" parameterType="long" resultType="java.lang.String">
+        select city_id from tbl_agent_control_area_conf where user_id = #{user_id,jdbcType=INTEGER}
+    </select>
+    <!--删除区域控货配置（业务员，业务经理）-->
+    <delete id="deleteAreaControlSetForBusiness" parameterType="java.util.Map">
+        delete from tbl_agent_control_area_conf where user_id = #{user_id,jdbcType=INTEGER}
+    </delete>
+
+    <!--新增区域控货配置（业务员，业务经理）-->
+    <insert id="insertAreaControlSetForBusiness" parameterType="java.util.Map">
+        insert into tbl_agent_control_area_conf(
+            user_id,
+            city_id
+        ) select #{user_id,jdbcType=INTEGER},a.* from(
+        <foreach collection="city_list" item="item" index="index" separator="UNION">
+            select
+                #{item,jdbcType=INTEGER}
+            from dual
+        </foreach>
+        ) a
+    </insert>
+
+    <!--查询区域控货配置列表（门店）-->
+    <select id="queryAreaControlSetListForStore" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select rownum rn, tt.* from (
+                select
+                    t1.id,
+                    t1.store_name,
+                    t1.store_address,
+                    t1.state,
+                    t2.area_name
+                from
+                    tbl_store_info t1
+                left join (
+                    select
+                        a.store store_id,
+                        to_char(wm_concat(b.name)) area_name
+                    from
+                        tbl_store_control_area_conf a
+                    left join
+                        tbl_dic_region b on a.city_id = b.id
+                    group by a.store
+                ) t2 on t1.id = t2.store_id
+                <where>
+                    <if test="store_name != null and store_name !=''">
+                        t1.store_name like '%'|| #{store_name,jdbcType=VARCHAR} ||'%'
+                    </if>
+                    <if test="store_address != null and store_address !=''">
+                        and t1.store_address like '%'|| #{store_address,jdbcType=VARCHAR} ||'%'
+                    </if>
+                    <if test="state != null and state !=''">
+                        and t1.state = #{state,jdbcType=VARCHAR}
+                    </if>
+                </where>
+                    order by t1.create_date desc
+            ) tt where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+        where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--查询区域控货配置列表总数量（门店）-->
+    <select id="queryAreaControlSetCountForStore" parameterType="java.util.Map" resultType="int">
+        select
+            count(t1.id)
+        from
+            tbl_store_info t1
+        <where>
+            <if test="store_name != null and store_name !=''">
+                t1.store_name like '%'|| #{store_name,jdbcType=VARCHAR} ||'%'
+            </if>
+            <if test="store_address != null and store_address !=''">
+                and t1.store_address like '%'|| #{store_address,jdbcType=VARCHAR} ||'%'
+            </if>
+            <if test="state != null and state !=''">
+                and t1.state = #{state,jdbcType=VARCHAR}
+            </if>
+        </where>
+    </select>
+
+    <!--查询区域控货配置区域列表（门店）-->
+    <select id="queryAreaListForStore" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            a.id,
+            a.name,
+            a.parent_id,
+            case when b.city_id is null then 0 else 1 end check_flag
+        from(
+            select t.id, 0 as parent_id,name
+            from tbl_dic_region t
+            where id in (
+                    select parent_id from tbl_dic_region tdr where exists (
+                            select 1 from tbl_agent_control_area_conf where user_id in (
+                                select MANAGER_USER_ID from TBL_STORE_INFO where id = #{store_id,jdbcType=INTEGER}
+                            ) and city_id = tdr.id
+                        )
+            ) and t.is_display = 1
+            union
+            select t.id, parent_id,name
+            from tbl_dic_region t where exists (
+                            select 1 from tbl_agent_control_area_conf where user_id in (
+                                 select MANAGER_USER_ID from TBL_STORE_INFO where id = #{store_id,jdbcType=INTEGER}
+                            ) and city_id = t.id
+             ) 
+             and t.is_display = 1
+        ) a left join tbl_store_control_area_conf b on a.id = b.city_id and b.store = #{store_id,jdbcType=INTEGER} order by a.id
+    </select>
+
+    <!--删除区域控货配置（业务员，业务经理）-->
+    <delete id="deleteAreaControlSetForStore" parameterType="java.util.Map">
+        delete from tbl_store_control_area_conf where store = #{store_id,jdbcType=INTEGER}
+    </delete>
+
+    <!--新增区域控货配置（门店）-->
+    <insert id="insertAreaControlSetForStore" parameterType="java.util.Map">
+        insert into tbl_store_control_area_conf(
+            store,
+            city_id
+        ) select #{store_id,jdbcType=INTEGER},a.* from(
+        <foreach collection="city_list" item="item" index="index" separator="UNION">
+            select
+                #{item,jdbcType=INTEGER}
+            from dual
+        </foreach>
+        ) a
+    </insert>
+    <!-- 控货类型(下拉框) -->
+    <resultMap type="java.util.Map" id="comboBoxList">
+    	<result column="id" property="id" />
+    	<result column="type_name" property="option"/>
+    	<result column="color_code" property="color_code"/>
+    </resultMap>
+    <select id="queryProductControlTypeComboBoxList" resultMap="comboBoxList">
+    	select id ,type_name,color_code from tbl_product_control_type
+    </select>
+    <!-- 查询品牌控货类型说明 -->
+    <resultMap type="java.util.Map" id="brandExplain">
+        <result column="context" property="context" jdbcType="CLOB" javaType = "string"/>
+    </resultMap>
+    <select id="queryBrandExplain" parameterType="java.util.Map" resultMap="brandExplain">
+    	select context from tbl_product_control_explain
+    	 <where>
+             <if test="brand_id != null and brand_id !=''">
+                 and brand_id = #{brand_id,jdbcType=INTEGER}
+             </if>
+             <if test="type_id != null and type_id !=''">
+                 and type_id = #{type_id,jdbcType=INTEGER}
+             </if>
+         </where>
+    </select>
+
+    <!-- 获取所有控货类型列表数据 -->
+    <select id="queryTypeList" resultType="java.util.Map">
+        select id type_id,type_name from tbl_product_control_type
+    </select>
+
+    <!-- 查询区域控货说明品牌配置信息列表 -->
+    <resultMap type="java.util.Map" id="ExplainList">
+        <result column="context" property="CONTEXT" jdbcType="CLOB" javaType = "java.lang.String"/>
+        <result column="id" property="ID"/>
+        <result column="type_id" property="TYPE_ID"/>
+    </resultMap>
+    <select id="queryExplainListByBrandId" parameterType="long" resultType="java.util.Map" resultMap="ExplainList">
+         SELECT id,context, type_id FROM tbl_product_control_explain WHERE brand_id = #{brand_id,jdbcType=INTEGER}
+    </select>
+
+    <!-- 获取品牌控货说明记录数 -->
+    <select id="queryExplainCountByBrandId" parameterType="long" resultType="int">
+        select count(1) from tbl_product_control_explain where brand_id = #{brand_id,jdbcType=INTEGER}
+    </select>
+
+    <!-- 根据品牌id删除品牌所有说明 -->
+    <delete id="deleteExplainByBrandId" parameterType="long">
+        delete tbl_product_control_explain where brand_id = #{brand_id,jdbcType=INTEGER}
+    </delete>
+
+    <!-- 批量添加品牌控货说明信息 -->
+    <insert id="insertBrandExplainByBatch" parameterType="java.util.Map">
+        insert into tbl_product_control_explain (
+            id,
+            type_id,
+            context,
+            brand_id
+        )
+        select SEQ_PRODUCT_CONTROL_EXPLAIN.NEXTVAL,A.* from(
+            <foreach collection="setData" item="item" index="index" separator="UNION">
+                select
+                    #{item.type_id, jdbcType=INTEGER},
+                    #{item.context, jdbcType=CLOB},
+                    #{brand_id, jdbcType=INTEGER}
+                from dual
+            </foreach>
+        ) A
+    </insert>
+    <!-- 查询一个业务经理配置的某个区域控货城市，是否被赋值给其下属的业务员或者业务经理使用 -->
+    <select id="queryIsUserByCistIdAndManager" parameterType="java.util.Map" resultType="int">
+    	  select
+		  /**是否被业务员使用**/
+		  ((SELECT COUNT(1) FROM tbl_agent_control_area_conf WHERE USER_ID IN (
+		      select USER_ID from TBL_STORE_USER_REL where STORE_ID IN (
+		        select ID from  TBL_STORE_INFO WHERE MANAGER_USER_ID = #{user_id,jdbcType=INTEGER}
+		      ) AND TYPE = 3
+		  ) AND CITY_ID = #{city_id,jdbcType=INTEGER}) +
+		  /**是否被门店使用**/
+		  (SELECT COUNT(1) FROM tbl_store_control_area_conf WHERE STORE IN (
+		        select ID from  TBL_STORE_INFO WHERE MANAGER_USER_ID = #{user_id,jdbcType=INTEGER}
+		    ) AND CITY_ID = #{city_id,jdbcType=INTEGER}
+		   )) num from dual
+    </select>
+    <!-- 查询一个业务经理配置的所有区域控货城市，是否被赋值给其下属的业务员或者业务经理使用-->
+    <select id="queryIsUserByManager" parameterType="java.util.Map" resultType="int">
+    	  select
+		  /**是否被业务员使用**/
+		  ((SELECT COUNT(1) FROM tbl_agent_control_area_conf WHERE USER_ID IN (
+		      select USER_ID from TBL_STORE_USER_REL where STORE_ID IN (
+		        select ID from  TBL_STORE_INFO WHERE MANAGER_USER_ID = #{user_id,jdbcType=INTEGER}
+		      ) AND TYPE = 3
+		  ) AND CITY_ID in
+		  	<foreach collection="cancle_list" item="city_id" open="(" close=")" separator=",">
+					#{city_id,jdbcType=INTEGER}
+			</foreach>
+		  ) +
+		  /**是否被门店使用**/
+		  (SELECT COUNT(1) FROM tbl_store_control_area_conf WHERE STORE IN (
+		        select ID from  TBL_STORE_INFO WHERE MANAGER_USER_ID = #{user_id,jdbcType=INTEGER}
+		    ) AND CITY_ID in 
+		  	<foreach collection="cancle_list" item="city_id" open="(" close=")" separator=",">
+					#{city_id,jdbcType=INTEGER}
+			</foreach>
+		   )) num from dual
+    </select>
+</mapper>

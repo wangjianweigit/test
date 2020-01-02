@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.store.order.dao.StoreBasicSaleDataDao">
+	<!-- 获取商家数据 -->
+    <select id="queryAgentId" parameterType="java.util.Map" resultType="java.util.Map">
+    	select to_char(wm_concat(agent_id)) as agent_id from tbl_user_info a where user_type=2
+    		<if test="ywjl_user_id != null and ywjl_user_id != '' ">
+	            and	a.market_supervision_user_id = #{ywjl_user_id,jdbcType=VARCHAR}
+	        </if>
+	        <if test="md_id != null and md_id != 0 ">
+	            and	a.store_id = #{md_id,jdbcType=INTEGER}
+	        </if>
+	        <if test="ywy_user_id != null and ywy_user_id != '' ">
+	            and	a.referee_user_id = #{ywy_user_id,jdbcType=VARCHAR}
+	        </if>
+    	<choose>
+			<when test="user_id != null and user_id != '' ">
+				and id=#{user_id,jdbcType=INTEGER}
+			</when>
+			<otherwise>
+				<if test="public_user_type != null and public_user_type == 3">
+		            and 1=2
+		         </if>
+		         <if test="public_user_type != null and public_user_type == 4">
+		            and a.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+		         </if>
+		         <if test="public_user_type != null and public_user_type == 5">
+		            and 1=2
+		         </if>
+		         <if test="public_user_type != null and public_user_type == 6">
+		            and 1=2
+		         </if>
+		         <if test="public_user_type != null and public_user_type == 7">
+					and a.supervisor_user_id = #{public_user_id,jdbcType=INTEGER}
+		         </if>
+		         <if test="public_user_type != null and public_user_type == 9">
+		            and a.partner_user_id = #{public_user_id,jdbcType=INTEGER}
+		         </if>
+			</otherwise>
+    	</choose>
+    </select>
+    
+    <!-- 获取商家下拉框数据  -->
+	<select id="queryAgentIdOption" parameterType="java.util.Map" resultType="java.util.Map" resultMap="agentListMap">
+		select id,user_manage_name from tbl_user_info a
+		 where a.user_type=2
+		 <if test="public_user_type != null and public_user_type == 3">
+            and 1=2
+         </if>
+         <if test="public_user_type != null and public_user_type == 4">
+            and a.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+         </if>
+         <if test="public_user_type != null and public_user_type == 5">
+            and 1=2
+         </if>
+         <if test="public_user_type != null and public_user_type == 6">
+            and 1=2
+         </if>
+         <if test="public_user_type != null and public_user_type == 7">
+			and a.supervisor_user_id = #{public_user_id,jdbcType=INTEGER}
+         </if>
+         <if test="public_user_type != null and public_user_type == 9">
+            and a.partner_user_id = #{public_user_id,jdbcType=INTEGER}
+         </if>
+	</select>
+    <resultMap id="agentListMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="user_manage_name" property="option"/>
+    </resultMap>
+    
+     <!-- 查询商家下的店铺列表 -->
+	<select id="queryStoreListOption" parameterType="java.util.Map" resultType="java.util.Map" resultMap="storeListMap">
+		select id,store_name from tbl_store_user_manage
+		 where user_id = #{user_id,jdbcType=INTEGER}
+		 and approval_state=1
+	</select>
+    <resultMap id="storeListMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="store_name" property="option"/>
+    </resultMap>
+    
+     <!-- 查询门店经销商ID -->
+	<select id="queryAgentStoreId" parameterType="java.util.Map" resultType="string">
+		SELECT AGENT_STORE_ID FROM TBL_STORE_USER_MANAGE
+		 WHERE ID = #{STORE_ID,jdbcType=INTEGER}
+	</select>
+	
+	 <!-- 根据会员经销商ID查询会员信息-->
+	<select id="queryUserInfoByAgentId" parameterType="java.util.List" resultType="java.util.Map">
+		select
+			tui.agent_id,
+            tui.id,tui.user_manage_name,
+            (select user_realname from tbl_sys_user_info where id = tui.market_supervision_user_id) ywjl_user_name,
+            (select user_realname from tbl_sys_user_info where id = tui.referee_user_id) ywy_user_name,
+            (select store_name from tbl_store_info where id = tui.store_id) md_name,
+            tui.partner_user_realna,
+            (select name from tbl_site_info where id = tui.site_id) site_name
+        from tbl_user_info tui
+        where tui.agent_id in
+        <foreach collection="list" open="(" close=")" item="item" index="index" separator=",">
+            #{item.AGENT_ID,jdbcType=INTEGER}
+        </foreach>
+	</select>
+	
+</mapper>

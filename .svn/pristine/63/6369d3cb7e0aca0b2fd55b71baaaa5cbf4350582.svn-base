@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project-module
+  type="WEB"
+  name="oms_server"
+  id="myeclipse.1491362029363"
+  context-root="/oms_server"
+  j2ee-spec="5.0"
+  archive="oms_server.war">
+  <attributes>
+    <attribute name="webrootdir" value="WebRoot" />
+  </attributes>
+</project-module>
+

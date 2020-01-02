@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.sys.dao.ExchangeDateDao">
+	<sql id="all_column">
+		id,
+		year,
+		to_char(spring_date, 'yyyy-mm-dd') spring_date,
+		to_char(summer_date, 'yyyy-mm-dd') summer_date,
+		to_char(autumn_date, 'yyyy-mm-dd') autumn_date,
+		to_char(winter_date, 'yyyy-mm-dd') winter_date
+	</sql>
+
+	<!--查询调换货时间配置总数-->
+	<select id="queryListForCount" parameterType="java.util.Map" resultType="int">
+		select count(1) 
+		  from tbl_exchange_date
+		 where delete_flag = 0
+	</select>
+
+	<!--查询调换货时间配置列表信息-->
+	<select id="queryListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+		    select t1.*,rownum rn from (
+		        select <include refid="all_column"/>
+		         from tbl_exchange_date 
+		        where delete_flag = 0
+		        order by year desc
+		    ) t1 where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+		) where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+
+	<!--校验该年份调换货时间配置是否存在-->
+	<select id="isExist" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_exchange_date
+		 where year = #{year,jdbcType=INTEGER}
+		<if test="id != null and id != 0">
+			and id != #{id,jdbcType=INTEGER}
+		</if>
+	</select>
+	
+	<!-- 查询调换货时间配置详情 -->
+	<select id="queryExchangeDateDetail" resultType="java.util.Map">
+		select <include refid="all_column"/>
+		 from tbl_exchange_date
+		where id = #{id,jdbcType=INTEGER}
+	</select>
+	
+	<!--新增-->
+	<insert id="insert" parameterType="java.util.Map">
+		insert into tbl_exchange_date(
+            id,
+		    year,
+		    spring_date,
+		    summer_date,
+		    autumn_date,
+		    winter_date,
+		    create_date,
+		    create_user_id,
+		    update_date,
+		    update_user_id
+		) values (
+		    seq_exchange_date.nextVal,
+		    #{year,jdbcType=INTEGER},
+		    to_date(#{spring_date,jdbcType=VARCHAR}, 'yyyy-mm-dd'),
+		    to_date(#{summer_date,jdbcType=VARCHAR}, 'yyyy-mm-dd'),
+		    to_date(#{autumn_date,jdbcType=VARCHAR}, 'yyyy-mm-dd'),
+		    to_date(#{winter_date,jdbcType=VARCHAR}, 'yyyy-mm-dd'),
+		    sysdate,
+		    #{public_user_id,jdbcType=INTEGER},
+		    sysdate,
+		    #{public_user_id,jdbcType=INTEGER}
+		)
+	</insert>
+	
+	<!-- 更新 -->
+	<update id="update" parameterType="java.util.Map">
+		update tbl_exchange_date
+		   set <if test="year != null and year !=''">year = #{year,jdbcType=INTEGER},</if>
+		       <if test="spring_date != null and spring_date !=''">spring_date = to_date(#{spring_date,jdbcType=VARCHAR}, 'yyyy-mm-dd'),</if>
+		   	   <if test="summer_date != null and summer_date !=''">summer_date = to_date(#{summer_date,jdbcType=VARCHAR}, 'yyyy-mm-dd'),</if>
+		   	   <if test="autumn_date != null and autumn_date !=''">autumn_date = to_date(#{autumn_date,jdbcType=VARCHAR}, 'yyyy-mm-dd'),</if>
+		   	   <if test="winter_date != null and winter_date !=''">winter_date = to_date(#{winter_date,jdbcType=VARCHAR}, 'yyyy-mm-dd'),</if>
+		       update_date = sysdate,
+		   	   update_user_id = #{public_user_id,jdbcType=INTEGER}
+		where id = #{id,jdbcType=INTEGER}
+	</update>
+	
+	<!-- 逻辑删除 -->
+    <delete id="deleted" parameterType="java.util.Map">
+    	update tbl_exchange_date 
+    		set delete_flag=1,
+    			update_date = sysdate,
+		   		update_user_id = #{public_user_id,jdbcType=INTEGER}
+	    where id = #{id,jdbcType=INTEGER}
+    </delete>
+
+</mapper>

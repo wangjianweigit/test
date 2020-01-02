@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.marketing.dao.ClearActivityDao">
+
+	<sql id="all_column">
+		cai.activity_id,
+		cai.custom_discount_flag,
+		cai.activity_service_discount * 10 as activity_service_discount,
+		cai.activity_max_discount * 10 as activity_max_discount,
+		cai.activity_min_discount * 10 as activity_min_discount,
+		cai.activity_discount * 10 as activity_discount,
+		cai.is_add,
+		cai.activity_quit_flag,
+		cai.tag_color,
+		cai.tag_name,
+		cai.apply_product_limit_amount,
+		cai.tag_level,
+		cai.tag_advance_img,
+		cai.tag_activity_img,
+		cai.background_img_display,
+		cai.tag_img_pc,
+		cai.tag_img_wx
+	</sql>	
+	
+	<!-- 根据活动ID查询清尾活动 -->
+    <select id="getClearActivityByActivityId" parameterType="java.lang.Long" resultType="java.util.HashMap">
+    	select <include refid="all_column"/> from tbl_clear_activity_info cai where cai.activity_id = #{activity_id,jdbcType=INTEGER}
+	</select>
+
+	<!-- 新增清尾活动信息 -->
+    <insert id="insertClearActivity" parameterType="java.util.HashMap">
+    	insert into tbl_clear_activity_info(
+			activity_id,
+			custom_discount_flag,
+			activity_service_discount,
+			activity_max_discount,
+			activity_min_discount,
+			activity_discount,
+			is_add,
+			activity_quit_flag,
+			tag_color,tag_name,
+			apply_product_limit_amount,
+			tag_level,
+			tag_advance_img,
+			tag_activity_img,
+			background_img_display,
+			tag_img_wx,
+			tag_img_pc
+    	) values (
+			#{ACTIVITY_ID,jdbcType=INTEGER},
+			#{CUSTOM_DISCOUNT_FLAG,jdbcType=VARCHAR},
+			#{ACTIVITY_SERVICE_DISCOUNT,jdbcType=DOUBLE},
+			#{ACTIVITY_MAX_DISCOUNT,jdbcType=DOUBLE},
+			#{ACTIVITY_MIN_DISCOUNT,jdbcType=DOUBLE},
+			#{ACTIVITY_DISCOUNT,jdbcType=DOUBLE},
+			#{IS_ADD,jdbcType=VARCHAR},
+			#{ACTIVITY_QUIT_FLAG,jdbcType=VARCHAR},
+			#{TAG_COLOR,jdbcType=VARCHAR},
+			#{TAG_NAME,jdbcType=VARCHAR},
+			#{APPLY_PRODUCT_LIMIT_AMOUNT,jdbcType=INTEGER},
+			#{TAG_LEVEL,jdbcType=VARCHAR},
+			#{TAG_ADVANCE_IMG,jdbcType=VARCHAR},
+			#{TAG_ACTIVITY_IMG,jdbcType=VARCHAR},
+			#{BACKGROUND_IMG_DISPLAY,jdbcType=VARCHAR},
+			#{TAG_IMG_WX,jdbcType=VARCHAR},
+			#{TAG_IMG_PC,jdbcType=VARCHAR}
+    	)
+	</insert>
+	
+	<!-- 更新清尾活动信息 -->
+    <update id="updateClearActivity" parameterType="java.util.HashMap">
+    	update  tbl_clear_activity_info set
+			<if test='CUSTOM_DISCOUNT_FLAG != null and CUSTOM_DISCOUNT_FLAG == "1" '>
+				ACTIVITY_DISCOUNT = #{ACTIVITY_DISCOUNT,jdbcType=DOUBLE},
+				ACTIVITY_MAX_DISCOUNT = NULL,
+				ACTIVITY_MIN_DISCOUNT = NULL,
+			</if>
+			<if test='CUSTOM_DISCOUNT_FLAG != null and CUSTOM_DISCOUNT_FLAG == "2" '>
+				ACTIVITY_DISCOUNT = NULL,
+				ACTIVITY_MAX_DISCOUNT = #{ACTIVITY_MAX_DISCOUNT,jdbcType=DOUBLE},
+				ACTIVITY_MIN_DISCOUNT = #{ACTIVITY_MIN_DISCOUNT,jdbcType=DOUBLE},
+			</if>
+			<if test='BACKGROUND_IMG_DISPLAY != null and BACKGROUND_IMG_DISPLAY == "1" '>
+				TAG_ADVANCE_IMG = #{TAG_ADVANCE_IMG,jdbcType=VARCHAR},
+				TAG_ACTIVITY_IMG = #{TAG_ACTIVITY_IMG,jdbcType=VARCHAR},
+			</if>
+			<if test='BACKGROUND_IMG_DISPLAY != null and BACKGROUND_IMG_DISPLAY == "2" '>
+				TAG_ADVANCE_IMG = NULL,
+				TAG_ACTIVITY_IMG = NULL,
+			</if>
+			<if test='TAG_LEVEL != null and TAG_LEVEL == "1" '>
+				TAG_IMG_WX = #{TAG_IMG_WX,jdbcType=VARCHAR},
+				TAG_IMG_PC = #{TAG_IMG_PC,jdbcType=VARCHAR},
+			</if>
+			<if test='TAG_LEVEL != null and TAG_LEVEL != "1" '>
+				TAG_IMG_WX = NULL,TAG_IMG_PC = NULL,
+			</if>
+			CUSTOM_DISCOUNT_FLAG = #{CUSTOM_DISCOUNT_FLAG,jdbcType=VARCHAR},
+			ACTIVITY_SERVICE_DISCOUNT = #{ACTIVITY_SERVICE_DISCOUNT,jdbcType=DOUBLE},
+			IS_ADD = #{IS_ADD,jdbcType=VARCHAR},
+			ACTIVITY_QUIT_FLAG = #{ACTIVITY_QUIT_FLAG,jdbcType=VARCHAR},
+			TAG_COLOR = #{TAG_COLOR,jdbcType=VARCHAR},
+			TAG_NAME = #{TAG_NAME,jdbcType=VARCHAR},
+			APPLY_PRODUCT_LIMIT_AMOUNT = #{APPLY_PRODUCT_LIMIT_AMOUNT,jdbcType=INTEGER},
+			TAG_LEVEL = #{TAG_LEVEL,jdbcType=VARCHAR},
+			BACKGROUND_IMG_DISPLAY = #{BACKGROUND_IMG_DISPLAY,jdbcType=VARCHAR}
+    	WHERE ACTIVITY_ID = #{ID,jdbcType=INTEGER}
+	</update>
+	
+	<!-- 更新清尾活动页面装修信息 -->
+    <update id="updateClearActivityDecorate" parameterType="java.util.HashMap">
+    	update  tbl_clear_activity_info set
+			tag_level = #{TAG_LEVEL,jdbcType=VARCHAR},
+			<if test='BACKGROUND_IMG_DISPLAY != null and BACKGROUND_IMG_DISPLAY == "1" '>
+				TAG_ADVANCE_IMG = #{TAG_ADVANCE_IMG,jdbcType=VARCHAR},
+				TAG_ACTIVITY_IMG = #{TAG_ACTIVITY_IMG,jdbcType=VARCHAR},
+			</if>
+			<if test='BACKGROUND_IMG_DISPLAY != null and BACKGROUND_IMG_DISPLAY == "2" '>
+				TAG_ADVANCE_IMG = NULL,
+				TAG_ACTIVITY_IMG = NULL,
+			</if>
+			<if test='TAG_LEVEL != null and TAG_LEVEL == "1" '>
+				TAG_IMG_WX = #{TAG_IMG_WX,jdbcType=VARCHAR},
+				TAG_IMG_PC = #{TAG_IMG_PC,jdbcType=VARCHAR},
+			</if>
+			<if test='TAG_LEVEL != null and TAG_LEVEL != "1" '>
+				tag_img_wx = null,
+				tag_img_pc = null,
+			</if>
+			tag_color = #{TAG_COLOR,jdbcType=VARCHAR},
+			tag_name = #{TAG_NAME,jdbcType=VARCHAR},
+			background_img_display = #{BACKGROUND_IMG_DISPLAY,jdbcType=VARCHAR}
+    	WHERE ACTIVITY_ID = #{ID,jdbcType=INTEGER}
+	</update>
+</mapper>

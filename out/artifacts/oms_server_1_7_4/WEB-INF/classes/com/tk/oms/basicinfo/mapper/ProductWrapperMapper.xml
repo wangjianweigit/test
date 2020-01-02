@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.basicinfo.dao.ProductWrapperDao">
+
+    <!--分页查询商品包材信息列表-->
+    <select id="listProductWrapperForPage" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select a.*, rownum num from (
+                select
+                    id,
+                    wrapper_code,
+                    wrapper_name,
+                    wrapper_long,
+                    wrapper_wide,
+                    wrapper_tall,
+                    product_specs,
+                    remark,
+                    state,
+                    to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date
+                from tbl_product_specs_wrapper_info
+                where is_delete = 1
+                <if test="wrapper_code != null and wrapper_code != ''">
+                    and wrapper_code like '%' || #{wrapper_code,jdbcType=VARCHAR} || '%'
+                </if>
+                <if test="wrapper_name != null and wrapper_name != ''">
+                    and wrapper_name like '%' || #{wrapper_name,jdbcType=VARCHAR} || '%'
+                </if>
+                <if test="start_time != null and start_time != ''">
+                    and create_date &gt;= to_date(#{start_time,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+                </if>
+                <if test="end_time != null and end_time != ''">
+                    and create_date &lt;= to_date(#{end_time,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+                </if>
+                <if test="state != null and state != ''">
+                    and state = #{state,jdbcType=INTEGER}
+                </if>
+                order by create_date desc,id desc
+            ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where num &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--查询商品包材信息列表总数量-->
+    <select id="countProductWrapperForPage" parameterType="java.util.Map" resultType="int">
+        select count(1) from tbl_product_specs_wrapper_info where is_delete = 1
+        <if test="wrapper_code != null and wrapper_code != ''">
+            and wrapper_code like '%' || #{wrapper_code,jdbcType=VARCHAR} || '%'
+        </if>
+        <if test="wrapper_name != null and wrapper_name != ''">
+            and wrapper_name like '%' || #{wrapper_name,jdbcType=VARCHAR} || '%'
+        </if>
+        <if test="start_time != null and start_time != ''">
+            and create_date &gt;= to_date(#{start_time,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+        </if>
+        <if test="end_time != null and end_time != ''">
+            and create_date &lt;= to_date(#{end_time,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+        </if>
+        <if test="state != null and state != ''">
+            and state = #{state,jdbcType=INTEGER}
+        </if>
+    </select>
+
+    <!--查询商品包材信息-->
+    <resultMap id="getProductWrapperMap" type="java.util.Map">
+        <result column="wrapper_code" property="wrapper_code"/>
+        <result column="wrapper_name" property="wrapper_name"/>
+        <result column="wrapper_long" property="wrapper_long"/>
+        <result column="wrapper_wide" property="wrapper_wide"/>
+        <result column="wrapper_tall" property="wrapper_tall"/>
+        <result column="product_specs" property="product_specs"/>
+        <result column="remark" property="remark" />
+    </resultMap>
+    <select id="getProductWrapperById" parameterType="java.lang.Long" resultMap="getProductWrapperMap">
+        select
+            wrapper_code,
+            wrapper_name,
+            wrapper_long,
+            wrapper_wide,
+            wrapper_tall,
+            product_specs,
+            remark
+        from tbl_product_specs_wrapper_info
+        where is_delete = 1 and id = #{wrapper_id,jdbcType=INTEGER}
+    </select>
+
+    <!--新增商品包材信息-->
+    <insert id="insertProductWrapper" parameterType="java.util.Map">
+        insert into tbl_product_specs_wrapper_info(
+            id,
+            wrapper_code,
+            wrapper_name,
+            wrapper_long,
+            wrapper_wide,
+            wrapper_tall,
+            product_specs,
+            remark,
+            creater_id,
+            create_date,
+            update_id,
+            update_date,
+            is_delete
+        ) values (
+            #{wrapper_id,jdbcType=INTEGER},
+            #{wrapper_code,jdbcType=VARCHAR},
+            #{wrapper_name,jdbcType=VARCHAR},
+            #{wrapper_long,jdbcType=INTEGER},
+            #{wrapper_wide,jdbcType=INTEGER},
+            #{wrapper_tall,jdbcType=INTEGER},
+            #{product_specs,jdbcType=VARCHAR},
+            #{remark,jdbcType=VARCHAR},
+            #{public_user_id,jdbcType=INTEGER},
+            sysdate,
+            #{public_user_id,jdbcType=INTEGER},
+            sysdate,
+            1
+        )
+    </insert>
+
+    <!--更新商品包材信息-->
+    <update id="updateProductWrapper" parameterType="java.util.Map">
+        update tbl_product_specs_wrapper_info set
+            <if test="wrapper_name != null and wrapper_name != ''">
+                wrapper_name = #{wrapper_name,jdbcType=VARCHAR},
+            </if>
+            <if test="wrapper_long != null and wrapper_long != ''">
+                wrapper_long = #{wrapper_long,jdbcType=INTEGER},
+            </if>
+            <if test="wrapper_wide != null and wrapper_wide != ''">
+                wrapper_wide = #{wrapper_wide,jdbcType=INTEGER},
+            </if>
+            <if test="wrapper_tall != null and wrapper_tall != ''">
+                wrapper_tall = #{wrapper_tall,jdbcType=INTEGER},
+            </if>
+            <if test="product_specs != null and product_specs != ''">
+                product_specs = #{product_specs,jdbcType=VARCHAR},
+            </if>
+            <if test="remark != null">
+                remark = #{remark,jdbcType=VARCHAR},
+            </if>
+            <if test="state != null and state != ''">
+                state = #{state,jdbcType=INTEGER},
+            </if>
+            update_id = #{public_user_id,jdbcType=INTEGER},update_date = sysdate
+        where is_delete = 1 and id = #{wrapper_id,jdbcType=INTEGER}
+    </update>
+
+    <!--删除商品包材信息-->
+    <update id="deleteProductWrapper" parameterType="java.util.Map">
+        update tbl_product_specs_wrapper_info set
+            is_delete = 2,
+            update_id = #{public_user_id,jdbcType=INTEGER},
+            update_date = sysdate
+         where is_delete = 1 and id = #{wrapper_id,jdbcType=INTEGER}
+    </update>
+
+    <!--生成包材ID-->
+    <select id="getWrapperId" resultType="long">
+        select seq_product_specs_wrapper_info.nextval from dual
+    </select>
+
+    <!--根据ID获取包材编码-->
+    <select id="getWrapperCodeById" parameterType="long" resultType="java.lang.String">
+        select replace('BC'||lpad(#{wrapper_id,jdbcType=INTEGER},4),' ','0') as wrapper_code from dual
+    </select>
+
+    <!--根据包材名称获取包材信息数量-->
+    <select id="countProductWrapperByName" parameterType="java.util.Map" resultType="int">
+        select count(1) from tbl_product_specs_wrapper_info where is_delete = 1 and wrapper_name = #{wrapper_name,jdbcType=VARCHAR}
+        <if test="wrapper_id != null and wrapper_id != 0">and id != #{wrapper_id,jdbcType=INTEGER}</if>
+    </select>
+
+    <!--根据包材名称获取包材信息数量-->
+    <select id="countProductWrapperRrf" parameterType="java.util.Map" resultType="int">
+        select count(1) from tbl_product_wrapper_ref_info where wrapper_id = #{wrapper_id,jdbcType=INTEGER} and is_delete = 1
+    </select>
+
+</mapper>

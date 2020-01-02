@@ -1,0 +1,30 @@
+package com.tk.oms.marketing.dao;
+
+import java.util.Map;
+
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface PreorderActivityDao {
+	/**
+	 * 获取促销活动-订货会信息
+	 */
+	public Map<String, Object> queryPreorderActivityDetail(Map<String,Object> paramMap);
+	/**
+	 * 插入订货会活动信息
+	 */
+	public int insertPreorderActivity(Map<String, Object> saleParamMap);
+	/**
+	 * 更新订货会活动信息
+	 */
+	public int updatePreorderActivity(Map<String, Object> paramMap);
+	/**
+	 * 更新订货会活动信息
+	 */
+	public int updatePreorderActivityDecorate(Map<String, Object> paramMap);
+	/**
+	 * 删除订货会活动信息
+	 */
+	public int deletePreorderActivity(Map<String, Object> paramMap);
+	
+}

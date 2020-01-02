@@ -1,0 +1,92 @@
+package com.tk.oms.basicinfo.dao;
+
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Map;
+
+@Repository
+public interface AddressLibraryManageDao {
+
+
+    /**
+     * 查询省市县数据列表
+     * @return
+     */
+    List<Map<String, Object>> queryList(Map<String, Object> params);
+
+    /**
+     * 查询已更新区域列表
+     * @return
+     */
+    List<Map<String, Object>> queryUpdateRegionList();
+
+    /**
+     * 获取单个数据
+     * @param id
+     * @return
+     */
+    Map<String, Object> queryById(long id);
+
+
+    /**
+     * 批量插入省市县数据
+     * @param params
+     * @return
+     */
+    int batchInsertOrUpdate(Map<String, Object> params);
+
+    /**
+     * 逻辑删除省市县数据
+     * @param params
+     * @return
+     */
+    int delete(Map<String, Object> params);
+
+    /**
+     * 获取最新的发布时间
+     * @return
+     */
+    String queryReleaseDate();
+
+    /**
+     * 判断数据是否与表内数据重复
+     * @param params
+     * @return
+     */
+    List<Map<String, Object>> isExist(Map<String, Object> params);
+
+    /**
+     * 判断数据是否与表内数据重复
+     * @param params
+     * @return
+     */
+    int isExistCode(Map<String, Object> params);
+
+    /**
+     * 获取发布版数据,不取大区数据，顶层为省
+     * 且将省份的parent_id设置为0
+     * @return
+     */
+    List<Map<String, Object>> queryRelease();
+
+    /**
+     * 新增发布日志
+     * @param params
+     * @return
+     */
+    int insertReleaseLog(Map<String, Object> params);
+
+    /**
+     * 更新排序
+     * @param params
+     * @return
+     */
+    int updateSort(Map<String, Object> params);
+
+    /**
+     * 批量新增或者更新区域相关信息
+     * @return
+     */
+    int batchInsertOrUpdateRegion();
+}

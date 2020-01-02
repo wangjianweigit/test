@@ -1,0 +1,1172 @@
+package com.tk.oms.sysuser.service;
+
+import java.io.IOException;
+import java.util.*;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import com.tk.sys.util.*;
+import org.apache.log4j.Logger;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import com.tk.oms.sysuser.dao.SysNodeDao;
+import com.tk.oms.sysuser.dao.SysRoleDao;
+import com.tk.oms.sysuser.dao.SysRoleFieldDao;
+import com.tk.oms.sysuser.dao.SysRoleNodeDao;
+import com.tk.oms.sysuser.dao.SysUserInfoDao;
+import com.tk.oms.sysuser.dao.SysUserRoleDao;
+import com.tk.oms.sysuser.dao.SysUserSiteDao;
+import com.tk.oms.sysuser.dao.SysUserStoreDao;
+import com.tk.oms.sysuser.entity.SysField;
+import com.tk.oms.sysuser.entity.SysNode;
+import com.tk.oms.sysuser.entity.SysRole;
+import com.tk.oms.sysuser.entity.SysRoleField;
+import com.tk.oms.sysuser.entity.SysUserInfo;
+
+/**
+ * 角色权限管理管理
+ * Created by wanghai on 2016/4/22 0022.
+ */
+@Service("SysRoleService")
+public class SysRoleService {
+
+    @Resource
+    private SysNodeDao sysNodeDao;
+    @Resource
+    private SysRoleDao sysRoleDao;
+    @Resource
+    private SysRoleNodeDao sysRoleNodeDao;
+    @Resource
+    private SysUserRoleDao sysUserRoleDao;
+    @Resource
+    private SysUserStoreDao sysUserStoreDao;
+    @Resource
+    private SysUserSiteDao sysUserSiteDao;
+    @Resource
+    private SysRoleFieldDao sysRoleFieldDao;
+    @Resource
+    private SysUserInfoService sysUserInfoService;
+    @Resource
+    private SysUserInfoDao sysUserInfoDao;
+    @Resource
+    private RabbitTemplate omsSysRabbitTemplate;
+
+    Logger logger = Logger.getLogger(this.getClass());
+
+    /** OA数据业务接口 */
+    @Value("${oa_service_url}")
+    private String oa_service_url;
+
+    /** 客户端系统Id */
+    @Value("${oauth.oauth_client_id}")
+    private String clientId;
+
+    /*****************************************************************菜单节点*******************************************************************************************************/
+    
+    /**
+     * 新增菜单或节点
+     * @param request
+     * @return
+     */
+    public ProcessResult addSysNode(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            //校验是否传入参数
+            if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+
+            SysNode node = (SysNode) Transform.GetPacket(json, SysNode.class);
+            //校验name参数
+            if(StringUtils.isEmpty(node.getName())) {
+                pr.setState(false);
+                pr.setMessage("缺少参数name");
+                return pr;
+            }
+            //校验唯一代码
+            if(StringUtils.isEmpty(node.getKey_name())) {
+                pr.setState(false);
+                pr.setMessage("缺少参数key_name");
+                return pr;
+            }
+
+            if(sysNodeDao.insert(node) > 0) {
+                pr.setState(true);
+                pr.setMessage("新增权限菜单或节点成功");
+            } else {
+                pr.setState(false);
+                pr.setMessage("新增权限菜单或节点失败");
+            }
+        } catch (IOException e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+
+        return pr;
+    }
+    
+    /**
+     * 删除菜单或节点
+     * @param request
+     * @return
+     * @throws Exception 
+     */
+    @Transactional
+    public ProcessResult delSysNode(HttpServletRequest request) throws Exception {
+        ProcessResult pr = new ProcessResult();
+
+            String json = HttpUtil.getRequestInputStream(request);
+            //校验是否传入参数
+            if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            HashMap<String,Object> paramMap = (HashMap<String,Object>) Transform.GetPacket(json, HashMap.class);
+            //校验name参数
+            if(!paramMap.containsKey("id")) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数id");
+            	return pr;
+            }
+
+            if(sysNodeDao.delete(paramMap) > 0) {
+            	//删除角色中已使的菜单或节点ID
+            	sysRoleNodeDao.delete(paramMap);
+        		pr.setState(true);
+        		pr.setMessage("删除权限菜单或节点成功");
+            	
+            } else {
+                pr.setState(false);
+                pr.setMessage("删除权限菜单或节点失败");
+            }
+
+        return pr;
+    }
+    
+    /**
+     * 修改菜单或节点
+     * @param request
+     * @return
+     */
+    public ProcessResult updateSysNode(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            //校验是否传入参数
+            if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            SysNode node = (SysNode) Transform.GetPacket(json, SysNode.class);
+            //校验id参数
+            if(StringUtils.isEmpty(node.getId())) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数id");
+            	return pr;
+            }
+
+            if(sysNodeDao.update(node) > 0) {
+        		pr.setState(true);
+        		pr.setMessage("修改权限菜单或节点成功");
+            	
+            } else {
+                pr.setState(false);
+                pr.setMessage("修改权限菜单或节点失败");
+            }
+        } catch (IOException e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+
+        return pr;
+    }
+    
+    /**
+     * 查询所有菜单或节点列表
+     * @param request
+     * @return
+     */
+    public ProcessResult querySysNodeList(HttpServletRequest request) {
+    	GridResult pr = new GridResult();
+        Map<String, Object> paramMap = new HashMap<String, Object>();
+        try {
+        	String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			
+            List<Map<String, Object>> list = sysNodeDao.queryAllList(paramMap);
+    		pr.setState(true);
+    		pr.setMessage("获取所有菜单和节点列表成功");
+    		pr.setObj(list);
+        } catch (IOException e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+
+        return pr;
+    }
+    
+    /**
+     * 查询菜单或节点详情
+     * @param request
+     * @return
+     */
+    public ProcessResult querySysNodeDetail(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            //校验是否传入参数
+            if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            SysNode node = (SysNode) Transform.GetPacket(json, SysNode.class);
+            //校验name参数
+            if(StringUtils.isEmpty(node.getId())) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数id");
+            	return pr;
+            }
+            node = sysNodeDao.queryById(node);
+            pr.setState(true);
+            pr.setMessage("获取菜单和节点详情成功");
+            pr.setObj(node);
+        } catch (IOException e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+    }
+    /*****************************************************************角色*******************************************************************************************************/
+    /**
+     * 新增角色
+     * @param request
+     * @return
+     */
+    public ProcessResult addSysRole(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            //校验是否传入参数
+            if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+
+            HashMap<String,Object> paramMap = (HashMap<String,Object>) Transform.GetPacket(json, HashMap.class);
+            //校验role_name参数
+            if(!paramMap.containsKey("role_name")) {
+                pr.setState(false);
+                pr.setMessage("缺少参数role_name");
+                return pr;
+            }
+            //判断是否有重复的角色名称
+            if(sysRoleDao.queryByRoleName(paramMap)>0){
+            	pr.setState(false);
+                pr.setMessage("角色名称重复");
+                return pr;
+            }
+            if(sysRoleDao.insert(paramMap)>0){
+            	paramMap.put("role_id", paramMap.get("id"));
+            	if(((List<Map<String,Object>>)paramMap.get("role_nodes")).size()>0){
+            		if(sysRoleNodeDao.insert(paramMap) > 0) {
+                        pr.setState(true);
+                        pr.setMessage("新增角色成功");
+                    } else {
+                        pr.setState(false);
+                        pr.setMessage("新增角色失败");
+                    }
+               }else{
+               		pr.setState(true);
+                    pr.setMessage("新增角色[未配置权限菜单]成功");
+               }
+            }else {
+                pr.setState(false);
+                pr.setMessage("新增角色失败");
+            }
+        } catch (IOException e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+
+        return pr;
+    }
+    
+    /**
+     * 删除角色
+     * @param request
+     * @return
+     * @throws Exception 
+     */
+    @Transactional
+    public ProcessResult delSysRole(HttpServletRequest request) throws Exception {
+        ProcessResult pr = new ProcessResult();
+            String json = HttpUtil.getRequestInputStream(request);
+            //校验是否传入参数
+            if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            HashMap<String,Object> paramMap = (HashMap<String,Object>) Transform.GetPacket(json, HashMap.class);
+            //校验name参数
+            if(!paramMap.containsKey("role_id")) {
+                pr.setState(false);
+                pr.setMessage("缺少参数role_id");
+                return pr;
+            }
+
+            if(sysRoleDao.delete(paramMap) > 0) {
+            	//删除角色权限菜单节点表数据
+            	sysRoleNodeDao.delete(paramMap);
+            	//删除角色字段节点表数据
+            	sysRoleFieldDao.delete(paramMap);
+            	//删除用户中已使的角色ID
+            	sysUserRoleDao.delete(paramMap);
+        		pr.setState(true);
+        		pr.setMessage("删除角色成功");
+            	
+            } else {
+                pr.setState(false);
+                pr.setMessage("删除角色失败");
+            }
+
+        return pr;
+    }
+    
+    /**
+     * 修改角色
+     * @param request
+     * @return
+     */
+    public ProcessResult updateSysRole(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            //校验是否传入参数
+            if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            HashMap<String,Object> paramMap = (HashMap<String,Object>) Transform.GetPacket(json, HashMap.class);
+          //校验name参数
+            if(!paramMap.containsKey("role_id")) {
+                pr.setState(false);
+                pr.setMessage("缺少参数role_id");
+                return pr;
+            }
+            //判断是否有重复的角色名称
+            if(sysRoleDao.queryByRoleName(paramMap)>0){
+            	pr.setState(false);
+                pr.setMessage("角色名称重复");
+                return pr;
+            }
+            if(sysRoleDao.update(paramMap) > 0) {
+            	//删除以前配置的数据
+                sysRoleNodeDao.delete(paramMap);
+                
+                if(((List<Map<String,Object>>)paramMap.get("role_nodes")).size()>0){
+                	if(sysRoleNodeDao.insert(paramMap) > 0) {
+                        pr.setState(true);
+                        pr.setMessage("修改角色信息成功");
+                    } else {
+                        pr.setState(false);
+                        pr.setMessage("修改角色信息失败");
+                    }
+               }else{
+               		pr.setState(true);
+                   pr.setMessage("成功取消该角色所有功能菜单权限");
+               }
+            } else {
+                pr.setState(false);
+                pr.setMessage("修改角色信息失败");
+            }
+        } catch (IOException e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+
+        return pr;
+    }
+    
+    /**
+     * 查询角色列表
+     * @param request
+     * @return
+     */
+    public ProcessResult querySysRoleList(HttpServletRequest request) {
+        GridResult pr = new GridResult();
+        Map<String, Object> paramMap = new HashMap<String, Object>();
+        try {
+        	String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			
+            GridResult pageParamResult = PageUtil.handlePageParams(paramMap);
+			if(pageParamResult!=null){
+				return pageParamResult;
+			}
+           
+            List<SysRole> list = sysRoleDao.queryList(paramMap);
+            int total = sysRoleDao.queryCount(paramMap);
+    		pr.setState(true);
+    		pr.setMessage("获取角色列表成功");
+    		pr.setObj(list);
+    		pr.setTotal(total);
+    		
+        } catch (IOException e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+
+        return pr;
+    }
+    
+    /**
+     * 查询角色详情
+     * @param request
+     * @return
+     */
+    public ProcessResult querySysRoleDetail(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            //校验是否传入参数
+            if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            HashMap<String,Object> map = (HashMap<String,Object>) Transform.GetPacket(json, HashMap.class);
+            //校验name参数
+            if(!map.containsKey("role_id")) {
+                pr.setState(false);
+                pr.setMessage("缺少参数role_id");
+                return pr;
+            }
+            SysRole role = sysRoleDao.queryById(map);
+            pr.setState(true);
+            pr.setMessage("获取角色详情成功");
+            pr.setObj(role);
+        } catch (IOException e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+    }
+    
+    /*****************************************************************角色菜单节点管理*******************************************************************************************************/
+    
+    /**
+     * 配置角色菜单节点权限
+     * @param request
+     * @return
+     * @throws Exception 
+     */
+    @Transactional
+    public ProcessResult editSysRoleNode(HttpServletRequest request) throws Exception {
+        ProcessResult pr = new ProcessResult();
+
+            String json = HttpUtil.getRequestInputStream(request);
+            //校验是否传入参数
+            if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+
+            HashMap<String,Object> map = (HashMap<String,Object>) Transform.GetPacket(json, HashMap.class);
+            //校验role_id参数
+            if(!map.containsKey("role_id")) {
+                pr.setState(false);
+                pr.setMessage("缺少参数role_id");
+                return pr;
+            }
+            //校验node_ids参数
+            if(!map.containsKey("node_ids")) {
+                pr.setState(false);
+                pr.setMessage("缺少参数node_ids");
+                return pr;
+            }
+            
+            //删除以前配置的数据
+            sysRoleNodeDao.delete(map);
+            
+            if(sysRoleNodeDao.insert(map) > 0) {
+                pr.setState(true);
+                pr.setMessage("配置角色菜单权限成功");
+            } else {
+                pr.setState(false);
+                pr.setMessage("配置角色菜单权限失败");
+            }
+
+        return pr;
+    }
+    
+    /**
+     * 查询菜单或按钮节点列表，如果有权限则选中
+     * @param request
+     * @return
+     */
+    public ProcessResult querySysRoleNode(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            
+            HashMap<String,Object> map = (HashMap<String,Object>) Transform.GetPacket(json, HashMap.class);
+            //校验role_id参数
+            if(!map.containsKey("role_id")) {
+                pr.setState(false);
+                pr.setMessage("缺少参数role_id");
+                return pr;
+            }
+           
+            //查询菜单或按钮节点列表，如果有权限则选中
+            List<HashMap<String,Object>> list = sysRoleNodeDao.queryList(map);
+            
+            pr.setState(true);
+            pr.setMessage("获取角色配置信息成功");
+            pr.setObj(list);
+            
+        } catch (IOException e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+
+        return pr;
+    }
+    
+/*****************************************************************角色字段权限管理*******************************************************************************************************/
+    
+    /**
+     * 配置角色字段权限
+     * @param request
+     * @return
+     * @throws Exception 
+     */
+    @SuppressWarnings("unchecked")
+	@Transactional
+    public ProcessResult editSysRoleField(HttpServletRequest request) throws Exception {
+        ProcessResult pr = new ProcessResult();
+
+            String json = HttpUtil.getRequestInputStream(request);
+            //校验是否传入参数
+            if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+
+            HashMap<String,Object> map = (HashMap<String,Object>) Transform.GetPacket(json, HashMap.class);
+            //校验role_id参数
+            if(!map.containsKey("role_id")) {
+                pr.setState(false);
+                pr.setMessage("缺少参数role_id");
+                return pr;
+            }
+            //校验Field_ids参数
+            if(!map.containsKey("field_ids")) {
+                pr.setState(false);
+                pr.setMessage("缺少参数field_ids");
+                return pr;
+            }
+
+            //删除以前配置的数据
+            sysRoleFieldDao.delete(map);
+            
+            if(map.get("field_ids")!=null&&(((List<Map<String,Object>>)map.get("field_ids")).size()>0)){
+	            if(sysRoleFieldDao.insert(map) > 0) {
+	                pr.setState(true);
+	                pr.setMessage("配置角色字段权限成功");
+	            } else {
+	                pr.setState(false);
+	                pr.setMessage("配置角色字段权限失败");
+	            }
+            }else{
+            	pr.setState(true);
+                pr.setMessage("清空角色字段权限成功");
+            }
+
+        return pr;
+    }
+    
+    /**
+     * 查询字段列表，如果有权限则选中
+     * @param request
+     * @return
+     */
+    @SuppressWarnings({ "unchecked" })
+	public ProcessResult querySysRoleField(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            //校验是否传入参数
+            if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String,Object> paramMap=(Map<String, Object>)Transform.GetPacket(json, HashMap.class);
+            SysRoleField roleField = new SysRoleField();
+            roleField.setRole_id((Integer.parseInt(paramMap.get("role_id")+"")));
+           
+            //查询字段列表，如果有权限则选中
+            List<SysField> list = sysRoleFieldDao.queryList(roleField);
+            
+            pr.setState(true);
+            pr.setMessage("获取角色配置信息成功");
+            pr.setObj(list);
+            
+        } catch (IOException e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+
+        return pr;
+    }
+    
+    /*****************************************************************用户门店权限管理*******************************************************************************************************/
+    /**
+     * 配置用户门店权限
+     * @param request
+     * @return
+     * @throws Exception 
+     */
+    @Transactional
+    public ProcessResult editSysUserStore(HttpServletRequest request) throws Exception {
+        ProcessResult pr = new ProcessResult();
+
+            String json = HttpUtil.getRequestInputStream(request);
+            //校验是否传入参数
+            if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+
+            HashMap<String,Object> map = (HashMap<String,Object>) Transform.GetPacket(json, HashMap.class);
+            //校验user_id参数
+            if(!map.containsKey("user_id")) {
+                pr.setState(false);
+                pr.setMessage("缺少参数user_id");
+                return pr;
+            }
+            //校验store_ids参数
+            if(!map.containsKey("store_ids")) {
+                pr.setState(false);
+                pr.setMessage("缺少参数store_ids");
+                return pr;
+            }
+            //删除历史权限
+            sysUserStoreDao.delete(map);
+            
+            //刷新最后更新时间
+        	sysUserInfoDao.updateLastUpdateTime(Long.parseLong(map.get("user_id")+""));
+            
+            if(((List<Map<String,Object>>)map.get("store_ids")).size()>0){
+            	 //插入新权限
+                if(sysUserStoreDao.insert(map) > 0) {
+                	SysUserInfo info=sysUserInfoDao.queryByUserId(Long.parseLong(map.get("user_id")+""));
+                	//记录用户门店权限配置日志
+            		Map<String,Object> logMap=new HashMap<String,Object>();
+            		logMap.put("USER_TYPE", 1);
+            		logMap.put("OPERATE_ID", 3);
+            		logMap.put("REMARK", "配置【门店权限】");
+            		logMap.put("CREATE_USER_ID", map.get("public_user_id"));
+            		logMap.put("USER_NAME", info.getUser_name());
+            		logMap.put("USER_REALNAME", info.getUser_realname());
+                    logMap.put("create_date", new Date());
+                    omsSysRabbitTemplate.convertAndSend(MqQueueKeyEnum.OMS_USER_SYS_LOG.getKey(), Jackson.writeObject2Json(logMap));
+                    pr.setState(true);
+                    pr.setMessage("配置用户门店权限成功");
+                } else {
+                    pr.setState(false);
+                    pr.setMessage("配置用户门店权限失败");
+                }
+            }else{
+            	pr.setState(true);
+                pr.setMessage("成功取消该用户所有门店权限");
+            }
+
+        return pr;
+    }
+    
+    /**
+     * 查询门店列表，如果有权限则选中
+     * @param request
+     * @return
+     */
+    public ProcessResult querySysUserStore(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            //校验是否传入参数
+            if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+
+            HashMap<String,Object> map = (HashMap<String,Object>) Transform.GetPacket(json, HashMap.class);
+           
+            //查询门店列表，如果有权限则选中
+            List<Map<String,Object>> list = sysUserStoreDao.queryUserStoreList(map);
+            
+            pr.setState(true);
+            pr.setMessage("获取用户门店权限配置信息成功");
+            pr.setObj(list);
+            
+        } catch (IOException e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+
+        return pr;
+    }
+    
+    /*****************************************************************用户站点权限管理*******************************************************************************************************/
+    /**
+     * 配置用户站点权限
+     * @param request
+     * @return
+     * @throws Exception 
+     */
+    @Transactional
+    public ProcessResult editSysUserSite(HttpServletRequest request) throws Exception {
+        ProcessResult pr = new ProcessResult();
+
+            String json = HttpUtil.getRequestInputStream(request);
+            //校验是否传入参数
+            if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+
+            HashMap<String,Object> map = (HashMap<String,Object>) Transform.GetPacket(json, HashMap.class);
+            //校验user_id参数
+            if(!map.containsKey("user_id")) {
+                pr.setState(false);
+                pr.setMessage("缺少参数user_id");
+                return pr;
+            }
+            //校验store_ids参数
+            if(!map.containsKey("site_ids")) {
+                pr.setState(false);
+                pr.setMessage("缺少参数site_ids");
+                return pr;
+            }
+            //删除历史权限
+            sysUserSiteDao.delete(map);
+            
+            if(((List<Map<String,Object>>)map.get("site_ids")).size()>0){
+            	 //插入新权限
+                if(sysUserSiteDao.insert(map) > 0) {
+                	SysUserInfo info=sysUserInfoDao.queryByUserId(Long.parseLong(map.get("user_id")+""));
+                	//记录用户站点权限配置日志
+            		Map<String,Object> logMap=new HashMap<String,Object>();
+            		logMap.put("USER_TYPE", 1);
+            		logMap.put("OPERATE_ID", 3);
+            		logMap.put("REMARK", "配置【站点权限】");
+            		logMap.put("CREATE_USER_ID", map.get("public_user_id"));
+            		logMap.put("USER_NAME", info.getUser_name());
+            		logMap.put("USER_REALNAME", info.getUser_realname());
+                    logMap.put("create_date", new Date());
+                    omsSysRabbitTemplate.convertAndSend(MqQueueKeyEnum.OMS_USER_SYS_LOG.getKey(), Jackson.writeObject2Json(logMap));
+                    pr.setState(true);
+                    pr.setMessage("配置用户站点权限成功");
+                } else {
+                    pr.setState(false);
+                    pr.setMessage("配置用户站点权限失败");
+                }
+            }else{
+            	pr.setState(true);
+                pr.setMessage("成功取消该用户所有站点权限");
+            }
+
+        return pr;
+    }
+    
+    /**
+     * 查询门店列表，如果有权限则选中
+     * @param request
+     * @return
+     */
+    public ProcessResult querySysUserSite(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            //校验是否传入参数
+            if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+
+            HashMap<String,Object> map = (HashMap<String,Object>) Transform.GetPacket(json, HashMap.class);
+           
+            //查询门店列表，如果有权限则选中
+            List<Map<String,Object>> list = sysUserSiteDao.queryUserSiteList(map);
+            
+            pr.setState(true);
+            pr.setMessage("获取用户站点权限配置信息成功");
+            pr.setObj(list);
+            
+        } catch (IOException e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+
+        return pr;
+    }
+    
+    /*****************************************************************用户角色管理*******************************************************************************************************/
+    
+    /**
+     * 配置用户角色
+     * @param request
+     * @return
+     * @throws Exception 
+     */
+    @Transactional
+    public ProcessResult editSysUserRole(HttpServletRequest request) throws Exception {
+        ProcessResult pr = new ProcessResult();
+
+            String json = HttpUtil.getRequestInputStream(request);
+            //校验是否传入参数
+            if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+
+            HashMap<String,Object> map = (HashMap<String,Object>) Transform.GetPacket(json, HashMap.class);
+            //校验user_id参数
+            if(!map.containsKey("user_id")) {
+                pr.setState(false);
+                pr.setMessage("缺少参数user_id");
+                return pr;
+            }
+            //校验role_ids参数
+            if(!map.containsKey("role_ids")) {
+                pr.setState(false);
+                pr.setMessage("缺少参数role_ids");
+                return pr;
+            }
+
+            //删除以前用户配置的数据
+            sysUserRoleDao.delete(map);
+            
+            if(((List<Map<String,Object>>)map.get("role_ids")).size()>0){
+            	//插入新的权限数据
+                if(sysUserRoleDao.insert(map) > 0) {
+                	SysUserInfo info=sysUserInfoDao.queryByUserId(Long.parseLong(map.get("user_id")+""));
+                	//记录用户角色权限配置日志
+                	Map<String,Object> logMap=new HashMap<String,Object>();
+            		logMap.put("USER_TYPE", 1);
+            		logMap.put("OPERATE_ID", 3);
+            		logMap.put("REMARK", "配置【角色权限】");
+            		logMap.put("CREATE_USER_ID", map.get("public_user_id"));
+            		logMap.put("USER_NAME", info.getUser_name());
+            		logMap.put("USER_REALNAME", info.getUser_realname());
+                    logMap.put("create_date", new Date());
+                    omsSysRabbitTemplate.convertAndSend(MqQueueKeyEnum.OMS_USER_SYS_LOG.getKey(), Jackson.writeObject2Json(logMap));
+                    pr.setState(true);
+                    pr.setMessage("配置用户角色成功");
+                } else {
+                    pr.setState(false);
+                    pr.setMessage("配置用户角色失败");
+                }
+           }else{
+           		pr.setState(true);
+               pr.setMessage("成功取消该用户所有角色权限");
+           }
+
+        return pr;
+    }
+    
+    /**
+     * 查询角色列表，如果有权限则选中
+     * @param request
+     * @return
+     */
+    public ProcessResult querySysUserRole(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            //校验是否传入参数
+            if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+
+            HashMap<String,Object> paramMap = (HashMap<String,Object>) Transform.GetPacket(json, HashMap.class);
+           
+            //查询菜单或按钮节点列表，如果有权限则选中
+            List<SysRole> list = sysUserRoleDao.queryUserRoleList(paramMap);
+            
+            pr.setState(true);
+            pr.setMessage("获取用户角色配置信息成功");
+            pr.setObj(list);
+            
+        } catch (IOException e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+
+        return pr;
+    }
+    
+    /**
+     * 获取用户节点权限
+     * @param request
+     * @return
+     */
+    public ProcessResult querySysUserNode(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            //  校验是否传入参数
+            if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            //  判断id是否已传入
+            SysUserInfo userinfo = (SysUserInfo) Transform.GetPacket(json, SysUserInfo.class);
+            if(userinfo.getId()==0) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数user_id");
+            	return pr;
+            }
+
+            List<Map<String, Object>> basicNodeList = new ArrayList<Map<String, Object>>();
+            List<Map<String, Object>> storeTreeNodeList = new ArrayList<Map<String, Object>>();
+            //  获取系统用户登录OA的openId
+            String openId = sysUserInfoService.getSysUserOAOpenIdById(userinfo.getId());
+            if(StringUtils.isEmpty(openId)){
+                pr.setState(false);
+                pr.setMessage("获取openId失败");
+                return pr;
+            }
+            //  获取系统用户菜单权限数据
+            Map<String, Object> paramMap = new HashMap<String, Object>();
+            paramMap.put("clientId", clientId);
+            paramMap.put("openId", openId);
+            pr = (ProcessResult)HttpClientUtil.postToOAByReverse(oa_service_url + "oauth2/user/menus", paramMap);
+            if(pr.getState()){
+                //  1.OMS系统菜单权限
+                List<Map<String, Object>> treeNodeList = (List<Map<String, Object>>)pr.getObj();
+                if(treeNodeList != null) {
+                    for (Map<String, Object> node : treeNodeList) {
+                        if (!StringUtils.isEmpty(node.get("menuType")) && Integer.parseInt(node.get("menuType").toString()) == 1) {
+                            storeTreeNodeList.add(node);
+                        } else {
+                            basicNodeList.add(node);
+                        }
+                    }
+                }
+            }else{
+                pr.setState(false);
+                logger.info(pr.getMessage());
+                pr.setMessage("获取系统菜单权限失败，请联系管理员~");
+                return pr;
+            }
+
+            Map<String,Object> resultMap = new HashMap<String,Object>();
+            resultMap.put("menu_type_0", basicNodeList);
+            resultMap.put("menu_type_1", storeTreeNodeList);
+            pr.setState(true);
+            pr.setMessage("获取用户节点权限成功");
+            pr.setObj(resultMap);
+        } catch (IOException e) {
+            pr.setState(false);
+            pr.setMessage("获取用户节点权限失败");
+        }
+
+        return pr;
+    }
+    
+    /**
+     * 获取用户字段权限——没有权限的字段名称
+     * @param request
+     * @return
+     */
+    public ProcessResult querySysUserNoField(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            //校验是否传入参数
+            if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+
+            SysUserInfo userinfo = (SysUserInfo) Transform.GetPacket(json, SysUserInfo.class);
+            
+            if(userinfo.getId()==0) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数user_id");
+            	return pr;
+            }
+
+            //  获取系统用户登录OA的openId
+            String openId = sysUserInfoService.getSysUserOAOpenIdById(userinfo.getId());
+            if(StringUtils.isEmpty(openId)){
+                pr.setState(false);
+                pr.setMessage("获取openId失败");
+                return pr;
+            }
+
+            //  获取系统用户菜单权限数据
+            Map<String, Object> paramMap = new HashMap<String, Object>();
+            paramMap.put("clientId", clientId);
+            paramMap.put("openId", openId);
+
+            //  获取用户节点权限
+            pr = HttpClientUtil.postToOAByReverse(oa_service_url + "oauth2/user/no_field", paramMap);
+            if(!pr.getState()) {
+                throw new RuntimeException("获取用户字段权限失败");
+            }
+            Map<String,Long> map = new HashMap<String,Long>();
+            List<Map<String, Object>> list = (List<Map<String, Object>>) pr.getObj();
+            Map<String,Object> m = null;
+            if(null!=list&&!list.isEmpty()&&list.size()>0){
+                for(int i=0;i<list.size();i++){
+                    m = list.get(i);
+                    map.put(m.get("parentId").toString()+"|"+m.get("fieldName").toString()+"|"+(StringUtils.isEmpty(m.get("type"))?"":m.get("type").toString()),Long.parseLong(m.get("parentId").toString()));
+                }
+            }
+            pr.setState(true);
+            pr.setMessage("获取用户字段权限成功");
+            pr.setObj(map);
+            
+        } catch (IOException e) {
+            pr.setState(false);
+            pr.setMessage("获取用户字段权限失败");
+        }
+
+        return pr;
+    }
+    /**
+     * 配置用户门店权限(私有平台)
+     * @param request
+     * @return
+     * @throws Exception 
+     */
+    @Transactional
+	@SuppressWarnings("unchecked")
+	public ProcessResult editSysUserPvtpStore(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			//校验是否传入参数
+	        if(StringUtils.isEmpty(json)) {
+	            pr.setState(false);
+	            pr.setMessage("缺少参数");
+	            return pr;
+	        }
+
+	        HashMap<String,Object> map = (HashMap<String,Object>) Transform.GetPacket(json, HashMap.class);
+	        //校验user_id参数
+	        if(!map.containsKey("data")) {
+	            pr.setState(false);
+	            pr.setMessage("缺少参数data");
+	            return pr;
+	        }
+	        
+	        if(!map.containsKey("type")) {
+	            pr.setState(false);
+	            pr.setMessage("缺少参数type");
+	            return pr;
+	        }
+	        List<Map<String, Object>> dataList = (List<Map<String, Object>>) map.get("data");
+	        int type = (Integer) map.get("type");//操作类型：1、新增；2、删除
+	        for(Map<String, Object> data : dataList) {
+	        	if("2".equals(data.get("type").toString())) {//私有平台
+	        		if(type == 2) {
+	        			//删除历史权限
+	        	        sysUserStoreDao.deleteUserPvtpStore(data);
+	        		}else {
+	        			sysUserStoreDao.insertUserPvtpStore(data);
+	        		}
+	        	}
+	        }
+	        //刷新最后更新时间
+	    	sysUserInfoDao.updateLastUpdateTime(Long.parseLong(map.get("user_id")+""));
+	        
+	    	 pr.setState(true);
+	         pr.setMessage("配置用户私有门店权限成功");
+		} catch (IOException e) {
+			 pr.setState(false);
+	         pr.setMessage("配置用户私有门店权限失败");
+	         throw new RuntimeException("配置用户私有门店权限失败");
+		}
+        
+        return pr;
+	}
+    
+    /**
+     * 查询私有门店列表，如果有权限则选中
+     * @param request
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+	public ProcessResult querySysUserPvtpStore(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            //校验是否传入参数
+            if(StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+
+            HashMap<String,Object> map = (HashMap<String,Object>) Transform.GetPacket(json, HashMap.class);
+           
+            //查询私有门店列表，如果有权限则选中
+            List<Map<String,Object>> list = sysUserStoreDao.queryUserPvtpStoreList(map);
+            
+            pr.setState(true);
+            pr.setMessage("获取用户私有门店权限配置信息成功");
+            pr.setObj(list);
+            
+        } catch (IOException e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+
+        return pr;
+    }
+    
+}

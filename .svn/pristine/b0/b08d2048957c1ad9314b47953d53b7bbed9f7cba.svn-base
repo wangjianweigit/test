@@ -1,0 +1,231 @@
+package com.tk.oms.basicinfo.service;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import com.tk.oms.basicinfo.dao.AfterSaleAddressDao;
+import com.tk.sys.util.GridResult;
+import com.tk.sys.util.HttpUtil;
+import com.tk.sys.util.PageUtil;
+import com.tk.sys.util.ProcessResult;
+import com.tk.sys.util.ResponseSateEnum;
+import com.tk.sys.util.Transform;
+
+@Service("AfterSaleAddressService")
+public class AfterSaleAddressService {
+	
+	@Resource
+	private AfterSaleAddressDao afterSaleAddressDao;
+	
+	/**
+	 * 获取订单列表
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryAfterSaleAddressList(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			GridResult pageParamResult = PageUtil.handlePageParams(paramMap);
+			if(pageParamResult!=null){
+				return pageParamResult;
+			}
+			List<Map<String, Object>> list = afterSaleAddressDao.queryAfterSaleAddressList(paramMap);
+			int count = afterSaleAddressDao.queryAfterSaleAddressCount(paramMap);
+			if (list != null && list.size() > 0) {
+				gr.setMessage("获取数据成功");
+				gr.setObj(list);
+			} else {
+				gr.setMessage("无数据");
+			}
+			gr.setState(true);
+			gr.setTotal(count);
+		} catch (Exception e) {
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+		}
+		return gr;
+	}
+	
+	/**
+	 * 获取售后地址详情
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult afterSaleAddressDetail(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			//获取待订单详情基本信息
+			Map<String,Object> detail = afterSaleAddressDao.queryAfterSaleAddressDetail(paramMap);
+			if(detail!=null){
+				pr.setMessage("获取数据成功");
+				pr.setObj(detail);
+			} else {
+				pr.setMessage("无数据");
+			}
+			pr.setState(true);
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+		}
+		return pr;
+	}
+	
+	/**
+	 * 新增售后地址
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult addAfterSaleAddress(HttpServletRequest request) throws Exception {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+//			if(StringUtils.isEmpty(paramMap.get("order_number"))||StringUtils.isEmpty(paramMap.get("public_user_name"))||StringUtils.isEmpty(paramMap.get("cancel_reason"))){
+//				pr.setMessage("缺少参数");
+//				pr.setState(false);
+//				return pr;
+//			}
+			int count=afterSaleAddressDao.addAfterSaleAddress(paramMap);
+			if(count>0){
+				pr.setMessage("新增数据成功");
+				pr.setState(true);
+			}else{
+				pr.setMessage("新增数据失败");
+				pr.setState(false);
+			}
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+	
+	
+	/**
+	 * 编辑售后地址
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult editAfterSaleAddress(HttpServletRequest request) throws Exception {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			if(StringUtils.isEmpty(paramMap.get("id"))){
+				pr.setMessage("缺少参数");
+				pr.setState(false);
+				return pr;
+			}
+			int count=afterSaleAddressDao.editAfterSaleAddress(paramMap);
+			if(count>0){
+				pr.setMessage("编辑数据成功");
+				pr.setState(true);
+			}else{
+				pr.setMessage("编辑数据失败");
+				pr.setState(false);
+			}
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+	
+	/**
+	 * 删除售后地址
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult removeAfterSaleAddress(HttpServletRequest request) throws Exception {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			if(StringUtils.isEmpty(paramMap.get("id"))){
+				pr.setMessage("缺少参数");
+				pr.setState(false);
+				return pr;
+			}
+			int count=afterSaleAddressDao.removeAfterSaleAddress(paramMap);
+			if(count>0){
+				pr.setMessage("删除数据成功");
+				pr.setState(true);
+			}else{
+				pr.setMessage("删除数据失败");
+				pr.setState(false);
+			}
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+	
+	/**
+	 * 启用禁用售后地址
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult editAfterSaleAddressState(HttpServletRequest request) throws Exception {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+			String json = HttpUtil.getRequestInputStream(request);
+			if(!StringUtils.isEmpty(json)){
+				paramMap = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+			}
+			if(StringUtils.isEmpty(paramMap.get("id"))){
+				pr.setMessage("缺少参数id");
+				pr.setState(false);
+				return pr;
+			}
+			if(StringUtils.isEmpty(paramMap.get("state"))){
+				pr.setMessage("缺少参数state");
+				pr.setState(false);
+				return pr;
+			}
+			int count=afterSaleAddressDao.editAfterSaleAddressState(paramMap);
+			if(count>0){
+				pr.setMessage("更新数据成功");
+				pr.setState(true);
+			}else{
+				pr.setMessage("更新数据失败");
+				pr.setState(false);
+			}
+		} catch (Exception e) {
+			pr.setState(false);
+			pr.setMessage(e.getMessage());
+			throw new RuntimeException(e.getMessage());
+		}
+		return pr;
+	}
+
+}

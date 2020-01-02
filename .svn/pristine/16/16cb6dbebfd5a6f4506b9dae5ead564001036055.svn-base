@@ -1,0 +1,33 @@
+package com.tk.sys.util;
+
+/**
+ * 
+ * Copyright (c), 2018, Tongku
+ * FileName : MqQueueKeyEnum.java
+ * 
+ *
+ * @author yejingquan
+ * @version 1.00
+ * @date 2018年9月19日
+ */
+public enum MqQueueKeyEnum {
+	
+	/** 更新商品吊牌价 */
+    ESB_PRODUCT_PRIZE_TAG_UPDATE("esb.product.prize.tag.update"),
+    /** 财务记账消息队列 */
+    ESB_FINANCE_PAYMENT_RECORD("esb.finance.payment.record");
+
+	private String key;
+
+    MqQueueKeyEnum(String key) {
+        this.key = key;
+    }
+
+    public String getKey() {
+        return key;
+    }
+
+    public void setKey(String key) {
+        this.key = key;
+    }
+}

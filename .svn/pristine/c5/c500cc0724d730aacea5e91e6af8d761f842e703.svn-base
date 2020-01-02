@@ -1,0 +1,3884 @@
+package com.tk.analysis.product.service;
+
+import java.math.BigDecimal;
+import java.text.DecimalFormat;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
+import com.tk.analysis.product.dao.ProductAnalysisOperationDao;
+import com.tk.sys.util.DateUtils;
+import com.tk.sys.util.GridResult;
+import com.tk.sys.util.HttpUtil;
+import com.tk.sys.util.PageUtil;
+import com.tk.sys.util.ProcessResult;
+import com.tk.sys.util.Transform;
+
+@Service("ProductAnalysisOperationService")
+public class ProductAnalysisOperationService {
+	private Log logger = LogFactory.getLog(this.getClass());
+	@Resource
+	private ProductAnalysisOperationDao productAnalysisOperationDao;
+	@Value("${jdbc_user}")
+	private String jdbc_user;
+	private String[] colors={"#2f4554 ", "#c23531", "#f000e8", "#3af3e8", "#ff4e00", "#7e00ff", "#0064d4", "#8f00d4", "#2B2B2B", "#1E90FF", "#00FF00", "#9400D3",
+            "#CD0000", "#CD853F", "#EE1289", "#FFFF00", "#FF00FF", "#001cf1", "#000000", "#50d400", "#f000e8", "#3af3e8", "#ff4e00", "#7e00ff", "#0064d4", "#8f00d4", "#2B2B2B", "#1E90FF", "#00FF00", "#9400D3",
+            "#CD0000", "#CD853F", "#EE1289", "#FFFF00", "#FF00FF", "#001cf1", "#000000", "#50d400", "#f000e8", "#3af3e8", "#ff4e00", "#7e00ff", "#0064d4", "#8f00d4", "#2B2B2B", "#1E90FF", "#00FF00", "#9400D3",
+            "#CD0000", "#CD853F", "#EE1289", "#FFFF00", "#FF00FF", "#001cf1", "#000000", "#50d400", "#f000e8", "#3af3e8", "#ff4e00", "#7e00ff", "#0064d4", "#8f00d4", "#2B2B2B", "#1E90FF", "#00FF00", "#9400D3",
+            "#CD0000", "#CD853F", "#EE1289", "#FFFF00", "#FF00FF", "#001cf1", "#000000", "#50d400", "#f000e8", "#3af3e8", "#ff4e00", "#7e00ff", "#0064d4", "#8f00d4", "#2B2B2B", "#1E90FF", "#00FF00", "#9400D3",
+            "#CD0000", "#CD853F", "#EE1289", "#FFFF00", "#FF00FF", "#001cf1", "#000000", "#50d400", "#f000e8", "#3af3e8", "#ff4e00", "#7e00ff", "#0064d4", "#8f00d4", "#2B2B2B", "#1E90FF", "#00FF00", "#9400D3",
+            "#CD0000", "#CD853F", "#EE1289", "#FFFF00", "#FF00FF", "#001cf1", "#000000", "#50d400", "#f000e8", "#3af3e8", "#ff4e00", "#7e00ff", "#0064d4", "#8f00d4", "#2B2B2B", "#1E90FF", "#00FF00", "#9400D3",
+            "#CD0000", "#CD853F", "#EE1289", "#FFFF00", "#FF00FF"};
+	
+	/**
+	 * 商品概况
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryProductSurvey(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+          
+            Map<String, Object> resultMap = productAnalysisOperationDao.queryProductSurvey(paramMap);
+            
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            
+            /**************************************************今日相关统计    begin****************************************************/
+            String td_date = sdf.format(new Date());
+            paramMap.put("start_date", td_date+" 00:00:00");
+            paramMap.put("end_date", td_date+" 23:59:59");
+            /** 实时 支付金额 */
+            float allPayMoney = productAnalysisOperationDao.queryRealTime_AllPayMoney(paramMap);
+            //预订支付的首款
+            float preFirstMoney = productAnalysisOperationDao.queryRealTime_PreFirstMoney(paramMap);
+          	//尾款订单的定金金额
+            float preOrderFirstMoney = productAnalysisOperationDao.queryRealTime_PreOrderFirstMoney(paramMap);
+            
+            //计算支付金额    
+          	float money = allPayMoney + preFirstMoney - preOrderFirstMoney;
+            
+          	float td_money = money;
+          	resultMap.put("TD_PAYMENT_MONEY", money);
+          	/**************************************************今日相关统计    end****************************************************/
+          	
+          	/**************************************************昨日相关统计    begin****************************************************/
+          	Calendar c = Calendar.getInstance();
+			c.add(Calendar.DATE, -1);
+			String yd_date = sdf.format(c.getTime());
+            paramMap.put("start_date", yd_date);
+            paramMap.put("end_date", yd_date);
+          	//所有支付金额
+            allPayMoney = productAnalysisOperationDao.r_queryOther_AllPayMoney(paramMap);
+            //预订支付的首款 
+            preFirstMoney = productAnalysisOperationDao.r_queryOther_PreFirstMoney(paramMap);
+            
+            //计算支付金额    
+          	money = allPayMoney + preFirstMoney;
+            
+          	resultMap.put("YD_PAYMENT_MONEY", money);
+          	/**************************************************昨日相关统计    end****************************************************/
+          	
+          	/**************************************************本周相关统计    begin****************************************************/
+          	//最近7天 不包含今天
+          	c = Calendar.getInstance();
+			c.add(Calendar.DATE, -6);
+			String tw_date = sdf.format(c.getTime());
+            paramMap.put("start_date", tw_date);
+            paramMap.put("end_date", yd_date);
+            //所有支付金额
+            allPayMoney = productAnalysisOperationDao.r_queryOther_AllPayMoney(paramMap);
+            //预订支付的首款 
+            preFirstMoney = productAnalysisOperationDao.r_queryOther_PreFirstMoney(paramMap);
+            
+            //计算支付金额    
+          	money = allPayMoney + preFirstMoney;
+            
+          	resultMap.put("TW_PAYMENT_MONEY", money);
+          	resultMap.put("START_THIS_WEEK", tw_date);
+          	resultMap.put("END_THIS_WEEK", yd_date);
+          	/**************************************************本周相关统计    end****************************************************/
+          	
+          	/**************************************************上周相关统计    begin****************************************************/
+          	//最近14天
+          	c = Calendar.getInstance();
+			c.add(Calendar.DATE, -13);
+			String lw_date = sdf.format(c.getTime());
+            paramMap.put("start_date", lw_date);
+            paramMap.put("end_date", tw_date);
+            //所有支付金额
+            allPayMoney = productAnalysisOperationDao.r_queryOther_AllPayMoney(paramMap);
+            //预订支付的首款 
+            preFirstMoney = productAnalysisOperationDao.r_queryOther_PreFirstMoney(paramMap);
+            
+            //计算支付金额    
+          	money = allPayMoney + preFirstMoney;
+            
+          	resultMap.put("LW_PAYMENT_MONEY", money);
+          	resultMap.put("START_LAST_WEEK", lw_date);
+          	resultMap.put("END_LAST_WEEK", tw_date);
+          	/**************************************************上周相关统计    end****************************************************/
+          	
+          	/**************************************************本月相关统计    begin****************************************************/
+          	c = Calendar.getInstance();  
+            c.add(Calendar.MONTH, 0);  
+            c.set(Calendar.DAY_OF_MONTH, 1);  
+            String firstday = sdf.format(c.getTime()); 
+            paramMap.put("start_date", firstday);
+            paramMap.put("end_date", td_date);
+            //所有支付金额
+            allPayMoney = productAnalysisOperationDao.r_queryOther_AllPayMoney(paramMap);
+            //预订支付的首款 
+            preFirstMoney = productAnalysisOperationDao.r_queryOther_PreFirstMoney(paramMap);
+            
+            //计算支付金额    
+          	money = allPayMoney + preFirstMoney;
+          	
+          	resultMap.put("TM_PAYMENT_MONEY", money+td_money);//包含当天数据
+            /**************************************************本月相关统计    end****************************************************/
+          	
+            pr.setState(true);
+			pr.setMessage("获取商品概况成功");
+			pr.setObj(resultMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e);
+        }
+        return pr;
+	}
+	
+	/**
+	 * 查询目标
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryTarget(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if(StringUtils.isEmpty(json)){
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if(StringUtils.isEmpty(paramMap.get("this_year"))||StringUtils.isEmpty(paramMap.get("last_year"))) {
+            	pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> retMap = new HashMap<String, Object>();
+            List<Map<String, Object>> resultList = productAnalysisOperationDao.queryTarget(paramMap);
+            retMap.put("dataList", resultList);
+            pr.setState(true);
+            pr.setMessage("查询成功!");
+            pr.setObj(retMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+	}
+	
+	/**
+	 * 查询目标
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult setTarget(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if(StringUtils.isEmpty(json)){
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            
+            //删除目标
+            productAnalysisOperationDao.deleteTargetByYear(paramMap);
+            //新增目标
+            productAnalysisOperationDao.insertTarget(paramMap);
+            
+            pr.setState(true);
+            pr.setMessage("新增成功!");
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+	}
+	
+	
+	/**
+	 * 核心数据分析-访客数
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryKernelData_VisitorCount(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if(StringUtils.isEmpty(json)){
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            Date startDate=sdf.parse(paramMap.get("start_date").toString());
+        	Date endDate=sdf.parse(paramMap.get("end_date").toString());
+        	int day=(int) ((endDate.getTime()-startDate.getTime())/(24*60*60*1000));
+        	if(day == 0) {//day为0时，则开始时间和结束时间为同一天
+        		day = 1;
+        	}
+            float t_visitorCount = 0;
+            float l_visitorCount = 0;
+        	/** 其他 核心数据分析-商品访客数 */
+            t_visitorCount = productAnalysisOperationDao.r_queryOther_VisitorCount(paramMap);
+            Calendar c = Calendar.getInstance();
+        	c.setTime(startDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("start_date", sdf.format(c.getTime()));
+			
+			c = Calendar.getInstance();
+			c.setTime(endDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("end_date", sdf.format(c.getTime()));
+            //较上个周期
+            l_visitorCount = productAnalysisOperationDao.r_queryOther_VisitorCount(paramMap);
+            if(t_visitorCount == 0 || l_visitorCount == 0) {
+            	resultMap.put("ratio", 0);
+            }else {
+            	resultMap.put("ratio", m2((t_visitorCount-l_visitorCount)/l_visitorCount*100));
+            }
+            resultMap.put("visitor_count", t_visitorCount);
+            
+            pr.setState(true);
+            pr.setMessage("获取访客数成功!");
+            pr.setObj(resultMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+	}
+	
+	/**
+	 * 核心数据分析-浏览量
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryKernelData_PvCount(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if(StringUtils.isEmpty(json)){
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            Date startDate=sdf.parse(paramMap.get("start_date").toString());
+        	Date endDate=sdf.parse(paramMap.get("end_date").toString());
+        	int day=(int) ((endDate.getTime()-startDate.getTime())/(24*60*60*1000));
+        	if(day == 0) {//day为0时，则开始时间和结束时间为同一天
+        		day = 1;
+        	}
+            float t_pvCount = 0;
+            float l_pvCount = 0;
+        	/** 其他 核心数据分析-商品浏览量 */
+        	t_pvCount = productAnalysisOperationDao.r_queryOther_PvCount(paramMap);
+        	Calendar c = Calendar.getInstance();
+        	c.setTime(startDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("start_date", sdf.format(c.getTime()));
+			
+			c = Calendar.getInstance();
+			c.setTime(endDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("end_date", sdf.format(c.getTime()));
+            //较上个周期
+            l_pvCount = productAnalysisOperationDao.r_queryOther_PvCount(paramMap);
+            if(t_pvCount == 0 || l_pvCount == 0) {
+            	resultMap.put("ratio", 0);
+            }else {
+            	resultMap.put("ratio", m2((t_pvCount-l_pvCount)/l_pvCount*100));
+            }
+            resultMap.put("pv_count", t_pvCount);
+            
+            pr.setState(true);
+            pr.setMessage("获取浏览量成功!");
+            pr.setObj(resultMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+	}
+	/**
+	 * 核心数据分析-下单买家数
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryKernelData_OPurchaseNumber(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if(StringUtils.isEmpty(json)){
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            Date startDate=sdf.parse(paramMap.get("start_date").toString());
+        	Date endDate=sdf.parse(paramMap.get("end_date").toString());
+        	int day=(int) ((endDate.getTime()-startDate.getTime())/(24*60*60*1000));
+        	if(day == 0) {//day为0时，则开始时间和结束时间为同一天
+        		day = 1;
+        	}
+            float t_purchase_number = 0;
+            float l_purchase_number = 0;
+        	/** 其他 核心数据分析-下单买家数 */
+        	t_purchase_number = productAnalysisOperationDao.r_queryOther_OPurchaseNumber(paramMap);
+        	Calendar c = Calendar.getInstance();
+        	c.setTime(startDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("start_date", sdf.format(c.getTime()));
+			
+			c = Calendar.getInstance();
+			c.setTime(endDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("end_date", sdf.format(c.getTime()));
+            //较上个周期
+            l_purchase_number = productAnalysisOperationDao.r_queryOther_OPurchaseNumber(paramMap);
+            if(t_purchase_number == 0 || l_purchase_number == 0) {
+            	resultMap.put("ratio", 0);
+            }else {
+            	resultMap.put("ratio", m2((t_purchase_number-l_purchase_number)/l_purchase_number*100));
+            }
+            resultMap.put("o_purchase_number", t_purchase_number);
+            
+            pr.setState(true);
+            pr.setMessage("获取下单买家数成功!");
+            pr.setObj(resultMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+	}
+	
+	/**
+	 * 核心数据分析-下单件数
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryKernelData_OCount(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if(StringUtils.isEmpty(json)){
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            Date startDate=sdf.parse(paramMap.get("start_date").toString());
+        	Date endDate=sdf.parse(paramMap.get("end_date").toString());
+        	int day=(int) ((endDate.getTime()-startDate.getTime())/(24*60*60*1000));
+        	if(day == 0) {//day为0时，则开始时间和结束时间为同一天
+        		day = 1;
+        	}
+            float t_count = 0;
+            float l_count = 0;
+        	/** 其他 核心数据分析-下单件数 */
+        	t_count = productAnalysisOperationDao.r_queryOther_OCount(paramMap);
+        	Calendar c = Calendar.getInstance();
+        	c.setTime(startDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("start_date", sdf.format(c.getTime()));
+			
+			c = Calendar.getInstance();
+			c.setTime(endDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("end_date", sdf.format(c.getTime()));
+            //较上个周期
+            l_count = productAnalysisOperationDao.r_queryOther_OCount(paramMap);
+            if(t_count == 0 || l_count == 0) {
+            	resultMap.put("ratio", 0);
+            }else {
+            	resultMap.put("ratio", m2((t_count-l_count)/l_count*100));
+            }
+            resultMap.put("o_count", t_count);
+            
+            pr.setState(true);
+            pr.setMessage("获取下单件数成功!");
+            pr.setObj(resultMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+	}
+	
+	/**
+	 * 核心数据分析-下单金额
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryKernelData_OMoney(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if(StringUtils.isEmpty(json)){
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            Date startDate=sdf.parse(paramMap.get("start_date").toString());
+        	Date endDate=sdf.parse(paramMap.get("end_date").toString());
+        	int day=(int) ((endDate.getTime()-startDate.getTime())/(24*60*60*1000));
+        	if(day == 0) {//day为0时，则开始时间和结束时间为同一天
+        		day = 1;
+        	}
+            float t_money = 0;
+            float l_money = 0;
+        	/** 其他 核心数据分析-下单金额 */
+        	t_money = productAnalysisOperationDao.r_queryOther_OMoney(paramMap);
+        	Calendar c = Calendar.getInstance();
+        	c.setTime(startDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("start_date", sdf.format(c.getTime()));
+			
+			c = Calendar.getInstance();
+			c.setTime(endDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("end_date", sdf.format(c.getTime()));
+            //较上个周期
+            l_money = productAnalysisOperationDao.r_queryOther_OMoney(paramMap);
+            if(t_money == 0 || l_money == 0) {
+            	resultMap.put("ratio", 0);
+            }else {
+            	resultMap.put("ratio", m2((t_money-l_money)/l_money*100));
+            }
+            resultMap.put("o_money", t_money);
+            
+            pr.setState(true);
+            pr.setMessage("获取下单金额成功!");
+            pr.setObj(resultMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+	}
+	
+	/**
+	 * 核心数据分析-下单转化率
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryKernelData_OZhl(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if(StringUtils.isEmpty(json)){
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            Date startDate=sdf.parse(paramMap.get("start_date").toString());
+        	Date endDate=sdf.parse(paramMap.get("end_date").toString());
+        	int day=(int) ((endDate.getTime()-startDate.getTime())/(24*60*60*1000));
+        	if(day == 0) {//day为0时，则开始时间和结束时间为同一天
+        		day = 1;
+        	}
+            float t_visitorCount = 0;
+            float t_purchase_number = 0;
+            float t_zhl = 0;
+            float l_visitorCount = 0;
+            float l_purchase_number = 0;
+            float l_zhl = 0;
+            /** 其他 核心数据分析-商品访客数 */
+            t_visitorCount = productAnalysisOperationDao.r_queryOther_VisitorCount(paramMap);
+            /** 其他 核心数据分析-下单买家数 */
+            t_purchase_number = productAnalysisOperationDao.r_queryOther_OPurchaseNumber(paramMap);
+            Calendar c = Calendar.getInstance();
+        	c.setTime(startDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("start_date", sdf.format(c.getTime()));
+			
+			c = Calendar.getInstance();
+			c.setTime(endDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("end_date", sdf.format(c.getTime()));
+            //较上个周期
+            /** 其他 核心数据分析-商品访客数 */
+            l_visitorCount = productAnalysisOperationDao.r_queryOther_VisitorCount(paramMap);
+            /** 其他 核心数据分析-下单买家数 */
+            l_purchase_number = productAnalysisOperationDao.r_queryOther_OPurchaseNumber(paramMap);
+            if(l_visitorCount == 0 || l_purchase_number == 0) {
+            	l_zhl = 0;
+            }else {
+            	l_zhl = 100*(l_purchase_number/l_visitorCount);
+            }
+            
+            if(t_visitorCount == 0 || t_purchase_number == 0) {
+            	resultMap.put("ratio", 0);
+            	t_zhl = 0;
+            }else {
+            	t_zhl = 100*(t_purchase_number/t_visitorCount);
+            	if(l_zhl == 0) {
+            		resultMap.put("ratio", 0);
+            	}else {
+            		resultMap.put("ratio", m2((t_zhl-l_zhl)/l_zhl*100));
+            	}
+            }
+            resultMap.put("o_zhl", t_zhl);
+            
+            pr.setState(true);
+            pr.setMessage("获取下单转化率成功!");
+            pr.setObj(resultMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+	}
+	
+	/**
+	 * 核心数据分析-支付买家数
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryKernelData_PayPurchaseNumber(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if(StringUtils.isEmpty(json)){
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            Date startDate=sdf.parse(paramMap.get("start_date").toString());
+        	Date endDate=sdf.parse(paramMap.get("end_date").toString());
+        	int day=(int) ((endDate.getTime()-startDate.getTime())/(24*60*60*1000));
+        	if(day == 0) {//day为0时，则开始时间和结束时间为同一天
+        		day = 1;
+        	}
+            float t_purchase_number = 0;
+            float l_purchase_number = 0;
+        	/** 其他 核心数据分析-支付买家数 */
+        	t_purchase_number = productAnalysisOperationDao.r_queryOther_PayPurchaseNumber(paramMap);
+        	Calendar c = Calendar.getInstance();
+        	c.setTime(startDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("start_date", sdf.format(c.getTime()));
+			
+			c = Calendar.getInstance();
+			c.setTime(endDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("end_date", sdf.format(c.getTime()));
+            //较上个周期
+            l_purchase_number = productAnalysisOperationDao.r_queryOther_PayPurchaseNumber(paramMap);
+            if(t_purchase_number == 0 || l_purchase_number == 0) {
+            	resultMap.put("ratio", 0);
+            }else {
+            	resultMap.put("ratio", m2((t_purchase_number-l_purchase_number)/l_purchase_number*100));
+            }
+            resultMap.put("p_purchase_number", t_purchase_number);
+            
+            pr.setState(true);
+            pr.setMessage("获取支付买家数成功!");
+            pr.setObj(resultMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+	}
+	
+	/**
+	 * 核心数据分析-支付件数
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryKernelData_PayCount(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if(StringUtils.isEmpty(json)){
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            Date startDate=sdf.parse(paramMap.get("start_date").toString());
+        	Date endDate=sdf.parse(paramMap.get("end_date").toString());
+        	int day=(int) ((endDate.getTime()-startDate.getTime())/(24*60*60*1000));
+        	if(day == 0) {//day为0时，则开始时间和结束时间为同一天
+        		day = 1;
+        	}
+            float t_count = 0;
+            float l_count = 0;
+        	/** 其他 核心数据分析-支付件数 */
+        	t_count = productAnalysisOperationDao.r_queryOther_PayCount(paramMap);
+        	Calendar c = Calendar.getInstance();
+        	c.setTime(startDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("start_date", sdf.format(c.getTime()));
+			
+			c = Calendar.getInstance();
+			c.setTime(endDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("end_date", sdf.format(c.getTime()));
+            //较上个周期
+            l_count = productAnalysisOperationDao.r_queryOther_PayCount(paramMap);
+            if(t_count == 0 || l_count == 0) {
+            	resultMap.put("ratio", 0);
+            }else {
+            	resultMap.put("ratio", m2((t_count-l_count)/l_count*100));
+            }
+            resultMap.put("p_count", t_count);
+            
+            pr.setState(true);
+            pr.setMessage("获取支付件数成功!");
+            pr.setObj(resultMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+	}
+	
+	/**
+	 * 核心数据分析-支付金额
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryKernelData_PayMoney(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if(StringUtils.isEmpty(json)){
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            Date startDate=sdf.parse(paramMap.get("start_date").toString());
+        	Date endDate=sdf.parse(paramMap.get("end_date").toString());
+        	int day=(int) ((endDate.getTime()-startDate.getTime())/(24*60*60*1000));
+        	if(day == 0) {//day为0时，则开始时间和结束时间为同一天
+        		day = 1;
+        	}
+            float t_money = 0;
+            float l_money = 0;
+            float t_preFirstMoney = 0;
+            float l_preFirstMoney = 0;
+        	/** 其他 核心数据分析-支付金额 */
+        	t_money = productAnalysisOperationDao.r_queryOther_PayMoney(paramMap);
+        	t_preFirstMoney = productAnalysisOperationDao.r_queryOther_PreFirstMoney(paramMap);
+        	t_money +=t_preFirstMoney;
+        	Calendar c = Calendar.getInstance();
+        	c.setTime(startDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("start_date", sdf.format(c.getTime()));
+			
+			c = Calendar.getInstance();
+			c.setTime(endDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("end_date", sdf.format(c.getTime()));
+            //较上个周期
+            l_money = productAnalysisOperationDao.r_queryOther_PayMoney(paramMap);
+            l_preFirstMoney = productAnalysisOperationDao.r_queryOther_PreFirstMoney(paramMap);
+            l_money +=l_preFirstMoney;
+            if(t_money == 0 || l_money == 0) {
+            	resultMap.put("ratio", 0);
+            }else {
+            	resultMap.put("ratio", m2((t_money-l_money)/l_money*100));
+            }
+            resultMap.put("p_money", t_money);
+            
+            pr.setState(true);
+            pr.setMessage("获取支付金额成功!");
+            pr.setObj(resultMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+	}
+	
+	/**
+	 * 核心数据分析-支付转化率
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryKernelData_PayZhl(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if(StringUtils.isEmpty(json)){
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            Date startDate=sdf.parse(paramMap.get("start_date").toString());
+        	Date endDate=sdf.parse(paramMap.get("end_date").toString());
+        	int day=(int) ((endDate.getTime()-startDate.getTime())/(24*60*60*1000));
+        	if(day == 0) {//day为0时，则开始时间和结束时间为同一天
+        		day = 1;
+        	}
+            float t_visitorCount = 0;
+            float t_purchase_number = 0;
+            float t_zhl = 0;
+            float l_visitorCount = 0;
+            float l_purchase_number = 0;
+            float l_zhl = 0;
+            /** 其他 核心数据分析-商品访客数 */
+            t_visitorCount = productAnalysisOperationDao.r_queryOther_VisitorCount(paramMap);
+            /** 其他 核心数据分析-支付买家数 */
+            t_purchase_number = productAnalysisOperationDao.r_queryOther_PayPurchaseNumber(paramMap);
+            Calendar c = Calendar.getInstance();
+        	c.setTime(startDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("start_date", sdf.format(c.getTime()));
+			
+			c = Calendar.getInstance();
+			c.setTime(endDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("end_date", sdf.format(c.getTime()));
+            //较上个周期
+            /** 其他 核心数据分析-商品访客数 */
+            l_visitorCount = productAnalysisOperationDao.r_queryOther_VisitorCount(paramMap);
+            /** 其他 核心数据分析-支付买家数 */
+            l_purchase_number = productAnalysisOperationDao.r_queryOther_PayPurchaseNumber(paramMap);
+            if(l_visitorCount == 0 || l_purchase_number == 0) {
+            	l_zhl = l_visitorCount;
+            }else {
+            	l_zhl = 100*(l_purchase_number/l_visitorCount);
+            }
+            
+            if(t_visitorCount == 0 || t_purchase_number == 0) {
+            	resultMap.put("ratio", 0);
+            	t_zhl = 0;
+            }else {
+            	t_zhl = 100*(t_purchase_number/t_visitorCount);
+            	if(l_zhl == 0) {
+            		resultMap.put("ratio", 0);
+            	}else {
+            		resultMap.put("ratio", m2((t_zhl-l_zhl)/l_zhl*100));
+            	}
+            }
+            resultMap.put("p_zhl", t_zhl);
+            
+            pr.setState(true);
+            pr.setMessage("获取支付转化率成功!");
+            pr.setObj(resultMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+	}
+	
+	/**
+	 * 核心数据分析-成功退款金额
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryKernelData_ReturnMoney(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if(StringUtils.isEmpty(json)){
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            Date startDate=sdf.parse(paramMap.get("start_date").toString());
+        	Date endDate=sdf.parse(paramMap.get("end_date").toString());
+        	int day=(int) ((endDate.getTime()-startDate.getTime())/(24*60*60*1000));
+        	if(day == 0) {//day为0时，则开始时间和结束时间为同一天
+        		day = 1;
+        	}
+            float t_money = 0;
+            float l_money = 0;
+            /** 其他 核心数据分析-成功退款金额 */
+            t_money = productAnalysisOperationDao.r_queryOther_ReturnMoney(paramMap);
+            Calendar c = Calendar.getInstance();
+        	c.setTime(startDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("start_date", sdf.format(c.getTime()));
+			
+			c = Calendar.getInstance();
+			c.setTime(endDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("end_date", sdf.format(c.getTime()));
+            //较上个周期
+            l_money = productAnalysisOperationDao.r_queryOther_ReturnMoney(paramMap);
+            
+            if(t_money == 0 || l_money == 0) {
+            	resultMap.put("ratio", 0);
+            }else {
+            	resultMap.put("ratio", m2((t_money-l_money)/l_money*100));
+            }
+            
+            resultMap.put("return_money", t_money);
+            
+            pr.setState(true);
+            pr.setMessage("获取成功退款金额成功!");
+            pr.setObj(resultMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+	}
+	
+	/**
+	 * 核心数据分析-退款商品数
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryKernelData_ReturnCount(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if(StringUtils.isEmpty(json)){
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            Date startDate=sdf.parse(paramMap.get("start_date").toString());
+        	Date endDate=sdf.parse(paramMap.get("end_date").toString());
+        	int day=(int) ((endDate.getTime()-startDate.getTime())/(24*60*60*1000));
+        	if(day == 0) {//day为0时，则开始时间和结束时间为同一天
+        		day = 1;
+        	}
+            float t_count = 0;
+            float l_count = 0;
+            /** 其他 核心数据分析-退款商品数 */
+            t_count = productAnalysisOperationDao.r_queryOther_RefundProductCount(paramMap);
+            Calendar c = Calendar.getInstance();
+        	c.setTime(startDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("start_date", sdf.format(c.getTime()));
+			
+			c = Calendar.getInstance();
+			c.setTime(endDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("end_date", sdf.format(c.getTime()));
+            //较上个周期
+            l_count = productAnalysisOperationDao.r_queryOther_RefundProductCount(paramMap);
+            
+            if(t_count == 0 || l_count == 0) {
+            	resultMap.put("ratio", 0);
+            }else {
+            	resultMap.put("ratio", m2((t_count-l_count)/l_count*100));
+            }
+            
+            resultMap.put("return_count", t_count);
+            
+            pr.setState(true);
+            pr.setMessage("获取退款商品数成功!");
+            pr.setObj(resultMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+	}
+	/**
+	 * 核心数据分析-客单价
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryKernelData_Kdj(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if(StringUtils.isEmpty(json)){
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            Date startDate=sdf.parse(paramMap.get("start_date").toString());
+        	Date endDate=sdf.parse(paramMap.get("end_date").toString());
+        	int day=(int) ((endDate.getTime()-startDate.getTime())/(24*60*60*1000));
+        	if(day == 0) {//day为0时，则开始时间和结束时间为同一天
+        		day = 1;
+        	}
+            float t_money = 0;
+            float t_purchaseNumber = 0;
+            float t_kdj = 0;
+            float t_preFirstMoney = 0;
+            float l_money = 0;
+            float l_purchaseNumber = 0;
+            float l_kdj = 0;
+            float l_preFirstMoney = 0;
+            
+            /** 其他 核心数据分析-支付金额 */
+            t_money = productAnalysisOperationDao.r_queryOther_AllPayMoney(paramMap);
+            t_preFirstMoney = productAnalysisOperationDao.r_queryOther_PreFirstMoney(paramMap);
+            t_money+=t_preFirstMoney;
+            /** 其他 核心数据分析-支付买家数 */
+            t_purchaseNumber = productAnalysisOperationDao.r_queryOther_PayPurchaseNumber(paramMap);
+            Calendar c = Calendar.getInstance();
+        	c.setTime(startDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("start_date", sdf.format(c.getTime()));
+			
+			c = Calendar.getInstance();
+			c.setTime(endDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("end_date", sdf.format(c.getTime()));
+            //较上个周期
+            /** 其他 核心数据分析-支付金额 */
+            l_money = productAnalysisOperationDao.r_queryOther_AllPayMoney(paramMap);
+            l_preFirstMoney = productAnalysisOperationDao.r_queryOther_PreFirstMoney(paramMap);
+            l_money+=l_preFirstMoney;
+            /** 其他 核心数据分析-支付买家数 */
+            l_purchaseNumber = productAnalysisOperationDao.r_queryOther_PayPurchaseNumber(paramMap);
+            
+            if(l_purchaseNumber == 0 || l_money == 0) {
+            	l_kdj = 0;
+            }else {
+            	l_kdj = l_money/l_purchaseNumber;
+            }
+            
+            if(t_purchaseNumber == 0 || t_money == 0) {
+            	resultMap.put("ratio", 0);
+            	t_kdj = 0;
+            }else {
+            	t_kdj = t_money/t_purchaseNumber;
+            	if(l_kdj == 0) {
+            		resultMap.put("ratio", 0);
+            	}else {
+            		resultMap.put("ratio", m2((t_kdj-l_kdj)/l_kdj*100));
+            	}
+            }
+            resultMap.put("kdj", t_kdj);
+            
+            pr.setState(true);
+            pr.setMessage("获取客单价成功!");
+            pr.setObj(resultMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+	}
+	
+	/**
+	 * 核心数据分析-折线
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryKernelDataChart(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+            List<Map<String, Object>> allDataList = new ArrayList<Map<String, Object>>();
+            List<Map<String, Object>> visitorPvCountList = new ArrayList<Map<String, Object>>();
+            List<Map<String, Object>> purchaseNumberMoneyList = new ArrayList<Map<String, Object>>();
+            List<Map<String, Object>> payPurchaseNumberMoneyList = new ArrayList<Map<String, Object>>();
+            List<Map<String, Object>> preFirstMoneyList = new ArrayList<Map<String, Object>>();
+            List<Map<String, Object>> returnList = new ArrayList<Map<String, Object>>();
+            List<String> time_list = new ArrayList<String>();
+            if(paramMap.get("start_date").equals(paramMap.get("end_date"))) {//一天
+            	time_list.add("00:00");
+            	time_list.add("01:00");
+            	time_list.add("02:00");
+            	time_list.add("03:00");
+            	time_list.add("04:00");
+            	time_list.add("05:00");
+            	time_list.add("06:00");
+            	time_list.add("07:00");
+            	time_list.add("08:00");
+            	time_list.add("09:00");
+            	time_list.add("10:00");
+            	time_list.add("11:00");
+            	time_list.add("12:00");
+            	time_list.add("13:00");
+            	time_list.add("14:00");
+            	time_list.add("15:00");
+            	time_list.add("16:00");
+            	time_list.add("17:00");
+            	time_list.add("18:00");
+            	time_list.add("19:00");
+            	time_list.add("20:00");
+            	time_list.add("21:00");
+            	time_list.add("22:00");
+            	time_list.add("23:00");
+            	/** 其他 折线图 商品访客数和浏览量 */
+                visitorPvCountList = productAnalysisOperationDao.r_queryOther_VisitorPvCountD_Chart(paramMap);
+                /** 其他 折线图 下单买家数、下单件数和下单金额 */
+                purchaseNumberMoneyList = productAnalysisOperationDao.r_queryOther_PurchaseNumberMoneyD_Chart(paramMap);
+                /** 其他 折线图 支付买家数、支付件数、支付金额 */
+                payPurchaseNumberMoneyList = productAnalysisOperationDao.r_queryOther_PayPurchaseNumberMoneyD_Chart(paramMap);
+                /** 其他 折线图 预订支付的首款 */
+                preFirstMoneyList = productAnalysisOperationDao.r_queryOther_PreFirstMoneyD_Chart(paramMap);
+                /** 其他 折线图 退款商品数和成功退款金额 */
+                returnList = productAnalysisOperationDao.r_queryOther_ReturnD_Chart(paramMap);
+            }else {
+            	String start_time = paramMap.get("start_date").toString();		//开始时间
+                String end_time = paramMap.get("end_date").toString();			//结束时间
+                SimpleDateFormat sf = new SimpleDateFormat("yyyy-MM-dd");
+                Date start_time_date = sf.parse(start_time);
+                Date end_time_date = sf.parse(end_time);
+                String tempDate = null;
+
+                //获取指定时间段所有日期数据
+                while(end_time_date.compareTo(start_time_date)>=0){
+                    tempDate =  sf.format(start_time_date);
+                    time_list.add(tempDate);
+                    start_time_date = DateUtils.addDay(start_time_date,1);
+                }
+                /** 其他 折线图 商品访客数和浏览量 */
+                visitorPvCountList = productAnalysisOperationDao.r_queryOther_VisitorPvCount_Chart(paramMap);
+                /** 其他 折线图 下单买家数、下单件数和下单金额 */
+                purchaseNumberMoneyList = productAnalysisOperationDao.r_queryOther_PurchaseNumberMoney_Chart(paramMap);
+                /** 其他 折线图 支付买家数、支付件数、支付金额 */
+                payPurchaseNumberMoneyList = productAnalysisOperationDao.r_queryOther_PayPurchaseNumberMoney_Chart(paramMap);
+                /** 其他 折线图 预订支付的首款 */
+                preFirstMoneyList = productAnalysisOperationDao.r_queryOther_PreFirstMoney_Chart(paramMap);
+                /** 其他 折线图 退款商品数和成功退款金额 */
+                returnList = productAnalysisOperationDao.r_queryOther_Return_Chart(paramMap);
+            }
+            
+            //访客数
+            Map<String,Object> visitorCountMap = list2Map(visitorPvCountList,"CREATE_DATE","VISITOR_COUNT");
+            //浏览量
+            Map<String,Object> pvCountMap = list2Map(visitorPvCountList,"CREATE_DATE","PV_COUNT");
+            //下单买家数
+            Map<String,Object> purchaseNumberMap = list2Map(purchaseNumberMoneyList,"CREATE_DATE","PURCHASE_NUMBER");
+            //下单金额
+            Map<String,Object> orderMoneyMap = list2Map(purchaseNumberMoneyList,"CREATE_DATE","ORDER_MONEY");
+            //下单件数
+            Map<String,Object> productCountMap = list2Map(purchaseNumberMoneyList,"CREATE_DATE","PRODUCT_COUNT");
+            //支付买家数
+            Map<String,Object> payPurchaseNumberMap = list2Map(payPurchaseNumberMoneyList,"CREATE_DATE","PURCHASE_NUMBER");
+            //支付件数
+            Map<String,Object> saleCountMap = list2Map(payPurchaseNumberMoneyList,"CREATE_DATE","PAYMENT_COUNT");
+            //支付金额
+            Map<String,Object> payMoneyMap = list2Map(payPurchaseNumberMoneyList,"CREATE_DATE","PAYMENT_MONEY");
+            //预订支付的首款
+            Map<String,Object> preFirstMoneyMap = list2Map(preFirstMoneyList,"CREATE_DATE","PRE_FIRST_MONEY");
+            //成功退款金额
+            Map<String,Object> returnMoneyMap = list2Map(returnList,"CREATE_DATE","RETURN_MONEY");
+            //退款商品数
+            Map<String,Object> returnCountMap = list2Map(returnList,"CREATE_DATE","RETURN_COUNT");
+            
+            //开始数据拼装
+          	String key="";
+          	
+          	Map<String, Object> map = null;
+            for(String time : time_list) {
+            	key = time;
+            	/** 核心数据分析-商品访客数 */
+                float visitorCount = visitorCountMap.get(key)==null?0:Float.parseFloat(visitorCountMap.get(key).toString());
+                /** 核心数据分析-商品浏览量 */
+                float pvCount = pvCountMap.get(key)==null?0:Float.parseFloat(pvCountMap.get(key).toString());
+                /** 核心数据分析-下单买家数 */
+                float purchaseNumber = purchaseNumberMap.get(key)==null?0:Float.parseFloat(purchaseNumberMap.get(key).toString());
+                /** 核心数据分析-下单件数 */
+                float productCount = productCountMap.get(key)==null?0:Float.parseFloat(productCountMap.get(key).toString());
+                /** 核心数据分析-下单金额 */
+                float orderMoney = orderMoneyMap.get(key)==null?0:Float.parseFloat(orderMoneyMap.get(key).toString());
+                /** 核心数据分析-支付买家数 */
+                float payPurchaseNumber = payPurchaseNumberMap.get(key)==null?0:Float.parseFloat(payPurchaseNumberMap.get(key).toString());
+                /** 核心数据分析-支付件数 */
+                float saleCount = saleCountMap.get(key)==null?0:Float.parseFloat(saleCountMap.get(key).toString());
+                /** 核心数据分析-支付金额 */
+                float payMoney = payMoneyMap.get(key)==null?0:Float.parseFloat(payMoneyMap.get(key).toString());
+                /** 核心数据分析-预订支付的首款 */
+                float preFirstMoney = preFirstMoneyMap.get(key)==null?0:Float.parseFloat(preFirstMoneyMap.get(key).toString());
+                /** 核心数据分析-成功退款金额 */
+                float returnMoney = returnMoneyMap.get(key)==null?0:Float.parseFloat(returnMoneyMap.get(key).toString());
+                /** 核心数据分析-退款商品数 */
+                float returnCount = returnCountMap.get(key)==null?0:Float.parseFloat(returnCountMap.get(key).toString());
+                
+                payMoney += preFirstMoney;
+                map = new HashMap<String, Object>();
+                //商品访客数
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", visitorCount);
+              	map.put("PAGE_NAME", "商品访客数");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//商品浏览量
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", pvCount);
+              	map.put("PAGE_NAME", "商品浏览量");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//下单买家数
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", purchaseNumber);
+              	map.put("PAGE_NAME", "下单买家数");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//下单件数
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", productCount);
+              	map.put("PAGE_NAME", "下单件数");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//下单件数
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", orderMoney);
+              	map.put("PAGE_NAME", "下单金额");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//下单转化率
+              	if(visitorCount==0||purchaseNumber==0){
+              		map.put("CNT", 0);
+              	}else{
+              		float zhl = 100*(purchaseNumber/visitorCount);
+              		map.put("CNT", m2(zhl));
+              	}
+              	map.put("CREATE_DATE", key);
+              	map.put("PAGE_NAME", "下单转化率");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//支付买家数
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", payPurchaseNumber);
+              	map.put("PAGE_NAME", "支付买家数");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//支付件数
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", saleCount);
+              	map.put("PAGE_NAME", "支付件数");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//支付金额
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", payMoney);
+              	map.put("PAGE_NAME", "支付金额");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//成功退款金额
+              	map.put("CNT", returnMoney);
+              	map.put("CREATE_DATE", key);
+              	map.put("PAGE_NAME", "成功退款金额");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//退款商品数
+              	map.put("CNT", returnCount);
+              	map.put("CREATE_DATE", key);
+              	map.put("PAGE_NAME", "退款商品数");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//客单价
+              	if(payPurchaseNumber == 0||payMoney == 0) {
+              		map.put("CNT", 0);
+              	}else {
+              		map.put("CNT", payMoney/payPurchaseNumber);
+              	}
+              	map.put("CREATE_DATE", key);
+              	map.put("PAGE_NAME", "客单价");
+              	allDataList.add(map);
+            }
+            
+            //将原始数据组装为Echart可识别的格式
+            resultMap = createData("PAGE_NAME", time_list, allDataList);
+            
+            pr.setState(true);
+			pr.setMessage("获取核心数据分析成功");
+			pr.setObj(resultMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e);
+        }
+        return pr;
+	}
+	
+	/**
+	 * 商品汇总排行
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryProductSummaryRank(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if(paramMap == null) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数");
+            	return pr;
+            }
+            paramMap.put("num", 10);
+            /** 其他 商品汇总排行 */
+            List<Map<String, Object>> resultList = productAnalysisOperationDao.r_queryOther_ProductSummary_Rank(paramMap);
+            
+            for(Map<String, Object> r :resultList) {
+            	//转化率
+            	float o_zhl = Float.parseFloat(r.get("O_ZHL").toString());
+          		r.put("O_ZHL", o_zhl>0?m2(o_zhl)+"%":o_zhl+"%");
+          		float p_zhl = Float.parseFloat(r.get("P_ZHL").toString());
+          		r.put("P_ZHL", p_zhl>0?m2(p_zhl)+"%":p_zhl+"%");
+            }
+            
+            pr.setState(true);
+			pr.setMessage("获取商品汇总排行成功");
+			pr.setObj(resultList);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e);
+        }
+        return pr;
+	}
+	/**
+	 * 查询销售区域排行
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult querySaleAreaRank(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if(paramMap == null||StringUtils.isEmpty(paramMap.get("type"))) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数");
+            	return pr;
+            }
+            paramMap.put("num", 10);
+            List<Map<String, Object>> provinceList = new ArrayList<Map<String, Object>>();
+            List<Map<String, Object>> cityList = new ArrayList<Map<String, Object>>();
+            long count = 0;
+            float money = 0;
+        	if("2".equals(paramMap.get("type").toString())) {//下单买家数
+            	/** 其他 下单买家总数 */
+                count = productAnalysisOperationDao.r_queryOther_PurchaseNumberTotal(paramMap);
+                paramMap.put("count", count);
+            	/** 其他 省份 下单买家数 排行榜 */
+                provinceList = productAnalysisOperationDao.r_queryOther_PurchaseNumberProvince_Rank(paramMap);
+                /** 其他 城市 下单买家数 排行榜 */
+                cityList = productAnalysisOperationDao.r_queryOther_PurchaseNumberCity_Rank(paramMap);
+            }else {//成交金额
+            	/** 其他 成交总金额 */
+            	money = productAnalysisOperationDao.r_queryOther_PayMoneyTotal(paramMap);
+            	paramMap.put("money", money);
+            	/** 其他 省份 成交金额 排行榜 */
+                provinceList = productAnalysisOperationDao.r_queryOther_PayMoneyProvince_Rank(paramMap);
+                /** 其他 城市 下单买家数 排行榜 */
+                cityList = productAnalysisOperationDao.r_queryOther_PayMoneyCity_Rank(paramMap);
+            }
+            
+            if("2".equals(paramMap.get("type").toString())) {
+            	for(Map<String, Object> p : provinceList) {
+                	float purchaseNumber = Float.parseFloat(p.get("PURCHASE_NUMBER").toString());
+                	p.put("RATIO", 100*purchaseNumber/count);
+                }
+            	for(Map<String, Object> c : cityList) {
+                	float purchaseNumber = Float.parseFloat(c.get("PURCHASE_NUMBER").toString());
+                	c.put("RATIO", 100*purchaseNumber/count);
+                }
+            }else {
+            	for(Map<String, Object> p : provinceList) {
+                	float payMoney = Float.parseFloat(p.get("PAYMENT_MONEY").toString());
+                	p.put("RATIO", 100*payMoney/money);
+                }
+            	for(Map<String, Object> c : cityList) {
+                	float payMoney = Float.parseFloat(c.get("PAYMENT_MONEY").toString());
+                	c.put("RATIO", 100*payMoney/money);
+                }
+            }
+            resultMap.put("provinceList", provinceList);
+            resultMap.put("cityList", cityList);
+            pr.setState(true);
+			pr.setMessage("获取销售区域排行成功");
+			pr.setObj(resultMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e);
+        }
+        return pr;
+	}
+	
+	/**
+	 * 查询销售区域明细
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult querySaleAreaDetail(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if(paramMap == null||StringUtils.isEmpty(paramMap.get("province_id"))) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数");
+            	return pr;
+            }
+            paramMap.put("num", 10);
+            List<Map<String, Object>> resultList = productAnalysisOperationDao.r_queryOther_SaleAreaDetail(paramMap);
+            pr.setState(true);
+			pr.setMessage("获取销售区域明细成功");
+			pr.setObj(resultList);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e);
+        }
+        return pr;
+	}
+	
+	/**
+	 * 查询销售区域地图
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult querySaleAreaMap(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if(paramMap == null||StringUtils.isEmpty(paramMap.get("type"))) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数");
+            	return pr;
+            }
+            List<Map<String, Object>> resultList = productAnalysisOperationDao.r_queryOther_SaleAreaMap(paramMap);
+            pr.setState(true);
+			pr.setMessage("获取销售区域地图成功");
+			pr.setObj(resultList);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e);
+        }
+        return pr;
+	}
+	/**
+	 * 查询商品销售分析列表
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryProductSaleListForPage(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        	PageUtil.handlePageParams(paramMap);
+	        }
+			if(paramMap.size() == 0) {
+            	gr.setState(false);
+            	gr.setMessage("参数缺失");
+                return gr;
+            }
+			/** 其他 商品汇总排行总数 */
+			int total = productAnalysisOperationDao.r_queryOther_ProductSummaryCount(paramMap);
+			/** 其他 商品汇总排行分页 */
+			List<Map<String, Object>> resultList = productAnalysisOperationDao.r_queryOther_ProductSummaryPage(paramMap);
+              
+            List<String> list = new ArrayList<String>();
+            
+            if (resultList != null && resultList.size() > 0) {
+            	 for(Map<String, Object> r : resultList) {
+                 	list.add(r.get("ITEMNUMBER").toString());
+                 }
+                 
+                 List<Map<String,Object>> stock_list = productAnalysisOperationDao.queryProductStockCount(list);//数据获取-商品库存
+                 Map<String,Object> stock_map = list2Map(stock_list,"ITEMNUMBER","STOCK_COUNT");
+                 
+            	for(Map<String, Object> r :resultList) {
+                	r.put("STOCK_COUNT", stock_map.get(r.get("ITEMNUMBER").toString())==null?0:Float.parseFloat(stock_map.get(r.get("ITEMNUMBER").toString()).toString()));
+                }
+				gr.setState(true);
+				gr.setMessage("查询商品销售分析列表成功");
+				gr.setObj(resultList);
+				gr.setTotal(total);
+			} else {
+				gr.setState(true);
+				gr.setMessage("无数据");
+			}
+		} catch (Exception e) {
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+		}
+		return gr;
+	}
+	
+	/**
+	 * 查询商品销售分析-折线
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryProductSaleChart(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if(paramMap == null) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数");
+            	return pr;
+            }
+            List<Map<String, Object>> allDataList = new ArrayList<Map<String, Object>>();
+            List<Map<String, Object>> visitorPvCountList = new ArrayList<Map<String, Object>>();
+            List<Map<String, Object>> purchaseNumberMoneyList = new ArrayList<Map<String, Object>>();
+            List<Map<String, Object>> payPurchaseNumberMoneyList = new ArrayList<Map<String, Object>>();
+            List<Map<String, Object>> preFirstMoneyList = new ArrayList<Map<String, Object>>();
+            List<Map<String, Object>> returnList = new ArrayList<Map<String, Object>>();
+            List<String> time_list = new ArrayList<String>();
+            if(paramMap.get("start_date").equals(paramMap.get("end_date"))) {//一天
+            	time_list.add("00:00");
+            	time_list.add("01:00");
+            	time_list.add("02:00");
+            	time_list.add("03:00");
+            	time_list.add("04:00");
+            	time_list.add("05:00");
+            	time_list.add("06:00");
+            	time_list.add("07:00");
+            	time_list.add("08:00");
+            	time_list.add("09:00");
+            	time_list.add("10:00");
+            	time_list.add("11:00");
+            	time_list.add("12:00");
+            	time_list.add("13:00");
+            	time_list.add("14:00");
+            	time_list.add("15:00");
+            	time_list.add("16:00");
+            	time_list.add("17:00");
+            	time_list.add("18:00");
+            	time_list.add("19:00");
+            	time_list.add("20:00");
+            	time_list.add("21:00");
+            	time_list.add("22:00");
+            	time_list.add("23:00");
+            	/** 其他 折线图 商品访客数和浏览量 */
+                visitorPvCountList = productAnalysisOperationDao.r_queryOther_VisitorPvCountD_Chart(paramMap);
+                /** 其他 折线图 下单买家数、下单件数和下单金额 */
+                purchaseNumberMoneyList = productAnalysisOperationDao.r_queryOther_PurchaseNumberMoneyD_Chart(paramMap);
+                /** 其他 折线图 支付买家数、支付件数、支付金额 */
+                payPurchaseNumberMoneyList = productAnalysisOperationDao.r_queryOther_PayPurchaseNumberMoneyD_Chart(paramMap);
+                /** 其他 折线图 预订支付的首款 */
+                preFirstMoneyList = productAnalysisOperationDao.r_queryOther_PreFirstMoneyD_Chart(paramMap);
+                /** 其他 折线图 退款商品数和成功退款金额 */
+                returnList = productAnalysisOperationDao.r_queryOther_ReturnD_Chart(paramMap);
+            }else {
+            	String start_time = paramMap.get("start_date").toString();		//开始时间
+                String end_time = paramMap.get("end_date").toString();			//结束时间
+                SimpleDateFormat sf = new SimpleDateFormat("yyyy-MM-dd");
+                Date start_time_date = sf.parse(start_time);
+                Date end_time_date = sf.parse(end_time);
+                String tempDate = null;
+
+                //获取指定时间段所有日期数据
+                while(end_time_date.compareTo(start_time_date)>=0){
+                    tempDate =  sf.format(start_time_date);
+                    time_list.add(tempDate);
+                    start_time_date = DateUtils.addDay(start_time_date,1);
+                }
+                /** 其他 折线图 商品访客数和浏览量 */
+                visitorPvCountList = productAnalysisOperationDao.r_queryOther_VisitorPvCount_Chart(paramMap);
+                /** 其他 折线图 下单买家数、下单件数和下单金额 */
+                purchaseNumberMoneyList = productAnalysisOperationDao.r_queryOther_PurchaseNumberMoney_Chart(paramMap);
+                /** 其他 折线图 支付买家数、支付件数和支付金额 */
+                payPurchaseNumberMoneyList = productAnalysisOperationDao.r_queryOther_PayPurchaseNumberMoney_Chart(paramMap);
+                /** 其他 折线图 预订支付的首款 */
+                preFirstMoneyList = productAnalysisOperationDao.r_queryOther_PreFirstMoney_Chart(paramMap);
+                /** 其他 折线图 成功退款件数和成功退款金额 */
+                returnList = productAnalysisOperationDao.r_queryOther_Return_Chart(paramMap);
+            }
+            
+            //访客数
+            Map<String,Object> visitorCountMap = list2Map(visitorPvCountList,"CREATE_DATE","VISITOR_COUNT");
+            //浏览量
+            Map<String,Object> pvCountMap = list2Map(visitorPvCountList,"CREATE_DATE","PV_COUNT");
+            //下单买家数
+            Map<String,Object> purchaseNumberMap = list2Map(purchaseNumberMoneyList,"CREATE_DATE","PURCHASE_NUMBER");
+            //下单金额
+            Map<String,Object> orderMoneyMap = list2Map(purchaseNumberMoneyList,"CREATE_DATE","ORDER_MONEY");
+            //下单件数
+            Map<String,Object> productCountMap = list2Map(purchaseNumberMoneyList,"CREATE_DATE","PRODUCT_COUNT");
+            //支付买家数
+            Map<String,Object> payPurchaseNumberMap = list2Map(payPurchaseNumberMoneyList,"CREATE_DATE","PURCHASE_NUMBER");
+            //支付件数
+            Map<String,Object> saleCountMap = list2Map(payPurchaseNumberMoneyList,"CREATE_DATE","PAYMENT_COUNT");
+            //支付金额
+            Map<String,Object> payMoneyMap = list2Map(payPurchaseNumberMoneyList,"CREATE_DATE","PAYMENT_MONEY");
+            //预订定金的首款
+            Map<String,Object> preFirstMoneyMap = list2Map(preFirstMoneyList,"CREATE_DATE","PRE_FIRST_MONEY");
+            //成功退款金额
+            Map<String,Object> returnMoneyMap = list2Map(returnList,"CREATE_DATE","RETURN_COUNT");
+            //成功退款件数
+            Map<String,Object> returnCountMap = list2Map(returnList,"CREATE_DATE","RETURN_MONEY");
+            
+            //开始数据拼装
+          	String key="";
+          	
+          	Map<String, Object> map = null;
+            for(String time : time_list) {
+            	key = time;
+            	/** 商品销售分析-商品访客数 */
+                float visitorCount = visitorCountMap.get(key)==null?0:Float.parseFloat(visitorCountMap.get(key).toString());
+                /** 商品销售分析-商品浏览量 */
+                float pvCount = pvCountMap.get(key)==null?0:Float.parseFloat(pvCountMap.get(key).toString());
+                /** 商品销售分析-下单买家数 */
+                float purchaseNumber = purchaseNumberMap.get(key)==null?0:Float.parseFloat(purchaseNumberMap.get(key).toString());
+                /** 商品销售分析-下单件数 */
+                float productCount = productCountMap.get(key)==null?0:Float.parseFloat(productCountMap.get(key).toString());
+                /** 商品销售分析-下单金额 */
+                float orderMoney = orderMoneyMap.get(key)==null?0:Float.parseFloat(orderMoneyMap.get(key).toString());
+                /** 商品销售分析-支付买家数 */
+                float payPurchaseNumber = payPurchaseNumberMap.get(key)==null?0:Float.parseFloat(payPurchaseNumberMap.get(key).toString());
+                /** 商品销售分析-支付件数 */
+                float saleCount = saleCountMap.get(key)==null?0:Float.parseFloat(saleCountMap.get(key).toString());
+                /** 商品销售分析-支付金额 */
+                float payMoney = payMoneyMap.get(key)==null?0:Float.parseFloat(payMoneyMap.get(key).toString());
+                /** 商品销售分析-预订支付的首款 */
+                float preFirstMoney = preFirstMoneyMap.get(key)==null?0:Float.parseFloat(preFirstMoneyMap.get(key).toString());
+                /** 商品销售分析-成功退款金额 */
+                float returnMoney = returnMoneyMap.get(key)==null?0:Float.parseFloat(returnMoneyMap.get(key).toString());
+                /** 商品销售分析-成功退款件数 */
+                float returnCount = returnCountMap.get(key)==null?0:Float.parseFloat(returnCountMap.get(key).toString());
+                
+                map = new HashMap<String, Object>();
+                //商品访客数
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", visitorCount);
+              	map.put("PAGE_NAME", "商品访客数");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//商品浏览量
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", pvCount);
+              	map.put("PAGE_NAME", "商品浏览量");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//下单买家数
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", purchaseNumber);
+              	map.put("PAGE_NAME", "下单买家数");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//下单件数
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", productCount);
+              	map.put("PAGE_NAME", "下单件数");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//下单件数
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", orderMoney);
+              	map.put("PAGE_NAME", "下单金额");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//下单转化率
+              	if(visitorCount==0||purchaseNumber==0){
+              		map.put("CNT", 0);
+              	}else{
+              		float zhl = 100*(purchaseNumber/visitorCount);
+              		map.put("CNT", m2(zhl));
+              	}
+              	map.put("CREATE_DATE", key);
+              	map.put("PAGE_NAME", "下单转化率");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//支付买家数
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", payPurchaseNumber);
+              	map.put("PAGE_NAME", "支付买家数");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//支付件数
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", saleCount);
+              	map.put("PAGE_NAME", "支付件数");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//支付金额
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", payMoney+preFirstMoney);
+              	map.put("PAGE_NAME", "支付金额");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//支付转化率
+              	if(visitorCount==0||payPurchaseNumber==0){
+              		map.put("CNT", 0);
+              	}else{
+              		float zhl = 100*(payPurchaseNumber/visitorCount);
+              		map.put("CNT", m2(zhl));
+              	}
+              	map.put("CREATE_DATE", key);
+              	map.put("PAGE_NAME", "支付转化率");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//成功退款金额
+              	map.put("CNT", returnMoney);
+              	map.put("CREATE_DATE", key);
+              	map.put("PAGE_NAME", "成功退款金额");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//成功退款件数
+              	map.put("CNT", returnCount);
+            
+              	map.put("CREATE_DATE", key);
+              	map.put("PAGE_NAME", "成功退款件数");
+              	allDataList.add(map);
+            }
+            
+            //将原始数据组装为Echart可识别的格式
+            resultMap = createData("PAGE_NAME", time_list, allDataList);
+            
+            pr.setState(true);
+			pr.setMessage("获取商品销售分析成功");
+			pr.setObj(resultMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e);
+        }
+        return pr;
+	}
+	
+	/**
+	 * 查询商品销售分析-库存明细
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryProductSaleStockDetail(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if(paramMap == null) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数");
+            	return pr;
+            }
+            
+            
+            pr.setState(true);
+			pr.setMessage("获取商品库存明细成功");
+			pr.setObj(resultMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e);
+        }
+        return pr;
+	}
+	
+	/**
+     * 查询商品退货分析
+     * @param request
+     * @return
+     */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryProductReturn(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if(paramMap == null) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数");
+            	return pr;
+            }
+            paramMap.put("jdbc_user", jdbc_user);
+            /**************************************************待处理    begin****************************************************/
+            Map<String, Object> dclMap = productAnalysisOperationDao.queryPendingDetail(paramMap);
+            resultMap.put("dclMap", dclMap);
+            /**************************************************待处理    end****************************************************/
+          	
+          	/**************************************************待买家退货    begin****************************************************/
+            //待暂收
+            paramMap.put("state", 3);
+            Map<String, Object> dmjthMap = productAnalysisOperationDao.queryProductReturnDetail(paramMap);
+            resultMap.put("dmjthMap", dmjthMap);
+            /**************************************************待买家退货    end****************************************************/
+            
+            /**************************************************待仓库收货    begin****************************************************/
+            //待点数
+            paramMap.put("state", 4);
+            Map<String, Object> dckshMap = productAnalysisOperationDao.queryProductReturnDetail(paramMap);
+            resultMap.put("dckshMap", dckshMap);
+            /**************************************************待仓库收货    end****************************************************/
+            
+            /**************************************************已收货待退款    begin****************************************************/
+            Map<String, Object> yshdtkMap = productAnalysisOperationDao.queryTakeDeliveryRefundDetail(paramMap);
+            resultMap.put("yshdtkMap", yshdtkMap);
+            /**************************************************已收货待退款    end****************************************************/
+            
+            pr.setState(true);
+			pr.setMessage("获取商品退货分析成功");
+			pr.setObj(resultMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e);
+        }
+        return pr;
+	}
+	
+	/**
+	 * 退货数据分析-成功退款笔数
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryReturnData_ReturnCount(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if(StringUtils.isEmpty(json)){
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            Date startDate=sdf.parse(paramMap.get("start_date").toString());
+        	Date endDate=sdf.parse(paramMap.get("end_date").toString());
+        	int day=(int) ((endDate.getTime()-startDate.getTime())/(24*60*60*1000));
+        	if(day == 0) {//day为0时，则开始时间和结束时间为同一天
+        		day = 1;
+        	}
+            float t_returnCount = 0;
+            float l_returnCount = 0;
+        	/** 其他 退货数据分析-成功退款笔数 */
+        	t_returnCount = productAnalysisOperationDao.r_queryOther_ReturnCount(paramMap);
+        	Calendar c = Calendar.getInstance();
+        	c.setTime(startDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("start_date", sdf.format(c.getTime()));
+			
+			c = Calendar.getInstance();
+			c.setTime(endDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("end_date", sdf.format(c.getTime()));
+            //较上个周期
+        	l_returnCount = productAnalysisOperationDao.r_queryOther_ReturnCount(paramMap);
+            if(t_returnCount == 0 || l_returnCount == 0) {
+            	resultMap.put("ratio", 0);
+            }else {
+            	resultMap.put("ratio", m2((t_returnCount-l_returnCount)/l_returnCount*100));
+            }
+            resultMap.put("return_count", t_returnCount);
+            
+            pr.setState(true);
+            pr.setMessage("获取成功退款笔数成功!");
+            pr.setObj(resultMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+	}
+	
+	/**
+	 * 退货数据分析-成功退款件数
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryReturnData_ProductCount(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if(StringUtils.isEmpty(json)){
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            Date startDate=sdf.parse(paramMap.get("start_date").toString());
+        	Date endDate=sdf.parse(paramMap.get("end_date").toString());
+        	int day=(int) ((endDate.getTime()-startDate.getTime())/(24*60*60*1000));
+        	if(day == 0) {//day为0时，则开始时间和结束时间为同一天
+        		day = 1;
+        	}
+            float t_productCount = 0;
+            float l_productCount = 0;
+        	/** 其他 退货数据分析-成功退款件数 */
+        	t_productCount = productAnalysisOperationDao.r_queryOther_ProductCount(paramMap);
+        	Calendar c = Calendar.getInstance();
+        	c.setTime(startDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("start_date", sdf.format(c.getTime()));
+			
+			c = Calendar.getInstance();
+			c.setTime(endDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("end_date", sdf.format(c.getTime()));
+            //较上个周期
+			l_productCount = productAnalysisOperationDao.r_queryOther_ProductCount(paramMap);
+            if(t_productCount == 0 || l_productCount == 0) {
+            	resultMap.put("ratio", 0);
+            }else {
+            	resultMap.put("ratio", m2((t_productCount-l_productCount)/l_productCount*100));
+            }
+            resultMap.put("product_count", t_productCount);
+            
+            pr.setState(true);
+            pr.setMessage("获取成功退款件数成功!");
+            pr.setObj(resultMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+	}
+	
+	/**
+	 * 退货数据分析-驳回申请笔数
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryReturnData_RejectCount(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if(StringUtils.isEmpty(json)){
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            Date startDate=sdf.parse(paramMap.get("start_date").toString());
+        	Date endDate=sdf.parse(paramMap.get("end_date").toString());
+        	int day=(int) ((endDate.getTime()-startDate.getTime())/(24*60*60*1000));
+        	if(day == 0) {//day为0时，则开始时间和结束时间为同一天
+        		day = 1;
+        	}
+            float t_rejectCount = 0;
+            float l_rejectCount = 0;
+        	/** 其他 退货数据分析-驳回申请笔数 */
+        	t_rejectCount = productAnalysisOperationDao.r_queryOther_RejectCount(paramMap);
+        	Calendar c = Calendar.getInstance();
+        	c.setTime(startDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("start_date", sdf.format(c.getTime()));
+			
+			c = Calendar.getInstance();
+			c.setTime(endDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("end_date", sdf.format(c.getTime()));
+            //较上个周期
+			l_rejectCount = productAnalysisOperationDao.r_queryOther_RejectCount(paramMap);
+            if(t_rejectCount == 0 || l_rejectCount == 0) {
+            	resultMap.put("ratio", 0);
+            }else {
+            	resultMap.put("ratio", m2((t_rejectCount-l_rejectCount)/l_rejectCount*100));
+            }
+            resultMap.put("reject_count", t_rejectCount);
+            
+            pr.setState(true);
+            pr.setMessage("获取驳回申请笔数成功!");
+            pr.setObj(resultMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+	}
+	
+	/**
+	 * 退货数据分析-品质退换货率
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryReturnData_Pzthhl(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if(StringUtils.isEmpty(json)){
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            Date startDate=sdf.parse(paramMap.get("start_date").toString());
+        	Date endDate=sdf.parse(paramMap.get("end_date").toString());
+        	int day=(int) ((endDate.getTime()-startDate.getTime())/(24*60*60*1000));
+        	if(day == 0) {//day为0时，则开始时间和结束时间为同一天
+        		day = 1;
+        	}
+            float t_qualityCount = 0;
+            float t_returnCount = 0;
+            float t_pzthhl = 0;
+            float l_qualityCount = 0;
+            float l_returnCount = 0;
+            float l_pzthhl = 0;
+        	/** 其他 退货数据分析-品质退换货笔数 */
+        	t_qualityCount = productAnalysisOperationDao.r_queryOther_QualityReturnCount(paramMap);
+        	/** 其他 退货数据分析-成功退款笔数 */
+        	t_returnCount = productAnalysisOperationDao.r_queryOther_ReturnCount(paramMap);
+        	
+        	Calendar c = Calendar.getInstance();
+        	c.setTime(startDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("start_date", sdf.format(c.getTime()));
+			
+			c = Calendar.getInstance();
+			c.setTime(endDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("end_date", sdf.format(c.getTime()));
+            //较上个周期
+			l_qualityCount = productAnalysisOperationDao.r_queryOther_QualityReturnCount(paramMap);
+			l_returnCount = productAnalysisOperationDao.r_queryOther_ReturnCount(paramMap);
+            if(l_returnCount == 0 || l_qualityCount == 0) {
+            	l_pzthhl = l_qualityCount;
+            }else {
+            	l_pzthhl = 100*(l_qualityCount/l_returnCount);
+            }
+            
+            if(t_returnCount == 0 || t_qualityCount == 0) {
+            	resultMap.put("ratio", 0);
+            	t_pzthhl = 0;
+            }else {
+            	t_pzthhl = 100*(t_qualityCount/t_returnCount);
+            	if(l_pzthhl == 0) {
+            		resultMap.put("ratio", 0);
+            	}else {
+            		resultMap.put("ratio", m2((t_pzthhl-l_pzthhl)/l_pzthhl*100));
+            	}
+            }
+            resultMap.put("pzthhl", t_pzthhl);
+            
+            pr.setState(true);
+            pr.setMessage("获取品质退换货率成功!");
+            pr.setObj(resultMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+	}
+	
+	/**
+	 * 退货数据分析-品质退换件数
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryReturnData_QualityProductCount(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if(StringUtils.isEmpty(json)){
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            Date startDate=sdf.parse(paramMap.get("start_date").toString());
+        	Date endDate=sdf.parse(paramMap.get("end_date").toString());
+        	int day=(int) ((endDate.getTime()-startDate.getTime())/(24*60*60*1000));
+        	if(day == 0) {//day为0时，则开始时间和结束时间为同一天
+        		day = 1;
+        	}
+            float t_productCount = 0;
+            float l_productCount = 0;
+        	/** 其他 退货数据分析-品质退换件数 */
+        	t_productCount = productAnalysisOperationDao.r_queryOther_QualityProductCount(paramMap);
+        	
+        	Calendar c = Calendar.getInstance();
+        	c.setTime(startDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("start_date", sdf.format(c.getTime()));
+			
+			c = Calendar.getInstance();
+			c.setTime(endDate);
+			c.add(Calendar.DATE, -day);
+			paramMap.put("end_date", sdf.format(c.getTime()));
+            //较上个周期
+			l_productCount = productAnalysisOperationDao.r_queryOther_QualityProductCount(paramMap);
+            
+            if(t_productCount == 0 || l_productCount == 0) {
+            	resultMap.put("ratio", 0);
+            }else {
+            	resultMap.put("ratio", m2((t_productCount-l_productCount)/l_productCount*100));
+            }
+            resultMap.put("quality_product_count", t_productCount);
+            
+            pr.setState(true);
+            pr.setMessage("获取品质退换件数成功!");
+            pr.setObj(resultMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+	}
+	
+	/**
+	 * 退货数据分析-折线
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryReturnDataChart(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+            List<Map<String, Object>> allDataList = new ArrayList<Map<String, Object>>();
+            List<Map<String, Object>> returnProductCountList = new ArrayList<Map<String, Object>>();
+            List<Map<String, Object>> rejectCountList = new ArrayList<Map<String, Object>>();
+            List<Map<String, Object>> qualityProductCountList = new ArrayList<Map<String, Object>>();
+            List<String> time_list = new ArrayList<String>();
+            if(paramMap.get("start_date").equals(paramMap.get("end_date"))) {//一天
+            	time_list.add("00:00");
+            	time_list.add("01:00");
+            	time_list.add("02:00");
+            	time_list.add("03:00");
+            	time_list.add("04:00");
+            	time_list.add("05:00");
+            	time_list.add("06:00");
+            	time_list.add("07:00");
+            	time_list.add("08:00");
+            	time_list.add("09:00");
+            	time_list.add("10:00");
+            	time_list.add("11:00");
+            	time_list.add("12:00");
+            	time_list.add("13:00");
+            	time_list.add("14:00");
+            	time_list.add("15:00");
+            	time_list.add("16:00");
+            	time_list.add("17:00");
+            	time_list.add("18:00");
+            	time_list.add("19:00");
+            	time_list.add("20:00");
+            	time_list.add("21:00");
+            	time_list.add("22:00");
+            	time_list.add("23:00");
+            	/** 其他 折线图 成功退款笔数和成功退款件数 */
+                returnProductCountList = productAnalysisOperationDao.r_queryOther_ReturnProductCountD_Chart(paramMap);
+                /** 其他 折线图 驳回申请笔数 */
+                rejectCountList = productAnalysisOperationDao.r_queryOther_RejectCountD_Chart(paramMap);
+                /** 其他 折线图 品质退换货笔数和品质退换件数 */
+                qualityProductCountList = productAnalysisOperationDao.r_queryOther_QualityReturnProductCountD_Chart(paramMap);
+            }else {
+            	String start_time = paramMap.get("start_date").toString();		//开始时间
+                String end_time = paramMap.get("end_date").toString();			//结束时间
+                SimpleDateFormat sf = new SimpleDateFormat("yyyy-MM-dd");
+                Date start_time_date = sf.parse(start_time);
+                Date end_time_date = sf.parse(end_time);
+                String tempDate = null;
+
+                //获取指定时间段所有日期数据
+                while(end_time_date.compareTo(start_time_date)>=0){
+                    tempDate =  sf.format(start_time_date);
+                    time_list.add(tempDate);
+                    start_time_date = DateUtils.addDay(start_time_date,1);
+                }
+                /** 其他 折线图 成功退款笔数和成功退款件数 */
+                returnProductCountList = productAnalysisOperationDao.r_queryOther_ReturnProductCount_Chart(paramMap);
+                /** 其他 折线图 驳回申请笔数 */
+                rejectCountList = productAnalysisOperationDao.r_queryOther_RejectCount_Chart(paramMap);
+                /** 其他 折线图 品质退换货笔数和品质退换件数 */
+                qualityProductCountList = productAnalysisOperationDao.r_queryOther_QualityReturnProductCount_Chart(paramMap);
+            }
+            //成功退款笔数
+            Map<String,Object> returnCountMap = list2Map(returnProductCountList,"CREATE_DATE","RETURN_COUNT");
+            //成功退款件数
+            Map<String,Object> productCountMap = list2Map(returnProductCountList,"CREATE_DATE","PRODUCT_COUNT");
+            //驳回申请笔数
+            Map<String,Object> rejectCountMap = list2Map(rejectCountList,"CREATE_DATE","REJECT_COUNT");
+            //品质退换货笔数
+            Map<String,Object> qualityCountMap = list2Map(qualityProductCountList,"CREATE_DATE","RETURN_COUNT");
+            //品质退换件数
+            Map<String,Object> qualityProductCountMap = list2Map(qualityProductCountList,"CREATE_DATE","PRODUCT_COUNT");
+            
+            //开始数据拼装
+          	String key="";
+          	
+          	Map<String, Object> map = null;
+            for(String time : time_list) {
+            	key = time;
+            	/** 退货数据分析-成功退款笔数 */
+                float returnCount = returnCountMap.get(key)==null?0:Float.parseFloat(returnCountMap.get(key).toString());
+                /** 退货数据分析-成功退款件数 */
+                float productCount = productCountMap.get(key)==null?0:Float.parseFloat(productCountMap.get(key).toString());
+                /** 退货数据分析-驳回申请笔数 */
+                float rejectCount = rejectCountMap.get(key)==null?0:Float.parseFloat(rejectCountMap.get(key).toString());
+                /** 退货数据分析-品质退换货笔数 */
+                float qualityCount = qualityCountMap.get(key)==null?0:Float.parseFloat(qualityCountMap.get(key).toString());
+                /** 退货数据分析-品质退换件数 */
+                float qualityProductCount = qualityProductCountMap.get(key)==null?0:Float.parseFloat(qualityProductCountMap.get(key).toString());
+                
+                map = new HashMap<String, Object>();
+                //成功退款笔数
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", returnCount);
+              	map.put("PAGE_NAME", "成功退款笔数");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//成功退款件数
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", productCount);
+              	map.put("PAGE_NAME", "成功退款件数");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//驳回申请笔数
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", rejectCount);
+              	map.put("PAGE_NAME", "驳回申请笔数");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//品质退换货率
+              	map.put("CREATE_DATE", key);
+              	if(returnCount==0||qualityCount==0){
+              		map.put("CNT", 0);
+              	}else{
+              		float pzthhl = 100*(qualityCount/returnCount);
+              		map.put("CNT", m2(pzthhl));
+              	}
+              	map.put("PAGE_NAME", "品质退换货率");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//品质退换件数
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", qualityProductCount);
+              	map.put("PAGE_NAME", "品质退换件数");
+              	allDataList.add(map);
+            }
+            
+            //将原始数据组装为Echart可识别的格式
+            resultMap = createData("PAGE_NAME", time_list, allDataList);
+            
+            pr.setState(true);
+			pr.setMessage("获取成功");
+			pr.setObj(resultMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e);
+        }
+        return pr;
+	}
+	/**
+	 * 商品退货分析-商品排行
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryProductReturnListForPage(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        	PageUtil.handlePageParams(paramMap);
+	        }
+			if(paramMap.size() == 0) {
+            	gr.setState(false);
+            	gr.setMessage("参数缺失");
+                return gr;
+            }
+			paramMap.put("jdbc_user", jdbc_user);
+			String file_names_return = "STAY_PRODUCT_COUNT";//待退货数
+			List<Map<String, Object>> resultList = new ArrayList<Map<String, Object>>();
+			List<String> list = new ArrayList<String>();
+			//商品总数
+			int total = productAnalysisOperationDao.r_queryOther_ProductReturnCount(paramMap);
+			String sort = "";
+			if(!StringUtils.isEmpty(paramMap.get("sort"))) {
+				sort = paramMap.get("sort").toString();
+			}
+			if(file_names_return.equals(sort)) {
+				//根据待退货数排序
+				resultList = productAnalysisOperationDao.queryReturnStayProductCountListForPage(paramMap);
+				if(resultList != null && resultList.size()>0) {
+					for(Map<String, Object> r : resultList) {
+	                 	list.add(r.get("ITEMNUMBER").toString());
+	                }
+					paramMap.put("list", list);
+					List<Map<String,Object>> reuturn_list = productAnalysisOperationDao.r_queryOther_ProductReturnInfo(paramMap);//数据获取-退货信息
+	                Map<String,Object> saleMoneyMap = list2Map(reuturn_list,"ITEMNUMBER","SALE_MONEY");
+	                Map<String,Object> saleCountMap = list2Map(reuturn_list,"ITEMNUMBER","SALE_COUNT");
+	                Map<String,Object> returnMoneyMap = list2Map(reuturn_list,"ITEMNUMBER","RETURN_MONEY");
+	                Map<String,Object> productCountMap = list2Map(reuturn_list,"ITEMNUMBER","PRODUCT_COUNT");
+	                
+	                for(Map<String, Object> r :resultList) {
+	                	//销量
+	                	float saleCount = saleCountMap.get(r.get("ITEMNUMBER").toString())==null?0:Float.parseFloat(saleCountMap.get(r.get("ITEMNUMBER").toString()).toString());
+	                	//成功退款件数
+	                	float productCount = productCountMap.get(r.get("ITEMNUMBER").toString())==null?0:Float.parseFloat(productCountMap.get(r.get("ITEMNUMBER").toString()).toString());
+	                	//退货占比
+	                	if(saleCount==0){
+	                  		r.put("RETURN_RATIO", saleCount);
+	                  	}else{
+	                  		float return_ratio = 100*(productCount/saleCount);
+	                  		r.put("RETURN_RATIO", return_ratio);
+	                  	}
+	                	r.put("SALE_MONEY", saleMoneyMap.get(r.get("ITEMNUMBER").toString())==null?0:Float.parseFloat(saleMoneyMap.get(r.get("ITEMNUMBER").toString()).toString()));
+	                	r.put("SALE_COUNT", saleCount);
+	                	r.put("RETURN_MONEY", returnMoneyMap.get(r.get("ITEMNUMBER").toString())==null?0:Float.parseFloat(returnMoneyMap.get(r.get("ITEMNUMBER").toString()).toString()));
+	                	r.put("PRODUCT_COUNT", productCount);
+	                }
+					gr.setState(true);
+	    			gr.setMessage("获取商品列表成功");
+	    			gr.setObj(resultList);
+	    			gr.setTotal(total);
+				}else {
+					gr.setState(true);
+					gr.setMessage("无数据");
+				}
+			}else {
+				//默认-商品列表
+				resultList = productAnalysisOperationDao.r_queryOther_ProductReturnListForPage(paramMap);
+				if(resultList != null && resultList.size()>0) {
+					for(Map<String, Object> r : resultList) {
+	                 	list.add(r.get("ITEMNUMBER").toString());
+	                }
+					paramMap.put("list", list);
+					List<Map<String,Object>> stay_list = productAnalysisOperationDao.queryReturnStayProductCount(paramMap);//数据获取-待退货数
+					Map<String,Object> stayMap = list2Map(stay_list,"ITEMNUMBER","STAY_PRODUCT_COUNT");
+					
+					for(Map<String, Object> r :resultList) {
+	                	//销量
+	                	float saleCount = Float.parseFloat(r.get("SALE_COUNT").toString());
+	                	//成功退款件数
+	                	float productCount = Float.parseFloat(r.get("PRODUCT_COUNT").toString());
+	                	//退货占比
+	                	if(saleCount==0){
+	                  		r.put("RETURN_RATIO", saleCount);
+	                  	}else{
+	                  		float return_ratio = 100*(productCount/saleCount);
+	                  		r.put("RETURN_RATIO", return_ratio);
+	                  	}
+	                	r.put("STAY_PRODUCT_COUNT", stayMap.get(r.get("ITEMNUMBER").toString())==null?0:Float.parseFloat(stayMap.get(r.get("ITEMNUMBER").toString()).toString()));
+	                }
+					gr.setState(true);
+	    			gr.setMessage("获取商品列表成功");
+	    			gr.setObj(resultList);
+	    			gr.setTotal(total);
+	            }else {
+	            	gr.setState(true);
+					gr.setMessage("无数据");
+				}
+			}
+        } catch (Exception e) {
+            gr.setState(false);
+            gr.setMessage(e.getMessage());
+            logger.error(e);
+        }
+        return gr;
+	}
+	/**
+	 * 商品退货分析-商品详情
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryProductReturnDetail(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> retMap = new HashMap<String, Object>();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if(paramMap == null||StringUtils.isEmpty(paramMap.get("itemnumber"))) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数");
+            	return pr;
+            }
+            paramMap.put("num", 5);
+            /** 退货原因分析 */
+            List<Map<String, Object>> reasonList = productAnalysisOperationDao.r_queryOther_ProductSingleAfterSale_Chart(paramMap);
+            
+        	/** 品质退换货商品总数 */
+        	float total = productAnalysisOperationDao.r_queryReturnQualityCount(paramMap);
+            /** 品质退换货分析 */
+        	List<Map<String, Object>> qualityList = productAnalysisOperationDao.r_queryReturnQualityList(paramMap);
+            
+        	for(Map<String, Object> q :qualityList) {
+             	//问题原因 商品数
+             	float productCount = Float.parseFloat(q.get("PRODUCT_COUNT").toString());
+             	//占比
+             	if(total==0||productCount==0){
+               		q.put("RATIO", 0);
+               	}else{
+               		float ratio = 100*(productCount/total);
+               		q.put("RATIO", ratio);
+               	}
+            }
+        	
+        	retMap.put("reasonList", reasonList);
+        	retMap.put("qualityList", qualityList);
+            pr.setState(true);
+			pr.setMessage("获取商品退货详情成功");
+			pr.setObj(retMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e);
+        }
+        return pr;
+	}	
+	
+	/**
+	 * 商品退货分析-退货原因分析
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryReturnReason(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if(paramMap == null) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数");
+            	return pr;
+            }
+            /** 退货原因分析 */
+            List<Map<String, Object>> resultList = productAnalysisOperationDao.r_queryOther_ProductSingleAfterSale_Chart(paramMap);
+            
+            pr.setState(true);
+			pr.setMessage("获取退货原因分析成功");
+			pr.setObj(resultList);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e);
+        }
+        return pr;
+	}
+	
+	/**
+	 * 商品退货分析-品质退换货分析
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryReturnQuality(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> retMap = new HashMap<String, Object>();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if(paramMap == null) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数");
+            	return pr;
+            }
+            paramMap.put("num", 10);
+            /** 品质退换货商品总数 */
+            float total = productAnalysisOperationDao.r_queryReturnQualityCount(paramMap);
+            /** 品质退换货分析 */
+            List<Map<String, Object>> resultList = productAnalysisOperationDao.r_queryReturnQualityList(paramMap);
+          
+            for(Map<String, Object> r :resultList) {
+            	//问题原因 商品数
+            	float productCount = Float.parseFloat(r.get("PRODUCT_COUNT").toString());
+            	//占比
+            	if(total==0||productCount==0){
+              		r.put("RATIO", 0);
+              	}else{
+              		float ratio = 100*(productCount/total);
+              		r.put("RATIO", ratio);
+              	}
+            }
+            retMap.put("dataList", resultList);
+            pr.setState(true);
+			pr.setMessage("获取品质退换货分析成功");
+			pr.setObj(retMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e);
+        }
+        return pr;
+	}
+	/**
+	 * 商品退货分析-退货商家排行
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryReturnStationedRank(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> retMap = new HashMap<String, Object>();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if(paramMap == null) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数");
+            	return pr;
+            }
+            paramMap.put("num", 10);
+            /** 退货商家排行 */
+            List<Map<String, Object>> resultList = productAnalysisOperationDao.r_queryReturnStationed_Rank(paramMap);
+           
+            retMap.put("dataList", resultList);
+            pr.setState(true);
+			pr.setMessage("获取退货商家排行成功");
+			pr.setObj(retMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e);
+        }
+        return pr;
+	}
+	/**
+	 * 商品退货分析-退货品牌排行
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryReturnBrandRank(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> retMap = new HashMap<String, Object>();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if(paramMap == null) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数");
+            	return pr;
+            }
+            paramMap.put("num", 10);
+            /** 退货品牌排行 */
+            List<Map<String, Object>> resultList = productAnalysisOperationDao.r_queryReturnBrand_Rank(paramMap);
+            
+            retMap.put("dataList", resultList);
+            pr.setState(true);
+			pr.setMessage("获取退货品牌排行成功");
+			pr.setObj(retMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e);
+        }
+        return pr;
+	}
+	
+	
+	/**
+	 * 单品分析搜索
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryProductSingleSearch(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if(paramMap == null) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数");
+            	return pr;
+            }
+            /** 单品分析搜索列表 最多10条 */
+            List<Map<String, Object>> resultList = productAnalysisOperationDao.r_queryProductSingleSearch(paramMap);
+            
+            pr.setState(true);
+			pr.setMessage("搜索成功");
+			pr.setObj(resultList);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e);
+        }
+        return pr;
+	}
+
+	/**
+	 * 查询单品分析列表
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryProductSingleListForPage(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        	PageUtil.handlePageParams(paramMap);
+	        }
+			if(paramMap.size() == 0) {
+            	gr.setState(false);
+            	gr.setMessage("参数缺失");
+                return gr;
+            }
+			
+			int total = productAnalysisOperationDao.r_queryProductSingleCount(paramMap);
+			
+			//销售价
+			String file_names_msp = ":MAX_SALE_PRICE:";
+			//累计销量
+			String file_names_sc = ":SALE_COUNT:";
+			//剩余库存
+//			String file_names_stc = ":STOCK_COUNT:";
+			//发布时间
+			String file_names_pd = ":FIRST_SELL_STATE_DATE:";
+			
+			List<Map<String, Object>> list=null;
+			//需要查询的商品列表
+			List<String> productList = new ArrayList<String>();
+			if((paramMap.containsKey("sort")&&!"".equals(paramMap.get("sort").toString()))
+					&&(paramMap.containsKey("sort_by")&&!"".equals(paramMap.get("sort_by").toString()))){
+				String sort = ":"+paramMap.get("sort").toString()+":";
+				if(file_names_msp.indexOf(sort)!=-1) {
+					//销售价---获取排序后的商品信息
+					productList=productAnalysisOperationDao.r_querySalePrice_Product(paramMap);
+				}else if(file_names_sc.indexOf(sort)!=-1) {
+					//累计销量---获取排序后的商品信息
+					productList=productAnalysisOperationDao.r_querySaleCount_Product(paramMap);
+				}
+//				else if(file_names_stc.indexOf(sort)!=-1) {
+//					//剩余库存---获取排序后的用户信息
+//					productList=productAnalysisOperationDao.queryStockCount_Product(paramMap);
+//				}
+				else if(file_names_pd.indexOf(sort)!=-1) {
+					//发布时间---获取排序后的用户信息
+					productList=productAnalysisOperationDao.r_queryPublishDate_Product(paramMap);
+				}else {
+					gr.setState(false);
+					gr.setMessage("未配置的排序字段，请联系管理员【"+paramMap.get("sort").toString()+"】");
+					return gr;
+				}
+			}else{
+				//查询默认排序的商品信息
+				productList=productAnalysisOperationDao.r_queryProductSingleListBy_Default(paramMap);
+			}
+			
+			if(!productList.isEmpty()&&productList.size()>0){
+				paramMap.put("productList", productList);
+				list = productAnalysisOperationDao.r_queryProductSingleList(paramMap);
+			}
+            
+			if (list != null && list.size() > 0) {
+				//数据获取-销售价
+				List<Map<String,Object>> salePriceList = productAnalysisOperationDao.r_querySalePrice(paramMap);
+				Map<String,Object> minSalePriceMap = list2Map(salePriceList,"ITEMNUMBER","MIN_SALE_PRICE");
+				Map<String,Object> maxSalePriceMap = list2Map(salePriceList,"ITEMNUMBER","MAX_SALE_PRICE");
+				//数据获取-累计销量
+				List<Map<String,Object>> saleCountList = productAnalysisOperationDao.r_querySaleCount(paramMap);
+				Map<String,Object> saleCountMap = list2Map(saleCountList,"ITEMNUMBER","SALE_COUNT");
+				//数据获取-剩余库存
+//				List<Map<String,Object>> stockCountList = productAnalysisOperationDao.queryStockCount(paramMap);
+//				Map<String,Object> stockCountMap = list2Map(stockCountList,"ITEMNUMBER","STOCK_COUNT");
+				
+				Map<String,Object> tempMap = null;
+				for(int i=0;i<list.size();i++) {
+					tempMap = list.get(i);
+					String itemnumber = tempMap.get("ITEMNUMBER").toString();
+					tempMap.put("MIN_SALE_PRICE",minSalePriceMap.get(itemnumber)==null?0:Float.parseFloat(minSalePriceMap.get(itemnumber).toString()));
+					tempMap.put("MAX_SALE_PRICE",maxSalePriceMap.get(itemnumber)==null?0:Float.parseFloat(maxSalePriceMap.get(itemnumber).toString()));
+					tempMap.put("SALE_COUNT",saleCountMap.get(itemnumber)==null?0:Float.parseFloat(saleCountMap.get(itemnumber).toString()));
+					//tempMap.put("STOCK_COUNT",stockCountMap.get(itemnumber)==null?0:Float.parseFloat(stockCountMap.get(itemnumber).toString()));
+				}
+				List<Map<String,Object>> stock_list = productAnalysisOperationDao.queryProductStockCount(productList);//数据获取-商品库存
+    	        Map<String,Object> stock_map = list2Map(stock_list,"ITEMNUMBER","STOCK_COUNT");
+    	        for(Map<String, Object> d : list) {
+    	        	d.put("STOCK_COUNT", stock_map.get(d.get("ITEMNUMBER").toString())==null?0:Float.parseFloat(stock_map.get(d.get("ITEMNUMBER").toString()).toString()));
+    	        }
+				gr.setState(true);
+				gr.setMessage("查询单品分析列表成功");
+				gr.setObj(list);
+				gr.setTotal(total);
+			} else {
+				gr.setState(true);
+				gr.setMessage("无数据");
+			}
+		} catch (Exception e) {
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+			e.printStackTrace();
+		}
+		return gr;
+	}
+	
+	/**
+	 * 单品分析-商品信息
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult querySingleProductInfo(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if(paramMap == null) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数");
+            	return pr;
+            }
+           
+            /** 单品分析-商品信息 */
+            Map<String, Object> resultMap = productAnalysisOperationDao.r_queryOther_SignleProductInfo(paramMap);
+            
+            pr.setState(true);
+			pr.setMessage("获取单品分析商品信息成功");
+			pr.setObj(resultMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e);
+        }
+        return pr;
+	}
+	
+	/**
+	 * 查询单品分析详情
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryProductSingleDetail(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> retMap = new HashMap<String, Object>();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if(paramMap == null) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数");
+            	return pr;
+            }
+           
+            /** 单品分析-商品总销量 */
+            float saleTotalCount = productAnalysisOperationDao.r_queryOther_SignleProductTotalSaleCount(paramMap);
+            /** 单品分析-按颜色统计 */
+            List<Map<String, Object>> colorList = productAnalysisOperationDao.r_queryOther_ProductSignleColorList(paramMap);
+            /** 单品分析-按规格统计 */
+            List<Map<String, Object>> specsList = productAnalysisOperationDao.r_queryOther_ProductSignleSpecsList(paramMap);
+            /** 单品分析-商品销量sku明细 */
+            List<Map<String, Object>> skuList = productAnalysisOperationDao.r_queryOther_ProductSignleSkuList(paramMap);
+            
+            //总销量
+            for(Map<String, Object> color : colorList) {
+            	float saleCount = Float.parseFloat(color.get("SALE_COUNT")+"");
+            	//占比
+            	if(saleTotalCount==0||saleCount==0){
+            		color.put("RATIO", 0);
+              	}else{
+              		color.put("RATIO",  100*saleCount/saleTotalCount);
+              	}
+            }
+            retMap.put("colorList", colorList);
+            for(Map<String, Object> specs : specsList) {
+            	float saleCount = Float.parseFloat(specs.get("SALE_COUNT")+"");
+            	//占比
+            	if(saleTotalCount==0||saleCount==0){
+            		specs.put("RATIO", 0);
+              	}else{
+              		specs.put("RATIO",  100*saleCount/saleTotalCount);
+              	}
+            }
+            retMap.put("specsList", specsList);
+            if(skuList != null && skuList.size() > 0) {
+            	List<String> list = new ArrayList<String>();
+            	for(Map<String, Object> s : skuList) {
+            		list.add(s.get("PRODUCT_SKU_ID").toString());
+            	}
+            	
+            	List<Map<String, Object>> stock_list = productAnalysisOperationDao.queryProductSkuStockCount(list);
+            	Map<String, Object> stock_map = list2Map(stock_list, "PRODUCT_SKU", "STOCK_COUNT");
+            	for(Map<String, Object> s : skuList) {
+            		s.put("STOCK_COUNT", stock_map.get(s.get("PRODUCT_SKU_ID").toString())==null?0:Float.parseFloat(stock_map.get(s.get("PRODUCT_SKU_ID").toString()).toString()));
+            	}
+            }
+            retMap.put("skuList", skuList);
+            
+            pr.setState(true);
+			pr.setMessage("获取单品分析详情成功");
+			pr.setObj(retMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e);
+        }
+        return pr;
+	}
+	
+	/**
+	 * 查询单品分析-销量分析-折线
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult querySingleSaleVolumeChart(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+           
+            List<Map<String, Object>> allDataList = new ArrayList<Map<String, Object>>();
+            List<Map<String, Object>> visitorPvCountList = new ArrayList<Map<String, Object>>();
+            List<Map<String, Object>> purchaseNumberMoneyList = new ArrayList<Map<String, Object>>();
+            List<Map<String, Object>> payPurchaseNumberMoneyList = new ArrayList<Map<String, Object>>();
+            List<Map<String, Object>> returnList = new ArrayList<Map<String, Object>>();
+            List<String> time_list = new ArrayList<String>();
+            if(paramMap.get("start_date").equals(paramMap.get("end_date"))) {//一天
+            	time_list.add("00:00");
+            	time_list.add("01:00");
+            	time_list.add("02:00");
+            	time_list.add("03:00");
+            	time_list.add("04:00");
+            	time_list.add("05:00");
+            	time_list.add("06:00");
+            	time_list.add("07:00");
+            	time_list.add("08:00");
+            	time_list.add("09:00");
+            	time_list.add("10:00");
+            	time_list.add("11:00");
+            	time_list.add("12:00");
+            	time_list.add("13:00");
+            	time_list.add("14:00");
+            	time_list.add("15:00");
+            	time_list.add("16:00");
+            	time_list.add("17:00");
+            	time_list.add("18:00");
+            	time_list.add("19:00");
+            	time_list.add("20:00");
+            	time_list.add("21:00");
+            	time_list.add("22:00");
+            	time_list.add("23:00");
+            	/** 其他 折线图 商品访客数和浏览量 */
+                visitorPvCountList = productAnalysisOperationDao.r_queryOther_ProductVisitorPvCountD_Chart(paramMap);
+                /** 其他 折线图 下单买家数、下单件数和下单金额 */
+                purchaseNumberMoneyList = productAnalysisOperationDao.r_queryOther_ProductPurchaseNumberMoneyD_Chart(paramMap);
+                /** 其他 折线图 支付买家数、支付件数和支付金额 */
+                payPurchaseNumberMoneyList = productAnalysisOperationDao.r_queryOther_ProductPayPurchaseNumberMoneyD_Chart(paramMap);
+                /** 其他 折线图 成功退款件数和成功退款金额 */
+                returnList = productAnalysisOperationDao.r_queryOther_ProductReturnD_Chart(paramMap);
+            }else {
+            	String start_time = paramMap.get("start_date").toString();		//开始时间
+                String end_time = paramMap.get("end_date").toString();			//结束时间
+                SimpleDateFormat sf = new SimpleDateFormat("yyyy-MM-dd");
+                Date start_time_date = sf.parse(start_time);
+                Date end_time_date = sf.parse(end_time);
+                String tempDate = null;
+
+                //获取指定时间段所有日期数据
+                while(end_time_date.compareTo(start_time_date)>=0){
+                    tempDate =  sf.format(start_time_date);
+                    time_list.add(tempDate);
+                    start_time_date = DateUtils.addDay(start_time_date,1);
+                }
+                /** 其他 折线图 商品访客数和浏览量 */
+                visitorPvCountList = productAnalysisOperationDao.r_queryOther_ProductVisitorPvCount_Chart(paramMap);
+                /** 其他 折线图 下单买家数、下单件数和下单金额 */
+                purchaseNumberMoneyList = productAnalysisOperationDao.r_queryOther_ProductPurchaseNumberMoney_Chart(paramMap);
+                /** 其他 折线图 支付买家数、支付件数和支付金额 */
+                payPurchaseNumberMoneyList = productAnalysisOperationDao.r_queryOther_ProductPayPurchaseNumberMoney_Chart(paramMap);
+                /** 其他 折线图 成功退款件数和成功退款金额 */
+                returnList = productAnalysisOperationDao.r_queryOther_ProductReturn_Chart(paramMap);
+            }
+        	
+            //访客数
+            Map<String,Object> visitorCountMap = list2Map(visitorPvCountList,"CREATE_DATE","VISITOR_COUNT");
+            //浏览量
+            Map<String,Object> pvCountMap = list2Map(visitorPvCountList,"CREATE_DATE","PV_COUNT");
+            //下单买家数
+            Map<String,Object> purchaseNumberMap = list2Map(purchaseNumberMoneyList,"CREATE_DATE","PURCHASE_NUMBER");
+            //下单金额
+            Map<String,Object> orderMoneyMap = list2Map(purchaseNumberMoneyList,"CREATE_DATE","ORDER_MONEY");
+            //下单件数
+            Map<String,Object> productCountMap = list2Map(purchaseNumberMoneyList,"CREATE_DATE","PRODUCT_COUNT");
+            //支付买家数
+            Map<String,Object> payPurchaseNumberMap = list2Map(payPurchaseNumberMoneyList,"CREATE_DATE","PURCHASE_NUMBER");
+            //支付件数
+            Map<String,Object> saleCountMap = list2Map(payPurchaseNumberMoneyList,"CREATE_DATE","PAYMENT_COUNT");
+            //支付金额
+            Map<String,Object> payMoneyMap = list2Map(payPurchaseNumberMoneyList,"CREATE_DATE","PAYMENT_MONEY");
+            //成功退款金额
+            Map<String,Object> returnMoneyMap = list2Map(returnList,"CREATE_DATE","RETURN_MONEY");
+            //成功退款件数
+            Map<String,Object> returnCountMap = list2Map(returnList,"CREATE_DATE","RETURN_COUNT");
+            
+            //开始数据拼装
+          	String key="";
+          	
+          	Map<String, Object> map = null;
+            for(String time : time_list) {
+            	key = time;
+            	/** 销量分析-商品访客数 */
+                float visitorCount = visitorCountMap.get(key)==null?0:Float.parseFloat(visitorCountMap.get(key).toString());
+                /** 销量分析-商品浏览量 */
+                float pvCount = pvCountMap.get(key)==null?0:Float.parseFloat(pvCountMap.get(key).toString());
+                /** 销量分析-下单买家数 */
+                float purchaseNumber = purchaseNumberMap.get(key)==null?0:Float.parseFloat(purchaseNumberMap.get(key).toString());
+                /** 销量分析-下单件数 */
+                float productCount = productCountMap.get(key)==null?0:Float.parseFloat(productCountMap.get(key).toString());
+                /** 销量分析-下单金额 */
+                float orderMoney = orderMoneyMap.get(key)==null?0:Float.parseFloat(orderMoneyMap.get(key).toString());
+                /** 销量分析-支付买家数 */
+                float payPurchaseNumber = payPurchaseNumberMap.get(key)==null?0:Float.parseFloat(payPurchaseNumberMap.get(key).toString());
+                /** 销量分析-支付件数 */
+                float saleCount = saleCountMap.get(key)==null?0:Float.parseFloat(saleCountMap.get(key).toString());
+                /** 销量分析-支付金额 */
+                float payMoney = payMoneyMap.get(key)==null?0:Float.parseFloat(payMoneyMap.get(key).toString());
+                /** 销量分析-成功退款金额 */
+                float returnMoney = returnMoneyMap.get(key)==null?0:Float.parseFloat(returnMoneyMap.get(key).toString());
+                /** 销量分析-成功退款件数 */
+                float returnCount = returnCountMap.get(key)==null?0:Float.parseFloat(returnCountMap.get(key).toString());
+                
+                map = new HashMap<String, Object>();
+                //商品访客数
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", visitorCount);
+              	map.put("PAGE_NAME", "商品访客数");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//商品浏览量
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", pvCount);
+              	map.put("PAGE_NAME", "商品浏览量");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//下单买家数
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", purchaseNumber);
+              	map.put("PAGE_NAME", "下单买家数");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//下单件数
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", productCount);
+              	map.put("PAGE_NAME", "下单件数");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//下单件数
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", orderMoney);
+              	map.put("PAGE_NAME", "下单金额");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//下单转化率
+              	if(visitorCount==0||purchaseNumber==0){
+              		map.put("CNT", 0);
+              	}else{
+              		float zhl = 100*(purchaseNumber/visitorCount);
+              		map.put("CNT", m2(zhl));
+              	}
+              	map.put("CREATE_DATE", key);
+              	map.put("PAGE_NAME", "下单转化率");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//支付买家数
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", payPurchaseNumber);
+              	map.put("PAGE_NAME", "支付买家数");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//支付件数
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", saleCount);
+              	map.put("PAGE_NAME", "支付件数");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//支付金额
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", payMoney);
+              	map.put("PAGE_NAME", "支付金额");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//成功退款金额
+              	map.put("CNT", returnMoney);
+              	map.put("CREATE_DATE", key);
+              	map.put("PAGE_NAME", "成功退款金额");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//成功退款件数
+              	map.put("CNT", returnCount);
+              	map.put("CREATE_DATE", key);
+              	map.put("PAGE_NAME", "成功退款件数");
+              	allDataList.add(map);
+            }
+            
+            //将原始数据组装为Echart可识别的格式
+            resultMap = createData("PAGE_NAME", time_list, allDataList);
+            
+            pr.setState(true);
+			pr.setMessage("获取销量分析成功");
+			pr.setObj(resultMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e);
+        }
+        return pr;
+	}
+	
+	/**
+	 * 查询单品分析-销售趋势
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryProductSingleTrend(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if(paramMap == null||StringUtils.isEmpty(paramMap.get("product_sku"))) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数");
+            	return pr;
+            }
+            
+            List<Map<String, Object>> allDataList = new ArrayList<Map<String, Object>>();
+            List<Map<String, Object>> payCountList = new ArrayList<Map<String, Object>>();
+            List<Map<String, Object>> returnCountList = new ArrayList<Map<String, Object>>();
+            List<String> time_list = new ArrayList<String>();
+            if(paramMap.get("start_date").equals(paramMap.get("end_date"))) {//一天
+            	time_list.add("00:00");
+            	time_list.add("01:00");
+            	time_list.add("02:00");
+            	time_list.add("03:00");
+            	time_list.add("04:00");
+            	time_list.add("05:00");
+            	time_list.add("06:00");
+            	time_list.add("07:00");
+            	time_list.add("08:00");
+            	time_list.add("09:00");
+            	time_list.add("10:00");
+            	time_list.add("11:00");
+            	time_list.add("12:00");
+            	time_list.add("13:00");
+            	time_list.add("14:00");
+            	time_list.add("15:00");
+            	time_list.add("16:00");
+            	time_list.add("17:00");
+            	time_list.add("18:00");
+            	time_list.add("19:00");
+            	time_list.add("20:00");
+            	time_list.add("21:00");
+            	time_list.add("22:00");
+            	time_list.add("23:00");
+            	
+            	/** 其他 折线图 sku支付件数 */
+                payCountList = productAnalysisOperationDao.r_queryOther_SkuPayCountD_Chart(paramMap);
+                /** 其他 折线图 sku成功退款件数 */
+                returnCountList = productAnalysisOperationDao.r_queryOther_SkuReturnCountD_Chart(paramMap);
+            }else {
+            	String start_time = paramMap.get("start_date").toString();		//开始时间
+                String end_time = paramMap.get("end_date").toString();			//结束时间
+                SimpleDateFormat sf = new SimpleDateFormat("yyyy-MM-dd");
+                Date start_time_date = sf.parse(start_time);
+                Date end_time_date = sf.parse(end_time);
+                String tempDate = null;
+
+                //获取指定时间段所有日期数据
+                while(end_time_date.compareTo(start_time_date)>=0){
+                    tempDate =  sf.format(start_time_date);
+                    time_list.add(tempDate);
+                    start_time_date = DateUtils.addDay(start_time_date,1);
+                }
+                /** 其他 折线图 sku支付件数 */
+                payCountList = productAnalysisOperationDao.r_queryOther_SkuPayCount_Chart(paramMap);
+                /** 其他 折线图 sku成功退款件数 */
+                returnCountList = productAnalysisOperationDao.r_queryOther_SkuReturnCount_Chart(paramMap);
+            }
+        	
+            //支付件数
+            Map<String,Object> saleCountMap = list2Map(payCountList,"CREATE_DATE","PRODUCT_COUNT");
+            //成功退款件数
+            Map<String,Object> returnCountMap = list2Map(returnCountList,"CREATE_DATE","PRODUCT_COUNT");
+            
+            //开始数据拼装
+          	String key="";
+          	
+          	Map<String, Object> map = null;
+            for(String time : time_list) {
+            	key = time;
+                /** 销售趋势-支付件数 */
+                float saleCount = saleCountMap.get(key)==null?0:Float.parseFloat(saleCountMap.get(key).toString());
+                /** 销售趋势-成功退款件数 */
+                float returnCount = returnCountMap.get(key)==null?0:Float.parseFloat(returnCountMap.get(key).toString());
+                
+              	
+              	map = new HashMap<String, Object>();
+              	//支付件数
+              	map.put("CREATE_DATE", key);
+              	map.put("CNT", saleCount);
+              	map.put("PAGE_NAME", "支付件数");
+              	allDataList.add(map);
+              	
+              	map = new HashMap<String, Object>();
+              	//成功退款件数
+              	map.put("CNT", returnCount);
+              	map.put("CREATE_DATE", key);
+              	map.put("PAGE_NAME", "成功退款件数");
+              	allDataList.add(map);
+            }
+            
+            //将原始数据组装为Echart可识别的格式
+            resultMap = createData("PAGE_NAME", time_list, allDataList);
+            
+            pr.setState(true);
+			pr.setMessage("获取sku销售趋势成功");
+			pr.setObj(resultMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e);
+        }
+        return pr;
+	}
+	
+	/**
+	 * 查询单品分析-销售区域分析
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryProductSingleSaleArea(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if(paramMap == null||StringUtils.isEmpty(paramMap.get("itemnumber"))) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数");
+            	return pr;
+            }
+            paramMap.put("num", 5);
+            /** 其他 单品分析-销售区域分析 */
+            List<Map<String, Object>> resultList = productAnalysisOperationDao.r_queryOther_ProductSingleSaleArea(paramMap);
+        	
+            pr.setState(true);
+			pr.setMessage("获取销售区域分析成功");
+			pr.setObj(resultList);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e);
+        }
+        return pr;
+	}
+	
+	/**
+	 * 查询单品分析-销售区域地图
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult querySingleSaleAreaMap(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if(paramMap == null) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数");
+            	return pr;
+            }
+            List<Map<String, Object>> resultList = productAnalysisOperationDao.r_queryOther_SingleSaleAreaMap(paramMap);
+            pr.setState(true);
+			pr.setMessage("获取销售区域地图成功");
+			pr.setObj(resultList);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e);
+        }
+        return pr;
+	}
+	
+	/**
+     * 查询单品分析-销售区域分析-sku销量明细
+     * @param request
+     * @return
+     */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryProductSingleSaleDetail(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if(paramMap == null||StringUtils.isEmpty(paramMap.get("itemnumber"))||StringUtils.isEmpty(paramMap.get("province_key"))
+            		||StringUtils.isEmpty(paramMap.get("city_key"))||StringUtils.isEmpty(paramMap.get("start_date"))||StringUtils.isEmpty(paramMap.get("end_date"))) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数");
+            	return pr;
+            }
+            paramMap.put("num", 10);
+            /** sku销量明细 */
+            List<Map<String, Object>> skuList = productAnalysisOperationDao.r_queryOther_SkuSaleDetail(paramMap);
+            
+            pr.setState(true);
+			pr.setMessage("获取sku销量明细成功");
+			pr.setObj(skuList);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e);
+        }
+        return pr;
+	}
+	/**
+	 * 查询单品分析-售后分析
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryProductSingleAfterSale(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> retMap = new HashMap<String, Object>();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if(paramMap == null||StringUtils.isEmpty(paramMap.get("itemnumber"))) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数");
+            	return pr;
+            }
+            paramMap.put("num", 5);
+            /** 售后汇总 */
+            List<Map<String, Object>> reasonList = productAnalysisOperationDao.r_queryOther_ProductSingleAfterSale_Chart(paramMap);
+            
+        	/** 品质退换货商品总数 */
+        	float total = productAnalysisOperationDao.r_queryReturnQualityCount(paramMap);
+            /** 品质退换货分析 */
+        	List<Map<String, Object>> qualityList = productAnalysisOperationDao.r_queryReturnQualityList(paramMap);
+            
+        	for(Map<String, Object> q :qualityList) {
+             	//问题原因 商品数
+             	float productCount = Float.parseFloat(q.get("PRODUCT_COUNT").toString());
+             	//占比
+             	if(total==0||productCount==0){
+               		q.put("RATIO", 0);
+               	}else{
+               		float ratio = 100*(productCount/total);
+               		q.put("RATIO", ratio);
+               	}
+            }
+        	
+        	retMap.put("reasonList", reasonList);
+        	retMap.put("qualityList", qualityList);
+            pr.setState(true);
+			pr.setMessage("获取售后分析成功");
+			pr.setObj(retMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e);
+        }
+        return pr;
+	}
+	
+	/**
+     * 异常商品-流量下跌
+     * 条件：最近7天浏览量/上周期7天浏览量*100 <= 50%
+     * 
+     * @param request
+     * @return
+     */
+	@SuppressWarnings("unchecked")
+	public GridResult queryAbnormalFlowListForPage(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> retMap = new HashMap<String, Object>();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        	PageUtil.handlePageParams(paramMap);
+	        }
+			if(paramMap.size() == 0) {
+            	gr.setState(false);
+            	gr.setMessage("参数缺失");
+                return gr;
+            }
+			
+			SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+        	
+			Calendar c = Calendar.getInstance();
+			c.add(Calendar.DATE, -1);
+			String first_end_date = sdf.format(c.getTime());
+			paramMap.put("first_end_date", first_end_date);
+			retMap.put("first_end_date", first_end_date);
+			Date firstEndDate = sdf.parse(first_end_date);
+			
+			c = Calendar.getInstance();
+			c.setTime(firstEndDate);
+			c.add(Calendar.DATE, -6);
+			String first_start_date = sdf.format(c.getTime());
+			paramMap.put("first_start_date", first_start_date);
+			retMap.put("first_start_date", first_start_date);
+			Date firstStartDate = sdf.parse(first_start_date);
+			
+			c = Calendar.getInstance();
+			c.setTime(firstStartDate);
+			c.add(Calendar.DATE, -1);
+			String last_end_date = sdf.format(c.getTime());
+			paramMap.put("last_end_date", last_end_date);
+			retMap.put("last_end_date", last_end_date);
+			Date lastEndDate = sdf.parse(last_end_date);
+			
+			c = Calendar.getInstance();
+			c.setTime(lastEndDate);
+			c.add(Calendar.DATE, -6);
+			String last_start_date = sdf.format(c.getTime());
+			paramMap.put("last_start_date", last_start_date);
+			retMap.put("last_start_date", last_start_date);
+			/** 流量下跌总数 */
+			int total = productAnalysisOperationDao.r_queryAbnormalFlowCount(paramMap);
+            /** 流量下跌列表 */
+            List<Map<String, Object>> resultList = productAnalysisOperationDao.r_queryAbnormalFlowListForPage(paramMap);
+            
+            if (resultList != null && resultList.size() > 0) {
+            	retMap.put("dataList", resultList);
+				gr.setState(true);
+				gr.setMessage("查询流量下跌列表成功");
+				gr.setObj(retMap);
+				gr.setTotal(total);
+			} else {
+				gr.setState(true);
+				gr.setMessage("无数据");
+				gr.setObj(retMap);
+			}
+		} catch (Exception e) {
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+		}
+		return gr;
+	}
+	
+	/**
+     * 异常商品-支付转化率低
+     * 条件：最近7天支付率 < 同类商品的平均转化率
+     * 
+     * @param request
+     * @return
+     */
+	@SuppressWarnings("unchecked")
+	public GridResult queryAbnormalZhlListForPage(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        	PageUtil.handlePageParams(paramMap);
+	        }
+			if(paramMap.size() == 0) {
+            	gr.setState(false);
+            	gr.setMessage("参数缺失");
+                return gr;
+            }
+			
+			SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+        	
+			Calendar c = Calendar.getInstance();
+			c.add(Calendar.DATE, -1);
+			String first_end_date = sdf.format(c.getTime());
+			paramMap.put("first_end_date", first_end_date);
+			Date firstEndDate = sdf.parse(first_end_date);
+			
+			c = Calendar.getInstance();
+			c.setTime(firstEndDate);
+			c.add(Calendar.DATE, -6);
+			String first_start_date = sdf.format(c.getTime());
+			paramMap.put("first_start_date", first_start_date);
+			Date firstStartDate = sdf.parse(first_start_date);
+			
+			c = Calendar.getInstance();
+			c.setTime(firstStartDate);
+			c.add(Calendar.DATE, -1);
+			String last_end_date = sdf.format(c.getTime());
+			paramMap.put("last_end_date", last_end_date);
+			Date lastEndDate = sdf.parse(last_end_date);
+			
+			c = Calendar.getInstance();
+			c.setTime(lastEndDate);
+			c.add(Calendar.DATE, -6);
+			String last_start_date = sdf.format(c.getTime());
+			paramMap.put("last_start_date", last_start_date);
+			
+			/** 同类商品支付转化率平均值 */
+			List<Map<String, Object>> list = productAnalysisOperationDao.r_queryAvgZhlList(paramMap);
+			paramMap.put("list", list);
+			/** 支付转化率低总数 */
+			int total = productAnalysisOperationDao.r_queryAbnormalZhlCount(paramMap);
+            /** 支付转化率低列表 */
+            List<Map<String, Object>> resultList = productAnalysisOperationDao.r_queryAbnormalZhlListForPage(paramMap);
+            
+            if (resultList != null && resultList.size() > 0) {
+				gr.setState(true);
+				gr.setMessage("查询支付转化率低列表成功");
+				gr.setObj(resultList);
+				gr.setTotal(total);
+			} else {
+				gr.setState(true);
+				gr.setMessage("无数据");
+			}
+		} catch (Exception e) {
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+		}
+		return gr;
+	}
+	
+	/**
+     * 异常商品-退款预警
+     * 条件：(最近7天退货数-上个周期7天退货数)/上个周期7天退货数*100 >= 50
+     * 
+     * @param request
+     * @return
+     */
+	@SuppressWarnings("unchecked")
+	public GridResult queryAbnormalRefundListForPage(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> retMap = new HashMap<String, Object>();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        	PageUtil.handlePageParams(paramMap);
+	        }
+			if(paramMap.size() == 0) {
+            	gr.setState(false);
+            	gr.setMessage("参数缺失");
+                return gr;
+            }
+			
+			SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+        	
+			Calendar c = Calendar.getInstance();
+			c.add(Calendar.DATE, -1);
+			String first_end_date = sdf.format(c.getTime());
+			paramMap.put("first_end_date", first_end_date);
+			retMap.put("first_end_date", first_end_date);
+			Date firstEndDate = sdf.parse(first_end_date);
+			
+			c = Calendar.getInstance();
+			c.setTime(firstEndDate);
+			c.add(Calendar.DATE, -6);
+			String first_start_date = sdf.format(c.getTime());
+			paramMap.put("first_start_date", first_start_date);
+			retMap.put("first_start_date", first_start_date);
+			Date firstStartDate = sdf.parse(first_start_date);
+			
+			c = Calendar.getInstance();
+			c.setTime(firstStartDate);
+			c.add(Calendar.DATE, -1);
+			String last_end_date = sdf.format(c.getTime());
+			paramMap.put("last_end_date", last_end_date);
+			retMap.put("last_end_date", last_end_date);
+			Date lastEndDate = sdf.parse(last_end_date);
+			
+			c = Calendar.getInstance();
+			c.setTime(lastEndDate);
+			c.add(Calendar.DATE, -6);
+			String last_start_date = sdf.format(c.getTime());
+			paramMap.put("last_start_date", last_start_date);
+			retMap.put("last_start_date", last_start_date);
+			
+			/** 退款预警总数 */
+			int total = productAnalysisOperationDao.r_queryAbnormalRefundCount(paramMap);
+            /** 退款预警列表 */
+            List<Map<String, Object>> resultList = productAnalysisOperationDao.r_queryAbnormalRefundListForPage(paramMap);
+            
+            if (resultList != null && resultList.size() > 0) {
+            	retMap.put("dataList", resultList);
+				gr.setState(true);
+				gr.setMessage("查询退款预警列表成功");
+				gr.setObj(retMap);
+				gr.setTotal(total);
+			} else {
+				gr.setState(true);
+				gr.setMessage("无数据");
+				gr.setObj(retMap);
+			}
+		} catch (Exception e) {
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+		}
+		return gr;
+	}
+	
+	/**
+	 * 异常商品-库存预警
+	 * 条件：最近3天销量>昨日库存量*80%
+	 * 
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryAbnormalStockListForPage(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        	PageUtil.handlePageParams(paramMap);
+	        }
+			if(paramMap.size() == 0) {
+            	gr.setState(false);
+            	gr.setMessage("参数缺失");
+                return gr;
+            }
+			
+			SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+        	
+			Calendar c = Calendar.getInstance();
+			c.add(Calendar.DATE, -1);
+			String first_end_date = sdf.format(c.getTime());
+			paramMap.put("first_end_date", first_end_date);
+			Date firstEndDate = sdf.parse(first_end_date);
+			
+			c = Calendar.getInstance();
+			c.setTime(firstEndDate);
+			c.add(Calendar.DATE, -3);
+			String first_start_date = sdf.format(c.getTime());
+			paramMap.put("first_start_date", first_start_date);
+			
+			paramMap.put("last_end_date", first_end_date);
+			Date lastEndDate = sdf.parse(first_end_date);
+			
+			c = Calendar.getInstance();
+			c.setTime(lastEndDate);
+			c.add(Calendar.DATE, -6);
+			String last_start_date = sdf.format(c.getTime());
+			paramMap.put("last_start_date", last_start_date);
+			
+			/** 库存预警总数 */
+			int total = productAnalysisOperationDao.r_queryAbnormalStockCount(paramMap);
+            /** 库存预警列表 */
+            List<Map<String, Object>> resultList = productAnalysisOperationDao.r_queryAbnormalStockListForPage(paramMap);
+            
+            List<String> list = new ArrayList<String>();
+            
+            if (resultList != null && resultList.size() > 0) {
+            	for(Map<String, Object> r : resultList) {
+                 	list.add(r.get("ITEMNUMBER").toString());
+                }
+                 
+                List<Map<String,Object>> stock_list = productAnalysisOperationDao.queryProductStockCount(list);//数据获取-商品库存
+                Map<String,Object> stock_map = list2Map(stock_list,"ITEMNUMBER","STOCK_COUNT");
+                 
+    	        for(Map<String, Object> r : resultList) {
+    	        	r.put("STOCK_COUNT", stock_map.get(r.get("ITEMNUMBER").toString())==null?0:Float.parseFloat(stock_map.get(r.get("ITEMNUMBER").toString()).toString()));
+    	        }
+				gr.setState(true);
+				gr.setMessage("查询库存预警列表成功");
+				gr.setObj(resultList);
+				gr.setTotal(total);
+			} else {
+				gr.setState(true);
+				gr.setMessage("无数据");
+			}
+		} catch (Exception e) {
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+		}
+		return gr;
+	}
+	
+	/**
+	 * 异常商品-滞销商品
+	 * 条件：上架时间 > 15天，剩余库存数 > 累计销量，最近7天销量 < 50 的商品
+	 * 
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryAbnormalUnsalableListForPage(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        	PageUtil.handlePageParams(paramMap);
+	        }
+			if(paramMap.size() == 0) {
+            	gr.setState(false);
+            	gr.setMessage("参数缺失");
+                return gr;
+            }
+			
+			SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+        	
+			Calendar c = Calendar.getInstance();
+			c.add(Calendar.DATE, -1);
+			String first_end_date = sdf.format(c.getTime());
+			paramMap.put("first_end_date", first_end_date);
+			Date firstEndDate = sdf.parse(first_end_date);
+			
+			c = Calendar.getInstance();
+			c.setTime(firstEndDate);
+			c.add(Calendar.DATE, -6);
+			String first_start_date = sdf.format(c.getTime());
+			paramMap.put("first_start_date", first_start_date);
+			
+			/** 滞销商品总数 */
+			int total = productAnalysisOperationDao.r_queryAbnormalUnsalableCount(paramMap);
+            /** 滞销商品列表 */
+            List<Map<String, Object>> resultList = productAnalysisOperationDao.r_queryAbnormalUnsalableListForPage(paramMap);
+            
+            List<String> list = new ArrayList<String>();
+            
+            if (resultList != null && resultList.size() > 0) {
+            	for(Map<String, Object> r : resultList) {
+                 	list.add(r.get("ITEMNUMBER").toString());
+                }
+                 
+                List<Map<String,Object>> stock_list = productAnalysisOperationDao.queryProductStockCount(list);//数据获取-商品库存
+                Map<String,Object> stock_map = list2Map(stock_list,"ITEMNUMBER","STOCK_COUNT");
+                 
+    	        for(Map<String, Object> r : resultList) {
+    	        	r.put("STOCK_COUNT", stock_map.get(r.get("ITEMNUMBER").toString())==null?0:Float.parseFloat(stock_map.get(r.get("ITEMNUMBER").toString()).toString()));
+    	        }
+				gr.setState(true);
+				gr.setMessage("查询滞销商品列表成功");
+				gr.setObj(resultList);
+				gr.setTotal(total);
+			} else {
+				gr.setState(true);
+				gr.setMessage("无数据");
+			}
+		} catch (Exception e) {
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+		}
+		return gr;
+	}
+	
+	/**
+	 * 商品库存明细
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryProductStockDetail(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> retMap = new HashMap<String, Object>();
+        try {
+            // 获取传入参数
+            String json = HttpUtil.getRequestInputStream(request);
+            // 解析传入参数
+            Map<String, Object> paramMap = (HashMap<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if(paramMap == null||StringUtils.isEmpty(paramMap.get("itemnumber"))) {
+            	pr.setState(false);
+            	pr.setMessage("缺少参数");
+            	return pr;
+            }
+            Map<String, Object> warehouseStockMap = new HashMap<String, Object>();
+            //商品库存明细
+            List<Map<String, Object>> skuList = productAnalysisOperationDao.queryProductStockDetail(paramMap);
+            //获取成品仓列表
+            List<Map<String, Object>> warehouseList = productAnalysisOperationDao.queryWarehouseList(paramMap);
+            paramMap.put("list", warehouseList);
+            //根据仓库查询商品SKU库存
+            List<Map<String, Object>> warehouseStockList = productAnalysisOperationDao.queryWarehouseProductSkuStock(paramMap);
+            if(warehouseStockList!=null&&warehouseStockList.size()>0){
+            	for(Map<String,Object> map:warehouseStockList){
+            		int stock_count = ((BigDecimal) map.get("STOCK_COUNT")).intValue();
+            		warehouseStockMap.put(map.get("PRODUCT_SKU")+"_"+map.get("WAREHOUSE_ID"), stock_count);
+            	}
+            }
+            retMap.put("warehouseList", warehouseList);
+            retMap.put("skuList", skuList);
+            retMap.put("warehouseStockMap", warehouseStockMap);
+            pr.setState(true);
+			pr.setMessage("获取商品库存明细成功");
+			pr.setObj(retMap);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e);
+        }
+        return pr;
+	}
+	
+	/**
+	 * 将list转换成map
+	 * @param list
+	 * @param mapKey
+	 * @param valueKey
+	 * @return
+	 */
+	private Map<String,Object> list2Map(List<Map<String, Object>> list ,String mapKey,String valueKey){
+		Map<String,Object> returnMap = new HashMap<String,Object>();
+		int size = list.size();
+		String key ="";
+		Object value ="";
+		for(int i=0;i<size;i++)
+		{
+			key = list.get(i).get(mapKey).toString();
+			value = list.get(i).get(valueKey);
+			returnMap.put(key, value);
+		}
+		return returnMap;
+	}
+	
+	private Map<String, Object> createData(String seriesName,List<String> time_list,List<Map<String, Object>> data_list) {
+        Map<String, Object> resultMap = new HashMap<String, Object>();
+        List<Map<String, Object>> seriesData = new ArrayList<Map<String, Object>>();
+        Map<String, Map<String, Object>> dataMap = new HashMap<String, Map<String, Object>>();
+        Map<String, Object> dataMapVal = null;// 存储一个统计分组段的数据列表
+        List<Double> dataList = null;
+        Set<String> seriesNameSet = new HashSet<String>();
+        if(data_list!=null && !data_list.isEmpty()){//有数据
+            for (Map<String, Object> data : data_list) {
+                String PAGE_NAME = data.get(seriesName) == null ? null: data.get(seriesName).toString();//分组统计类型
+                seriesNameSet.add(PAGE_NAME);
+                String ORDER_DATE = data.get("CREATE_DATE") == null ? DateUtils.format(new Date(), "YYYY-MM-dd") : data.get("CREATE_DATE").toString();
+                double COUNT = data.get("CNT") == null ? 0 : Double.parseDouble(data.get("CNT").toString());//分组中某天的统计数量
+                if (dataMap.containsKey(PAGE_NAME)) {// 已存在直接put
+                    dataMapVal = dataMap.get(PAGE_NAME);
+                    dataMapVal.put(ORDER_DATE, COUNT);
+                } else {
+                    dataMapVal = new HashMap<String, Object>();
+                    dataMapVal.put(ORDER_DATE, COUNT);
+                    dataMap.put(PAGE_NAME, dataMapVal);
+                }
+            }
+            int i=0;
+            for (String PAGE_NAME : dataMap.keySet()) {
+                dataMapVal = dataMap.get(PAGE_NAME);
+                dataList = new ArrayList<Double>();
+                double count = 0;
+                for (String time : time_list) {
+                    if (StringUtils.isEmpty(time))
+                        continue; // 日期为空，跳过该次循环
+                    if (dataMapVal!=null && !StringUtils.isEmpty(dataMapVal.get(time))) {
+                        count = dataMapVal.get(time) == null ? 0 : Double.parseDouble(dataMapVal.get(time).toString());
+                    }
+                    dataList.add(count);
+                    count = 0;
+                }
+                Map<String, Object> seriesDataMap = new HashMap<String, Object>();
+                seriesDataMap.put("name", PAGE_NAME);
+                seriesDataMap.put("type", "line");
+                seriesDataMap.put("yAxis", i);
+                seriesDataMap.put("color", colors[i]);
+                i++;
+                seriesDataMap.put("data", dataList);
+                seriesData.add(seriesDataMap);
+            }
+        }
+        //排序
+        Collections.sort(seriesData, new Comparator<Map<String, Object>>() {
+            public int compare(Map<String, Object> o1, Map<String, Object> o2) {
+                return o1.get("name").toString().compareTo(o2.get("name").toString());
+            }
+        });
+        resultMap.put("seriesData", seriesData);
+        resultMap.put("xAxis", time_list);
+        resultMap.put("legend", seriesNameSet);
+        return resultMap;
+    }
+	
+	/**
+     * Float类型 保留两位小数
+     */
+    public static String m2(float v) {
+        DecimalFormat df = new DecimalFormat("#.00");
+        return df.format(v);
+    }
+
+}

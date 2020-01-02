@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.decoration.dao.DecorateDataDao">
+   
+   <resultMap type="java.util.Map" id="navMap">
+   	    <result column="id" property="id"/>
+		<result column="name" property="name"/>
+		<result column="tag_name" property="tag_name"/>
+		<result column="tag_color" property="tag_color"/>
+		<result column="url_type" property="url_type"/>
+		<result column="page_id" property="page_id"/>
+		<result column="url" property="url"/>
+   </resultMap>
+   
+   <!-- 获取最新导航列表 -->
+   <select id="queryNavList" parameterType="java.util.Map" resultMap="navMap">
+   		select id,name,tag_name,tag_color,url_type,page_id,url from TBL_DECORATE_NAV where template_id = 
+			(select max(id) from tbl_decorate_template where effective_start_date &lt;= sysdate and site_id = #{site_id,jdbcType=INTEGER}) 
+		and site_id =  #{site_id,jdbcType=INTEGER}
+		order by sort_id desc
+   </select>
+   
+	<!-- 查询首页ID -->
+	<select id="queryHomePageIdBySiteId" parameterType="java.util.Map"  resultType="java.util.Map">
+ 		   select id page_id from tbl_decorate_page where template_id = 
+ 		   		(select max(id) from tbl_decorate_template where effective_start_date &lt;= sysdate and site_id = #{site_id,jdbcType=INTEGER})
+			and page_state= '2' and home_page_flag = '2' and site_id = #{site_id,jdbcType=INTEGER}
+	</select>
+	
+	<!-- 查询页面是否合法,返回数量 -->
+	<select id="queryPageCountBySitePageTemplate" parameterType="java.util.Map"  resultType="int">
+ 		   select count(*) from tbl_decorate_page where id = #{page_id,jdbcType=INTEGER} and template_id = #{template_id,jdbcType=INTEGER} and site_id =#{public_user_site_id,jdbcType=INTEGER}
+	</select>
+   
+   	<resultMap type="java.util.Map" id="moduleBaseConfMap">
+        <result property="MODULE_BASE_CONF" column="MODULE_BASE_CONF" jdbcType="CLOB" javaType = "java.lang.String"/>
+    </resultMap>
+    <!-- 通过页面查询对应数据源 -->
+    <select id="queryModuleBaseConfByPageModuleId" parameterType="java.util.Map" resultMap="moduleBaseConfMap">
+ 		 select b.module_code,a.module_base_conf from tbl_decorate_page_module a,tbl_decorate_module b 
+ 		 where a.module_id =  b.id and a.id = #{page_module_id,jdbcType=INTEGER}
+	</select>
+	
+	<!-- 商品控件统一返回数据格式 -->
+	<resultMap type="java.util.Map" id="ProductMap">
+        <result column="ITEMNUMBER" property="ITEMNUMBER" />                  	<!-- 货号 -->
+        <result column="PRODUCT_NAME" property="PRODUCT_NAME" />				<!-- 商品名称 -->
+        <result column="PRODUCT_IMG_URL" property="PRODUCT_IMG_URL" />			<!-- 商品主图 -->
+        <result column="PRODUCT_SUBTITLE" property="PRODUCT_SUBTITLE" />		<!-- 商品副标题 -->
+        <result column="IS_OUTSTOCK" property="IS_OUTSTOCK" />					<!-- 是否支持缺货订购（0：不支持，1：支持）-->
+        <result column="SALE_COUT" property="SALE_COUT" />						<!-- 销量 -->
+        <result column="SALE_PRICE_MIN" property="SALE_PRICE_MIN" />			<!-- 会员最低售价 -->
+        <result column="SALE_PRICE_QJ" property="SALE_PRICE_QJ" />				<!-- 会员售价区间 -->
+        <result column="TAG_PRICE_QJ" property="TAG_PRICE_QJ" />				<!-- 吊牌价区间 -->
+        <result column="OLD_PRICE_QJ" property="OLD_PRICE_QJ" />				<!-- 原售价区间 -->
+        <result column="PRODUCT_TAGS" property="PRODUCT_TAGS" />				<!-- 活动标签 -->
+    </resultMap>
+	
+	<!-- 【商品控件数据】【按活动】 -->
+    <select id="queryProductForActivity" parameterType="java.util.Map" resultMap="ProductMap">
+ 		 	select * from (
+		 		 select a.*,
+                    	NVL(b.sale_count,0) sale_count,
+		 		  		getProduct_OldPrice_Min(a.itemnumber)  			   sale_price_min,
+		 		  		getProduct_OldPrice_Qj(a.itemnumber)               sale_price_qj,
+				        getProduct_TagPrice_Qj(a.itemnumber)  			   tag_price_qj,
+				        getProduct_OldPrice_Qj(a.itemnumber) 			   old_price_qj,
+				        '' 		   										   product_tags 
+		 		   from 
+		 		  (
+		 		  		select itemnumber,product_name,product_img_url,product_subtitle,is_outstock,sort_value,update_date,first_sell_state_date sell_state_date
+		 		  		from tbl_product_info pi
+		 		  		where IS_DISPLAY_NOUSER(#{site_id,jdbcType=INTEGER},itemnumber)=1 
+		 		  		and exists (
+		 		  			select 1 from TBL_ACTIVITY_PRODUCT ap where ap.product_itemnumber = pi.itemnumber 
+		 		  			<if test="activity_id!=null and activity_id!=0">
+		 		  				and activity_id = #{activity_id,jdbcType=INTEGER}
+		 		  			</if>
+		 		  		)
+		 		  		<if test="brand_id!=null and brand_id!=0">
+		 		  			and pi.BRAND_ID = #{brand_id,jdbcType=INTEGER}
+		 		  		</if>
+		 		  ) a,
+		 		  (
+		 		  		select nvl (sum (h.product_count), 0) sale_count,h.itemnumber from tbl_order_product h, tbl_order_info hh,tbl_product_info hhh
+		          		where h.order_number = hh.order_number
+		                and (   hh.order_state = 1 or hh.order_state = 2 or hh.order_state = 3 or hh.order_state = 5) 
+		                and hhh.itemnumber = h.itemnumber(+) group by h.itemnumber        
+		          ) b 
+		 		 <where>
+		 		 	 a.itemnumber = b.itemnumber(+) 
+		 		 </where>
+		 		 order by ${sort_by} ${sort_type}
+	 		 ) 
+ 		 	 where rownum &lt;= #{count}
+	</select>
+	
+	<!-- 【商品控件数据】【按分类】 -->
+    <select id="queryProductForType" parameterType="java.util.Map" resultMap="ProductMap">
+ 		 select * from (
+	 		 select a.*,
+                    NVL(b.sale_count,0) sale_count,
+	 		  		getProduct_OldPrice_Min(a.itemnumber)  			   sale_price_min,
+	 		  		getProduct_OldPrice_Qj(a.itemnumber)               sale_price_qj,
+			        getProduct_TagPrice_Qj(a.itemnumber)  			   tag_price_qj,
+			        getProduct_OldPrice_Qj(a.itemnumber) 			   old_price_qj,
+			        '' 		   										   product_tags 
+	 		   from 
+	 		  (
+	 		  		select itemnumber,product_name,product_img_url,product_subtitle,is_outstock,sort_value,update_date,first_sell_state_date sell_state_date
+	 		  		from tbl_product_info 
+	 		  		where IS_DISPLAY_NOUSER(#{site_id,jdbcType=INTEGER},itemnumber)=1 
+	 		  		<if test="type_id!=null and type_id!=0">
+	 		  			and product_type_id = #{type_id,jdbcType=INTEGER}
+	 		  		</if>
+	 		  		<if test="brand_id!=null and brand_id!=0">
+		 		  		and BRAND_ID = #{brand_id,jdbcType=INTEGER}
+		 		  	</if>
+	 		  ) a,
+	 		  (
+	 		  		select nvl (sum (h.product_count), 0) sale_count,h.itemnumber from tbl_order_product h, tbl_order_info hh,tbl_product_info hhh
+	          		where h.order_number = hh.order_number
+	                and (   hh.order_state = 1 or hh.order_state = 2 or hh.order_state = 3 or hh.order_state = 5) 
+	                and hhh.itemnumber = h.itemnumber(+) group by h.itemnumber        
+	          ) b 
+	 		 <where>
+	 		 	 a.itemnumber = b.itemnumber(+) 
+	 		 </where>
+ 		 ) 
+ 		 where rownum &lt;= #{count}
+ 		 order by ${sort_by} ${sort_type}
+	</select>
+	
+	<!-- 【商品控件数据】【按特定商品】 -->
+    <select id="queryProductForSelect" parameterType="java.util.Map" resultMap="ProductMap">
+ 		  select a.*,
+ 		  		b.sale_count,
+ 		  		getProduct_OldPrice_Min(a.itemnumber)  			   sale_price_min,
+ 		  		getProduct_OldPrice_Qj(a.itemnumber)               sale_price_qj,
+		        getProduct_TagPrice_Qj(a.itemnumber)  			   tag_price_qj,
+		        getProduct_OldPrice_Qj(a.itemnumber) 			   old_price_qj,
+		        '' 		   										   product_tags 
+ 		   from 
+ 		  (
+ 		  		select itemnumber,product_name,product_img_url,product_subtitle,is_outstock from tbl_product_info 
+ 		  		where IS_DISPLAY_NOUSER(#{site_id,jdbcType=INTEGER},itemnumber)=1 
+ 		  		and itemnumber in 
+ 		  		<foreach collection="productlist" item="productitem" open="(" close=")" separator=",">
+					#{productitem,jdbcType=VARCHAR}
+				</foreach>
+ 		  ) a,
+ 		  (
+ 		  		select nvl (sum (h.product_count), 0) sale_count,h.itemnumber from tbl_order_product h, tbl_order_info hh,tbl_product_info hhh
+          		where h.order_number = hh.order_number
+                and (   hh.order_state = 1 or hh.order_state = 2 or hh.order_state = 3 or hh.order_state = 5) 
+                and hhh.itemnumber = h.itemnumber(+) group by h.itemnumber        
+          ) b 
+ 		 <where>
+ 		 	 a.itemnumber = b.itemnumber(+) 
+ 		 </where>
+	</select>
+	<!-- 【新闻控件 】数据-->
+	<select id="queryNewsListForModul" parameterType="java.util.Map" resultType="java.util.Map">
+			select a.*
+			  from (select
+			 		   id, 
+					   name,
+					   label_color,
+					   label_text,
+					   browse_amount,
+					   img_url,
+					   to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date
+			      from tbl_news_info
+			     where state = '2'
+			       and is_delete = '1'
+			     order by ${sort_by} desc) a
+			     where rownum &lt;= #{count,jdbcType=INTEGER}
+	</select>
+</mapper>

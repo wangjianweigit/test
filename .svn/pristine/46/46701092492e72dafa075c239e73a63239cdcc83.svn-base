@@ -1,0 +1,374 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.marketing.dao.ActivityDao">
+	<sql id="all_column">
+			TAI.ID,
+			TAI.ACTIVITY_NAME,
+			TAI.ACTIVITY_TYPE,
+			TAI.ACTIVITY_REMARK,
+			TAI.ACTIVITY_QUALIFICATION,
+			TAI.ACTIVITY_REGULATION,
+			TAI.ACTIVITY_IMAGE,
+			TAI.STATE,
+			TO_CHAR(TAI.APPLY_BEGIN_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  APPLY_BEGIN_DATE,
+			TO_CHAR(TAI.APPLY_END_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  APPLY_END_DATE,
+			TO_CHAR(TAI.BEGIN_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  BEGIN_DATE,
+			TO_CHAR(TAI.END_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  END_DATE,
+			TAI.END_DATE AS  END_DATE_OLD,
+			TO_CHAR(TAI.CREATE_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  CREATE_DATE,
+			TAI.CREATE_USER_ID,
+			TAI.ACTIVITY_STATE,
+			TAI.APPROVAL_USER_ID,
+			TO_CHAR(TAI.APPROVAL_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  APPROVAL_DATE,
+			TAI.REJECTED_REASON,
+			TAI.SITE_ID,
+			TAI.ACTIVITY_ABSTRACT,
+			TAI.ACTIVITY_CONFIG,
+			TAI.ACTIVITY_PRODUCT_CYCLE,
+			TAI.RECOMMEN_SOCIAL_HOME,
+			TAI.CANCEL_TIME,
+			TAI.PAY_END_FLAG,
+			TAI.is_open_share
+	</sql>
+	<!-- 商品基本信息详情结果封装 -->
+	<resultMap type="java.util.Map" id="baseResultMap">
+        <result property="ACTIVITY_REMARK" column="ACTIVITY_REMARK" jdbcType="CLOB" javaType = "java.lang.String"/>
+        <result property="ACTIVITY_QUALIFICATION" column="ACTIVITY_QUALIFICATION" jdbcType="CLOB" javaType = "java.lang.String"/>
+        <result property="ACTIVITY_REGULATION" column="ACTIVITY_REGULATION" jdbcType="CLOB" javaType = "java.lang.String"/>
+    </resultMap>
+	<!-- 获取促销活动列表 -->
+    <select id="queryActivityList" parameterType="java.util.HashMap" resultMap="baseResultMap">
+    	SELECT  A.*,
+    			(SELECT TSUI.USER_REALNAME FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.ID = A.CREATE_USER_ID) AS CREATE_USER_NAME,
+    			(SELECT TSUI.USER_REALNAME FROM TBL_SYS_USER_INFO TSUI WHERE TSUI.ID = A.APPROVAL_USER_ID) AS APPROVAL_USER_NAME,
+    			(SELECT TSAI.LOCKED_STOCK FROM TBL_ACTIVITY_DETAIL TSAI WHERE TSAI.ACTIVITY_ID = A.ID) AS LOCKED_STOCK,
+    			(SELECT TSAI.RECOMMEN_HOME FROM TBL_ACTIVITY_DETAIL TSAI WHERE TSAI.ACTIVITY_ID = A.ID) AS RECOMMEN_HOME,
+    			(SELECT TSAI.USER_GROUP_ID FROM TBL_ACTIVITY_DETAIL TSAI WHERE TSAI.ACTIVITY_ID = A.ID) AS USER_GROUP_ID,
+    			(SELECT TSAI.TAG_LEVEL FROM TBL_ACTIVITY_DETAIL TSAI WHERE TSAI.ACTIVITY_ID = A.ID) AS TAG_LEVEL,
+    			CASE WHEN A.END_DATE_OLD &gt; SYSDATE THEN '1' ELSE '2' END PRODUCT_AUDIT_STATE,
+    			(SELECT TO_CHAR(WM_CONCAT(TSI.NAME)) FROM TBL_ACTIVITY_SITE TAS,TBL_SITE_INFO TSI WHERE TAS.ACTIVITY_ID = A.ID AND TSI.ID = TAS.SITE_ID) AS ACTIVITY_SITES
+    	  FROM (SELECT T.*,ROWNUM AS RN
+				  FROM (SELECT <include refid="all_column"/>,
+				  			   TAI.START_STATE,TAI.ONOFF_STATE
+				  		  FROM (SELECT TAI.*,
+				  		  			   CASE WHEN TAI.BEGIN_DATE &gt; SYSDATE THEN '0'
+					  					    WHEN TAI.END_DATE &lt; SYSDATE THEN '2'
+					  				   ELSE
+					  					 '1'
+					  				   END AS START_STATE,
+					  				   CASE WHEN TAI.STATE='1' THEN '4'
+                           					WHEN TAI.STATE='2' THEN '3'
+                           				END AS ONOFF_STATE
+				  				FROM TBL_ACTIVITY_INFO TAI) TAI
+					    <where>
+							   IS_DELETE='1'
+							<if test="state != null and state != '' ">
+							    AND	TAI.STATE = #{state,jdbcType=VARCHAR}
+							</if>
+							<if test="start_state != null">
+								AND TAI.START_STATE IN
+				                <foreach item="item" collection="start_state" open="(" separator="," close=")">
+									#{item}
+								</foreach>
+							</if>
+							<if test="activity_state != null">
+								AND TAI.ACTIVITY_STATE IN
+				                <foreach item="item" collection="activity_state" open="(" separator="," close=")">
+									#{item}
+								</foreach>
+							</if>
+							<if test="onoff_state != null">
+								AND TAI.ONOFF_STATE IN
+							    <foreach item="item" collection="onoff_state" open="(" separator="," close=")">
+									#{item}
+								</foreach>
+							</if>
+							<if test='activity_list_type != null and activity_list_type == "2" and (activity_state==null or activity_state=="")'>
+								AND	TAI.ACTIVITY_STATE IN ('1','2','4')
+							</if>
+							<if test="activity_type != null and activity_type != '' ">
+							    AND	TAI.ACTIVITY_TYPE = #{activity_type,jdbcType=VARCHAR}
+							</if>
+							<if test="activity_name != null and activity_name != '' ">
+							    AND	TAI.ACTIVITY_NAME LIKE '%'||#{activity_name,jdbcType=VARCHAR}||'%'
+							</if>
+							<if test="start_date != null and start_date != '' ">
+							    AND	TAI.CREATE_DATE &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+							</if>
+							<if test="end_date != null and end_date != '' ">
+							    AND	TAI.CREATE_DATE &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+							</if>
+ 							<if test="site_id != null and site_id != 0 ">
+ 							    AND EXISTS(SELECT 1 FROM TBL_ACTIVITY_SITE TAS WHERE TAS.ACTIVITY_ID = TAI.ID AND TAS.SITE_ID = #{site_id,jdbcType=INTEGER})
+ 							</if>
+					    </where>
+					    ORDER BY TAI.CREATE_DATE DESC
+			) T WHERE ROWNUM &lt;= #{end_rownum,jdbcType=INTEGER}) A
+		 WHERE RN &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+
+	<!-- 获取促销活动总数 -->
+    <select id="queryActivityCount" parameterType="java.util.HashMap" resultType="int">
+    	SELECT count(1)
+		  FROM (SELECT TAI.*,
+				  	   CASE WHEN TAI.BEGIN_DATE &gt; SYSDATE THEN '0'
+					  	    WHEN TAI.END_DATE &lt; SYSDATE THEN '2'
+					   ELSE
+					  		'1'
+					   END AS START_STATE,
+	  				   CASE WHEN TAI.STATE='1' THEN '4'
+                 			WHEN TAI.STATE='2' THEN '3'
+                 		END AS ONOFF_STATE
+				FROM TBL_ACTIVITY_INFO TAI) TAI
+		<where>
+			   IS_DELETE='1'
+			<if test="state != null and state != '' ">
+			   AND	TAI.STATE = #{state,jdbcType=VARCHAR}
+			</if>
+			<if test="start_state != null">
+				AND TAI.START_STATE IN
+			    <foreach item="item" collection="start_state" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+			</if>
+			<if test="activity_state != null">
+				AND TAI.ACTIVITY_STATE IN
+			    <foreach item="item" collection="activity_state" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+			</if>
+			<if test="onoff_state != null">
+				AND TAI.ONOFF_STATE IN
+			    <foreach item="item" collection="onoff_state" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+			</if>
+			<if test='activity_list_type != null and activity_list_type == "2" and (activity_state==null or activity_state=="")'>
+				AND	TAI.ACTIVITY_STATE IN ('1','2','4')
+			</if>
+			<if test="activity_type != null and activity_type != '' ">
+				AND	TAI.ACTIVITY_TYPE = #{activity_type,jdbcType=VARCHAR}
+			</if>
+			<if test="activity_name != null and activity_name != '' ">
+				AND	TAI.ACTIVITY_NAME LIKE '%'||#{activity_name,jdbcType=VARCHAR}||'%'
+			</if>
+			<if test="start_date != null and start_date != '' ">
+				AND	TAI.CREATE_DATE &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+			<if test="end_date != null and end_date != '' ">
+				AND	TAI.CREATE_DATE &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+ 			<if test="site_id != null and site_id != 0 ">
+ 				AND EXISTS(SELECT 1 FROM TBL_ACTIVITY_SITE TAS WHERE TAS.ACTIVITY_ID = TAI.ID AND TAS.SITE_ID = #{site_id,jdbcType=INTEGER})
+ 			</if>
+		</where>
+	</select>
+
+	<!-- 获取促销活动基本信息详情 -->
+    <select id="queryActivityDetail" parameterType="java.util.HashMap" resultMap="baseResultMap">
+    	SELECT <include refid="all_column"/> ,
+    			CASE WHEN TAI.BEGIN_DATE &gt; SYSDATE THEN '0'
+					 WHEN TAI.END_DATE &lt; SYSDATE THEN '2'
+					   ELSE
+					  		'1'
+					   END AS START_STATE,
+			   (SELECT TO_CHAR(WM_CONCAT('【'||TSI.NAME||'】')) FROM TBL_ACTIVITY_SITE TAS,TBL_SITE_INFO TSI WHERE TAS.ACTIVITY_ID = TAI.ID AND TSI.ID = TAS.SITE_ID) AS ACTIVITY_SITES
+		  FROM TBL_ACTIVITY_INFO TAI
+		<where>
+				1=1
+			<if test="id != null and id != 0 ">
+				AND	TAI.ID = #{id,jdbcType=INTEGER}
+			</if>
+		</where>
+	</select>
+
+	<!-- 更新待审批促销活动审批状态 -->
+    <update id="updatePendingApprovalActivityState" parameterType="java.util.HashMap">
+    	UPDATE  TBL_ACTIVITY_INFO TAI
+    	   SET  TAI.ACTIVITY_STATE = #{activity_state,jdbcType=VARCHAR},TAI.APPROVAL_DATE = SYSDATE,TAI.APPROVAL_USER_ID = #{public_user_id,jdbcType=INTEGER}
+    	   		<if test="rejected_reason != null and rejected_reason != ''">
+    	   			,TAI.REJECTED_REASON =  #{rejected_reason,jdbcType=VARCHAR}
+    	   		</if>
+    	 WHERE	TAI.ID = #{id,jdbcType=INTEGER}
+	</update>
+
+	<!-- 更新促销活动为待审批 -->
+    <update id="updateActivityStateForApproval" parameterType="java.util.HashMap">
+    	UPDATE  TBL_ACTIVITY_INFO TAI
+    	   SET  TAI.ACTIVITY_STATE = #{activity_state,jdbcType=VARCHAR}
+    	 WHERE	TAI.ID = #{id,jdbcType=INTEGER}
+	</update>
+
+	<!-- 获取获取活动ID（通过序列生成） -->
+    <select id="queryActivityId" parameterType="java.util.HashMap" resultType="int">
+    	SELECT SEQ_ACTIVITY_INFO.NEXTVAL FROM DUAL
+	</select>
+
+	<!-- 插入活动基本信息 -->
+    <insert id="insertActivity" parameterType="java.util.HashMap">
+    	INSERT INTO TBL_ACTIVITY_INFO(
+			ID,
+			ACTIVITY_NAME,
+			ACTIVITY_TYPE,
+			ACTIVITY_REMARK,
+			ACTIVITY_QUALIFICATION,
+			ACTIVITY_REGULATION,
+			ACTIVITY_IMAGE,
+			STATE,
+			EXCLUSIVE_FLAG,
+			APPLY_BEGIN_DATE,
+			APPLY_END_DATE,
+			BEGIN_DATE,
+			END_DATE,
+			CREATE_DATE,
+			CREATE_USER_ID,
+			ACTIVITY_STATE,
+			ACTIVITY_ABSTRACT,
+			ACTIVITY_CONFIG,
+			ACTIVITY_PRODUCT_CYCLE,
+			RECOMMEN_SOCIAL_HOME,
+			ACTIVITY_SERVICE_DISCOUNT,
+			CANCEL_TIME,
+			PAY_END_FLAG,
+			is_open_share
+    	) VALUES(
+			#{ACTIVITY_ID,jdbcType=INTEGER},
+			#{ACTIVITY_NAME,jdbcType=VARCHAR},
+			#{ACTIVITY_TYPE,jdbcType=VARCHAR},
+			#{ACTIVITY_REMARK,jdbcType=VARCHAR},
+			#{ACTIVITY_QUALIFICATION,jdbcType=VARCHAR},
+			#{ACTIVITY_REGULATION,jdbcType=VARCHAR},
+			#{ACTIVITY_IMAGE,jdbcType=VARCHAR},
+			'1',
+			'1',
+			TO_DATE(#{APPLY_BEGIN_DATE,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS'),
+			TO_DATE(#{APPLY_END_DATE,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS'),
+			TO_DATE(#{BEGIN_DATE,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS'),
+			TO_DATE(#{END_DATE,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS'),
+			SYSDATE,
+			#{public_user_id,jdbcType=INTEGER},
+			'1',
+			#{ACTIVITY_ABSTRACT,jdbcType=VARCHAR},
+			#{ACTIVITY_CONFIG,jdbcType=VARCHAR},
+			#{ACTIVITY_PRODUCT_CYCLE,jdbcType=INTEGER},
+			#{recommen_social_home,jdbcType=INTEGER},
+			#{ACTIVITY_SERVICE_DISCOUNT,jdbcType=DOUBLE},
+			#{CANCEL_TIME,jdbcType=INTEGER},
+			#{PAY_END_FLAG,jdbcType=INTEGER},
+			#{is_open_share,jdbcType=INTEGER}
+    	)
+	</insert>
+	
+	<!-- 更新活动基本信息 -->
+    <update id="updateActivity" parameterType="java.util.HashMap">
+    	UPDATE TBL_ACTIVITY_INFO
+		   SET ACTIVITY_NAME = #{ACTIVITY_NAME,jdbcType=VARCHAR},
+		       ACTIVITY_TYPE = #{ACTIVITY_TYPE,jdbcType=VARCHAR},
+		       ACTIVITY_REMARK = #{ACTIVITY_REMARK,jdbcType=VARCHAR},
+		       ACTIVITY_QUALIFICATION = #{ACTIVITY_QUALIFICATION,jdbcType=VARCHAR},
+		       ACTIVITY_REGULATION = #{ACTIVITY_REGULATION,jdbcType=VARCHAR},
+		       ACTIVITY_IMAGE = #{ACTIVITY_IMAGE,jdbcType=VARCHAR},
+		       ACTIVITY_ABSTRACT = #{ACTIVITY_ABSTRACT,jdbcType=VARCHAR},
+		       APPLY_BEGIN_DATE =  TO_DATE(#{APPLY_BEGIN_DATE,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS'),
+    		   APPLY_END_DATE = TO_DATE(#{APPLY_END_DATE,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS'),
+    		   BEGIN_DATE = TO_DATE(#{BEGIN_DATE,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS'),
+    		   END_DATE = TO_DATE(#{END_DATE,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS'),
+    		   <if test='ACTIVITY_CONFIG != null and ACTIVITY_CONFIG =="1" '>
+    		   ACTIVITY_CONFIG =  #{ACTIVITY_CONFIG,jdbcType=VARCHAR},
+    		   ACTIVITY_PRODUCT_CYCLE = NULL,
+    		   </if>
+    		   <if test='ACTIVITY_CONFIG != null and ACTIVITY_CONFIG =="2" '>
+    		   ACTIVITY_CONFIG =  #{ACTIVITY_CONFIG,jdbcType=VARCHAR},
+    		   ACTIVITY_PRODUCT_CYCLE = #{ACTIVITY_PRODUCT_CYCLE,jdbcType=INTEGER},
+    		   </if>
+			   is_open_share = #{is_open_share,jdbcType=INTEGER},
+               RECOMMEN_SOCIAL_HOME = #{recommen_social_home, jdbcType=INTEGER},
+			   ACTIVITY_SERVICE_DISCOUNT = #{ACTIVITY_SERVICE_DISCOUNT,jdbcType=DOUBLE},
+			   CANCEL_TIME = #{CANCEL_TIME,jdbcType=INTEGER},
+			   PAY_END_FLAG = #{PAY_END_FLAG,jdbcType=INTEGER}
+    	WHERE ID = #{ID,jdbcType=INTEGER}	   
+	</update>
+	
+	<!-- 更新活动基本信息 -->
+    <update id="updateActivityDecorate" parameterType="java.util.HashMap">
+    	UPDATE TBL_ACTIVITY_INFO
+		   SET ACTIVITY_REMARK = #{ACTIVITY_REMARK,jdbcType=VARCHAR},
+		       ACTIVITY_QUALIFICATION = #{ACTIVITY_QUALIFICATION,jdbcType=VARCHAR},
+		       ACTIVITY_REGULATION = #{ACTIVITY_REGULATION,jdbcType=VARCHAR},
+		       ACTIVITY_IMAGE = #{ACTIVITY_IMAGE,jdbcType=VARCHAR},
+		       ACTIVITY_ABSTRACT = #{ACTIVITY_ABSTRACT,jdbcType=VARCHAR},
+		       RECOMMEN_SOCIAL_HOME = #{recommen_social_home, jdbcType=INTEGER},
+		       is_open_share = #{is_open_share,jdbcType=INTEGER}
+    	WHERE ID = #{ID,jdbcType=INTEGER}	   
+	</update>
+	
+	<delete id="deleteActivity" parameterType="java.util.HashMap">
+		DELETE FROM TBL_ACTIVITY_INFO TAI WHERE TAI.ID = #{id,jdbcType=VARCHAR}
+	</delete>
+	<!-- 逻辑删除活动信息 -->
+    <update id="updateActivityIsDelete" parameterType="java.util.HashMap">
+    	UPDATE TBL_ACTIVITY_INFO
+		   SET IS_DELETE = '2'
+    	WHERE ID = #{id,jdbcType=INTEGER}	   
+	</update>
+	
+	<!-- 活动启停用 -->
+    <update id="updateActivityState" parameterType="java.util.HashMap">
+    	UPDATE TBL_ACTIVITY_INFO
+		   SET STATE = #{state,jdbcType=VARCHAR}
+    	WHERE ID = #{id,jdbcType=INTEGER}	   
+	</update>
+	
+	<!-- 获取促销活动站点列表 -->
+	<resultMap id="ActivitySitesListMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="name" property="option"/>
+    </resultMap>
+    <select id="queryActivitySitesList" parameterType="java.util.HashMap" resultMap="ActivitySitesListMap">
+    	SELECT TSI.ID,
+    		   TSI.ID AS SITE_ID,
+    		   TSI.NAME AS NAME,
+		       TSI.NAME AS SITE_NAME,
+		       TSI.STATE,
+		       NVL((SELECT 1
+		          FROM TBL_ACTIVITY_SITE TAS
+		         WHERE TAS.ACTIVITY_ID = #{id,jdbcType=INTEGER} AND TAS.SITE_ID = TSI.ID),0)
+		          AS ACTIVITY_SUPPORT_FLAG
+		  FROM TBL_SITE_INFO TSI
+		  WHERE TSI.PLATFORM_TYPE=1
+		 ORDER BY TSI.ID
+	</select>
+	
+	<!-- 活动站点设置 -->
+    <update id="insertActivitySite" parameterType="java.util.HashMap">
+    	INSERT INTO TBL_ACTIVITY_SITE(ID,ACTIVITY_ID,SITE_ID,CREATE_DATE)
+    	SELECT SEQ_ACTIVITY_SITE.NEXTVAL,#{ACTIVITY_ID,jdbcType=INTEGER} AS ACTIVITY_ID,
+    		   TSI.ID AS SITE_ID,SYSDATE
+    	FROM   TBL_SITE_INFO TSI
+    	WHERE  TSI.ID IN
+    	   <foreach item="item" collection="SITE" open="(" separator="," close=")">
+				#{item}
+		   </foreach>
+	</update>
+	
+	<delete id="deleteActivitySite" parameterType="java.util.HashMap">
+		DELETE FROM TBL_ACTIVITY_SITE TAS WHERE TAS.ACTIVITY_ID = #{ACTIVITY_ID,jdbcType=INTEGER}
+	</delete>
+
+	<!--查询正在进行活动的商品数量-->
+	<select id="countGoingActivityProduct" parameterType="java.util.Map" resultType="java.lang.Integer">
+        select count(1)
+        from tbl_activity_product_apply apa,tbl_activity_info ai,tbl_activity_site tas
+        where apa.is_delete = '1'
+		and apa.activity_id = ai.id
+		and ai.id = tas.activity_id
+		AND activity_end_date &gt;= SYSDATE
+		and ai.state = '2'
+		and apa.activity_id != #{id,jdbcType=INTEGER}
+		and tas.site_id in (select site_id from tbl_activity_site ttas where ttas.activity_id = #{id,jdbcType=INTEGER})
+		and exists(select 1 from tbl_activity_product_apply pa where pa.activity_id = #{id,jdbcType=INTEGER} and apa.product_itemnumber = pa.product_itemnumber)
+	</select>
+
+</mapper>

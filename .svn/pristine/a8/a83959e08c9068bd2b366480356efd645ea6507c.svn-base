@@ -1,0 +1,29 @@
+package com.tk.analysis.home.control;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import com.tk.analysis.home.service.HomeAnalysisService;
+import com.tk.sys.util.Packet;
+import com.tk.sys.util.Transform;
+
+@Controller
+@RequestMapping("/home_analysis")
+public class HomeAnalysisControl {
+	@Resource
+	private HomeAnalysisService homeAnalysisService;
+	
+	/**
+	 * 使用OA的openId直接获取用户平台权限
+	 */
+	@RequestMapping(value = "/get_user_platform", method = RequestMethod.POST)
+	@ResponseBody
+	public Packet getUserPlatformList(HttpServletRequest request) {
+		return Transform.GetResult(homeAnalysisService.getUserPlatformList(request));
+	}
+}

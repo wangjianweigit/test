@@ -1,0 +1,302 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.member.dao.RetailStoreApprovalDao">
+
+    <!-- 查询店铺审批列表 -->
+    <select id="queryStoreApprovalList" parameterType="java.util.Map" resultType="java.util.Map">
+        select t.*,
+        	   (select user_realname from tbl_sys_user_info ui where t.edit_user_id=ui.id) edit_user_name,
+        	   (select name from TBL_DIC_REGION where id=t.user_company_address_province)||
+        	   		(select name from TBL_DIC_REGION where id=t.user_company_address_city) ||
+        	   		(select name from TBL_DIC_REGION where id=t.user_company_address_county) ||
+        	   		user_company_address_deails user_address,
+        	   (select count(1) from tbl_user_info where id=t.id)as user_count 
+        	   	FROM (
+		            select a.*,rownum num FROM (
+		                select
+		                    t.id,
+		                    t.shop_name,
+		                    t.shop_logo,
+		                    t.user_realname,
+		                    t.user_mobilephone,
+		                    t.user_company_address_province,
+		                    t.user_company_address_city,
+		                    t.user_company_address_county,
+		                    t.user_company_address_deails,
+		                    to_char(T.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+		                    to_char(T.edit_date,'yyyy-mm-dd hh24:mi:ss') edit_date,
+		                    t.edit_user_id,
+		                    t.user_approval_state,
+		                    t.company_approval_state,
+		                    t.user_reject_reason
+		                from tbl_retail_user_info t
+		                <where>
+		                   t.is_new_user=1
+		                    <if test="shop_name!=null and shop_name!='' ">
+		                        and t.shop_name like '%'||#{shop_name,jdbcType=VARCHAR}||'%'
+		                    </if>
+		                    <if test="user_realname!=null and user_realname!='' ">
+		                        and t.user_realname =#{user_realname,jdbcType=VARCHAR}
+		                    </if>
+		                    <if test="user_mobilephone!=null and user_mobilephone!=''">
+		                        and t.user_mobilephone = #{user_mobilephone,jdbcType=VARCHAR}
+		                    </if>
+		                    <if test="start_date != null and start_date != ''">
+		                        and t.create_date &gt;= TO_DATE(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+		                    </if>
+		                    <if test="end_date != null and end_date != ''">
+		                        and t.create_date &lt;= TO_DATE(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+		                    </if>
+		                    <if test="user_approval_state!=null and user_approval_state!=''">
+		                        and t.user_approval_state =#{user_approval_state,jdbcType=INTEGER}
+		                    </if>
+		                    <if test="company_approval_state!=null and company_approval_state!=''">
+		                        and t.company_approval_state =#{company_approval_state,jdbcType=INTEGER}
+		                    </if>
+		                </where>
+		            order by t.create_date desc
+		        ) a where ROWNUM  &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) t where num &gt;#{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!-- 查询店铺审批记录数 -->
+    <select id="queryStoreApprovalCount" parameterType="java.util.Map" resultType="int">
+         select
+             count(1)
+         from tbl_retail_user_info t
+         <where>
+            t.is_new_user=1
+             <if test="shop_name!=null and shop_name!='' ">
+                 and t.shop_name like '%'||#{shop_name,jdbcType=VARCHAR}||'%'
+             </if>
+             <if test="user_realname!=null and user_realname!='' ">
+                 and t.user_realname =#{user_realname,jdbcType=VARCHAR}
+             </if>
+             <if test="user_mobilephone!=null and user_mobilephone!=''">
+                 and t.user_mobilephone = #{user_mobilephone,jdbcType=VARCHAR}
+             </if>
+             <if test="start_date != null and start_date != ''">
+                 and t.create_date &gt;= TO_DATE(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+             </if>
+             <if test="end_date != null and end_date != ''">
+                 and t.create_date &lt;= TO_DATE(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+             </if>
+             <if test="user_approval_state!=null and user_approval_state!=''">
+                 and t.user_approval_state =#{user_approval_state,jdbcType=INTEGER}
+             </if>
+             <if test="company_approval_state!=null and company_approval_state!=''">
+                 and t.company_approval_state =#{company_approval_state,jdbcType=INTEGER}
+             </if>
+         </where>
+    </select>
+
+    <!-- 查询店铺审核详情 -->
+    <select id="queryStoreApprovalDetail" parameterType="java.util.Map" resultType="java.util.Map">
+        select a.id,
+        	   a.shop_name,
+        	   a.user_realname,
+        	   a.user_mobilephone,
+        	   a.user_manage_cardid,
+        	   a.user_manage_cardid_file,
+        	   a.user_company_name,
+        	   a.user_company_corporation,
+        	   a.shop_images,
+        	   a.user_approval_state,
+        	   to_char(a.approval_date,'yyyy-mm-dd hh24:mi:ss') approval_date,
+        	   (select openid from tbl_user_info where id=a.id) openid,
+        	   (select name from tbl_dic_region where id=a.user_company_address_province)||
+        	   		(select name from tbl_dic_region where id=a.user_company_address_city) ||
+        	   		(select name from tbl_dic_region where id=a.user_company_address_county) ||
+        	   		user_company_address_deails user_address,
+        	   (select referee_user_realname from tbl_user_info where id=a.id)referee_user_realname,
+        	   (select market_supervision_user_realna from tbl_user_info where id=a.id)market_supervision_user_realna,
+        	   (select store_name from tbl_user_info where id=a.id)store_name,
+        	   (select template_name from tbl_user_logistics_template where id=(select user_logistics_template_id from tbl_user_info where id=a.id))template_name,
+        	   (select user_realname from tbl_sys_user_info where id=(select recommend_user_id from tbl_user_info where id=a.id))recommend_user_realname,
+        	   (select name from tbl_site_info where id=(select site_id from tbl_user_info where id=a.id)) site_name
+    	  from tbl_retail_user_info a
+         where a.id = #{id,jdbcType=INTEGER}
+    </select>
+    
+     <!-- 查询店铺审核编辑详情 -->
+    <select id="queryRetailStoreApprovalUserInfoDetail" parameterType="java.util.Map" resultType="java.util.Map">
+        select a.id,
+        	   (select shop_name from tbl_retail_user_info t where t.id=a.id) as shop_name,
+        	   a.user_manage_name,
+        	   a.user_manage_cardid,
+        	   a.user_manage_mobilephone,
+        	   a.user_manage_cardid_file1,
+        	   a.market_supervision_user_id,
+        	   a.store_id,
+        	   a.referee_user_id,
+        	   a.recommend_user_id,
+        	   a.user_logistics_template_id,
+        	   a.site_id
+    	  from tbl_user_info a
+         where a.id = #{id,jdbcType=INTEGER}
+    </select>
+    
+    <!--编辑会员信息 -->
+    <update id="updateUserInfo" parameterType="java.util.Map">
+        update tbl_user_info
+        <set>
+            <if test="USER_MANAGE_NAME != null and USER_MANAGE_NAME != ''">
+	            USER_MANAGE_NAME = #{USER_MANAGE_NAME,jdbcType=VARCHAR},
+	        </if>
+	        <if test="USER_MANAGE_MOBILEPHONE != null and USER_MANAGE_MOBILEPHONE != ''">
+	            USER_MANAGE_MOBILEPHONE = #{USER_MANAGE_MOBILEPHONE,jdbcType=VARCHAR},
+	        </if>
+            <if test="USER_MANAGE_CARDID != null and USER_MANAGE_CARDID != ''">
+	            USER_MANAGE_CARDID = #{USER_MANAGE_CARDID,jdbcType=VARCHAR},
+	        </if>
+	        <if test="USER_MANAGE_CARDID_FILE1 != null and USER_MANAGE_CARDID_FILE1 != ''">
+	            USER_MANAGE_CARDID_FILE1 = #{USER_MANAGE_CARDID_FILE1,jdbcType=VARCHAR},
+	        </if>
+	        <if test="MARKET_SUPERVISION_USER_ID != null and MARKET_SUPERVISION_USER_ID != ''">
+	            MARKET_SUPERVISION_USER_ID = #{MARKET_SUPERVISION_USER_ID,jdbcType=INTEGER},
+	        </if>
+	        <if test="STORE_ID != null and STORE_ID != ''">
+	            STORE_ID = #{STORE_ID,jdbcType=INTEGER},
+	        </if>
+	        <if test="REFEREE_USER_ID != null and REFEREE_USER_ID != ''">
+	            REFEREE_USER_ID = #{REFEREE_USER_ID,jdbcType=INTEGER},
+	        </if>
+	        <if test="SITE_ID != null and SITE_ID != ''">
+	            SITE_ID = #{SITE_ID,jdbcType=INTEGER},
+	        </if>
+	        <if test="RECOMMEND_USER_ID != null and RECOMMEND_USER_ID != ''">
+	            RECOMMEND_USER_ID = #{RECOMMEND_USER_ID,jdbcType=INTEGER},
+	        </if>
+	        <if test="USER_LOGISTICS_TEMPLATE_ID != null and USER_LOGISTICS_TEMPLATE_ID != ''">
+	            USER_LOGISTICS_TEMPLATE_ID = #{USER_LOGISTICS_TEMPLATE_ID,jdbcType=INTEGER},
+	        </if>
+            edit_user_id = #{public_user_id,jdbcType=VARCHAR},
+            edit_date = sysdate
+        </set>
+        where id = #{user_id,jdbcType=INTEGER}
+    </update>
+    
+    <!--编辑新零售会员信息 -->
+    <update id="updateRetailUserInfo" parameterType="java.util.Map">
+        update tbl_retail_user_info
+        <set>
+            <if test="SHOP_NAME != null and SHOP_NAME != ''">
+	            SHOP_NAME = #{SHOP_NAME,jdbcType=VARCHAR},
+	        </if>
+            edit_user_id = #{public_user_id,jdbcType=VARCHAR},
+            edit_date = sysdate
+        </set>
+        where id = #{user_id,jdbcType=INTEGER}
+    </update>
+    
+    <!--店铺审核(审核用户认证信息)-->
+    <update id="auditUserStoreApproval" parameterType="java.util.Map">
+        update tbl_retail_user_info
+        <set>
+        	<if test="user_reject_reason != null and user_reject_reason != ''">
+	            user_reject_reason = #{user_reject_reason,jdbcType=VARCHAR},
+	        </if>
+	            user_approval_state = #{user_approval_state,jdbcType=INTEGER},
+	            approval_user_id=#{public_user_id,jdbcType=INTEGER},
+	            approval_date=sysdate
+        </set>
+        where id = #{retail_user_id,jdbcType=INTEGER}
+    </update>
+    
+    <!-- 店铺审核(审核通过成为正式会员) -->
+    <insert id="insertUserInfo" parameterType="java.util.Map">
+        insert into tbl_user_info(
+            id,
+            user_name,
+            login_name,
+            user_state,
+            user_manage_name,
+            user_manage_cardid,
+            user_manage_cardid_file1,
+            user_manage_mobilephone,
+            market_supervision_user_id,
+            market_supervision_user_realna,
+            store_id,
+            store_name,
+            referee_user_id,
+            referee_user_realname,
+            site_id,
+            user_logistics_template_id,
+            recommend_user_id,
+            user_type,
+            source_platform,
+            distribution_state
+        )
+        select id,
+        	   id as user_id,
+        	   user_mobilephone,
+        	   1,
+        	   USER_REALNAME,
+        	   USER_MANAGE_CARDID,
+        	   USER_MANAGE_CARDID_FILE,
+        	   USER_MOBILEPHONE,
+        	   #{market_supervision_user_id,jdbcType=INTEGER},
+        	   #{market_supervision_user_realna,jdbcType=VARCHAR},
+        	   #{store_id,jdbcType=INTEGER}, 
+        	   #{store_name,jdbcType=VARCHAR},
+        	   #{referee_user_id,jdbcType=INTEGER}, 
+        	   #{referee_user_realname,jdbcType=VARCHAR},
+        	   #{site_id,jdbcType=INTEGER}, 
+        	   #{user_logistics_template_id,jdbcType=INTEGER}, 
+        	   #{recommend_user_id,jdbcType=INTEGER},
+        	   1,
+        	   1,
+        	   1 
+         from tbl_retail_user_info 
+        where id=#{retail_user_id,jdbcType=INTEGER}
+    </insert>
+    
+    <!-- 初始化临时表会员数据 -->
+    <insert id="insertUserInfoApply" parameterType="java.util.Map">
+        insert into tbl_user_info_apply(
+            id,
+            user_name,
+            login_name,
+            user_state,
+            user_manage_name,
+            user_manage_cardid,
+            user_manage_cardid_file1,
+            user_manage_mobilephone,
+            market_supervision_user_id,
+            market_supervision_user_realna,
+            store_id,
+            store_name,
+            referee_user_id,
+            referee_user_realname,
+            site_id,
+            user_logistics_template_id,
+            recommend_user_id,
+            user_type,
+            distribution_state
+        )
+        select id,
+        	   id as user_id,
+        	   user_mobilephone,
+        	   1,
+        	   USER_REALNAME,
+        	   USER_MANAGE_CARDID,
+        	   USER_MANAGE_CARDID_FILE,
+        	   USER_MOBILEPHONE,
+        	   #{market_supervision_user_id,jdbcType=INTEGER},
+        	   #{market_supervision_user_realna,jdbcType=VARCHAR},
+        	   #{store_id,jdbcType=INTEGER}, 
+        	   #{store_name,jdbcType=VARCHAR},
+        	   #{referee_user_id,jdbcType=INTEGER}, 
+        	   #{referee_user_realname,jdbcType=VARCHAR},
+        	   #{site_id,jdbcType=INTEGER}, 
+        	   #{user_logistics_template_id,jdbcType=INTEGER}, 
+        	   #{recommend_user_id,jdbcType=INTEGER},
+        	   1,
+        	   1 
+         from tbl_retail_user_info 
+        where id=#{retail_user_id,jdbcType=INTEGER}
+    </insert>
+
+</mapper>

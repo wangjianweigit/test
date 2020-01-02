@@ -1,0 +1,448 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.analysis.dao.MemberAnalysisDao">
+
+	<!--获取会员动态分析总数 -->
+	<select id="queryMemberAnalysisCount" parameterType="java.util.Map" resultType="int">
+			select count(1) from tbl_user_info t
+		 		where t.user_state in (1,2)
+		 		and t.user_type &lt;&gt;5
+		   <if test="login_name!=null and login_name!=''">
+			  and trim(t.login_name) =#{login_name,jdbcType=VARCHAR}
+		   </if>
+		   <if test="user_manage_name!=null and user_manage_name!=''">
+			  and t.user_manage_name = #{user_manage_name,jdbcType=VARCHAR}
+		   </if>
+		   <if test="user_manage_mobilephone!=null and user_manage_mobilephone!=''">
+			  and t.user_manage_mobilephone = #{user_manage_mobilephone,jdbcType=VARCHAR}
+		   </if>
+           <if test="market_supervision_user_id != null and market_supervision_user_id != 0">
+              and t.market_supervision_user_id=#{market_supervision_user_id,jdbcType=INTEGER}
+           </if>
+           <if test="store_id != null and store_id != 0">
+              and t.store_id=#{store_id,jdbcType=INTEGER}
+           </if>
+           <if test="referee_user_id != null and referee_user_id != ''">
+              and t.referee_user_id =#{referee_user_id,jdbcType=INTEGER}
+           </if>
+           <if test="province != null and province!=''">
+				and t.user_company_address_province =#{province,jdbcType=INTEGER} 
+		   </if>
+		   <if test="city != null and city!=''">
+				and t.user_company_address_city =#{city,jdbcType=INTEGER} 
+			</if>
+			<if test="area != null and area!=''">
+				and t.user_company_address_county =#{area,jdbcType=INTEGER} 
+			</if>
+			<if test="site_id != null and site_id!=''">
+				and t.site_id =#{site_id,jdbcType=INTEGER} 
+		    </if>
+		    <if test="state != null">
+				and t.user_state IN
+	                <foreach item="item" collection="state" open="(" separator="," close=")">
+						#{item}
+					</foreach>
+			</if>
+		    <if test="public_user_type != null and public_user_type == 2">
+	            and EXISTS (SELECT 1 FROM TBL_SYS_USER_STORE TSUS WHERE TSUS.STORE_ID = t.STORE_ID AND TSUS.USER_ID = #{public_user_id,jdbcType=INTEGER})
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 3">
+	            and t.referee_user_id = #{public_user_id,jdbcType=INTEGER}
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 4">
+	            and t.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 5">
+	            and EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID = t.STORE_ID AND TSI.SHOPKEEPER_USER_ID = #{public_user_id,jdbcType=INTEGER})
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 6">
+	            and EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUI WHERE TSUI.STORE_ID = t.STORE_ID AND TSUI.USER_ID = #{public_user_id,jdbcType=INTEGER})
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 9">
+	            and EXISTS(SELECT 1 
+	                         FROM TBL_SYS_USER_INFO TSUI
+	                        WHERE TSUI.USER_TYPE = 4
+	            				  AND TSUI.ORGANIZATION_ID IN (
+									  	SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+									  	START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER} CONNECT BY PRIOR ID = PARENT_ID
+						              )
+						          AND TSUI.id = t.market_supervision_user_id)
+	        </if>
+	</select>
+	
+	<!--获取会员动态分析列表 -->
+	<select id="queryMemberAnalysisList" parameterType="java.util.Map" resultType="java.util.Map">
+	select * from (
+	select b.*, rownum rn from (
+		select t.user_name,
+	       t.user_manage_name,
+	       t.login_name,
+	       nvl(t1.login_count, 0) login_count,
+	       nvl(t2.last_login_count, 0) last_login_count,
+	       case
+	         when nvl(t2.last_login_count, 0) = 0 then 0
+	         else
+	         trunc((nvl(t1.login_count, 0) - nvl(t2.last_login_count, 0)) /t2.last_login_count * 100,2)
+	       end login_count_rate,
+	       nvl(t3.pv, 0) pv,
+	       nvl(t4.last_pv, 0) last_pv,
+	       case
+	         when nvl(t4.last_pv, 0) = 0 then 0
+	         else
+	         trunc((nvl(t3.pv, 0) - nvl(t4.last_pv, 0)) / t4.last_pv * 100, 2)
+	       end pv_rate,
+	       nvl(t5.pay_money, 0) pay_money,
+	       nvl(t6.last_pay_money, 0) last_pay_money,
+	       case
+	         when nvl(t6.last_pay_money, 0) = 0 then 0
+	         else
+	         trunc((nvl(t5.pay_money, 0) - nvl(t6.last_pay_money, 0)) /t6.last_pay_money * 100,2)
+	       end pay_money_rate,
+	       nvl(t7.order_count, 0) order_count,
+	       nvl(t8.last_order_count, 0) last_order_count,
+	       case
+	         when nvl(t8.last_order_count, 0) = 0 then 0
+	         else
+	         trunc((nvl(t7.order_count, 0) - nvl(t8.last_order_count, 0)) /t8.last_order_count * 100,2)
+	       end order_count_rate,
+	       t9.return_num,
+	       t9.PRODUCT_COUNT,
+	       t10.last_return_num,
+	       t10.last_PRODUCT_COUNT,
+	       case
+	         when nvl(t9.PRODUCT_COUNT, 0) = 0 then 0
+	         else
+	         trunc(nvl((t9.return_num / t9.PRODUCT_COUNT), 0) * 100, 2)
+	       end return_rate,
+	       case
+	         when nvl(t10.last_PRODUCT_COUNT, 0) = 0 then 0
+	         else
+	         trunc(nvl((t10.last_return_num / t10.last_PRODUCT_COUNT), 0) * 100,2) 
+	       end last_return_rate,
+	       case
+	         when nvl(t10.last_return_num, 0) = 0 or nvl(t10.last_PRODUCT_COUNT, 0) = 0 then 0
+	         else
+	         TRUNC ( (  NVL2 (t9.PRODUCT_COUNT,decode(t9.PRODUCT_COUNT,0,0,nvl(t9.return_num,0) / t9.PRODUCT_COUNT),0)
+                 - NVL2 (t10.last_PRODUCT_COUNT,decode(t10.last_PRODUCT_COUNT,0,0,nvl(t10.last_return_num,0)/ t10.last_PRODUCT_COUNT),0))
+              / (t10.last_return_num / t10.last_PRODUCT_COUNT)
+              * 100,2)
+	       end change_return_rate,
+	       nvl(t11.order_product_count, 0) order_product_count,
+	       nvl(t12.last_order_product_count, 0) last_order_product_count,
+	       case
+	         when nvl(t12.last_order_product_count, 0) = 0 then 0
+	         else
+	         trunc((nvl(t11.order_product_count, 0) - nvl(t12.last_order_product_count, 0)) / t12.last_order_product_count * 100, 2)
+	       end order_product_count_rate
+		  from tbl_user_info  t
+		  left join (select create_user_name,count(1) login_count
+		               from tbl_user_log_info
+		              where page_type = '登录'
+		              <if test="start_date != null and start_date != '' and end_date != null and end_date != ''">
+		              	AND create_date BETWEEN to_date(#{start_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS') AND to_date(#{end_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS')
+                      </if>
+		              group by create_user_name) t1 on t.user_name =t1.create_user_name
+		  left join (select create_user_name,count(1) last_login_count
+		               from tbl_user_log_info
+		              where page_type = '登录'
+		                <if test="last_start_date != null and last_start_date != '' and last_end_date != null and last_end_date != ''">
+	                      AND create_date BETWEEN to_date(#{last_start_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS') AND to_date(#{last_end_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS')
+	                   </if>
+		              group by create_user_name) t2 on t.user_name =t2.create_user_name
+		  left join (select create_user_name,count(1) pv
+		               from tbl_user_log_info
+		              where 1=1
+		              <if test="start_date != null and start_date != '' and end_date != null and end_date != ''">
+		              	AND create_date BETWEEN to_date(#{start_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS') AND to_date(#{end_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS')
+                      </if>
+		              group by create_user_name) t3 on t.user_name =t3.create_user_name
+		  left join (select create_user_name,count(1) last_pv
+		               from tbl_user_log_info
+		              where 1=1
+		               <if test="last_start_date != null and last_start_date != '' and last_end_date != null and last_end_date != ''">
+	                      AND create_date BETWEEN to_date(#{last_start_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS') AND to_date(#{last_end_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS')
+	                   </if>
+		              group by create_user_name) t4 on t.user_name =t4.create_user_name
+		  left join (select user_name,SUM (PRODUCT_COUNT) order_product_count
+		               from tbl_order_info
+		              where PAYMENT_STATE = 2
+		              <if test="start_date != null and start_date != '' and end_date != null and end_date != ''">
+		              	AND create_date BETWEEN to_date(#{start_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS') AND to_date(#{end_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS')
+                      </if>
+		              group by user_name) t11 on t.user_name =t11.user_name
+		  left join (select user_name,SUM (PRODUCT_COUNT) last_order_product_count
+		               from tbl_order_info
+		              where PAYMENT_STATE = 2
+		              <if test="last_start_date != null and last_start_date != '' and last_end_date != null and last_end_date != ''">
+		              	AND create_date BETWEEN to_date(#{last_start_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS') AND to_date(#{last_end_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS')
+                      </if>
+		              group by user_name) t12 on t.user_name = t12.user_name
+		  left join (select user_name, sum(PAYMENT_MONEY) pay_money
+		               from tbl_order_info
+		              where PAYMENT_STATE = 2
+		              <if test="start_date != null and start_date != '' and end_date != null and end_date != ''">
+		              	AND create_date BETWEEN to_date(#{start_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS') AND to_date(#{end_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS')
+                      </if>
+		              group by user_name) t5 on t.user_name = t5.user_name
+		  left join (select user_name, sum(PAYMENT_MONEY) last_pay_money
+		               from tbl_order_info
+		              where PAYMENT_STATE = 2
+		              <if test="last_start_date != null and last_start_date != '' and last_end_date != null and last_end_date != ''">
+	                      AND create_date BETWEEN to_date(#{last_start_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS') AND to_date(#{last_end_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS')
+	                   </if>
+		              group by user_name) t6 on t.user_name = t6.user_name
+		  left join (select oi.user_name, count(1) order_count
+		               from tbl_order_info oi
+		              where ORDER_NUMBER in
+		                    (select a.ORDER_NUMBER
+		                       from tbl_order_info a
+		                      where ORDER_STATE = 6
+		                      <if test="start_date != null and start_date != '' and end_date != null and end_date != ''">
+				              	AND create_date BETWEEN to_date(#{start_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS') AND to_date(#{end_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS')
+		                      </if>
+		                     union all
+		                     select a.ORDER_NUMBER
+		                       from tbl_order_info a
+		                      where 1=1
+		                      <if test="start_date != null and start_date != '' and end_date != null and end_date != ''">
+				              	AND create_date BETWEEN to_date(#{start_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS') AND to_date(#{end_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS')
+		                      </if>
+		                        and exists
+		                      (select 1
+		                               from TBL_ORDER_RETURN_INFO b
+		                              where a.order_number = b.ORDER_NUMBER
+		                                and b.STATE = '2'))
+		              group by oi.user_name) t7 on t.user_name = t7.user_name
+		  left join (select oi.user_name, count(1) last_order_count
+		               from tbl_order_info oi
+		              where ORDER_NUMBER in
+		                    (select a.ORDER_NUMBER
+		                       from tbl_order_info a
+		                      where ORDER_STATE = 6
+		                      <if test="last_start_date != null and last_start_date != '' and last_end_date != null and last_end_date != ''">
+			                      AND create_date BETWEEN to_date(#{last_start_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS') AND to_date(#{last_end_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS')
+			                   </if>
+		                     union all
+		                     select a.ORDER_NUMBER
+		                       from tbl_order_info a
+		                      where 1=1
+		                      <if test="last_start_date != null and last_start_date != '' and last_end_date != null and last_end_date != ''">
+			                      AND create_date BETWEEN to_date(#{last_start_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS') AND to_date(#{last_end_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS')
+			                   </if>
+		                        and exists
+		                      (select 1
+		                               from TBL_ORDER_RETURN_INFO b
+		                              where a.order_number = b.ORDER_NUMBER
+		                                and b.STATE = '2'))
+		              group by oi.user_name) t8 on t.user_name = t8.user_name
+		  left join (select tui.user_name,
+		                    e.RETURN_NUM,
+                        	f.PRODUCT_COUNT 
+		               from tbl_user_info tui
+		               left join (SELECT c.user_name,count(A.PRODUCT_UNIQUE_CODE) RETURN_NUM
+		                           FROM ${jdbc_user}.TBL_NEW_RETURN_CONFIRM a
+		                           left join ${jdbc_user}.TBL_NEW_RETURN_ORDER b on a.RETURN_NUMBER =b.RETURN_NUMBER
+		                           left join TBl_user_info c on c.ID = b.user_id
+		                          WHERE b.state = '8'
+		                          <if test="start_date != null and start_date != '' and end_date != null and end_date != ''">
+					              	AND REFUND_DATE BETWEEN to_date(#{start_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS') AND to_date(#{end_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS')
+			                      </if>
+		                          GROUP BY c.user_name) e on tui.user_name =e.user_name
+		               left join (select oi.user_name, sum(c.PRODUCT_COUNT)PRODUCT_COUNT
+		                           from tbl_order_info oi,
+		                                (select a.ORDER_NUMBER_PLATFORM,sum(b.OUT_COUNT) PRODUCT_COUNT
+		                                   from ${jdbc_user}.TBL_INVOICE_INFO a,${jdbc_user}.TBL_INVOICE_PRODUCT b
+		                                  where 1=1
+		                                  AND A.INVOICE_NUMBER = B.INVOICE_NUMBER
+                                          AND A.DELIVER_STATE ='2'
+                                          <if test="start_date != null and start_date != '' and end_date != null and end_date != ''">
+							              	AND DELIVER_DATE BETWEEN to_date(#{start_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS') AND to_date(#{end_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS')
+					                      </if>
+		                                  group by a.ORDER_NUMBER_PLATFORM) c
+		                          where oi.order_number = c.ORDER_NUMBER_PLATFORM GROUP BY oi.user_name) f on tui.user_name =f.user_name
+		              where e.return_num is not null or f.PRODUCT_COUNT is not null
+		                 ) t9 on t.user_name =t9.user_name
+		  left join (select tui.user_name,
+		                    e.LAST_RETURN_NUM,
+                        	f.LAST_PRODUCT_COUNT
+		               from tbl_user_info tui
+		               left join (SELECT c.user_name,count(A.PRODUCT_UNIQUE_CODE) LAST_RETURN_NUM
+		                           FROM ${jdbc_user}.TBL_NEW_RETURN_CONFIRM a
+		                           left join ${jdbc_user}.TBL_NEW_RETURN_ORDER b on a.RETURN_NUMBER =b.RETURN_NUMBER
+		                           left join TBl_user_info c on c.ID = b.user_id
+		                          WHERE b.state = '8'
+		                          <if test="last_start_date != null and last_start_date != '' and last_end_date != null and last_end_date != ''">
+			                      		AND REFUND_DATE BETWEEN to_date(#{last_start_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS') AND to_date(#{last_end_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS')
+			                   		</if>
+		                          GROUP BY c.user_name) e on tui.user_name =e.user_name
+		               left join (select oi.user_name, sum(c.PRODUCT_COUNT)LAST_PRODUCT_COUNT
+		                           from tbl_order_info oi,
+		                                (select a.ORDER_NUMBER_PLATFORM,
+		                                        sum(b.OUT_COUNT) PRODUCT_COUNT
+		                                   from ${jdbc_user}.TBL_INVOICE_INFO a,${jdbc_user}.TBL_INVOICE_PRODUCT b
+		                                  where 1=1
+		                                  	AND A.INVOICE_NUMBER = B.INVOICE_NUMBER
+                                         	AND A.DELIVER_STATE ='2'
+                                         	<if test="last_start_date != null and last_start_date != '' and last_end_date != null and last_end_date != ''">
+					                      		AND DELIVER_DATE BETWEEN to_date(#{last_start_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS') AND to_date(#{last_end_date,jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS')
+					                   		</if>
+		                                  group by a.ORDER_NUMBER_PLATFORM) c
+		                          where oi.order_number = c.ORDER_NUMBER_PLATFORM group by oi.user_name) f on tui.user_name =f.user_name
+		              where e.LAST_RETURN_NUM is not null or f.LAST_PRODUCT_COUNT is not null
+		                 ) t10 on t.user_name =t10.user_name
+		               where t.user_state in (1,2)
+		               and t.user_type &lt;&gt;5
+				    <if test="login_name!=null and login_name!=''">
+					  and trim(t.login_name) =#{login_name,jdbcType=VARCHAR}
+				   </if>
+				   <if test="user_manage_name!=null and user_manage_name!=''">
+					  and t.user_manage_name = #{user_manage_name,jdbcType=VARCHAR}
+				   </if>
+				   <if test="user_manage_mobilephone!=null and user_manage_mobilephone!=''">
+					  and t.user_manage_mobilephone = #{user_manage_mobilephone,jdbcType=VARCHAR}
+				   </if>
+		           <if test="market_supervision_user_id != null and market_supervision_user_id != 0">
+		              and t.market_supervision_user_id=#{market_supervision_user_id,jdbcType=INTEGER}
+		           </if>
+		           <if test="store_id != null and store_id != 0">
+		              and t.store_id=#{store_id,jdbcType=INTEGER}
+		           </if>
+		           <if test="referee_user_id != null and referee_user_id != ''">
+		              and t.referee_user_id =#{referee_user_id,jdbcType=INTEGER}
+		           </if>
+		           <if test="province != null and province!=''">
+					  and t.user_company_address_province =#{province,jdbcType=INTEGER} 
+				   </if>
+				   <if test="city != null and city!=''">
+					   and t.user_company_address_city =#{city,jdbcType=INTEGER} 
+					</if>
+					<if test="area != null and area!=''">
+						and t.user_company_address_county =#{area,jdbcType=INTEGER} 
+					</if>
+					<if test="site_id != null and site_id!=''">
+						and t.site_id =#{site_id,jdbcType=INTEGER} 
+				    </if>
+				    <if test="state != null">
+						and t.user_state IN
+			                <foreach item="item" collection="state" open="(" separator="," close=")">
+								#{item}
+							</foreach>
+					</if>
+				    <if test="public_user_type != null and public_user_type == 2">
+			            and EXISTS (SELECT 1 FROM TBL_SYS_USER_STORE TSUS WHERE TSUS.STORE_ID = t.STORE_ID AND TSUS.USER_ID = #{public_user_id,jdbcType=INTEGER})
+			        </if>
+			        <if test="public_user_type != null and public_user_type == 3">
+			            and t.referee_user_id = #{public_user_id,jdbcType=INTEGER}
+			        </if>
+			        <if test="public_user_type != null and public_user_type == 4">
+			            and t.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+			        </if>
+			        <if test="public_user_type != null and public_user_type == 5">
+			            and EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID = t.STORE_ID AND TSI.SHOPKEEPER_USER_ID = #{public_user_id,jdbcType=INTEGER})
+			        </if>
+			        <if test="public_user_type != null and public_user_type == 6">
+			            and EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUI WHERE TSUI.STORE_ID = t.STORE_ID AND TSUI.USER_ID = #{public_user_id,jdbcType=INTEGER})
+			        </if>
+			        <if test="public_user_type != null and public_user_type == 9">
+			            and EXISTS(SELECT 1 
+			                         FROM TBL_SYS_USER_INFO TSUI
+			                        WHERE TSUI.USER_TYPE = 4
+			            				  AND TSUI.ORGANIZATION_ID IN (
+											  	SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+											  	START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER} CONNECT BY PRIOR ID = PARENT_ID
+								              )
+								          AND TSUI.id = t.market_supervision_user_id)
+			        </if>
+			        <if test="sort != null and sort != ''">
+			             order by ${sort} ${sort_by},user_name
+			         </if>
+				) b where
+				rownum &lt;= #{end_rownum})
+				where rn &gt; #{start_rownum}
+		
+	</select>
+	
+	
+	<!--获取会员动态分析图表 -->
+	<select id="queryMemberChartList" parameterType="java.util.Map" resultType="java.util.Map">
+			select '浏览量' type_name,count(1) cnt,TO_CHAR (a.CREATE_DATE, 'YYYY-MM-DD') create_date from TBL_USER_LOG_INFO a,tbl_user_info t
+                <where>
+                    t.user_name = a.create_user_name
+                    and t.user_name=#{user_name,jdbcType=VARCHAR}
+                    <if test="start_time != null and start_time != ''">
+                         and a.CREATE_DATE &gt;= TO_DATE(#{start_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+                     </if>
+                     <if test="end_time != null and end_time != ''">
+                         and a.CREATE_DATE &lt;= TO_DATE(#{end_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+                     </if>
+				    <if test="public_user_type != null and public_user_type == 2">
+			            and EXISTS (SELECT 1 FROM TBL_SYS_USER_STORE TSUS WHERE TSUS.STORE_ID = t.STORE_ID AND TSUS.USER_ID = #{public_user_id,jdbcType=INTEGER})
+			        </if>
+			        <if test="public_user_type != null and public_user_type == 3">
+			            and t.referee_user_id = #{public_user_id,jdbcType=INTEGER}
+			        </if>
+			        <if test="public_user_type != null and public_user_type == 4">
+			            and t.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+			        </if>
+			        <if test="public_user_type != null and public_user_type == 5">
+			            and EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID = t.STORE_ID AND TSI.SHOPKEEPER_USER_ID = #{public_user_id,jdbcType=INTEGER})
+			        </if>
+			        <if test="public_user_type != null and public_user_type == 6">
+			            and EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUI WHERE TSUI.STORE_ID = t.STORE_ID AND TSUI.USER_ID = #{public_user_id,jdbcType=INTEGER})
+			        </if>
+			        <if test="public_user_type != null and public_user_type == 9">
+			            and EXISTS(SELECT 1 
+			                         FROM TBL_SYS_USER_INFO TSUI
+			                        WHERE TSUI.USER_TYPE = 4
+			            				  AND TSUI.ORGANIZATION_ID IN (
+											  	SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+											  	START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER} CONNECT BY PRIOR ID = PARENT_ID
+								              )
+								          AND TSUI.id = t.market_supervision_user_id)
+			        </if>
+                </where>
+                group by TO_CHAR (a.CREATE_DATE, 'YYYY-MM-DD')
+                UNION ALL
+                select '购买商品数' type_name ,sum(PRODUCT_COUNT) cnt,TO_CHAR (a.CREATE_DATE, 'YYYY-MM-DD') create_date from tbl_order_info a,tbl_user_info t
+                <where>
+                        t.user_name = a.user_name
+                        and t.user_name=#{user_name,jdbcType=VARCHAR}
+                        and a.PAYMENT_STATE = 2
+                        <if test="start_time != null and start_time != ''">
+                         	 and a.CREATE_DATE &gt;= TO_DATE(#{start_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+                        </if>
+                        <if test="end_time != null and end_time != ''">
+                          	and a.CREATE_DATE &lt;= TO_DATE(#{end_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+                        </if>
+					    <if test="public_user_type != null and public_user_type == 2">
+				            and EXISTS (SELECT 1 FROM TBL_SYS_USER_STORE TSUS WHERE TSUS.STORE_ID = t.STORE_ID AND TSUS.USER_ID = #{public_user_id,jdbcType=INTEGER})
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 3">
+				            and t.referee_user_id = #{public_user_id,jdbcType=INTEGER}
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 4">
+				            and t.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 5">
+				            and EXISTS(SELECT 1 FROM TBL_STORE_INFO TSI WHERE TSI.ID = t.STORE_ID AND TSI.SHOPKEEPER_USER_ID = #{public_user_id,jdbcType=INTEGER})
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 6">
+				            and EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUI WHERE TSUI.STORE_ID = t.STORE_ID AND TSUI.USER_ID = #{public_user_id,jdbcType=INTEGER})
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 9">
+				            and EXISTS(SELECT 1 
+				                         FROM TBL_SYS_USER_INFO TSUI
+				                        WHERE TSUI.USER_TYPE = 4
+				            				  AND TSUI.ORGANIZATION_ID IN (
+												  	SELECT ID FROM TBL_SYS_ORGANIZATION_INFO WHERE CONNECT_BY_ISLEAF=1
+												  	START WITH PARENT_ID = #{public_user_organization_id,jdbcType=INTEGER} CONNECT BY PRIOR ID = PARENT_ID
+									              )
+									          AND TSUI.id = t.market_supervision_user_id)
+				        </if>
+                    </where>
+                    group by TO_CHAR (a.CREATE_DATE, 'YYYY-MM-DD')
+	</select>
+		
+</mapper>

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.pvtp.store.dao.PvtpStoreInfoDao">
+	
+	<!-- 查询私有平台商家列表 -->
+	<select id="queryPvtpStoreInfoList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		select * from
+			(select a.*, rownum num from
+			(
+				select id,
+                       store_code,
+                       store_name,
+                       store_address,
+                       store_phone,
+                       store_limit,
+                       store_mobile_phone,
+                       create_user_id,
+                       create_date,
+                       state,
+                       off_date,
+                       address_max,
+                       address_province,
+                       address_city,
+                       address_county,
+                       getMd_CREDIT_MONEY_BALANCE(id) credit_money_balance,
+                       verify_code,
+                       site_id,
+                       manager_user_id,
+					   shopkeeper_user_id,
+                       (select name
+                          from TBL_SITE_INFO tsi
+                         where tsi.id = site_id) site_name,
+                       (select company_name from TBL_STATIONED_USER_INFO tsui where tsui.id= (select stationed_user_id from TBL_SITE_INFO tsi where tsi.id = t.site_id)) stationed_user_name 
+				from TBL_STORE_INFO t
+				<where>
+					exists(select 1 from tbl_site_info tsi where t.site_id=tsi.id and tsi.stationed_user_id is not null)
+					<if test="store_name != null and store_name != ''">
+						and store_name like '%'||#{store_name,jdbcType=VARCHAR}||'%'
+					</if>
+					<if test="store_mobile_phone != null and store_mobile_phone != ''">
+						and store_mobile_phone = #{store_mobile_phone,jdbcType=VARCHAR}
+					</if>
+					<if test="state != null">
+						and state IN
+		                <foreach item="item" collection="state" open="(" separator="," close=")">
+							#{item}
+						</foreach>
+					</if>
+					<if test="site_id != null">
+						and site_id = #{site_id,jdbcType=INTEGER}
+					</if>
+				</where>
+				order by create_date desc
+			) a
+			where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where num &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	
+	<!--查询私有平台商家列表数量 -->
+	<select id="queryPvtpStoreInfoCount" parameterType="java.util.Map" resultType="int">
+		   select count(1) from TBL_STORE_INFO t
+				<where>
+					exists(select 1 from tbl_site_info tsi where t.site_id=tsi.id and tsi.stationed_user_id is not null)
+					<if test="store_name != null and store_name != ''">
+						AND store_name like '%'||#{store_name,jdbcType=VARCHAR}||'%'
+					</if>
+					<if test="store_mobile_phone != null and store_mobile_phone != ''">
+						and store_mobile_phone = #{store_mobile_phone,jdbcType=VARCHAR}
+					</if>
+					<if test="state != null">
+						and t.state IN
+		                <foreach item="item" collection="state" open="(" separator="," close=")">
+							#{item}
+						</foreach>
+					</if>
+					<if test="site_id != null">
+						and site_id = #{site_id,jdbcType=INTEGER}
+					</if>
+				</where>
+	</select>
+</mapper>
+

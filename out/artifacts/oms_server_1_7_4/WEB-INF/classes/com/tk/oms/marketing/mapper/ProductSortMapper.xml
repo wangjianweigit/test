@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.marketing.dao.ProductSortDao">
+	<!-- 查询规则列表 -->
+    <select id="querySortRole" resultType="java.util.Map">
+        select code,name,weight_percent from tbl_product_sort_role
+    </select>
+	<!-- 更新规则权重百分比 -->
+    <update id="updateWeightPercent" parameterType="java.util.List">
+        update tbl_product_sort_role set weight_percent =
+        <foreach collection="list" item="item" open=" (case code when " close=" end) " separator=" when ">
+            #{item.code,jdbcType=VARCHAR} then #{item.weight_percent,jdbcType=INTEGER}
+        </foreach>
+        where code in
+        <foreach collection="list" item="item" open="(" close=")" separator=",">
+            #{item.code,jdbcType=VARCHAR}
+        </foreach>
+    </update>
+    <!-- 查询人工加权商品数量 -->
+    <select id="queryProductCount" parameterType="java.util.Map" resultType="int" >
+		select count(1) from tbl_product_info where state = '上架'
+        <if test="product_itemnumber != null and product_itemnumber != ''">
+            and itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+        </if>
+        <if test="year != null and year != ''">
+            and year = #{year,jdbcType=INTEGER}
+        </if>
+        <if test="season_id != null and season_id != ''">
+            and season_id = #{season_id,jdbcType=VARCHAR}
+        </if>
+    </select>
+    <!-- 查询人工加权商品列表 -->
+    <select id="queryProductList" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select c.*, rownum num from (
+                select
+                    a.product_itemnumber,
+                    a.product_img_url,
+                    a.weighting,
+                    a.temp_weighting,
+                    nvl(a.weight_value,0) weight_value,
+                    nvl(b.weight_value,0) temp_weight_value,
+                    case when a.temp_weighting != a.weighting then to_char(a.sort_num-b.sort_num)
+                         else '' end sort_change,
+                    a.sort_value
+                from (
+                    select id,product_itemnumber,product_img_url,year,season_id,weighting,temp_weighting,weight_value,sort_value,rownum sort_num from (
+                        SELECT pi.id,pi.itemnumber product_itemnumber,
+                            pi.product_img_url product_img_url,
+                            pi.year,
+                            pi.season_id,
+                            NVL (sp.weighting, 0) weighting,
+                            NVL (sp.temp_weighting, 0) temp_weighting,
+                            NVL (pi.sort_value,0) + NVL (sp.weighting, 0) weight_value,
+                            NVL (pi.sort_value,0) sort_value
+                        FROM tbl_product_info pi, (select a.*,(select pi.itemnumber from tbl_product_info pi where pi.id = a.product_id) product_itemnumber from tbl_site_product_delay a where a.site_id = #{public_user_site_id,jdbcType=INTEGER}) sp
+                        WHERE pi.itemnumber = sp.product_itemnumber(+)
+                            and pi.state = '上架'
+                        order by weight_value desc,pi.id desc
+                    )
+                ) a,(
+                    select product_itemnumber,weight_value,rownum sort_num from (
+                        SELECT pi.itemnumber product_itemnumber,
+                            NVL (pi.sort_value,0) + NVL (sp.temp_weighting, 0) weight_value
+                        FROM tbl_product_info pi, (select a.*,(select pi.itemnumber from tbl_product_info pi where pi.id = a.product_id) product_itemnumber from tbl_site_product_delay a where a.site_id = #{public_user_site_id,jdbcType=INTEGER}) sp
+                        WHERE pi.itemnumber = sp.product_itemnumber(+)
+                            and pi.state = '上架'
+                        order by weight_value desc,pi.id desc
+                    )
+                ) b where a.product_itemnumber = b.product_itemnumber
+                <if test="product_itemnumber != null and product_itemnumber != ''">
+                    and a.product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+                </if>
+                <if test="year != null and year != ''">
+		            and a.year = #{year,jdbcType=INTEGER}
+		        </if>
+		        <if test="season_id != null and season_id != ''">
+		            and a.season_id = #{season_id,jdbcType=INTEGER}
+		        </if>
+                order by a.weight_value desc,a.id desc
+            ) c where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where num &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+    <!-- 新增人工加权商品 -->
+    <insert id="insertProductWeighting" parameterType="java.util.Map">
+        insert into tbl_site_product_delay(
+            site_id,
+            product_id,
+            temp_weighting,
+            stationed_user_id
+        )
+        values (
+            #{public_user_site_id,jdbcType=INTEGER},
+            (select id from tbl_product_info where itemnumber = #{product_itemnumber,jdbcType=VARCHAR} and rownum &lt;=1),
+            #{temp_weighting,jdbcType=INTEGER},
+            #{public_user_id,jdbcType=INTEGER}
+        )
+    </insert>
+    <!-- 更新人工加权 -->
+    <update id="updateProductWeighting" parameterType="java.util.Map">
+        update tbl_site_product_delay set temp_weighting = #{temp_weighting,jdbcType=INTEGER}
+        where site_id = #{public_user_site_id,jdbcType=INTEGER} and product_id = (select id from tbl_product_info where itemnumber = #{product_itemnumber,jdbcType=VARCHAR} and rownum &lt;=1)
+    </update>
+    <!-- 发布人工加权 -->
+    <update id="releaseProductWeighting" parameterType="java.util.Map">
+        update tbl_site_product_delay set weighting = temp_weighting where site_id = #{public_user_site_id,jdbcType=INTEGER}
+    </update>
+    <!-- 根据站点ID和货号查询站点商品配置信息 -->
+	<select id="querySiteProduct" parameterType="java.util.Map" resultType="java.util.Map">
+		select site_id,product_id,weighting,temp_weighting,delay_days from tbl_site_product_delay
+		where site_id = #{public_user_site_id,jdbcType=INTEGER} and product_id = (select id from tbl_product_info where itemnumber = #{product_itemnumber,jdbcType=VARCHAR} and rownum &lt;=1)
+	</select>
+	<!-- 上新商品查询上新商品列表 -->
+	<select id="queryNewProductList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+            select a.*, rownum num from (
+                select id,
+                	   itemnumber,
+                	   state,
+		               product_name,
+		               product_img_url,
+		               is_outstock,
+		               first_sell_sort_value,
+		               product_count 
+		               from tbl_product_info
+					where first_sell_state_date is not null
+					and PRODUCT_TYPE=0
+					<if test="itemnumber != null and itemnumber != ''">
+			           and itemnumber = #{itemnumber,jdbcType=VARCHAR}
+			        </if>
+			        <if test="year != null and year != ''">
+			           and year = #{year,jdbcType=INTEGER}
+			        </if>
+			        <if test="season_id != null and season_id != ''">
+			           and season_id = #{season_id,jdbcType=INTEGER}
+			        </if>
+					 order by first_sell_sort_value desc
+            ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where num &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 上新商品查询上新商品总数-->
+	<select id="queryNewProductCount" parameterType="java.util.Map" resultType="int">
+          select count(1) from tbl_product_info 
+			where first_sell_state_date is not null
+			and PRODUCT_TYPE=0
+			<if test="itemnumber != null and itemnumber != ''">
+		       and itemnumber = #{itemnumber,jdbcType=VARCHAR}
+		    </if>
+		    <if test="year != null and year != ''">
+		       and year = #{year,jdbcType=INTEGER}
+		    </if>
+		    <if test="season_id != null and season_id != ''">
+		       and season_id = #{season_id,jdbcType=INTEGER}
+		    </if>
+	</select>
+	<!-- 根据货号查询销量-->
+	<select id="querySaleVolume"  parameterType="java.util.Map" resultType="int">
+		select nvl(sum(h.product_count),0) trade_count
+		 from tbl_order_product h, tbl_order_info hh
+		 where h.order_number= hh.order_number and 
+		  (
+		  hh.order_state = 1 
+		  or hh.order_state = 2 
+		  or hh.order_state = 3 
+		  or hh.order_state = 5)
+		 and h.itemnumber=#{itemnumber,jdbcType=VARCHAR}
+	</select>
+	<!-- 更新上新商品排序值 -->
+    <update id="updateMaxMinFirstSellSortValue" parameterType="java.util.Map">
+        update tbl_product_info 
+        	<if test="type != null and type != '' and type=='top'">
+	           set first_sell_sort_value =seq_first_sell_sort_value.nextval
+	        </if>
+	        <if test="type != null and type != '' and type=='bottom'">
+	           set first_sell_sort_value =(select min(first_sell_sort_value)-1 from tbl_product_info)
+	        </if>
+        where id=#{product_id,jdbcType=INTEGER}
+    </update>
+    <!-- 更新上新商品排序值 -->
+    <update id="updateFirstSellSortValue" parameterType="java.util.Map">
+        update tbl_product_info 
+	           set first_sell_sort_value =#{new_sort_value,jdbcType=INTEGER}
+        where id=#{id,jdbcType=INTEGER}
+    </update>
+    <!-- 将当前商品排序值增加或减少-->
+    <update id="updateRiseOrDownFirstSellSortValue" parameterType="java.util.Map">
+        update tbl_product_info 
+        	<if test="type != null and type != '' and type=='prev'">
+        		set first_sell_sort_value =first_sell_sort_value-1
+        			where first_sell_sort_value&gt;#{sort_value,jdbcType=INTEGER}
+        		and first_sell_sort_value&lt;=#{new_sort_value,jdbcType=INTEGER}
+        	</if>
+        	<if test="type != null and type != '' and type=='next'">
+        		set first_sell_sort_value =first_sell_sort_value+1
+        			where first_sell_sort_value&gt;=#{new_sort_value,jdbcType=INTEGER}
+        		and first_sell_sort_value&lt;#{sort_value,jdbcType=INTEGER}
+        	</if>
+    </update>
+    <!-- 查询当前商品排序值-->
+	<select id="queryProductFirstSellSortValue"  parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT num, first_sell_sort_value
+		  FROM (SELECT a.*, ROWNUM num
+		          FROM (  SELECT id,
+		                         itemnumber,
+		                         product_name,
+		                         product_img_url,
+		                         is_outstock,
+		                         first_sell_sort_value
+		                    FROM tbl_product_info
+		                   WHERE first_sell_state_date IS NOT NULL
+		                   and PRODUCT_TYPE=0
+		                ORDER BY first_sell_sort_value DESC) a)
+		 <where>
+			 <if test="product_id != null and product_id != ''">
+			 	id=#{product_id,jdbcType=INTEGER}
+			 </if>
+			 <if test="num != null and num != ''">
+			 	num=#{num,jdbcType=INTEGER}
+			 </if>
+		 </where>
+	</select>
+	<!-- 查询最大排名-->
+	<select id="queryProductMaxNum" resultType="int">
+		select count(1) from tbl_product_info where first_sell_state_date is not null and PRODUCT_TYPE=0
+	</select>
+</mapper>

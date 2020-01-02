@@ -1,0 +1,210 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+ <head>
+    <meta http-equiv="content-type" content="text/html;charset=utf-8">
+    <title>测试界面</title>
+    <script src="http://apps.bdimg.com/libs/jquery/1.8.0/jquery.min.js"></script>
+    <script src="jquery.form.js"></script>
+    <script src="webtoolkit.md5.js"></script>
+    <script src="t.js"></script>
+    <style type="text/css">
+    	body
+		{
+			font-size:18px;
+		}
+    </style>
+    <script type="text/javascript">
+        // ################################ 常量定义 ################################
+        var BaseURL = "/oms_server/";
+        var jmURL = BaseURL+"test/encryption";//加密url
+		var jm2URL = BaseURL+"test/decrypt";//解密url
+		/**
+		测试地址，注意,测试地址中的 / 使用两个下划线代替
+		**/
+        
+        
+        var DATA_MAP = {
+            site_info__edit: {
+                info: '修改站点信息',
+                data: '{"id":24,"discount":0.9,"remark":"jddf","create_user_id":5,"STATE":2,"parent_warehouse_id":"11,31,51,71,91","warehouse_id":"21,41,61,81,101"}'
+            },
+            site_info__add: {
+                info: '新增站点信息',
+                data: '{"discount":0.9,"remark":"jddf","create_user_id":5,"STATE":2,"parent_warehouse_id":"11,31,51,71,91","warehouse_id":"21,41,61,81,101"}'
+            },
+            site_info__remove: {
+                info: '删除站点信息',
+                data: '{"id":24}'
+            },
+            site_info__list: {
+                info: '获取站点信息列表',
+                data: '{"pageIndex":1,"pageSize":10}'
+            },
+            issuing_grade__list:{
+                info: '代发等级列表',
+                data: '{"pageIndex":1,"pageSize":10}'
+            },
+            issuing_grade__add:{
+                info: '代发等级新增',
+                data: '{"grade_name":"代发","piece_cost":10,"create_user_id":2,"remark":"dhf"}'
+            },
+            issuing_grade__edit:{
+                info: '代发等级修改',
+                data: '{"id":31,"grade_name":1,"piece_cost":10,"create_user_id":2,"remark":"dhf"}'
+            },
+            issuing_grade__remove:{
+                info: '代发等级删除',
+                data: '{"id":31}'
+            },
+            issuing_grade__sort:{
+                info: '代发等级排序',
+                data: '{"fromId":2,"toId":3}'
+            },
+            
+            
+            product_popular_key_words__list:{
+                 info: '热门关键字列表列表',
+                data: '{"pageIndex":1,"pageSize":10}'
+            },
+            product_popular_key_words__add:{
+                info: '热门关键字列表新增',
+                data: '{"site_id":1,"keyword":"dafsh","create_user_id":2,"url":"dfh","state":1}'
+            },
+            product_popular_key_words__edit:{
+                info: '热门关键字列表修改',
+                data: '{"id":2,"site_id":1,"keyword":"dafsh","create_user_id":2,"url":"dfh","state":1}'
+            },
+            product_popular_key_words__remove:{
+                info: '热门关键字列表删除',
+                data: '{"id":2}'
+            },
+            product_popular_key_words__sort:{
+                info: '热门关键字列表排序',
+                data: '{"id":2,"toId":3}'
+            },
+            
+            store_info__list:{
+                 info: '门店列表',
+                data: '{"pageIndex":1,"pageSize":10}'
+            },
+            store_info__add:{
+                info: '门店列表新增',
+                data: '{"store_code":1,"store_name":"dafsh","store_address":"fsdk","store_phone":"87963215","store_mobile_phone":"13698563215","create_user_id":5,"address_max":2,"address_province":450500,"address_city":5,"address_county":2,"site_id":2}'
+            },
+            store_info__edit:{
+                info: '门店列表修改',
+                data: '{"id":2,"store_code":1,"store_name":"dafsh","store_address":2,"store_phone":"87963215","store_mobile_phone":"13698563215","create_user_id":5,"address_max":2,"address_province":450500,"address_city":5,"address_county":2,"site_id":2}'
+            },
+            store_info__remove:{
+                info: '门店列表删除',
+                data: '{"id":2}'
+            },
+            store_info__update_verify_code:{
+                info: '更新门店验证码', 
+                data: '{"id":42}'
+            },
+            store_info__update_credit:{
+                info: '更新门店授信额度',
+                data: '{"id":42,"store_limit":5}'
+            },
+            store_info__update_state:{
+                info: '更新门店状态',
+                data: '{"id":42,"state":2}'
+            },
+            freight_template__list:{
+            	info: '查询运费模板列表',
+                data: '{"pageIndex":1,"pageSize":10}'
+            },
+            freight_template__add:{
+            	info: '新增运费模板',
+                data: '{"create_user_id":1,"name":"测试专用2","time":"12小时","logistic_ids":"1|1","logistic_names":"申通|申通","send_to_areas":"0|310000,320000,330000","send_to_area_names":"默认运费|上海市,江苏省,浙江省","first_counts":"5|5","first_moneys":"5.00|5.00","continue_counts":"2|1","continue_moneys":"1.00|1.00","warehouse_ids":"1|1"}'
+            },
+            freight_template__edit:{
+            	info: '编辑运费模板',
+                data: '{"template_id":1,"create_user_id":1,"name":"测试专用","time":"12小时","logistic_ids":"1|1|1","logistic_names":"申通|申通|申通","send_to_areas":"0|310000,320000,330000|340000,360000,350000,440000,450000,460000","send_to_area_names":"默认运费|上海市,江苏省,浙江省|安徽省,江西省,福建省,广东省,广 西,海南省","first_counts":"5|5|5","first_moneys":"5.00|5.00|10.00","continue_counts":"2|1|1","continue_moneys":"1.00|1.00|2.00","warehouse_ids":"1|1|1"}'
+            },
+            freight_template__remove:{
+            	info: '删除运费模板',
+                data: '{"template_id":1}'
+            },
+            freight_template__detail:{
+            	info: '查询运费模板详情',
+                data: '{"template_id":5,"warehouse_id":1}'
+            },
+            freight_template__state:{
+            	info: '运费模板启停用',
+                data: '{"template_id":5,"state":"2"}'
+            },
+            freight_template__default:{
+            	info: '默认运费模板设置',
+                data: '{"template_id":5,"is_default":"2"}'
+            },
+            logistics_company__list:{
+            	info: '查询物流公司列表',
+                data: '{"pageIndex":1,"pageSize":10}'
+            },
+            logistics_company__detail:{
+            	info: '查询物流公司详情',
+                data: '{"id":1}'
+            },
+            logistics_company__add:{
+            	info: '添加物流公司',
+                data: '{"create_user_id":1,"code":"ZT","name":"中通快递","type":"1"}'
+            },
+            logistics_company__remove:{
+            	info: '删除物流公司',
+                data: '{"id":3}'
+            },
+            logistics_company__edit:{
+            	info: '编辑物流公司',
+                data: '{"id":2,"type":"2","code":"ST","name":"申通快递"}'
+            },
+            logistics_company__sort:{
+            	info: '物流公司排序',
+                data: '{"id1":1,"id2":2}'
+            },
+            sys_user__select_ywjl_list:{
+            	info: '获取【通用下拉框】查询【业务经理】下拉',
+                data: '{"public_user_type":5,"public_user_id":135}'
+            },
+            sys_user__select_md_list:{
+            	info: '获取【通用下拉框】查询【门店】下拉',
+                data: '{"public_user_type":5,"public_user_id":135,"page_select_ywjl_id":134}'
+            },
+            sys_user__select_ywy_list:{
+            	info: '获取【通用下拉框】查询【业务员】下拉',
+                data: '{"public_user_type":5,"public_user_id":135,"page_select_md_id":14}'
+            }
+            
+        }
+        
+        
+        
+      
+    </script>
+</head>
+<body>
+Action:
+<!-- 
+<input type="radio" name="action" value="http://localhost:8080/esb/" onclick="changeAction(this);" checked="checked"/>localhost
+<input type="radio" name="action" value="http://192.168.0.188:8080/esb/" onclick="changeAction(this);"/>188
+ -->
+<br/>
+<select id="action_select" onchange="h($('#action_select option:selected').attr('value'))" size="8"
+        style="width:40%;">
+</select><br/>
+访问URL:
+<input id="submit_url" onchange="h(this.value)" value=".action" style="width:35%;background-color:pink;height:30"><form id="htmlForm" name="htmlForm" action="" method="post">
+    data:<input type="button" value="提交" onclick="submit_function('data');"/>
+    <input type="button" onclick="javascript: $('#ret').val('');" value="清除"/><br/>
+    <textarea id="data" name="data" style="width:40%;height:100px;font-size: 15px;font-family:monaco" onchange="load_data('data')"></textarea>
+    <input id="req_h_data" type="hidden" value=""/>
+    <input id="res_h_data" type="hidden" value=""/>
+</form>
+<div style="position: fixed;top: 20px;right:30px;width:45%;overflow-y: auto;height:100%;background: #eee;">
+    response:<br/>
+    <span id="ret" style="font-size: 15px;font-family:monaco"></span>
+</div>
+<div id="data_view" style="position: fixed;top:350px;width:40%;overflow-y: auto;height: 400px;background: #eee;font-size: 15px;font-family:monaco"></div>
+</body>
+</html>

@@ -1,0 +1,144 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+ <head>
+    <meta http-equiv="content-type" content="text/html;charset=utf-8">
+    <title>测试界面</title>
+    <script src="http://apps.bdimg.com/libs/jquery/1.8.0/jquery.min.js"></script>
+    <script src="jquery.form.js"></script>
+    <script src="webtoolkit.md5.js"></script>
+    <script src="t.js"></script>
+    <style type="text/css">
+    	body
+		{
+			font-size:18px;
+		}
+    </style>
+    <script type="text/javascript">
+        // ################################ 常量定义 ################################
+        var BaseURL = "/oms_server/";
+        var jmURL = BaseURL+"test/encryption";//加密url
+		var jm2URL = BaseURL+"test/decrypt";//解密url
+		/**
+		测试地址，注意,测试地址中的 / 使用两个下划线代替
+		**/
+        
+        
+        var DATA_MAP = {
+            member__add: {
+                info: '新增会员信息',
+                data: '{"logistics_compamy_ids":"1,2,3","login_name":"dfh6", "login_password":"123456","user_state":1,"user_resource":"1","user_manage_name":"dfklsd","user_manage_sex":"5","user_manage_cardid":"adfjkdaslfkdf","user_manage_cardid_file1":"adfjdsfkl","user_manage_cardid_file2":"dfjaskldfjds","user_manage_current_address":"adskjfkasldjfdf", "user_manage_telephone":"873018501", "user_manage_mobilephone":"13565698955", "user_manage_weixin":"adfdff","user_manage_qq":"fhdjsfhh","user_manage_email":"dfjkadlf", "user_company_name":"dfjakd","user_company_corporation":"jdflkadsf","user_company_telephone":"fdjalkdf","user_company_type":2,"user_company_address_max":5,"user_company_address_province":8,"user_company_address_city":801,"user_company_address_county":80101, "user_company_address_deails":"dfjkdfjlsdf","user_company_comment":"dfkdf","referee_user_id":1, "referee_user_realname":"dfadsjfldaksf","market_supervision_user_id":2,"market_supervision_user_realna":"dfadsf","store_id":1, "store_name":"dfjds","distribution_state":2,"issuing_grade_id":8, "shop_name":"fdadkfjad","platform":"fjadklfjd", "site_id":2}'
+            },
+            
+            
+            
+            
+            
+             member__approval_list: {
+                info: '查询审批列表',
+                data: '{"pageIndex":1,"pageSize":10}'
+            },
+            member__manager_list: {
+                info: '查询会员管理列表',
+                data: '{"pageIndex":1,"pageSize":10}'
+            },
+            member__approval_status_pause: {
+                info: '暂不审核',
+                data: '{"user_name":"46"}'
+            },
+             member__find: {
+                info: '查询会员详情',
+                data: '{"user_name":"46"}'
+            },
+            member__approval: {
+                info: '会员审核',
+                data: '{"id":46,"user_name":"46","logistics_compamy_ids":"1,2,3","login_name":"dfh", "login_password":"123456","user_state":1,"user_resource":"1","user_manage_name":"dfklsd","user_manage_sex":"5","user_manage_cardid":"adfjkdaslfkdf","user_manage_cardid_file1":"adfjdsfkl","user_manage_cardid_file2":"dfjaskldfjds","user_manage_current_address":"adskjfkasldjfdf", "user_manage_telephone":"873018501", "user_manage_mobilephone":"13985698745", "user_manage_weixin":"adfdff","user_manage_qq":"fhdjsfhh","user_manage_email":"dfjkadlf", "user_company_name":"dfjakd","user_company_corporation":"jdflkadsf","user_company_telephone":"fdjalkdf","user_company_type":2,"user_company_address_max":5,"user_company_address_province":8,"user_company_address_city":801,"user_company_address_county":80101, "user_company_address_deails":"dfjkdfjlsdf","user_company_comment":"dfkdf","referee_user_id":1, "referee_user_realname":"dfadsjfldaksf","market_supervision_user_id":2,"market_supervision_user_realna":"dfadsf","store_id":1, "store_name":"dfjds","distribution_state":2,"issuing_grade_id":8, "shop_name":"fdadkfjad","platform":"fjadklfjd", "site_id":2}'
+            } ,
+            
+            
+            member__disable: {
+                info: '禁用或者启用会员',
+                data: '{"user_name":46,"user_state":2}'
+            },
+            
+            member__multi_disable: {
+                info: '批量禁用或者启用会员',
+                data: '{"ids":"1,2,3,7","user_state":2}'
+            },
+            
+            member__update_score: {
+                info: '更新会员积分',
+                data: '{"id":"46","score":20}'
+            },
+            member__query_score: {
+                info: '获取会员积分',
+                data: '{"user_id":46}'
+            },
+            member__update_issuing_grade: {
+                info: '设置代发等级',
+                data: '{"id":"1","issuing_grade_id":2}'
+            },
+            member__user_agent_add: {
+                info: '新增平台会员申请成为经销商申请记录',
+                data: '{"user_name":"1"}'
+            },
+            
+            member__user_agent_approval: {
+                info: '平台会员申请成为经销商审核',
+                data: '{"user_name":"1","approval_user_id":1,"state":1,"approval_remark":"dafasdf"}'
+            },
+            
+            member__edit: {
+                info: '编辑会员',
+                data: '{"id":1,"login_name":"dfh", "login_password":"e10adc3949ba59abbe56e057f20f883e","user_state":1,"user_resource":"1","user_manage_name":"dfklsd","user_manage_sex":"5","user_manage_cardid":"adfjkdaslfkdf","user_manage_cardid_file1":"adfjdsfkl","user_manage_cardid_file2":"dfjaskldfjds","user_manage_current_address":"adskjfkasldjfdf", "user_manage_telephone":"873018501", "user_manage_mobilephone":"13985698745", "user_manage_weixin":"adfdff","user_manage_qq":"fhdjsfhh","user_manage_email":"dfjkadlf", "user_company_name":"dfjakd","user_company_corporation":"jdflkadsf","user_company_telephone":"fdjalkdf","user_company_type":2,"user_company_address_max":5,"user_company_address_province":8,"user_company_address_city":801,"user_company_address_county":80101, "user_company_address_deails":"dfjkdfjlsdf","user_company_comment":"dfkdf","referee_user_id":1, "referee_user_realname":"dfadsjfldaksf","market_supervision_user_id":2,"market_supervision_user_realna":"dfadsf","store_id":1, "store_name":"dfjds","distribution_state":2,"issuing_grade_id":8, "shop_name":"fdadkfjad","platform":"fjadklfjd", "site_id":2}'
+            }
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+           
+          
+        };
+        
+        
+        
+      
+    </script>
+</head>
+<body>
+Action:
+<!-- 
+<input type="radio" name="action" value="http://localhost:8080/esb/" onclick="changeAction(this);" checked="checked"/>localhost
+<input type="radio" name="action" value="http://192.168.0.188:8080/esb/" onclick="changeAction(this);"/>188
+ -->
+<br/>
+<select id="action_select" onchange="h($('#action_select option:selected').attr('value'))" size="8"
+        style="width:40%;">
+</select><br/>
+访问URL:
+<input id="submit_url" onchange="h(this.value)" value=".action" style="width:35%;background-color:pink;height:30"><form id="htmlForm" name="htmlForm" action="" method="post">
+    data:<input type="button" value="提交" onclick="submit_function('data');"/>
+    <input type="button" onclick="javascript: $('#ret').val('');" value="清除"/><br/>
+    <textarea id="data" name="data" style="width:40%;height:100px;font-size: 15px;font-family:monaco" onchange="load_data('data')"></textarea>
+    <input id="req_h_data" type="hidden" value=""/>
+    <input id="res_h_data" type="hidden" value=""/>
+</form>
+<div style="position: fixed;top: 20px;right:30px;width:45%;overflow-y: auto;height:100%;background: #eee;">
+    response:<br/>
+    <span id="ret" style="font-size: 15px;font-family:monaco"></span>
+</div>
+<div id="data_view" style="position: fixed;top:350px;width:40%;overflow-y: auto;height: 400px;background: #eee;font-size: 15px;font-family:monaco"></div>
+</body>
+</html>

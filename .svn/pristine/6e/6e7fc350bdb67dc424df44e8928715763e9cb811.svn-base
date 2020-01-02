@@ -1,0 +1,99 @@
+package com.tk.oms.member.dao;
+
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Map;
+
+@Repository
+public interface RetailStoreApprovalDao {
+	
+	/**
+     * 查询店铺审核列表
+     * @param params
+     * @return
+     */
+    public List<Map<String, Object>> queryStoreApprovalList(Map<String, Object> params);
+
+    /**
+     * 查询店铺审核列表总数
+     * @param params
+     * @return
+     */
+    public int queryStoreApprovalCount(Map<String, Object> params);
+    
+    /**
+     * 查询店铺审核详情
+     * @param params
+     * @return
+     */
+    public Map<String, Object> queryStoreApprovalDetail(Map<String, Object> params);
+    
+    /**
+     * 查询店铺审核编辑详情
+     * @param params
+     * @return
+     */
+    public Map<String, Object> queryRetailStoreApprovalUserInfoDetail(Map<String, Object> params);
+    
+    /**
+     * 店铺会员编辑信息
+     * @param params
+     * @return
+     */
+    public int updateUserInfo(Map<String, Object> params);
+    
+    /**
+     * 编辑新零售会员信息
+     * @param params
+     * @return
+     */
+    public int updateRetailUserInfo(Map<String, Object> params);
+    
+    /**
+     * 店铺审核(审核用户认证信息)
+     * @param params
+     * @return
+     */
+    public int auditUserStoreApproval(Map<String, Object> params);
+    /**
+     * 店铺审核(审核通过成为正式会员)
+     * @param params
+     * @return
+     */
+    public int insertUserInfo(Map<String, Object> params);
+    /**
+     * 初始化临时表会员数据
+     * @param params
+     * @return
+     */
+    public int insertUserInfoRecord(Map<String, Object> params);
+
+    /**
+     * 查询新零售小程序店铺实名认证记录列表
+     * @param params
+     * @return
+     */
+    public List<Map<String, Object>> queryStoreCertList(Map<String, Object> params);
+
+    /**
+     * 查询新零售小程序店铺实名认证记录总数
+     * @param params
+     * @return
+     */
+    public int queryStoreCertCount(Map<String, Object> params);
+    
+    /**
+     * 查询新零售小程序店铺实名认证记录详情
+     * @param params
+     * @return
+     */
+    public Map<String, Object> queryStoreCertDetail(Map<String, Object> params);
+    
+    /**
+     * 小程序店铺会员编辑信息（权限审批）
+     * @param params
+     * @return
+     */
+    public int updateUserInfoOnRetailAudit(Map<String, Object> params);
+}

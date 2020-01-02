@@ -1,0 +1,381 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.basicinfo.dao.ProductSpecsesDao">
+
+    <!-- 查询商品规格列表信息 -->
+    <select id="queryProductSpecGroupList" parameterType="java.util.Map" resultType="java.util.Map">
+		    SELECT 
+		    dps.ID, 
+		    dps.PRODUCT_SPECS,
+		    dps.PRODUCT_TYPE_ID
+		    FROM tbl_dic_product_specses dps
+		    WHERE dps.parent_id = 0
+			ORDER BY dps.PRODUCT_TYPE_ID,PRODUCT_SPECS
+    </select>
+
+    <!-- 根据父级id查询商品规格列表信息 -->
+    <select id="queryProductSpecListByParentId" parameterType="long" resultType="java.util.Map">
+        SELECT
+        ID,
+        PRODUCT_SPECS
+        FROM tbl_dic_product_specses
+        where parent_id = #{parent_id, jdbcType=INTEGER}
+        order by product_specs asc
+    </select>
+
+    <!-- 查询商品规格信息记录数 -->
+    <select id="queryProductSpecsesCount" parameterType="java.util.Map" resultType="int">
+        SELECT
+          count(1)
+        FROM tbl_dic_product_specses
+        <where>
+            1=1
+            <if test="group_name != null and group_name !=''">
+                AND group_name = #{group_name, jdbcType=VARCHAR}
+            </if>
+
+        </where>
+    </select>
+
+    <!-- 通过商品规格id查询商品规格信息 -->
+    <select id="queryProductSpecById" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT
+            id,
+            product_specs,
+            parent_id,
+            to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+            create_user_id,
+            PRODUCT_TYPE_ID
+        FROM tbl_dic_product_specses
+        WHERE id = #{id, jdbcType=INTEGER}
+    </select>
+
+    <!-- 查询商品规格是否为可更改状态-->
+    <select id="queryProductSpecsesByEditable" parameterType="java.util.Map" resultType="int">
+        select count(1) from tbl_product_info_apply a,tbl_product_sku_apply b where a.id = b.product_id and b.product_specs = #{product_specs, jdbcType=VARCHAR} and a.specs_group_id = #{specs_group_id, jdbcType=INTEGER}
+    </select>
+
+    <!-- 通过规格分组名称查询规格信息 -->
+    <select id="queryProductSpecByGroup" parameterType="java.util.Map" resultType="int">
+        SELECT  count(1)
+        FROM tbl_dic_product_specses
+        WHERE product_specs = #{product_specs, jdbcType=VARCHAR}
+        <if test="id!=null and id!=0">
+        	and id!=#{id, jdbcType=INTEGER}
+        </if>
+    </select>
+
+
+    <!-- 通过规格父级id查询规格列表 -->
+    <select id="queryProductSpecsesByGroupParentId" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT product_specs FROM tbl_dic_product_specses WHERE parent_id = #{parent_id, jdbcType=INTEGER}
+    </select>
+
+    <!-- 查询所有规格数据列表 -->
+    <select id="queryProductSpecCountBySpec" resultType="int">
+        SELECT count(1) FROM tbl_dic_product_specses WHERE product_specs = #{product_specs,jdbcType=VARCHAR}
+    </select>
+
+    <!-- 新增商品规格分组 -->
+    <insert id="insertProductSpecses" parameterType="java.util.Map">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            select SEQ_DIC_PRODUCT_SPECSES.nextval from dual
+        </selectKey>
+        INSERT INTO TBL_DIC_PRODUCT_SPECSES (
+             ID,
+             PRODUCT_SPECS,
+             PARENT_ID,
+             CREATE_DATE,
+             CREATE_USER_ID,
+             PRODUCT_TYPE_ID
+        )
+        VALUES (
+            #{id, jdbcType=INTEGER},
+            #{product_specs, jdbcType=VARCHAR},
+            #{parent_id, jdbcType=INTEGER},
+            sysdate,
+            #{create_user_id, jdbcType=INTEGER},
+            #{product_type_id, jdbcType=INTEGER}
+        )
+    </insert>
+
+    <!-- 批量新增商品规格 -->
+    <insert id="insertProductSpecsesByBatch" parameterType="java.util.Map">
+        INSERT INTO TBL_DIC_PRODUCT_SPECSES (
+            ID,
+            PRODUCT_SPECS,
+            PARENT_ID,
+            CREATE_DATE,
+            CREATE_USER_ID,
+            PRODUCT_TYPE_ID
+        )
+        	SELECT SEQ_DIC_PRODUCT_SPECSES.nextval,
+            product_specs,
+            #{parent_id, jdbcType=INTEGER},
+            sysdate,
+            #{create_user_id, jdbcType=INTEGER},
+            #{product_type_id, jdbcType=INTEGER}
+        FROM(
+            <foreach collection="product_specs_list" item="item" index="index" separator="UNION">
+                SELECT
+                #{item, jdbcType=VARCHAR} as product_specs
+                FROM dual
+            </foreach>
+        )
+    </insert>
+
+    <!-- 修改商品规格分组信息 -->
+    <update id="updateProductSpecses" parameterType="java.util.Map">
+        UPDATE TBL_DIC_PRODUCT_SPECSES
+        <set>
+            <if test="product_specs != null and product_specs != ''">
+                product_specs = #{product_specs,jdbcType=VARCHAR},
+            </if>
+            <if test="product_type_id != null and product_type_id != 0">
+                product_type_id = #{product_type_id,jdbcType=INTEGER},
+            </if>
+        </set>
+        WHERE id = #{id,jdbcType=INTEGER}
+    </update>
+
+    <!-- 根据商品规格id删除商品规格 -->
+    <delete id="deleteProductSpecsesByParentId" parameterType="long">
+        DELETE TBL_DIC_PRODUCT_SPECSES WHERE parent_id = #{id,jdbcType=INTEGER}
+    </delete>
+
+    <!-- 根据商品规格id删除商品规格 -->
+    <delete id="deleteProductSpecsesById" parameterType="long">
+        DELETE TBL_DIC_PRODUCT_SPECSES WHERE id = #{id,jdbcType=INTEGER}
+    </delete>
+
+    <!-- 根据规格id删除规格分组所有信息 -->
+    <delete id="deleteProductSpecGroupById" parameterType="long">
+        DELETE TBL_DIC_PRODUCT_SPECSES WHERE id = #{id,jdbcType=INTEGER} or parent_id = #{id,jdbcType=INTEGER}
+    </delete>
+
+    <!-- 批量删除商品规格数据 -->
+    <delete id="deleteProductSpecsesByBatch" parameterType="java.util.Map">
+        DELETE TBL_DIC_PRODUCT_SPECSES WHERE group_name = #{group_name,jdbcType=VARCHAR}
+    </delete>
+    
+    <!--配码管理新增-->
+	<insert id="insertWithCodeInfo" parameterType="java.util.Map" >
+		insert into tbl_with_code_info
+			(id,
+			code_name,
+			create_date,
+			create_user_id,
+			specses_group_id
+			) 
+		values(
+			seq_with_code_info.nextval,
+			#{code_name,jdbcType=VARCHAR},
+			sysdate,
+			#{public_user_id,jdbcType=INTEGER},
+			#{specses_group_id,jdbcType=INTEGER}
+		)
+	</insert>
+	<!-- 配码管理删除-->
+	<delete id="removeWithCodeInfo" parameterType="java.util.Map">
+		delete from tbl_with_code_info where id=#{id, jdbcType=INTEGER}
+	</delete>
+	<!-- 配码管理详情删除-->
+	<delete id="removeWithCodeDetail" parameterType="java.util.Map">
+		delete from tbl_with_code_detail where code_id=#{id, jdbcType=INTEGER}
+		<if test="spec != null and spec != ''">
+			and code_specs=#{spec, jdbcType=VARCHAR}
+		</if>
+	</delete>
+	
+	
+	<!-- 查询配码管理数量 -->
+    <select id="queryWithCodeCount" parameterType="java.util.Map" resultType="int">
+        SELECT
+          count(1)
+        FROM TBL_WITH_CODE_INFO
+    </select>
+    <!-- 查询配码管理列表-->
+    <select id="queryWithCodeList" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (select T.*,rownum as rn from (
+		         select twci.id,
+          				twci.code_name,
+          				to_char(twci.create_date,'yyyy-mm-dd hh24:mi:ss') create_date, 
+          				twci.create_user_id,
+          				twci.specses_group_id,
+          				(select product_specs from tbl_dic_product_specses t where t.id=twci.specses_group_id)specses_group_name
+		            from tbl_with_code_info  twci
+		                 order by create_date desc) T 
+				where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+     <!-- 查询配码管理详情-->
+    <select id="queryWithCodeDetail" parameterType="java.util.Map" resultType="java.util.Map">
+    	select id,
+    		  code_name,
+   		      to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date, 
+   		      create_user_id, 
+   		      specses_group_id
+    	from tbl_with_code_info where id=#{id,jdbcType=INTEGER}
+    </select>
+    
+     <!-- 查询配码管理详情-->
+    <select id="queryWithCodeSpecsDetail" parameterType="java.util.Map" resultType="java.util.Map">
+    	select id,
+    		  code_id,
+   		      code_specs, 
+   		      code_size, 
+   		      code_amount
+    	from tbl_with_code_detail where code_specs=#{code_specs,jdbcType=VARCHAR}
+    	and code_id=#{code_id,jdbcType=INTEGER}
+    </select>
+    
+    <!-- 查询配码可使用规格-->
+    <select id="queryWithCodeSpecs" parameterType="java.util.Map"  resultType="string">
+    	 SELECT DISTINCT product_specs
+		    FROM tbl_dic_product_specses
+		   WHERE parent_id=#{specses_group_id,jdbcType=INTEGER}
+		ORDER BY product_specs
+    </select>
+    
+    <!-- 查询指定配码规格-->
+    <select id="queryWithCodeSpecsByCodeId" parameterType="java.util.Map"  resultType="string">
+    	 select  code_specs
+		    from tbl_with_code_detail
+		 where code_id=#{code_id,jdbcType=INTEGER} 
+		 group by code_specs
+    </select>
+    
+    <!-- 查询规格下拉数据-->
+    <select id="querySpecsOption"  resultType="java.util.Map" resultMap="specsListMap">
+    	 select  id,product_specs
+		    from TBL_DIC_PRODUCT_SPECSES
+		 where parent_id=0
+    </select>
+    
+    <resultMap id="specsListMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="product_specs" property="option"/>
+    </resultMap>
+    
+    <!-- 查询配码下拉数据-->
+    <select id="queryWithCodeOption"  resultType="java.util.Map" resultMap="withCodeMap">
+    	 select  id,code_name
+		    from tbl_with_code_info
+		 <where>
+		 	<if test="specses_group_id != null and specses_group_id != ''">
+               and specses_group_id=#{specses_group_id,jdbcType=INTEGER}
+            </if>
+		 </where> 
+		 
+    </select>
+    
+    <resultMap id="withCodeMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="code_name" property="option"/>
+    </resultMap>
+    
+    <!-- 修改配码管理 -->
+    <update id="editWithCodeInfo" parameterType="java.util.Map">
+        UPDATE TBL_WITH_CODE_INFO
+        <set>
+            <if test="code_name != null and code_name != ''">
+                code_name = #{code_name,jdbcType=VARCHAR},
+            </if>
+            <if test="specses_group_id != null and specses_group_id != 0">
+                specses_group_id = #{specses_group_id,jdbcType=INTEGER},
+            </if>
+        </set>
+        WHERE id = #{id,jdbcType=INTEGER}
+    </update>
+    
+    <!-- 插入配码详情数据 -->
+	<insert  id ="insertWithCodeDetail" parameterType ="java.util.List">
+        INSERT INTO TBL_WITH_CODE_DETAIL (
+        	ID, 
+        	CODE_ID,
+        	CODE_SPECS, 
+        	CODE_SIZE, 
+        	CODE_AMOUNT
+        )
+        SELECT SEQ_WITH_CODE_DETAIL.NEXTVAL,
+               A.CODE_ID,
+               A.CODE_SPECS,
+               A.CODE_SIZE,
+               A.CODE_AMOUNT
+          FROM (
+		        <foreach collection="list" item="item" index="index" separator="UNION">
+		            SELECT  #{item.code_id,jdbcType=INTEGER} AS CODE_ID,
+		            		#{item.code_specs,jdbcType=VARCHAR} AS CODE_SPECS,
+		            		#{item.size,jdbcType=VARCHAR} AS CODE_SIZE,
+		            		#{item.num,jdbcType=INTEGER} AS CODE_AMOUNT
+		            FROM DUAL
+		        </foreach>
+        	   ) A
+         </insert>
+	 <!-- 查询当前配码设置规格数量-->
+    <select id="queryWithCodeSetSpecsCount" parameterType="java.util.Map" resultType="int" >
+    	 SELECT COUNT (1)
+  			FROM (  SELECT code_specs FROM TBL_WITH_CODE_DETAIL
+           WHERE code_id = #{code_id,jdbcType=INTEGER}
+        GROUP BY code_specs)
+    </select>
+    
+    <!-- 查询当前配码实际需要配置规格数量-->
+    <select id="queryWithCodeAcutalSetSpecsCount" parameterType="java.util.Map" resultType="int" >
+    	 select count(1) from (SELECT product_specs
+		  	FROM TBL_DIC_PRODUCT_SPECSES
+		 WHERE parent_id = (SELECT id
+		                      FROM TBL_DIC_PRODUCT_SPECSES
+		                     WHERE id = (SELECT SPECSES_GROUP_ID
+		                                   FROM TBL_WITH_CODE_info
+		                                  WHERE id = #{code_id,jdbcType=INTEGER})))
+    </select>
+
+    <!--查询商品规格列表-->
+    <select id="listProductSpecs" resultType="java.util.Map">
+         select
+            product_specs
+         from tbl_dic_product_specses
+         where parent_id in (
+            select dps.id from tbl_dic_product_specses dps where dps.parent_id = 0
+            and exists(select 1 from tbl_dic_product_type pt where dps.product_type_id = pt.id and type = 1)
+         ) group by product_specs order by product_specs asc
+    </select>
+    <!-- 查询所有的鞋类商品规格信息，用于为商家进行可用的商品规格进行授权 -->
+    <select id="getAllShoesProductSpecs" resultType="java.util.Map">
+		select 
+	        PARENT_ID,
+	        ID,
+	        PRODUCT_SPECS,
+	        (case when NVL(sps.specses_id,0) = 0 then 0 else 1 end) selected
+		from TBL_DIC_PRODUCT_SPECSES dps
+		LEFT JOIN TBL_STATIONED_PRODUCT_SPECSES sps on dps.id = sps.specses_id and sps.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		 where exists(
+		    select 1 from TBL_DIC_PRODUCT_SPECSES t2 
+		    where PRODUCT_TYPE_ID = 290 and PARENT_ID = 0
+		    and dps.PARENT_ID = t2.id
+		)
+		order by PARENT_ID,PRODUCT_SPECS
+    </select>
+    <!-- (根据商家ID)清除已经配置的商家可用规格数据 -->
+    <delete id="deleteSpecsByStaId">
+    	DELETE FROM TBL_STATIONED_PRODUCT_SPECSES
+    	where stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+    </delete>
+    <!-- 批量插入商家可用规格数据 -->
+	<insert id ="batchInsertStaProductSpecs" parameterType ="java.util.List">
+		insert into TBL_STATIONED_PRODUCT_SPECSES (stationed_user_id,specses_id)
+		select 
+		#{stationed_user_id,jdbcType=INTEGER} as stationed_user_id,
+		specses_id 
+		from(
+		<foreach collection="specses_id_list" item="item" index="index" separator="UNION">
+			select
+				#{item,jdbcType=INTEGER} as specses_id
+			from dual
+		</foreach>
+		) A
+	</insert>
+</mapper>

@@ -1,0 +1,22 @@
+﻿﻿﻿#（内网测试）远程调用见证宝接口
+pay_service_url=http://16.16.16.188:9090/
+oss_service_url = http://16.16.16.188:8088/
+sms_service_url=http://push.tk61.cn:9086/Home/noticeSend
+retail_service_url=http://16.16.16.188:9095/
+retail_service_new_url=http://16.16.16.188:9602/
+store_service_url=http://16.16.16.188:9601/
+erp_service_url=http://16.16.16.188:8010/
+#scs_server项目地址
+scs_server_url =http://16.16.16.188:8510/
+#oa_server项目地址
+oa_service_url=http://192.168.20.199:10120/
+
+#读取ERP数据库用户名
+jdbc_user=TKERP_NEW
+
+#（外网测试）远程调用见证宝接口
+#pay_service_url=http://www.tkvip.com:9090/
+#oss_service_url = http://www.tkvip.com:8088/
+#oss_service_url = http://www.tk61.cn:8088/
+#读取ERP数据库用户名
+#jdbc_user=TKERP

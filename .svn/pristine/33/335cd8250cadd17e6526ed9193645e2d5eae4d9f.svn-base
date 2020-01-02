@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 平台会员申请提现操作DAO -->
+<mapper namespace="com.tk.oms.finance.dao.UserExtractDao">
+	<sql id="all_colum">
+		uer.ID,
+		uer.APPLY_NUMBER,
+		uer.BANK_ID,
+		to_char(uer.APPLY_DATE,'yyyy-mm-dd hh24:mi:ss') APPLY_DATE,
+		uer.APPLY_USER_ID,
+		uer.EXTRACT_MONEY,
+		uer.PHONE,
+		uer.REMARK,
+		uer.STATE,
+		uer.AUDIT_USER_ID,
+		to_char(uer.AUDIT_DATE,'yyyy-mm-dd hh24:mi:ss') AUDIT_DATE,
+		uer.REJECT_REASON,
+		uer.PLAYMONEY_USER_ID,
+		to_char(uer.PLAYMONEY_DATE,'yyyy-mm-dd hh24:mi:ss') PLAYMONEY_DATE,
+		uer.IS_DELETE,
+		uer.PLAYMONEY_VOUCHER_URL
+	</sql>
+    <!--分页获取平台会员提现申请单列表-->
+    <select id="queryListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select a.*,rownum rn from (
+            	   SELECT 
+            	   <include refid="all_colum"></include>,
+                   sui1.LOGIN_NAME,
+                   sui1.USER_MANAGE_NAME,
+                   uer.BIND_TYPE,
+                   uer.BANK_CARD,
+                   uer.BANK_NAME,
+                   (select USER_REALNAME from tbl_sys_user_info sui where sui.id = uer.AUDIT_USER_ID) AUDIT_USER_REALNAME,
+				   (select USER_REALNAME from tbl_sys_user_info sui where sui.id = uer.PLAYMONEY_USER_ID) PLAYMONEY_USER_REALNAME            
+                   FROM
+                   TBL_USER_EXTRACT_RECORD uer
+                   LEFT JOIN TBL_USER_INFO sui1 ON uer.APPLY_USER_ID = sui1.id
+                   WHERE uer.IS_DELETE = '1'
+                    	 <if test="state!=null and state.size()>0">
+					    	and uer.state in 
+					    	 <foreach item="s" collection="state" open="(" separator="," close=")">
+					    	 		#{s,jdbcType=INTEGER}
+					    	 </foreach>
+					     </if>
+					      <if test="apply_number!=null and apply_number!=''">
+						    	 and uer.apply_number like concat(concat('%', #{apply_number,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="login_name!=null and login_name!=''">
+						    	 and sui1.login_name like concat(concat('%', #{login_name,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="user_manage_name!=null and user_manage_name!=''">
+						    	 and sui1.user_manage_name like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="phone!=null and phone!=''">
+						    	 and uer.phone like concat(concat('%', #{phone,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="bank_card!=null and bank_card!=''">
+						    	 and uer.bank_card like concat(concat('%', #{bank_card,jdbcType=VARCHAR}),'%')
+						  </if>
+			      ORDER BY uer.APPLY_DATE DESC
+            ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--获取平台会员提现申请总数-->
+    <select id="queryListForCount" parameterType="java.util.Map" resultType="int">
+         		   SELECT 
+            	   count(1)
+                   FROM
+                   TBL_USER_EXTRACT_RECORD uer
+                   LEFT JOIN TBL_USER_INFO sui1 ON uer.APPLY_USER_ID = sui1.id 
+                   WHERE uer.IS_DELETE = '1'
+                    	 <if test="state!=null and state.size()>0">
+					    	and uer.state in 
+					    	 <foreach item="s" collection="state" open="(" separator="," close=")">
+					    	 		#{s,jdbcType=INTEGER}
+					    	 </foreach>
+					     </if>
+					      <if test="apply_number!=null and apply_number!=''">
+						    	 and uer.apply_number like concat(concat('%', #{apply_number,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="login_name!=null and login_name!=''">
+						    	 and sui1.login_name like concat(concat('%', #{login_name,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="user_manage_name!=null and user_manage_name!=''">
+						    	 and sui1.user_manage_name like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="phone!=null and phone!=''">
+						    	 and uer.phone like concat(concat('%', #{phone,jdbcType=VARCHAR}),'%')
+						  </if>
+					      <if test="bank_card!=null and bank_card!=''">
+						    	 and uer.bank_card like concat(concat('%', #{bank_card,jdbcType=VARCHAR}),'%')
+						  </if>
+    </select>
+    <!-- 根据ID查询会员提现申请记录 -->
+    <select id="queryById" parameterType="long" resultType="java.util.Map">
+      	   	   SELECT 
+            	   <include refid="all_colum"></include>,
+                   sui1.LOGIN_NAME,
+                   sui1.USER_MANAGE_NAME,
+                   uer.BIND_TYPE,
+                   uer.BANK_CARD,
+                   uer.BANK_NAME,
+                   (select USER_REALNAME from tbl_sys_user_info sui where sui.id = uer.AUDIT_USER_ID) AUDIT_USER_REALNAME,
+				   (select USER_REALNAME from tbl_sys_user_info sui where sui.id = uer.PLAYMONEY_USER_ID) PLAYMONEY_USER_REALNAME,
+					uer.TRAN_LOGNO
+                   FROM
+                   TBL_USER_EXTRACT_RECORD uer
+                   LEFT JOIN TBL_USER_INFO sui1 ON uer.APPLY_USER_ID = sui1.id
+                   WHERE uer.IS_DELETE = '1' AND uer.id = #{id,jdbcType=INTEGER}
+    </select>
+    <!-- 对用户提现操作记录进行审批 -->
+    <update id="approval" parameterType="java.util.Map">
+    	UPDATE TBL_USER_EXTRACT_RECORD uer SET
+    	uer.STATE = #{state,jdbcType=VARCHAR},
+    	uer.AUDIT_USER_ID =  #{public_user_id,jdbcType=INTEGER},
+    	uer.AUDIT_DATE =   sysdate,
+    	uer.REJECT_REASON =  #{reject_reason,jdbcType=VARCHAR}
+        WHERE uer.IS_DELETE = '1' AND uer.id = #{id,jdbcType=INTEGER}
+    </update>
+    <!-- 对用户提现操作记录进行打款 -->
+    <update id="pay" parameterType="java.util.Map">
+    	UPDATE TBL_USER_EXTRACT_RECORD uer SET
+    	uer.STATE = #{state,jdbcType=VARCHAR},
+    	uer.PLAYMONEY_USER_ID =  #{public_user_id,jdbcType=INTEGER},
+    	uer.PLAYMONEY_DATE =   sysdate,
+    	uer.PLAYMONEY_VOUCHER_URL = #{voucher_img_url,jdbcType=VARCHAR}
+        WHERE uer.IS_DELETE = '1' AND uer.id = #{id,jdbcType=INTEGER}
+    </update>
+</mapper>

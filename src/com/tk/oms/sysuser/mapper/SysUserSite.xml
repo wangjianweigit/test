@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.sysuser.dao.SysUserSiteDao">
+	
+	<!-- 配置用户站点信息 -->
+    <insert id="insert" parameterType="java.util.Map">
+        insert into tbl_sys_user_site(id,user_id,site_id)
+        select seq_sys_user_site.nextval,#{user_id,jdbcType=INTEGER},site_id from (
+	        <foreach collection="site_ids" open="(" close=")" item="item" separator="union all">
+	            select
+	            #{item.id,jdbcType=INTEGER} as site_id
+	            from dual
+	        </foreach>
+        )
+    </insert>
+    
+    <!-- 删除用户站点配置信息 -->
+    <delete id="delete"  parameterType="java.util.Map">
+         delete from tbl_sys_user_site 
+         <where>
+                user_id = #{user_id,jdbcType=INTEGER}
+         </where> 
+    </delete>
+
+
+	<resultMap id="userSiteMap" type="java.util.Map">
+		  <result column="id" property="id" />
+		  <result column="checked" property="checked" />
+	</resultMap>
+	<!-- 查询站点列表，如果有权限则选中 -->
+    <select id="queryUserSiteList" resultMap="userSiteMap" parameterType="java.util.Map">
+    	select a.id,a.name site_name,nvl(c.user_id,0) checked,remark,to_char(create_date,'yyyy-mm-dd hh24:mi') create_date from tbl_site_info a,(select user_id,site_id from tbl_sys_user_site where user_id = #{user_id,jdbcType=INTEGER}) c where  a.id = c.site_id(+) and a.platform_type=1 order by a.id desc 
+    </select>
+
+	<resultMap id="queryListMap" type="java.util.HashMap">
+        <result column="id" property="id"/>
+        <result column="name" property="option"/>
+    </resultMap>
+	
+	<!-- 查询用户可使用的站点列表 -->
+    <select id="queryList" resultMap="queryListMap" parameterType="com.tk.oms.sysuser.entity.SysUserInfo">
+    	 <if test="user_name!='admin'">
+         	select b.id,b.name from TBL_SYS_USER_SITE a, TBL_SITE_INFO b where   a.site_id(+) = b.id and A.USER_ID = #{id,jdbcType=INTEGER} and b.STATE='2' order by a.IS_DEFAULT asc,b.id asc 
+         </if>
+         <if test="user_name=='admin'">
+         	select id,name from TBL_SITE_INFO order by id asc 
+         </if>
+         
+    </select>
+    
+</mapper>

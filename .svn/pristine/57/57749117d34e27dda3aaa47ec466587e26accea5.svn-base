@@ -1,0 +1,115 @@
+package com.tk.oms.marketing.dao;
+
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface ActivityProductDao {
+
+	/**
+	 * 获取参与促销活动商品列表
+	 */
+	public List<Map<String,Object>> queryActivityProductList(Map<String,Object> paramMap);
+	/**
+	 * 获取参与促销活动商品总数
+	 */
+	public int queryActivityProductCount(Map<String,Object> paramMap);
+	/**
+	 * 获取参与促销活动的待审批商品列表
+	 */
+	public List<Map<String,Object>> queryPendingApprovalActivityProductList(Map<String,Object> paramMap);
+	/**
+	 * 获取参与促销活动的待审批商品总数
+	 */
+	public int queryPendingApprovalActivityProductCount(Map<String,Object> paramMap);
+
+	/**
+	 * 根据活动商品ID查询商品阶梯优惠信息
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String,Object>> listProductLadderDiscountById(Map<String,Object> paramMap);
+	
+	/**
+	 * 获取参与促销活动的待审批商品详情
+	 */
+	public Map<String,Object> queryPendingApprovalActivityProductDetail(Map<String,Object> paramMap);
+	/**
+	 * 更新促销活动商品申请表（审核通过-驳回）
+	 */
+	public int updatePendingApprovalActivityProductState(Map<String, Object> paramMap);
+	/**
+	 * 获取参与活动的商品sku列表
+	 */
+	public List<Map<String, Object>> queryActivityProductSkuList(Map<String, Object> paramMap);
+	/**
+	 * 获取参与活动的待审批商品sku列表
+	 */
+	public List<Map<String, Object>> queryPendingApprovalActivityProductSkuList(Map<String, Object> paramMap);
+	/**
+	 * 更新活动商品表从待审批商品表
+	 */
+	public int updateActivityProductFromPendingApprovalActivityProduct(Map<String, Object> paramMap);
+	/**
+	 * 更新活动商品sku表从待审批商品sku表
+	 */
+	public int updateActivityProductSkuFromPendingApprovalActivityProductSku(Map<String, Object> paramMap);
+
+	/**
+	 * 更新预售活动商品sku表从待审批商品sku表
+	 */
+	public int updatePreSellActivitySkuFromApprovalActivityProductSku(Map<String, Object> paramMap);
+	/**
+	 * 获取活动商品sku库存列表
+	 */
+	public List<Map<String, Object>> queryActivityProductSkuStockList(Map<String, Object> paramMap);
+	/**
+	 * 活动商品排序
+	 */
+	public int updateActivityProductSortId(List<Map<String, Object>> paramList);
+	/**
+	 * 活动商品强制退出删除活动商品sku
+	 */
+	public int deleteActivityProductSku(Map<String, Object> paramMap);
+	/**
+	 * 活动商品强制退出删除活动商品
+	 */
+	public int deleteActivityProduct(Map<String, Object> paramMap);
+	/**
+	 * 活动商品强制退出删除活动商品sku申请
+	 */
+	public int deleteActivityProductSkuApply(Map<String, Object> paramMap);
+	/**
+	 * 活动商品强制退出删除活动商品申请
+	 */
+	public int deleteActivityProductApply(Map<String, Object> paramMap);
+	/**
+	 * 活动对应入驻商报名商品数量是否超过活动允许数量限制
+	 */
+	public int checkActivityProductCount(Map<String, Object> paramMap);
+	/**
+	 * 校验活动报名时间是否已截止
+	 */
+	public int checkActivityApplyDateCount(Map<String, Object> paramMap);
+	/**
+	 * 查询待审批商品数据
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> queryActivityProductApplyList(Map<String, Object> paramMap);
+	/**
+	 * 批量更新待审批状态
+	 * @param paramMap
+	 * @return
+	 */
+	public int batchUpdateActivityProductApplyState(Map<String, Object> paramMap);
+
+	/**
+	 * 根据时间状态查询活动中是否存在该时间状态的商品
+	 * @param paramMap
+	 * @return
+	 */
+	int queryIsExistProductByState(Map<String, Object> paramMap);
+}

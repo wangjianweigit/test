@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.finance.dao.StoreContributoryDao">
+	<!-- 店铺缴款数量 -->
+	<select id="queryListCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		from tbl_store_ctrb_order
+		<where>
+			<if test="audit_state !=null and audit_state !=''">
+		 		and audit_state in 
+		 		<foreach item="item" collection="audit_state" open="(" separator="," close=")">
+	   	 			#{item,jdbcType=INTEGER}
+	   	 		</foreach>
+		 	</if>
+			<if test="ctrb_number != null and ctrb_number != ''">
+				and ctrb_number like '%'||#{ctrb_number,jdbcType=VARCHAR}||'%'
+			</if>
+			<if test="ctrb_user_name != null and ctrb_user_name !=''">
+				and ctrb_user_name = #{ctrb_user_name,jdbcType=VARCHAR}
+			</if>
+			<if test="store_id != null and store_id != ''">
+				and store_id = #{store_id,jdbcType=INTEGER}
+			</if>
+			<if test="user_store_id != null and user_store_id != ''">
+				and user_store_id = #{user_store_id,jdbcType=INTEGER}
+			</if>
+			<if test="start_date != null and start_date != ''">
+				and ctrb_date &gt;= to_date(#{start_date},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+			<if test="end_date != null and end_date != ''">
+				and ctrb_date &lt;= to_date(#{end_date},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+		</where>
+	</select>
+	<!-- 店铺缴款列表 -->
+	<select id="queryListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+		select *
+			from (select a.*, rownum rn
+				from (
+					select id,
+						   ctrb_number,
+						   nvl(ctrb_money,0) ctrb_money,
+						   ctrb_user_name,
+						   to_char(ctrb_date,'yyyy-mm-dd hh24:mi:ss') ctrb_date,
+						   voucher_path,
+						   audit_state,
+						   audit_user_name,
+						   audit_reject_reason,
+						   to_char(audit_date,'yyyy-mm-dd hh24:mi:ss') audit_date,
+						   (select user_manage_name from tbl_user_info where id = t.store_id) store_name,
+						   (select store_name from tbl_store_user_manage where id = t.user_store_id) user_store_name
+					from tbl_store_ctrb_order t
+					<where>
+						<if test="audit_state !=null and audit_state !=''">
+					 		and audit_state in 
+					 		<foreach item="item" collection="audit_state" open="(" separator="," close=")">
+				   	 			#{item,jdbcType=INTEGER}
+				   	 		</foreach>
+					 	</if>
+						<if test="ctrb_number != null and ctrb_number != ''">
+							and ctrb_number like '%'||#{ctrb_number,jdbcType=VARCHAR}||'%'
+						</if>
+						<if test="ctrb_user_name != null and ctrb_user_name !=''">
+							and ctrb_user_name = #{ctrb_user_name,jdbcType=VARCHAR}
+						</if>
+						<if test="store_id != null and store_id != ''">
+							and store_id = #{store_id,jdbcType=INTEGER}
+						</if>
+						<if test="user_store_id != null and user_store_id != ''">
+							and user_store_id = #{user_store_id,jdbcType=INTEGER}
+						</if>
+						<if test="start_date != null and start_date != ''">
+							and ctrb_date &gt;= to_date(#{start_date},'YYYY-MM-DD HH24:MI:SS')
+						</if>
+						<if test="end_date != null and end_date != ''">
+							and ctrb_date &lt;= to_date(#{end_date},'YYYY-MM-DD HH24:MI:SS')
+						</if>
+					</where>
+					order by audit_state asc,ctrb_date desc
+				) a
+			where rownum  &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 店铺缴款详情 -->
+	<select id="queryStoreContributoryDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select id,
+			   ctrb_number,
+			   nvl(ctrb_money,0) ctrb_money,
+			   ctrb_user_name,
+			   to_char(ctrb_date,'yyyy-mm-dd hh24:mi:ss') ctrb_date,
+			   to_char(daily_start_time,'yyyy-mm-dd hh24:mi:ss') daily_start_time,
+			   to_char(daily_end_time,'yyyy-mm-dd hh24:mi:ss') daily_end_time,
+			   voucher_path,
+			   nvl(cash_in,0) cash_in,
+			   nvl(cash_out,0) cash_out, 
+			   audit_state,
+			   ctrb_remark,
+			   store_id,
+			   (select user_manage_name from tbl_user_info where id =t.store_id) store_name,
+			   (select store_name from tbl_store_user_manage where id = t.user_store_id) user_store_name,
+			   (select user_realname from tbl_sys_user_info where id = t.partner_user_id) partner_user_name
+		from tbl_store_ctrb_order t
+	   where ctrb_number =#{ctrb_number,jdbcType=VARCHAR}
+	</select>
+	<!-- 店铺缴款交易单列表 -->
+	<select id="queryStoreContributoryTradeList" parameterType="java.util.Map" resultType="java.util.Map">
+		select trade_number,
+			   trade_type,
+			   trade_product_count,
+			   nvl(trade_money,0) trade_money,
+			   to_char(trade_create_date,'yyyy-mm-dd hh24:mi:ss') trade_create_date
+		  from tbl_store_ctrb_order_detail
+		 where ctrb_number =#{ctrb_number,jdbcType=VARCHAR}
+	</select>
+	<!-- 审批 -->
+	<update id="auditStoreContributory" parameterType="java.util.Map">
+		update tbl_store_ctrb_order
+		   set <if test="audit_reject_reason != null and audit_reject_reason !=''">audit_reject_reason = #{audit_reject_reason,jdbcType=VARCHAR},</if>
+		   	   audit_user_id = #{public_user_id,jdbcType=INTEGER},
+			   audit_user_name = #{public_user_realname,jdbcType=VARCHAR},
+			   audit_state = #{audit_state,jdbcType=INTEGER},
+			   audit_date = sysdate
+		 where ctrb_number = #{ctrb_number,jdbcType=VARCHAR}
+	</update>
+	<!-- 校验审批状态 -->
+	<select id="queryStoreContributoryIsExists" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_store_ctrb_order
+		 where ctrb_number = #{ctrb_number,jdbcType=VARCHAR}
+		   and audit_state = 1
+	</select>
+	<!-- 更新付款状态 -->
+	<update id="updateStoreTrade" parameterType="java.util.Map">
+		update tbl_store_trade
+		   set payment_state = 2
+		 where trade_number in (select trade_number from tbl_store_ctrb_order_detail where ctrb_number = #{ctrb_number,jdbcType=VARCHAR})
+	</update>
+	<!-- 更新清分状态 -->
+	<update id="updateStoreTradeDivide" parameterType="java.util.Map">
+		update tbl_store_trade_divide
+		   set clearing_state = 2
+		 where trade_number in (select trade_number from tbl_store_ctrb_order_detail where ctrb_number = #{ctrb_number,jdbcType=VARCHAR})
+	</update>
+</mapper>

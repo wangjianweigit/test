@@ -1,0 +1,242 @@
+package com.tk.analysis.transaction.dao;
+
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.stereotype.Repository;
+
+import com.tk.oms.basicinfo.dao.BaseDao;
+
+@Repository
+public interface TransactionAnalysisDao  extends BaseDao<Map<String, Object>> {
+	
+	/**
+	 * 交易总览-访客数
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryVisitorCount(Map<String, Object> paramMap);
+	/**
+	 * 交易总览-下单买家数、下单金额
+	 * @param paramMap
+	 * @return
+	 */
+	Map<String, Object> r_queryPurchaseNumberMoney(Map<String, Object> paramMap);
+	/**
+	 * 交易总览-支付买家数、支付金额
+	 * @param paramMap
+	 * @return
+	 */
+	Map<String, Object> r_queryPayPurchaseNumberMoney(Map<String, Object> paramMap);
+	/**
+	 * 交易总览-预订支付的首款
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryPreFirstMoney(Map<String, Object> paramMap);
+	/**
+	 * 交易趋势-访客数
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryTrend_VisitorCount(Map<String, Object> paramMap);
+	/**
+	 * 交易趋势-支付金额
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryTrend_AllPayMoney(Map<String, Object> paramMap);
+	/**
+	 * 交易趋势-支付买家数
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryTrend_PayPurchaseNumber(Map<String, Object> paramMap);
+	/**
+	 * 交易趋势-订单笔数
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryTrend_OrderCount(Map<String, Object> paramMap);
+	/**
+	 * 交易趋势-订单商品数
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryTrend_OrderProductCount(Map<String, Object> paramMap);
+	/**
+	 * 交易趋势-成功退款金额
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryTrend_ReturnMoney(Map<String, Object> paramMap);
+	/**
+	 * 交易趋势-下单买家数
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryTrend_PurchaseNumber(Map<String, Object> paramMap);
+	/**
+	 * 交易趋势-访客数 折线图<天>
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryTrend_VisitorCountD_Chart(Map<String, Object> paramMap);
+	/**
+	 * 交易趋势-下单买家数、订单笔数和订单商品数 折线图<天>
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryTrend_PurchaseNumberCountD_Chart(Map<String, Object> paramMap);
+	/**
+	 * 交易趋势-支付买家数、支付金额 折线图<天>
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryTrend_PayPurchaseNumberMoneyD_Chart(Map<String, Object> paramMap);
+	/**
+	 * 交易趋势-成功退款金额 折线图<天>
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryTrend_ReturnMoneyD_Chart(Map<String, Object> paramMap);
+	/**
+	 * 交易趋势-访客数 折线图
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryTrend_VisitorCount_Chart(Map<String, Object> paramMap);
+	/**
+	 * 交易趋势-下单买家数、订单笔数和订单商品数 折线图
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryTrend_PurchaseNumberCount_Chart(Map<String, Object> paramMap);
+	/**
+	 * 交易趋势-支付买家数、支付金额 折线图
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryTrend_PayPurchaseNumberMoney_Chart(Map<String, Object> paramMap);
+	/**
+	 * 交易趋势-成功退款金额 折线图
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryTrend_ReturnMoney_Chart(Map<String, Object> paramMap);
+	/**
+	 * 终端列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryTerminalList(Map<String, Object> paramMap);
+	/**
+	 * 终端构成-访客数
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryTerminal_VisitorCount(Map<String, Object> paramMap);
+	/**
+	 * 终端构成-支付买家数、支付金额、支付商品数
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryTerminal_PurchaseNumberMoneyCount(Map<String, Object> paramMap);
+	/**
+	 * 终端构成-预订支付的首款
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryTerminal_PreFirstMoney(Map<String, Object> paramMap);
+	/**
+	 * 商品分类列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> queryProductTypeList(Map<String, Object> paramMap);
+	/**
+	 * 商品类目构成-访客数
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryClassify_VisitorCount(Map<String, Object> paramMap);
+	/**
+	 * 商品类目构成-支付买家数、支付金额、支付商品数
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryClassify_PurchaseNumberMoneyCount(Map<String, Object> paramMap);
+	/**
+	 * 品牌列表
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> queryBrandList(Map<String, Object> paramMap);
+	/**
+	 * 品牌构成-访客数
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryBrand_VisitorCount(Map<String, Object> paramMap);
+	/**
+	 * 品牌构成-支付买家数、支付金额、支付商品数
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryBrand_PurchaseNumberMoneyCount(Map<String, Object> paramMap);
+	/**
+	 * 品牌构成-所有品牌的支付总金额
+	 * @param paramMap
+	 * @return
+	 */
+	float r_queryBrand_AllPayMoney(Map<String, Object> paramMap);
+	/**
+	 * 数据趋势-访客数 折线图
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryDataTrend_VisitorCount_Chart(Map<String, Object> paramMap);
+	/**
+	 * 数据趋势-支付买家数、支付金额和支付商品数 折线图
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryDataTrend_PayPurchaseNumberMoneyCount_Chart(Map<String, Object> paramMap);
+	/**
+	 * 数据趋势-预订支付的首款 折线图
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryDataTrend_PreFirstMoney_Chart(Map<String, Object> paramMap);
+	/**
+	 * 数据趋势-访客数 折线图<天>
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryDataTrend_VisitorCountD_Chart(Map<String, Object> paramMap);
+	/**
+	 * 数据趋势-支付买家数、支付金额和支付商品数 折线图<天>
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryDataTrend_PayPurchaseNumberMoneyCountD_Chart(Map<String, Object> paramMap);
+	/**
+	 * 数据趋势-预订支付的首款 折线图<天>
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryDataTrend_PreFirstMoneyD_Chart(Map<String, Object> paramMap);
+	/**
+	 * 终端下拉框
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> r_queryTerminalSelect(Map<String, Object> paramMap);
+	/**
+	 * 品牌下拉框
+	 * @param paramMap
+	 * @return
+	 */
+	List<Map<String, Object>> queryBrandSelect(Map<String, Object> paramMap);
+
+}

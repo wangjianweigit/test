@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.basicinfo.dao.ClassifyDao">
+	<sql id="classifyInfo_column">
+		t.id,
+		t.classify_id,
+		to_char(t.issue_date,'yyyy-mm-dd hh24:mi:ss') issue_date,
+		t.headline,
+		t.content,
+		nvl(t.img_url,0) img_url,
+		t.video_url,
+		t.page_view
+	</sql>
+	<!-- 查询分类信息列表总数 -->
+	<select id="queryClassifyCount" parameterType="java.util.Map" resultType="int">
+		select count(1) from tbl_classify where parent_id = #{parent_id,jdbcType=INTEGER}
+	</select>
+
+	<!-- 查询分类列表 -->
+	<select id="queryClassifyList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+		select a.*, rownum num from (
+		select
+		id,
+		name,
+		imgurl,
+		state,
+		sort_id
+		from
+		tbl_classify
+		where
+		parent_id = #{parent_id,jdbcType=INTEGER}
+		order by sort_id
+		) a where rownum  &lt;= #{end_rownum,jdbcType=INTEGER}
+		) where num &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+
+	<!-- 查询大类列表 -->
+	<resultMap id="classCheckMap" type="java.util.Map">
+		<result column="id" property="id"/>
+		<result column="name" property="option"/>
+	</resultMap>
+	<select id="queryLargeClass" resultMap="classCheckMap">
+		select id,name from tbl_classify where parent_id is null order by id asc
+	</select>
+
+	<!-- 新增分类信息 -->
+	<insert id="addClassify" parameterType="java.util.Map">
+		insert into tbl_classify(
+		id,
+		name,
+		imgurl,
+		parent_id,
+		sort_id,
+		state
+		) values(
+		seq_classify.nextval,
+		#{name,jdbcType=VARCHAR},
+		#{imgurl,jdbcType=VARCHAR},
+		#{parent_id,jdbcType=INTEGER},
+		(select case when count(sort_id) = 0 then 1 else max(sort_id)+1 end from tbl_classify where parent_id = #{parent_id}),
+		'1'
+		)
+	</insert>
+
+	<!-- 更新分类信息 -->
+	<update id="updateClassify" parameterType="java.util.Map">
+		update tbl_classify
+		<set>
+			<if test="name != null and name != ''">
+				name = #{name,jdbcType=VARCHAR},
+			</if>
+			<if test="imgurl != null and imgurl != ''">
+				imgurl = #{imgurl,jdbcType=VARCHAR}
+			</if>
+		</set>
+		where id = #{id,jdbcType=INTEGER}
+	</update>
+
+	<!-- 查询视频列表总数量 -->
+	<select id="queryVideoListCount" parameterType="java.util.Map" resultType="int">
+		select
+		count(1)
+		from
+		tbl_classify_info t
+		where
+		classify_id in (select id from tbl_classify where parent_id = '1')
+		<if test="headline != null and headline != ''">
+			and headline like concat(concat('%', #{headline,jdbcType=VARCHAR}),'%')
+		</if>
+		<if test="classify_id != null and classify_id != ''">
+			and classify_id = #{classify_id,jdbcType=INTEGER}
+		</if>
+	</select>
+	<!-- 分页查询视频列表 -->
+	<select id="queryVideoList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from
+		(select a.*,rownum num from (
+		select
+		<include refid="classifyInfo_column"/>,
+		(select name from tbl_classify where id = t.classify_id) classify_name
+		from
+		tbl_classify_info t
+		where
+		classify_id in (select id from tbl_classify where parent_id = '1')
+		<if test="headline != null and headline != '' ">
+			and headline LIKE CONCAT(CONCAT('%', #{headline,jdbcType=VARCHAR}),'%')
+		</if>
+		<if test="classify_id != null and classify_id != '' ">
+			and classify_id = #{classify_id,jdbcType=INTEGER}
+		</if>
+		order by sort_id asc
+		) a where rownum  &lt;= #{end_rownum,jdbcType=INTEGER}
+		) where num &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+
+	<!-- 新增子类信息 -->
+	<insert id="addClassifyInfo" parameterType="java.util.Map">
+		insert into tbl_classify_info (
+			<if test="content != null and content != '' ">
+				content,
+			</if>
+			<if test="img_url != null and img_url != '' ">
+				img_url,
+			</if>
+			<if test="video_url != null and video_url != '' ">
+				video_url,
+			</if>
+			id,
+			classify_id,
+			issue_date,
+			classify_name,
+			headline,
+			sort_id,
+			page_view
+		) values(
+			<if test="content != null and content != ''">
+				#{content,jdbcType=VARCHAR},
+			</if>
+			<if test="img_url != null and img_url != ''">
+				#{img_url,jdbcType=VARCHAR},
+			</if>
+			<if test="video_url != null and video_url != ''">
+				#{video_url,jdbcType=VARCHAR},
+			</if>
+			seq_classify_info.nextval,
+			#{classify_id,jdbcType=INTEGER},
+			sysdate,
+			(select name from tbl_classify where id = #{classify_id,jdbcType=INTEGER}),
+			#{headline,jdbcType=VARCHAR},
+			(select case when count(sort_id) = 0 then 1 else max(sort_id)+1 end from tbl_classify_info),
+			'0'
+		)
+	</insert>
+
+	<!-- 更新子类信息 -->
+	<update id="updateClassifyInfo" parameterType="java.util.Map">
+		update tbl_classify_info
+		<set>
+			<if test="classify_id != null and classify_id != 0">
+				classify_id = #{classify_id,jdbcType=INTEGER},
+				classify_name = (select name from tbl_classify where id = #{classify_id,jdbcType=INTEGER}),
+			</if>
+			<if test="content != null and content != ''">
+				content = #{content,jdbcType=VARCHAR},
+			</if>
+			<if test="img_url != null and img_url != ''">
+				img_url = #{img_url,jdbcType=VARCHAR},
+			</if>
+			<if test="video_url != null and video_url != '' ">
+				video_url = #{video_url,jdbcType=VARCHAR},
+			</if>
+			<if test="headline != null and headline != '' ">
+				headline = #{headline,jdbcType=VARCHAR}
+			</if>
+		</set>
+		where id = #{id,jdbcType=INTEGER}
+	</update>
+
+	<!-- 删除子类信息 -->
+	<delete id="deleteClassifyInfo" parameterType="int">
+		delete from tbl_classify_info where id = #{id,jdbcType=INTEGER}
+	</delete>
+
+
+	<!-- 查询知识库列表总数 -->
+	<select id="queryRepositoryListCount" parameterType="java.util.Map" resultType="int">
+		select
+		count(1)
+		from
+		tbl_classify_info t
+		where
+		classify_id in (select id from tbl_classify where parent_id = '2')
+		<if test="headline != null and headline != '' ">
+			and headline like concat(concat('%', #{headline,jdbcType=VARCHAR}),'%')
+		</if>
+		<if test="classify_id != null and classify_id != '' ">
+			and classify_id = #{classify_id,jdbcType=INTEGER}
+		</if>
+	</select>
+
+	<!-- 分页查询知识库列表 -->
+	<select id="queryRepositoryList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from
+		(select a.*,rownum num from (
+		select
+		id,
+		classify_id,
+		to_char(issue_date,'yyyy-mm-dd hh24:mi:ss') issue_date,
+		headline,
+		(select name from tbl_classify where id = t.classify_id) classify_name
+		from
+		tbl_classify_info t
+		where
+		classify_id in (select id from tbl_classify where parent_id = '2')
+		<if test="headline != null and headline != '' ">
+			and headline like concat(concat('%', #{headline,jdbcType=VARCHAR}),'%')
+		</if>
+		<if test="classify_id != null and classify_id != '' ">
+			and classify_id = #{classify_id,jdbcType=INTEGER}
+		</if>
+		order by sort_id asc
+		) a where rownum  &lt;= #{end_rownum,jdbcType=INTEGER}
+		) where num &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+
+	<resultMap id="LargeClassifyMap" type="java.util.Map">
+		<result column="id" property="id"/>
+		<result column="name" property="name"/>
+		<result column="imgurl" property="imgurl"/>
+		<result column="parent_id" property="parent_id"/>
+		<result column="sort_id" property="sort_id"/>
+		<result column="state" property="state"/>
+	</resultMap>
+	<!-- 通过ID获取分类信息 -->
+	<select id="queryLargeClassifyById" parameterType="java.util.Map" resultMap="LargeClassifyMap">
+		select
+		id,
+		name,
+		imgurl,
+		parent_id,
+		sort_id,
+		state
+		from
+		tbl_classify
+		where
+		id = #{id,jdbcType=INTEGER}
+	</select>
+	<resultMap type="java.util.Map" id="resultClassifyInfoDetail">
+		<result column="classify_id" property="classify_id" />
+		<result column="headline" property="headline"/>
+		<result column="content" property="content"/>
+		<result column="img_url" property="img_url"/>
+		<result column="video_url" property="video_url"/>
+		<result column="page_view" property="page_view"/>
+	</resultMap>
+	<!-- 查询分类明细 -->
+	<select id="queryClassifyDetail" parameterType="java.util.Map" resultType="java.util.Map" resultMap="resultClassifyInfoDetail">
+		select
+			<include refid="classifyInfo_column"/>,
+			c.name classify_name,
+			c.parent_id
+		from
+		tbl_classify_info t,tbl_classify c
+		where
+		c.id = t.classify_id
+		and t.id = #{id,jdbcType=INTEGER}
+	</select>
+
+	<!-- 更新排序 -->
+	<update id="updateClassifySort" parameterType="java.util.Map">
+		update tbl_classify
+        set sort_id =
+        (
+          case when id = #{fromId,jdbcType=INTEGER} then
+            (select sort_id from tbl_classify where id = #{toId,jdbcType=INTEGER})
+          when id = #{toId,jdbcType=INTEGER} then
+            (select sort_id from tbl_classify where id = #{fromId,jdbcType=INTEGER})
+          end
+        )
+        where id = #{fromId,jdbcType=INTEGER} or id = #{toId,jdbcType=INTEGER}
+	</update>
+
+	<!-- 更新子类排序 -->
+	<update id="updateClassifyInfoSort" parameterType="java.util.Map">
+		update tbl_classify_info
+        set sort_id =
+        (
+          case when id = #{fromId,jdbcType=INTEGER} then
+            (select sort_id from tbl_classify_info where id = #{toId,jdbcType=INTEGER})
+          when id = #{toId,jdbcType=INTEGER} then
+            (select sort_id from tbl_classify_info where id = #{fromId,jdbcType=INTEGER})
+          end
+        )
+        where id = #{fromId,jdbcType=INTEGER} or id = #{toId,jdbcType=INTEGER}
+	</update>
+
+	<!-- 是否启用 -->
+	<update id="updateClassifyState" parameterType="java.util.Map">
+		update
+		    tbl_classify
+		set
+		    state = #{state,jdbcType=CHAR}
+		where
+		    id = #{id,jdbcType=INTEGER}
+	</update>
+
+	<!-- 删除分类信息 -->
+	<delete id="deleteClassify" parameterType="java.util.Map">
+		delete from tbl_classify where id = #{id,jdbcType=INTEGER}
+	</delete>
+
+	<!-- 根据classify_id查询是否有关联数据 -->
+	<select id="selectClassifyInfoCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+          from tbl_classify_info 
+         where classify_id = #{id,jdbcType=INTEGER}
+	</select>
+	
+	<!-- 分类下拉框 -->
+	<select id="queryClassifyCombobox" resultMap="classCheckMap">
+		select id,name
+		  from tbl_classify
+		 where parent_id = #{parent_id,jdbcType=INTEGER} order by id asc
+	</select>
+</mapper>

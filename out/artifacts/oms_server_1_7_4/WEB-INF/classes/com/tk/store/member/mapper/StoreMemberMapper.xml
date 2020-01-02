@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.store.member.dao.StoreMemberDao">
+	<!-- 会员列表 -->
+	<select id="queryStoreMemberList" parameterType="java.util.List" resultType="java.util.Map">
+		select A.* from(
+	        <foreach collection="list" item="item" index="index" separator="UNION ALL">
+		          select #{item.STATUS,jdbcType=INTEGER} STATUS,
+				         #{item.USER_ID,jdbcType=INTEGER} USER_ID,
+				         #{item.NAME,jdbcType=VARCHAR} NAME,
+				         decode(#{item.GENDER,jdbcType=INTEGER},1,'男',2,'女',null,'') GENDER,
+				         #{item.PHONE,jdbcType=VARCHAR} PHONE,
+				         #{item.MONTH,jdbcType=VARCHAR}||'-'||#{item.DAY,jdbcType=VARCHAR} BIRTHDAY,
+				         #{item.COOPER_ID,jdbcType=INTEGER} REGION_ID,
+				         (select user_realname from tbl_sys_user_info where id = #{item.COOPER_ID,jdbcType=INTEGER}) REGION_NAME,
+				         #{item.AGENT_ID,jdbcType=INTEGER} AGENT_ID,
+				         #{item.JOINT_NAME,jdbcType=VARCHAR} BUSINESS_NAME,
+				         #{item.STORE_NAME,jdbcType=VARCHAR} STORE_NAME,
+				         to_char(#{item.USER_DEAL_ORDER_COUNT,jdbcType=INTEGER}) USER_DEAL_ORDER_COUNT,
+				         to_char(#{item.USER_DEAL_MONEY_SUM,jdbcType=INTEGER}) USER_DEAL_MONEY_SUM,
+				         #{item.INTEGRAL,jdbcType=INTEGER} INTEGRAL,
+				         #{item.CREATE_TIME,jdbcType=VARCHAR} CREATE_TIME,
+				         #{item.LEVEL_NAME,jdbcType=VARCHAR} LEVEL_NAME,
+				         #{item.LEVEL_ID,jdbcType=VARCHAR} LEVEL_ID,
+				         to_number(#{item.DISCOUNT,jdbcType=INTEGER}) DISCOUNT,
+				         #{item.NO_GIVE_MONEY,jdbcType=DOUBLE} NO_GIVE_MONEY,
+				         #{item.ACCOUNT_BALANCE,jdbcType=DOUBLE} ACCOUNT_BALANCE
+			        from dual
+			 </foreach>
+			) A
+			order by A.CREATE_TIME desc
+	</select>
+	<!-- 会员详情 -->
+	<select id="queryStoreMemberDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select #{NAME,jdbcType=VARCHAR} NAME,
+            decode(#{GENDER,jdbcType=INTEGER},1,'男',2,'女',null,'') GENDER,
+            #{PHONE,jdbcType=VARCHAR} PHONE,
+            #{MONTH,jdbcType=VARCHAR}||'-'||#{DAY,jdbcType=VARCHAR} BIRTHDAY,
+            (select user_realname from tbl_sys_user_info where id = #{COOPER_ID,jdbcType=INTEGER}) REGION_NAME,
+            #{JOINT_NAME,jdbcType=VARCHAR} BUSINESS_NAME,
+            #{STORE_NAME,jdbcType=VARCHAR} STORE_NAME,
+            to_char(#{USER_DEAL_ORDER_COUNT,jdbcType=INTEGER}) USER_DEAL_ORDER_COUNT,
+            to_char(#{USER_DEAL_MONEY_SUM,jdbcType=INTEGER}) USER_DEAL_MONEY_SUM,
+            #{INTEGRAL,jdbcType=INTEGER} INTEGRAL,
+            #{CREATE_TIME,jdbcType=VARCHAR} CREATE_TIME,
+            #{LEVEL_NAME,jdbcType=VARCHAR} LEVEL_NAME,
+            #{LEVEL_ID,jdbcType=VARCHAR} LEVEL_ID,
+            #{DISCOUNT,jdbcType=DOUBLE} DISCOUNT
+		  from dual
+	</select>
+	<resultMap id="userStoreListMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="store_name" property="option"/>
+    </resultMap>
+	<!-- 门店下拉框 -->
+	<select id="queryUserStoreList" parameterType="java.util.Map" resultType="java.util.Map" resultMap="userStoreListMap">
+		select id,store_name from tbl_store_user_manage
+		 where user_id = #{user_id,jdbcType=INTEGER}
+		   and approval_state = 1
+	</select>
+    <!-- 获取新零售门店ID -->
+    <select id="queryAgentStoreId" parameterType="java.util.Map" resultType="string">
+    	select agent_store_id
+    	  from tbl_store_user_manage
+    	 where id = #{store_id,jdbcType=INTEGER}
+    </select>
+    <resultMap id="userSelectMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="user_realname" property="option"/>
+    </resultMap>
+	<!-- 区域下拉框 -->
+	<select id="userSelect" parameterType="java.util.Map" resultType="java.util.Map" resultMap="userSelectMap">
+		select id,user_realname 
+		  from tbl_sys_user_info tsui
+		 <where>
+		 	user_type = 9
+		 	and state = 2
+		 	<if test="public_user_type != null and public_user_type == 3">
+	            and 1=2
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 4">
+	            and 1=2
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 5">
+	            and 1=2
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 6">
+	            and 1=2
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 7">
+				and 1=2
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 9">
+	            and tsui.id = #{public_user_id,jdbcType=INTEGER}
+	        </if>
+		 </where>
+	</select>
+</mapper>

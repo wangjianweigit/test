@@ -1,0 +1,590 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.store.product.dao.RegionsProductDao">
+	<!-- 商品数量 -->
+	<select id="queryProductCount" parameterType="java.util.Map" resultType="int">
+		   select count(1)
+			 from (select product_itemnumber, max(create_date) create_date from tbl_product_region group by product_itemnumber) tpr,
+		          tbl_product_info t1
+		    where tpr.product_itemnumber = t1.itemnumber(+)
+		          <if test="product_itemnumber != null and product_itemnumber !=''">
+			 		  and tpr.product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+			 	  </if>
+			 	  <if test="product_type_id != null and product_type_id !=''">
+			 		  and (t1.product_type_id = #{product_type_id,jdbcType=INTEGER}
+			  		  or t1.product_type_id in (select id from tbl_dic_product_type t start with parent_id = #{product_type_id,jdbcType=INTEGER} connect by prior id=parent_id))
+			 	  </if>
+			 	  <if test="product_name != null and product_name !=''">
+			 		  and t1.product_name like '%'||#{product_name,jdbcType=VARCHAR}||'%'
+			 	  </if>
+				  <if test="brand_id != null and brand_id !=''">
+			 		  and t1.brand_id = #{brand_id,jdbcType=INTEGER}
+			 	  </if>
+			 	  <if test="year != null and year !=''">
+			 		  and t1.year = #{year,jdbcType=INTEGER}
+			 	  </if>
+				  <if test="start_date != null and start_date != '' ">
+					  and tpr.create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+				  </if>
+				  <if test="end_date != null and end_date != '' ">
+					  and tpr.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+				  </if>
+			 	  <if test="season_id != null and season_id !=''">
+			 		  and t1.season_id = #{season_id,jdbcType=INTEGER}
+			 	  </if>
+			 	  <if test="user_id != null and user_id != ''">
+			 	  	  and exists (select 1 from tbl_product_region where user_id = #{user_id,jdbcType=INTEGER} and product_itemnumber = tpr.product_itemnumber)
+			 	  </if>
+			 	  and exists(
+				   	   select 1 from tbl_sys_user_info tsui 
+				   	   <where>
+			   	  		    1=1
+			   	  		    and exists (select 1 from tbl_product_region where user_id = tsui.id and product_itemnumber = tpr.product_itemnumber)
+				        <if test="public_user_type != null and public_user_type == 3">
+				            and 1=2
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 4">
+				            and 1=2
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 5">
+				            and 1=2
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 6">
+				            and 1=2
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 7">
+							and 1=2
+				        </if>
+				        <if test="public_user_type != null and public_user_type == 9">
+				            and tsui.id = #{public_user_id,jdbcType=INTEGER}
+				        </if>
+			   	   	</where>)
+	</select>
+	<!-- 商品列表 -->
+	<select id="queryProductListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+		select temp.*,(select to_char(wm_concat(type_name)) from tbl_dic_product_type start with id=temp.product_type_id connect by prior parent_id=id) as product_type,
+			          (select name from tbl_dic_product_season tdps where tdps.id = temp.season_id) as season,
+			          (select brand_name from tbl_dic_product_brand tdpb where tdpb.id = temp.brand_id) as brand,
+			          (select to_char(wm_concat((select user_realname from tbl_sys_user_info where id = t.user_id)||'：￥'||to_char(t1.min_retail_price,'fm9999990.00')||'-'||to_char(t2.max_retail_price,'fm9999990.00'))) from tbl_product_region t,
+						(select product_region_id,min(retail_price) min_retail_price from tbl_product_region_detail group by product_region_id) t1,
+						(select product_region_id,max(retail_price) max_retail_price from tbl_product_region_detail group by product_region_id) t2
+						where t.id = t1.product_region_id
+						and  t.id = t2.product_region_id
+						and t.product_itemnumber = temp.product_itemnumber) retail_price,
+			          (select to_char(wm_concat(user_realname)) from tbl_sys_user_info t1 
+			          	where exists (select 1 from tbl_product_region where user_id = t1.id and product_itemnumber = temp.product_itemnumber)) product_region,
+			          	(select user_id from tbl_product_region where product_itemnumber = temp.product_itemnumber and rownum &lt;= 1) user_id
+		  from (
+			select a.*,rownum rn from (
+			   select t1.id as product_id,
+			          tpr.product_itemnumber,
+			          t1.product_name,
+			          to_char(tpr.create_date, 'yyyy-mm-dd hh24:mi:ss') create_date,
+					  t1.product_img_url,
+			          t1.year,
+					  t1.product_type_id,
+					  t1.season_id,
+					  t1.brand_id,
+                      (select max(product_prize_tag) from tbl_product_sku where product_itemnumber=tpr.product_itemnumber) product_prize_tag
+			     from (select product_itemnumber, max(create_date) create_date from tbl_product_region group by product_itemnumber) tpr,
+		          	  tbl_product_info t1
+		    	where tpr.product_itemnumber = t1.itemnumber(+)
+			          <if test="product_itemnumber != null and product_itemnumber !=''">
+				 		  and tpr.product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+				 	  </if>
+				 	  <if test="product_type_id != null and product_type_id !=''">
+				 		  and (t1.product_type_id = #{product_type_id,jdbcType=INTEGER}
+			  		  		or t1.product_type_id in (select id from tbl_dic_product_type t start with parent_id = #{product_type_id,jdbcType=INTEGER} connect by prior id=parent_id))
+				 	  </if>
+				 	  <if test="product_name != null and product_name !=''">
+				 		  and t1.product_name like '%'||#{product_name,jdbcType=VARCHAR}||'%'
+				 	  </if>
+					  <if test="brand_id != null and brand_id !=''">
+				 		  and t1.brand_id = #{brand_id,jdbcType=INTEGER}
+				 	  </if>
+				 	  <if test="year != null and year !=''">
+				 		  and t1.year = #{year,jdbcType=INTEGER}
+				 	  </if>
+					  <if test="start_date != null and start_date != '' ">
+						  and tpr.create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+					  </if>
+					  <if test="end_date != null and end_date != '' ">
+						  and tpr.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+					  </if>
+				 	  <if test="season_id != null and season_id !=''">
+				 		  and t1.season_id = #{season_id,jdbcType=INTEGER}
+				 	  </if>
+				 	  <if test="user_id != null and user_id != ''">
+			 	  	  	and exists (select 1 from tbl_product_region where user_id = #{user_id,jdbcType=INTEGER} and product_itemnumber = tpr.product_itemnumber)
+			 	  	  </if>
+			 	  	  and exists(
+				   	   	select 1 from tbl_sys_user_info tsui 
+				   	   	<where>
+			   	  		    1=1
+			   	  		    and exists (select 1 from tbl_product_region where user_id = tsui.id and product_itemnumber = tpr.product_itemnumber)
+					        <if test="public_user_type != null and public_user_type == 3">
+					            and 1=2
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 4">
+					            and 1=2
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 5">
+					            and 1=2
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 6">
+					            and 1=2
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 7">
+								and 1=2
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 9">
+					            and tsui.id = #{public_user_id,jdbcType=INTEGER}
+					        </if>
+				   	   	</where>)
+				   	   	order by tpr.create_date desc
+					  ) a
+		 	where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) temp
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 商品库数量 -->
+	<select id="queryProductLibraryCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_product_info tpi
+		 where exists (select 1 from tbl_product_consortium where product_itemnumber = tpi.itemnumber)
+		   and not exists
+		    	(SELECT product_itemnumber
+					  FROM ( SELECT product_itemnumber, COUNT (1) AS itemnumber_count
+			                    FROM tbl_product_region
+			                   WHERE user_id IN 
+				                   <foreach collection="user_ids" item="item" open="(" separator="," close=")">
+						 	  	  		#{item}
+						 	  	  </foreach>
+					 	  	  group by product_itemnumber)
+					 WHERE itemnumber_count = #{itemnumber_count,jdbcType=INTEGER}
+					 and product_itemnumber = tpi.itemnumber)
+		  <if test="itemnumber != null and itemnumber !=''">
+	 		  and tpi.itemnumber = #{itemnumber,jdbcType=VARCHAR}
+	 	  </if>
+	 	  <if test="product_type_id != null and product_type_id !=''">
+	 		  and (tpi.product_type_id = #{product_type_id,jdbcType=INTEGER}
+			  or tpi.product_type_id in (select id from tbl_dic_product_type t start with parent_id = #{product_type_id,jdbcType=INTEGER} connect by prior id=parent_id))
+	 	  </if>
+	 	  <if test="season_id != null and season_id !=''">
+	 		  and tpi.season_id = #{season_id,jdbcType=INTEGER}
+	 	  </if>
+	 	  <if test="brand_id != null and brand_id !=''">
+	 		  and tpi.brand_id = #{brand_id,jdbcType=INTEGER}
+	 	  </if>
+	 	  <if test="year != null and year !=''">
+	 		  and tpi.year = #{year,jdbcType=INTEGER}
+	 	  </if>
+	 	  <if test="product_itemnumbers != null and product_itemnumbers != ''">
+	 	  	  and tpi.itemnumber not in
+	 	  	  <foreach collection="product_itemnumbers" item="item" open="(" separator="," close=")">
+	 	  	  	#{item}
+	 	  	  </foreach>
+	 	  </if>
+	</select>
+	<!-- 商品库列表 -->
+	<select id="queryProductLibraryListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+			select a.*,rownum rn from (
+				select tpi.itemnumber,
+				       tpi.product_name,
+				       tpi.year,
+				       (select brand_name from tbl_dic_product_brand tdpb where tdpb.id = tpi.brand_id)  as brand,
+				       (select type_name from tbl_dic_product_type tdpt where tdpt.id = tpi.product_type_id)  as product_type,
+				       (select name from tbl_dic_product_season tdps where tdps.id = tpi.season_id)  as season,
+				       tpi.product_img_url
+				  from tbl_product_info tpi
+				 where exists (select 1 from tbl_product_consortium where product_itemnumber = tpi.itemnumber)
+				    and  not exists
+				    	(SELECT product_itemnumber
+							  FROM ( SELECT product_itemnumber, COUNT (1) AS itemnumber_count
+					                    FROM tbl_product_region
+					                   WHERE user_id IN 
+						                   <foreach collection="user_ids" item="item" open="(" separator="," close=")">
+								 	  	  		#{item}
+								 	  	  </foreach>
+							 	  	  group by product_itemnumber)
+							 WHERE itemnumber_count = #{itemnumber_count,jdbcType=INTEGER}
+							 and product_itemnumber = tpi.itemnumber)
+				  <if test="itemnumber != null and itemnumber !=''">
+			 		  and tpi.itemnumber = #{itemnumber,jdbcType=VARCHAR}
+			 	  </if>
+			 	  <if test="product_type_id != null and product_type_id !=''">
+			 		  and (tpi.product_type_id = #{product_type_id,jdbcType=INTEGER}
+			  			or tpi.product_type_id in (select id from tbl_dic_product_type t start with parent_id = #{product_type_id,jdbcType=INTEGER} connect by prior id=parent_id))
+			 	  </if>
+			 	  <if test="season_id != null and season_id !=''">
+			 		  and tpi.season_id = #{season_id,jdbcType=INTEGER}
+			 	  </if>
+			 	  <if test="brand_id != null and brand_id !=''">
+			 		  and tpi.brand_id = #{brand_id,jdbcType=INTEGER}
+			 	  </if>
+			 	  <if test="year != null and year !=''">
+			 		  and tpi.year = #{year,jdbcType=INTEGER}
+			 	  </if>
+			 	  <if test="product_itemnumbers != null and product_itemnumbers != ''">
+			 	  	  and tpi.itemnumber not in
+			 	  	  <foreach collection="product_itemnumbers" item="item" open="(" separator="," close=")">
+			 	  	  	#{item}
+			 	  	  </foreach>
+			 	  </if>) a
+		 	where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 新增区域商品 -->
+	<insert id="insert" parameterType="java.util.Map">
+		<selectKey keyProperty="id" resultType="int" order="BEFORE">
+			select seq_product_region.nextval from dual
+		</selectKey>
+		insert into tbl_product_region(
+				id,
+				user_id,
+				product_itemnumber,
+				create_id,
+				create_date,
+				update_id,
+				update_date)
+		values (#{id,jdbcType=INTEGER},
+				#{user_id,jdbcType=INTEGER},
+				#{product_itemnumber,jdbcType=VARCHAR},
+				#{public_user_id,jdbcType=INTEGER},
+				sysdate,
+				#{public_user_id,jdbcType=INTEGER},
+				sysdate)
+	</insert>
+	<!-- 新增区域商品关联明细数据 -->
+	<insert id="insertRegionProductDetail" parameterType="java.util.Map">
+		insert into tbl_product_region_detail(id,product_region_id,product_itemnumber,product_specs,product_sku,retail_price,create_id) 
+		select seq_product_region_detail.nextval,
+			   #{id,jdbcType=INTEGER},
+			   product_itemnumber,
+			   product_specs,
+			   product_sku,
+			   <choose>
+			   	<when test="retail_price != null">#{retail_price,jdbcType=INTEGER},</when>
+			   	<otherwise>retail_price,</otherwise>
+			   </choose>
+			   #{public_user_id,jdbcType=INTEGER} 
+		 from tbl_product_consortium t 
+		where product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+			  <if test="product_specs != null and product_specs != ''">
+			  and t.product_specs = #{product_specs,jdbcType=VARCHAR}
+			  </if>
+	</insert>
+	
+	<!-- 商品零售详情 -->
+	<select id="queryProductRetailDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		<choose>
+			<when test="id != null and id != 0">
+				select a.product_itemnumber,
+				       a.product_specs,
+				       NVL(getSpecs_SalePrice(a.product_itemnumber,a.product_specs,0),0) min_product_prize_cost,
+         	   		   NVL(getSpecs_SalePrice(a.product_itemnumber,a.product_specs,1),0) max_product_prize_cost,
+				       case when nvl(temp.retail_price, 0) = 0 then nvl(tpc.retail_price, 0)
+                            else nvl(temp.retail_price, 0) end retail_price
+				  from (select product_itemnumber, product_specs
+				          from tbl_product_sku
+				         where product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+				           and product_specs is not null
+				         group by product_itemnumber,
+				                  product_specs) a,
+				       tbl_product_info tpi,
+				       (select product_itemnumber, product_specs, retail_price
+				          from tbl_product_region_detail where product_region_id = #{id,jdbcType=INTEGER}
+				         group by product_itemnumber, product_specs, retail_price) temp,
+				 (select product_itemnumber, product_specs, retail_price
+                          from tbl_product_consortium where product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+                         group by product_itemnumber, product_specs, retail_price) tpc
+                 where a.product_itemnumber = tpi.itemnumber(+)
+                   and a.product_itemnumber = temp.product_itemnumber(+)
+                   and a.product_specs = temp.product_specs(+)
+                   and a.product_itemnumber = tpc.product_itemnumber(+)
+                   and a.product_specs = tpc.product_specs(+)
+				   order by a.product_specs
+			</when>
+			<otherwise>
+				select a.product_itemnumber,
+				       a.product_specs,
+				       NVL(getSpecs_SalePrice(a.product_itemnumber,a.product_specs,0),0) min_product_prize_cost,
+         	   		   NVL(getSpecs_SalePrice(a.product_itemnumber,a.product_specs,1),0) max_product_prize_cost,
+				       nvl(tpc.retail_price, 0) retail_price
+				  from (select product_itemnumber, product_specs
+				          from tbl_product_sku
+				         where product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+				           and product_specs is not null
+				         group by product_itemnumber,
+				                  product_specs) a,
+				       tbl_product_info tpi,
+				       (select product_itemnumber, product_specs, retail_price
+				          from tbl_product_consortium
+				         group by product_itemnumber, product_specs, retail_price) tpc
+				 where a.product_itemnumber = tpi.itemnumber(+)
+				   and a.product_itemnumber = tpc.product_itemnumber(+)
+				   and a.product_specs = tpc.product_specs(+)
+				   order by a.product_specs
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 更新零售价 -->
+	<update id="update" parameterType="java.util.Map">
+		update tbl_product_region_detail
+		   set retail_price = #{retail_price,jdbcType=INTEGER}
+		 where product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+		   and product_specs = #{product_specs,jdbcType=VARCHAR}
+		   and product_region_id = #{id,jdbcType=INTEGER}
+	</update>
+	
+	<!-- 区域商品sku数量 -->
+	<select id="queryRegionProductSkuCount" parameterType="java.util.Map" resultType="int">
+		select count(1) from tbl_product_region_detail
+		 where product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+		   and product_specs = #{product_specs,jdbcType=VARCHAR}
+		   and product_region_id = #{id,jdbcType=INTEGER}
+	</select>
+	<!-- 商品规格sku数量 -->
+	<select id="queryProductSkuCount" parameterType="java.util.Map" resultType="int">
+		select count(1) from tbl_product_sku
+		 where product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+		   and product_specs = #{product_specs,jdbcType=VARCHAR}
+	</select>
+	<resultMap type="java.util.Map" id="userSelectMap">
+		<result property="id" column="id"/>
+		<result property="option" column="user_realname"/>
+	</resultMap>
+	<!-- 所属区域下拉框 -->
+	<select id="queryUserSelect" parameterType="java.util.Map" resultMap="userSelectMap">
+		select id,user_realname 
+		  from tbl_sys_user_info 
+		 where user_type = 9 
+		   and state = 2
+		   <if test="public_user_type != null and public_user_type == 9">
+	           and id = #{public_user_id,jdbcType=INTEGER}
+	       </if>
+	</select>
+	<!-- 查询商品所属区域 -->
+	<select id="queryUserList" parameterType="java.util.Map" resultType="java.util.Map">
+		select id,
+			   user_id,
+			   (select user_realname from tbl_sys_user_info where id = t.user_id) user_name,
+			   case when (select count(1) from tbl_product_store tps where product_itemnumber = t.product_itemnumber and exists (select 1 from tbl_user_info where partner_user_id = t.user_id and id = tps.user_id))
+			   > 0 then 1 else 0 end check_type
+		  from tbl_product_region t
+		 where product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+		 <if test="user_id != null and user_id != ''">
+		  	and t.user_id = #{user_id,jdbcType=INTEGER}
+		  </if>
+		 order by create_date desc
+	</select>
+	<!-- 删除区域商品 -->
+	<delete id="deleteRegionProduct" parameterType="java.util.Map">
+		delete from tbl_product_region where  
+		product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+			and user_id not in
+			<foreach item="user_id" collection="user_ids" open="(" separator="," close=")">
+				 #{user_id,jdbcType=INTEGER}
+			</foreach>
+	</delete>
+	<!-- 删除区域商品明细 -->
+	<delete id="deleteRegionProductDetail" parameterType="java.util.Map">
+		delete from tbl_product_region_detail t
+		where exists (select 1 from tbl_product_region 
+			where product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+			and user_id not in
+			<foreach item="user_id" collection="user_ids" open="(" separator="," close=")">
+				 #{user_id,jdbcType=INTEGER}
+			</foreach>
+			and id = t.product_region_id)
+	</delete>
+	<!-- 查询商品信息列表 -->
+	<select id="queryProductInfoList" parameterType="java.util.Map" resultType="java.util.Map">
+		select itemnumber as product_itemnumber,product_name,product_img_url 
+		from tbl_product_info where itemnumber in
+		<foreach item="item" collection="product_itemnumber" open="(" separator="," close=")">
+	    	#{item,jdbcType=VARCHAR}
+	    </foreach>
+	</select>
+	<!-- 查询区域信息 -->
+	<select id="queryUserInfo" parameterType="java.util.Map" resultType="java.util.Map">
+		select id as user_id,user_realname as user_name 
+		  from tbl_sys_user_info 
+		 where id in
+			<foreach item="user_id" collection="user_ids" open="(" separator="," close=")">
+				 #{user_id,jdbcType=INTEGER}
+			</foreach>
+	</select>
+	<!-- 区域商品是否存在 -->
+	<select id="queryRegionProductIsExist" parameterType="java.util.Map" resultType="int">
+		select count(1) from tbl_product_region where user_id = #{user_id,jdbcType=INTEGER} and product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+	</select>
+	<!-- 查询A区域和B区域不相同商品信息 -->
+	<select id="queryProductDifferList" parameterType="java.util.Map" resultType="java.util.Map">
+		select id,product_itemnumber
+		 from tbl_product_region t where user_id = #{out_user_id,jdbcType=INTEGER} and not exists 
+		(select 1 from tbl_product_region where user_id =#{in_user_id,jdbcType=INTEGER} and product_itemnumber =t.product_itemnumber)
+	</select>
+	
+	<!-- 批量导入 -->
+	<insert id="addRegionProductDetailBatch" parameterType="java.util.Map">
+		insert into tbl_product_region_detail(id,product_region_id,product_itemnumber,product_specs,product_sku,retail_price,create_id) 
+		select seq_product_region_detail.nextval,
+			   #{id,jdbcType=INTEGER},
+			   product_itemnumber,
+			   product_specs,
+			   product_sku,
+			   retail_price,
+			   #{public_user_id,jdbcType=INTEGER} 
+		 from tbl_product_region_detail t 
+		where product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+		  and product_region_id = #{product_region_id,jdbcType=INTEGER}
+	</insert>
+	<!-- 新增区域商品明细(过滤sku) -->
+	<insert id="insertRegionProductDetailFilter" parameterType="java.util.Map">
+		insert into tbl_product_region_detail(id,product_region_id,product_itemnumber,product_specs,product_sku,retail_price,create_id) 
+		select seq_product_region_detail.nextval,
+			   #{id,jdbcType=INTEGER},
+			   product_itemnumber,
+			   product_specs,
+			   id,
+			   #{retail_price,jdbcType=INTEGER},
+			   #{public_user_id,jdbcType=INTEGER} 
+		 from tbl_product_sku t
+		where t.product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+		  and t.product_specs = #{product_specs,jdbcType=VARCHAR}
+		  and not exists (select 1 from tbl_product_region_detail where product_itemnumber=t.product_itemnumber and product_specs = t.product_specs
+          and product_sku = t.id and product_region_id = #{id,jdbcType=INTEGER})
+	</insert>
+	
+	<!-- 获取区域商品数量 -->
+	<select id="queryRegionProductCount" parameterType="java.util.Map" resultType="int">
+		   select count(1)
+			 from (select product_itemnumber, max(create_date) create_date from tbl_product_region group by product_itemnumber) tpr,
+		          tbl_product_info t1
+		    where tpr.product_itemnumber = t1.itemnumber(+)
+		          <if test="product_itemnumber != null and product_itemnumber !=''">
+			 		  and tpr.product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+			 	  </if>
+			 	  <if test="product_type_id != null and product_type_id !=''">
+			 		  and (t1.product_type_id = #{product_type_id,jdbcType=INTEGER}
+			  		  or t1.product_type_id in (select id from tbl_dic_product_type t start with parent_id = #{product_type_id,jdbcType=INTEGER} connect by prior id=parent_id))
+			 	  </if>
+			 	  <if test="product_name != null and product_name !=''">
+			 		  and t1.product_name like '%'||#{product_name,jdbcType=VARCHAR}||'%'
+			 	  </if>
+				  <if test="brand_id != null and brand_id !=''">
+			 		  and t1.brand_id = #{brand_id,jdbcType=INTEGER}
+			 	  </if>
+			 	  <if test="year != null and year !=''">
+			 		  and t1.year = #{year,jdbcType=INTEGER}
+			 	  </if>
+				  <if test="start_date != null and start_date != '' ">
+					  and tpr.create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+				  </if>
+				  <if test="end_date != null and end_date != '' ">
+					  and tpr.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+				  </if>
+			 	  <if test="season_id != null and season_id !=''">
+			 		  and t1.season_id = #{season_id,jdbcType=INTEGER}
+			 	  </if>
+			 	  <if test="partner_user_id != null and partner_user_id != ''">
+			 	  	  and exists (select 1 from tbl_product_region where user_id = #{partner_user_id,jdbcType=INTEGER} and product_itemnumber = tpr.product_itemnumber)
+			 	  </if>
+	</select>
+	<!-- 获取区域商品列表 -->
+	<select id="queryRegionProductList" parameterType="java.util.Map" resultType="java.util.Map">
+		select temp.*,(select to_char(wm_concat(type_name)) from tbl_dic_product_type start with id=temp.product_type_id connect by prior parent_id=id) as product_type,
+			          (select name from tbl_dic_product_season tdps where tdps.id = temp.season_id) as season,
+			          (select brand_name from tbl_dic_product_brand tdpb where tdpb.id = temp.brand_id) as brand,
+			          (select '￥'||to_char(t1.min_retail_price,'fm9999990.00')||'-'||to_char(t2.max_retail_price,'fm9999990.00') from tbl_product_region t,
+                        (select product_region_id,min(retail_price) min_retail_price from tbl_product_region_detail group by product_region_id) t1,
+                        (select product_region_id,max(retail_price) max_retail_price from tbl_product_region_detail group by product_region_id) t2
+                        where t.id = t1.product_region_id
+                        and  t.id = t2.product_region_id
+                        and T.user_id=#{partner_user_id,jdbcType=INTEGER}
+                        and t.product_itemnumber = temp.product_itemnumber) retail_price,
+                      #{partner_user_id,jdbcType=INTEGER} as partner_user_id
+		  from (
+			select a.*,rownum rn from (
+			   select t1.id as product_id,
+			          tpr.product_itemnumber,
+			          t1.product_name,
+			          to_char(tpr.create_date, 'yyyy-mm-dd hh24:mi:ss') create_date,
+					  t1.product_img_url,
+			          t1.year,
+					  t1.product_type_id,
+					  t1.season_id,
+					  t1.brand_id,
+                      (select max(product_prize_tag) from tbl_product_sku where product_itemnumber=tpr.product_itemnumber) product_prize_tag
+			     from (select product_itemnumber, max(create_date) create_date from tbl_product_region group by product_itemnumber) tpr,
+		          	  tbl_product_info t1
+		    	where tpr.product_itemnumber = t1.itemnumber(+)
+			          <if test="product_itemnumber != null and product_itemnumber !=''">
+				 		  and tpr.product_itemnumber = #{product_itemnumber,jdbcType=VARCHAR}
+				 	  </if>
+				 	  <if test="product_type_id != null and product_type_id !=''">
+				 		  and (t1.product_type_id = #{product_type_id,jdbcType=INTEGER}
+				  		  or t1.product_type_id in (select id from tbl_dic_product_type t start with parent_id = #{product_type_id,jdbcType=INTEGER} connect by prior id=parent_id))
+				 	  </if>
+				 	  <if test="product_name != null and product_name !=''">
+				 		  and t1.product_name like '%'||#{product_name,jdbcType=VARCHAR}||'%'
+				 	  </if>
+					  <if test="brand_id != null and brand_id !=''">
+				 		  and t1.brand_id = #{brand_id,jdbcType=INTEGER}
+				 	  </if>
+				 	  <if test="year != null and year !=''">
+				 		  and t1.year = #{year,jdbcType=INTEGER}
+				 	  </if>
+					  <if test="start_date != null and start_date != '' ">
+						  and tpr.create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+					  </if>
+					  <if test="end_date != null and end_date != '' ">
+						  and tpr.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+					  </if>
+				 	  <if test="season_id != null and season_id !=''">
+				 		  and t1.season_id = #{season_id,jdbcType=INTEGER}
+				 	  </if>
+				 	  <if test="partner_user_id != null and partner_user_id != ''">
+			 	  	  	and exists (select 1 from tbl_product_region where user_id = #{partner_user_id,jdbcType=INTEGER} and product_itemnumber = tpr.product_itemnumber)
+			 	  	  </if>
+				   	   	order by tpr.create_date desc
+					  ) a
+		 	where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) temp
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 查询当前区域当前货号是否已经导入过-->
+	<select id="queryProductRegionByUserAndItenmuber" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from tbl_product_region 
+			where user_id=#{user_id,jdbcType=INTEGER} 
+			and product_itemnumber=#{product_itemnumber,jdbcType=VARCHAR}
+	</select>
+	<!-- 查询已导入商品设置的信息-->
+	<select id="queryProductRegionDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select tpri.product_itemnumber,
+			   tpri.product_specs,
+			   nvl(getSpecs_SalePrice(tpri.product_itemnumber,tpri.product_specs,0),0) min_product_prize_cost,
+               nvl(getSpecs_SalePrice(tpri.product_itemnumber,tpri.product_specs,1),0) max_product_prize_cost,
+               tpri.retail_price
+		 from tbl_product_region_detail  tpri
+		where product_region_id =(select id from tbl_product_region 
+			where user_id=#{user_id,jdbcType=INTEGER} 
+			and product_itemnumber=#{product_itemnumber,jdbcType=VARCHAR})
+	</select>
+	<!-- 删除区域商品 -->
+	<delete id="deleteRegionProductByUserAndItemnumber" parameterType="java.util.Map">
+		delete from tbl_product_region 
+			where user_id=#{user_id,jdbcType=INTEGER} 
+			and product_itemnumber=#{product_itemnumber,jdbcType=VARCHAR}
+		
+	</delete>
+	<!-- 删除区域商品明细 -->
+	<delete id="deleteRegionProductDetailByUserAndItemnumber" parameterType="java.util.Map">
+		delete from tbl_product_region_detail t
+		where product_region_id =(select id from tbl_product_region 
+			where user_id=#{user_id,jdbcType=INTEGER} 
+			and product_itemnumber=#{product_itemnumber,jdbcType=VARCHAR})
+	</delete>
+</mapper>

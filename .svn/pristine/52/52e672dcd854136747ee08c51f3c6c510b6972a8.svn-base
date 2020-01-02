@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.stationed.dao.StationedSettlementDao">
+	<!-- 
+		查询有月结权限的平台会员对于各个入驻商的月结欠款信息
+	        以及代发费、物流费、仓储费、平台服务费、入驻商服务费信息
+	-->
+	<select id="queryUserMonthlySettlement" parameterType="java.util.Map" resultType="java.util.Map">
+		select 
+	    USER_MANAGE_NAME,
+	    LOGIN_NAME,
+	    COMPANY_NAME,
+	    ROUND(NVL(sum(settlement_amount),0),2) SETTLEMENT_AMOUNT
+		from
+		(
+		    select 
+		    bsi.remark,
+		    bsi.settlement_amount,
+			bsi.settled_amount,
+		    (CASE bsi.remark
+		             WHEN '入驻商货款' THEN TO_CHAR(bsi.settlement_user_id)
+		             WHEN '代发费' THEN '代发费'
+		             WHEN '物流费' THEN '物流费'
+		             WHEN '会员服务费' THEN '会员服务费'
+		             WHEN '仓储费' THEN '仓储费'
+		             WHEN '入驻商服务费' THEN '入驻商服务费'
+		    ELSE '' END) COMPANY_NAME,
+		    ui.USER_MANAGE_NAME,
+		    ui.LOGIN_NAME
+		    from TBL_USER_INFO ui 
+		    left join TBL_ORDER_INFO oi on to_char(ui.id) = oi.user_name 
+		    left join TBL_BUSS_SETTLEMENT_INFO bsi on oi.order_number = bsi.order_number
+		    where exists (
+		        select 1 from tbl_bank_account ba 
+		        where ba.user_id = ui.id 
+		        and (
+		        	ba.credit_money > 0
+		        	OR
+		        	ba.credit_money_use > 0
+		        )
+		    )
+		    and bsi.SETTLEMENT_TYPE='1' and  bsi.SETTLEMENT_GROUP='2'  and   bsi.IS_DELETE = '0'  and  bsi.SETTLEMENT_STATE='3'
+		    <if test="user_manage_name!=null and user_manage_name!=''">
+		    	and ui.USER_MANAGE_NAME like concat(concat('%', #{user_manage_name,jdbcType=VARCHAR}),'%')
+		    </if>
+		    <if test="login_name!=null and login_name!=''">
+		    	and ui.LOGIN_NAME like concat(concat('%', #{login_name,jdbcType=VARCHAR}),'%')
+		    </if>
+		) temp
+		group by user_manage_name,login_name,company_name
+		order by user_manage_name,login_name,company_name
+	</select>
+	<!-- 入驻相关查询主表结果 -->
+    <resultMap id="stationedMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="name" property="name"/>
+    </resultMap>
+	
+	<select id="queryStationedList" parameterType="java.util.Map" resultMap="stationedMap">
+		select id,company_name name from TBL_STATIONED_USER_INFO where STATIONED_USER_TYPE = 2 and state = 2
+		order by id asc
+	</select>
+	
+	<!-- 
+		查询有月结权限的门店的对于各个入驻商的月结欠款信息
+	        以及代发费、物流费、仓储费、平台服务费、入驻商服务费信息
+	-->
+	<select id="queryStoreMonthlySettlement" parameterType="java.util.Map" resultType="java.util.Map">
+        select 
+        STORE_NAME,
+        COMPANY_NAME,
+        ROUND(NVL(sum(un_settlement_amount),0),2) UN_SETTLEMENT_AMOUNT,
+        ROUND(NVL(sum(reimbursement_amount),0),2) REIMBURSEMENT_AMOUNT
+        from
+        (
+            select 
+            bsi.remark,
+            (
+                CASE WHEN bsi.SETTLEMENT_GROUP='2'  and  bsi.SETTLEMENT_STATE='3' THEN bsi.settlement_amount
+                ELSE 0 END 
+            ) reimbursement_amount, /**授信待还款***/
+             (
+                CASE WHEN  bsi.SETTLEMENT_STATE= '1' THEN case when bsi.settlement_amount <![CDATA[ > ]]> bsi.settled_amount then bsi.settlement_amount - bsi.settled_amount else 0 end
+                ELSE 0 END 
+            )  un_settlement_amount,/**待结算***/
+            (CASE bsi.remark
+                     WHEN '入驻商货款' THEN TO_CHAR(bsi.settlement_user_id)
+                     WHEN '代发费' THEN '代发费'
+                     WHEN '物流费' THEN '物流费'
+                     WHEN '会员服务费' THEN '会员服务费'
+                     WHEN '仓储费' THEN '仓储费'
+                     WHEN '入驻商服务费' THEN '入驻商服务费'
+            ELSE '' END) COMPANY_NAME,
+            ui.STORE_NAME
+            from TBL_USER_INFO ui 
+            left join TBL_ORDER_INFO oi on to_char(ui.id) = oi.user_name 
+            left join TBL_BUSS_SETTLEMENT_INFO bsi on oi.order_number = bsi.order_number
+            where exists (
+		        select 1 from tbl_bank_account ba 
+		        where ba.user_id = ui.id 
+		        and (
+		        	ba.credit_money > 0
+		        	OR
+		        	ba.credit_money_use > 0
+		        )
+		    )
+            and bsi.SETTLEMENT_TYPE ='1'   and   bsi.IS_DELETE = '0' 
+            and bsi.SETTLEMENT_STATE in ('1','3') 
+            <if test="store_name!=null and store_name!=''">
+		    	and ui.store_name like concat(concat('%', #{store_name,jdbcType=VARCHAR}),'%')
+		    </if>
+        ) temp
+        group by STORE_NAME,company_name
+        order by STORE_NAME,company_name
+	</select>
+</mapper>

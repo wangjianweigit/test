@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tk.oms.finance.dao.OrderAuditingDao">
+	<sql id="all_column">
+        	info.id,
+			info.order_number,
+			to_char(info.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+			info.user_name,
+			info.user_manage_name,
+			info.order_type,
+			info.order_state,
+			info.order_remark,
+			info.receiving_name,
+			info.receiving_address,
+			info.receiving_phone,
+			info.logistics_company_code,
+			info.logistics_company_name,
+			info.logistics_number,
+			nvl(info.logistics_money,0) logistics_money,
+			nvl(info.df_money,0) df_money,
+			info.cancel_reason,
+			to_char(info.cancel_date,'yyyy-mm-dd hh24:mi:ss') cancel_date,
+			info.payment_state,
+			to_char(info.payment_date,'yyyy-mm-dd hh24:mi:ss') payment_date,
+			info.payment_type,
+			nvl(info.payment_money,0) payment_money,
+			info.payment_number,
+			info.check_user_name,
+			info.check_user_realname,
+			to_char(info.check_date,'yyyy-mm-dd hh24:mi:ss') check_date,
+			info.check_cancle_reason,
+			nvl(info.product_money,0) product_money,
+			nvl(info.product_count,0) product_count,
+			nvl(info.discount_money,0) discount_money,
+			info.update_reason,
+			to_char(info.confirm_date,'yyyy-mm-dd hh24:mi:ss') confirm_date,
+			info.order_source,
+			info.cancel_user_name,
+			info.cancel_user_realname,
+			info.check_state,
+			info.refund_state,
+			info.ywjl_user_name,
+			info.ywy_user_name,
+			info.md_id,
+			info.xdr_user_type,
+			info.xdr_user_name,
+			(select STORE_NAME from  TBL_STORE_INFO t where t.id=info.md_id and rownum &lt;=1) as md_name,
+			(select USER_REALNAME from  tbl_sys_user_info t where t.USER_NAME=info.ywjl_user_name and rownum &lt;=1) as ywjl_user_realname,
+			(select USER_REALNAME from  tbl_sys_user_info t where t.USER_NAME=info.ywy_user_name and rownum &lt;=1) as ywy_user_realname,
+			(select USER_REALNAME from  tbl_sys_user_info t where t.USER_NAME=info.xdr_user_name and rownum &lt;=1) as xdr_user_realname,
+			(select LOGIN_NAME from  TBL_USER_INFO t where t.user_name=info.user_name and rownum &lt;=1) as login_name,
+			info.payment_method,
+			info.transfer_voucher_url,
+			info.payment_transfer_user_name,
+			info.payment_transfer_user_realname,
+			to_char(info.payment_transfer_date,'yyyy-mm-dd hh24:mi:ss') payment_transfer_date,
+			info.user_pay_state,
+			info.user_voucher_url,
+			info.warehouse_id,
+			(select name from tbl_warehouse_info where id = info.warehouse_id) warehouse_name,
+			t.pay_trade_number,
+			t.voucher_path,
+			t.audit_state,
+			t.audit_user_name,
+			t.audit_user_realname,
+			to_char(t.audit_date,'yyyy-mm-dd hh24:mi:ss') audit_date,
+			(info.product_money + info.logistics_money + info.df_money) order_total_moeny
+    </sql>
+    <sql id="detail_column">
+    		info.id,
+			info.order_number,
+			to_char(info.create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+			info.user_name,
+			info.user_manage_name,
+			info.order_type,
+			info.order_state,
+			info.order_remark,
+			info.receiving_name,
+            info.receiving_address,
+            info.receiving_phone,
+			info.payment_state,
+			to_char(info.payment_date,'yyyy-mm-dd hh24:mi:ss') payment_date,
+			info.payment_type,
+			nvl(info.payment_money,0) payment_money,
+			info.payment_number,
+			nvl(info.product_count,0) product_count,
+			info.order_source,
+			info.check_state,
+			info.ywjl_user_name,
+			info.ywy_user_name,
+			info.md_id,
+			info.xdr_user_type,
+			info.xdr_user_name,
+			(select STORE_NAME from  TBL_STORE_INFO t where t.id=info.md_id and rownum &lt;=1) as md_name,
+			(select USER_REALNAME from  tbl_sys_user_info t where t.USER_NAME=info.ywjl_user_name and rownum &lt;=1) as ywjl_user_realname,
+			(select USER_REALNAME from  tbl_sys_user_info t where t.USER_NAME=info.ywy_user_name and rownum &lt;=1) as ywy_user_realname,
+			(select USER_REALNAME from  tbl_sys_user_info t where t.USER_NAME=info.xdr_user_name and rownum &lt;=1) as xdr_user_realname,
+			(select LOGIN_NAME from  TBL_USER_INFO t where t.user_name=info.user_name and rownum &lt;=1) as login_name,
+			info.user_pay_state,
+			info.user_voucher_url,
+			info.warehouse_id,
+			(select name from tbl_warehouse_info where id = info.warehouse_id) warehouse_name,
+			t.pay_trade_number,
+			t.voucher_path,
+			t.audit_state,
+			t.audit_user_name,
+			t.audit_user_realname,
+			to_char(t.audit_date,'yyyy-mm-dd hh24:mi:ss') audit_date,
+			(info.product_money + info.logistics_money + info.df_money) order_total_moeny
+    </sql>
+    <!-- 通用查询条件 -->
+    <sql id="where_order">
+        <where>
+        	d.pay_trade_number = t.pay_trade_number
+			and d.order_number = info.order_number
+	 		and t.voucher_path is not null 
+	 		and t.state = '1'
+	 		and t.audit_state is not null
+            <if test="order_number != null and order_number != ''">
+	            and info.order_number = #{order_number}
+	        </if>
+	        <if test="receiving_phone != null and receiving_phone != ''">
+	            and info.receiving_phone = #{receiving_phone}
+	        </if>
+	        <if test="user_name != null and user_name != ''">
+	            and EXISTS (select 1 from TBL_USER_INFO tt where tt.LOGIN_NAME like '%'||#{user_name}||'%' and tt.user_name=info.USER_NAME)
+	        </if>
+	        <if test="user_manage_name != null and user_manage_name != ''">
+	            and info.user_manage_name = #{user_manage_name}
+	        </if>
+	        <if test="itemnumber != null and itemnumber != ''">
+	            and EXISTS (select 1 from tbl_order_product product where product.order_number = info.order_number and product.itemnumber = #{itemnumber})
+	        </if>
+	        <if test="begin_date!=null and begin_date!=''">
+          		and info.create_date &gt;= to_date(#{begin_date},'yyyy-mm-dd hh24:mi:ss')
+            </if>
+            <if test="end_date!=null and end_date!=''">
+           		and info.create_date &lt;= to_date(#{end_date},'yyyy-mm-dd hh24:mi:ss')
+            </if>
+            <if test="sale_check_state!=null and sale_check_state==1">
+          		and info.payment_state=3 and info.VOUCHER_PATH is not null
+            </if>
+            <if test="sale_check_state!=null and sale_check_state==2">
+          		and (info.payment_state=2 and info.payment_type in('POS刷卡','现金支付','现金转账')) and info.VOUCHER_PATH is not null
+            </if>
+            <if test="sale_check_state!=null and sale_check_state==0">
+          		and info.payment_type in('POS刷卡','现金支付','现金转账') and (info.payment_state=3 or info.payment_state=2) and info.VOUCHER_PATH is not null
+            </if>
+            <if test="xdr_user_realname!=null and xdr_user_realname!=''">
+          		and EXISTS (select 1 from tbl_sys_user_info tt where tt.USER_REALNAME like '%'||#{xdr_user_realname}||'%' and tt.user_name=info.XDR_USER_NAME)
+            </if>
+			<if test="market_supervision_user_id != null and market_supervision_user_id != 0">
+				and EXISTS (select 1 from tbl_sys_user_info tt where tt.id = #{market_supervision_user_id,jdbcType=INTEGER} and tt.user_name=info.YWJL_USER_NAME)
+			</if>
+			<if test="referee_user_id != null and referee_user_id != 0">
+				and EXISTS (select 1 from tbl_sys_user_info tt where tt.id = #{referee_user_id,jdbcType=INTEGER} and tt.user_name=info.YWY_USER_NAME)
+			</if>
+			<if test="store_id != null and store_id != 0">
+				and EXISTS (select 1 from TBL_STORE_INFO tt where tt.id = #{store_id,jdbcType=INTEGER} and tt.id=info.md_id)
+			</if>
+            <!--<if test="ywjl_user_realname !=null and ywjl_user_realname !=''">-->
+          		<!--and EXISTS (select 1 from tbl_sys_user_info tt where tt.USER_REALNAME like '%'||#{ywjl_user_realname}||'%' and tt.user_name=info.YWJL_USER_NAME)-->
+            <!--</if>-->
+            <!--<if test="ywy_user_realname !=null and ywy_user_realname!=''">-->
+          		<!--and EXISTS (select 1 from tbl_sys_user_info tt where tt.USER_REALNAME like '%'||#{ywy_user_realname}||'%' and tt.user_name=info.YWY_USER_NAME)-->
+            <!--</if>-->
+            <!--<if test="md_name !=null and md_name !=''">-->
+          		<!--and EXISTS (select 1 from TBL_STORE_INFO tt where tt.STORE_NAME like '%'||#{md_name}||'%' and tt.id=info.md_id)-->
+            <!--</if>-->
+            <if test="audit_state !=null and audit_state !=''">
+		 		and t.audit_state in <foreach item="audit_state" collection="audit_state" open="(" separator="," close=")">#{audit_state}</foreach>
+		 	</if>
+        </where>
+    </sql>
+
+	<!-- 订单审核列表 -->
+	<select id="queryOrderAuditingList" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+            select a.*, rownum num from (
+                select <include refid="all_column"/>
+                from tbl_order_info info,tbl_order_union_pay t, tbl_order_union_pay_detail d
+                <include refid="where_order"/>
+                order by create_date desc
+            ) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) where num &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 订单审核数量 -->
+	<select id="queryOrderAuditingCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_order_info info,tbl_order_union_pay t, tbl_order_union_pay_detail d
+          <include refid="where_order"/>
+	</select>
+	<!-- 订单审核详情 -->
+	<select id="queryOrderAuditingDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select <include refid="detail_column"/>
+ 		 from tbl_order_info info,tbl_order_union_pay t, tbl_order_union_pay_detail d   
+        where d.pay_trade_number = t.pay_trade_number
+          and d.order_number = info.order_number
+ 		  and info.order_number = #{order_number,jdbcType=VARCHAR}
+ 		  and t.pay_trade_number = #{pay_trade_number,jdbcType=VARCHAR}
+	</select>
+	<!-- 查询交易号关联订单 -->
+	<select id="queryOrderUnionPayList" parameterType="java.util.Map" resultType="java.util.Map">
+		 select info.order_number,
+	      		(info.product_money + info.logistics_money + info.df_money) order_total_moeny,
+	       		info.order_type,
+	      		to_char(info.create_date,'yyyy-mm-dd hh24:mi:ss') as create_date
+	 	   from tbl_order_info info
+	      where info.order_number in (select order_number
+	                              		from tbl_order_union_pay_detail
+	                             	   where pay_trade_number = #{pay_trade_number,jdbcType=VARCHAR})
+	</select>
+	<!-- 订单审核通过，驳回 -->
+	<update id="orderAuditing" statementType="CALLABLE" parameterType="java.util.Map">
+		<![CDATA[
+			call pro_order_auditing(
+					#{public_user_name,mode=IN,jdbcType=VARCHAR},
+					#{pay_trade_number,mode=IN,jdbcType=VARCHAR},
+					#{order_number,mode=IN,jdbcType=VARCHAR},
+					#{check_type,mode=IN,jdbcType=VARCHAR},
+					#{rejected_reason,mode=IN,jdbcType=VARCHAR},
+					#{output_status,mode=OUT,jdbcType=VARCHAR},
+					#{output_msg,mode=OUT,jdbcType=VARCHAR}
+				)
+			]]>
+	</update>
+	<!-- 查询现金支付预充值状态 add wanghai -->
+	<select id="queryPayPrechargeState" parameterType="java.lang.String" resultType="java.lang.String">
+		select prerecharge_state from TBL_ORDER_UNION_PAY where pay_trade_number = #{pay_trade_number,jdbcType=VARCHAR}
+	</select>
+	<!-- 根据支付关联号查询会员ID和银行子账户 add wanghai -->
+	<select id="queryUserAccountByPayTradeNumber" parameterType="java.lang.String" resultType="java.util.Map">
+		select user_id,bank_account from tbl_bank_account
+		where user_id = (
+			select distinct i.user_name from tbl_order_info i, TBL_ORDER_UNION_PAY_DETAIL d
+			where i.order_number = d.order_number and d.pay_trade_number = #{pay_trade_number,jdbcType=VARCHAR}
+		)
+	</select>
+	<!-- 根据支付关联号查询订单支付总额 add wanghai -->
+	<select id="queryPayAmountByPayTradeNumber" parameterType="java.lang.String" resultType="double">
+		select sum(payment_money) from tbl_order_info i, TBL_ORDER_UNION_PAY_DETAIL d
+		where i.order_number = d.order_number and d.pay_trade_number = #{pay_trade_number,jdbcType=VARCHAR}
+	</select>
+	<!-- 更新现金支付预充值状态 add wanghai -->
+	<update id="updatePreChargeState" parameterType="java.lang.String">
+		update TBL_ORDER_UNION_PAY set prerecharge_state = '2' where pay_trade_number = #{pay_trade_number,jdbcType=VARCHAR}
+	</update>
+</mapper>

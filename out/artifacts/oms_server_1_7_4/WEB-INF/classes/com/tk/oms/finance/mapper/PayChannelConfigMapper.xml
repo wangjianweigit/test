@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tk.oms.finance.dao.PayChannelConfigDao">
+
+    <!--获取记录数-->
+    <select id="queryListForCount" resultType="int" parameterType="java.util.Map">
+        select count(1) from tbl_pay_config_operation
+    </select>
+
+    <!--获取分页列表-->
+    <select id="queryListForPage" resultType="java.util.Map" parameterType="java.util.Map">
+      select * from (
+            select t.*, rownum rn from (
+                select to_char(create_date, 'yyyy-mm-dd hh24:mi:ss') as create_date,
+                    (select user_realname from TBL_SYS_USER_INFO WHERE t.creater_id = id) as operater,
+                    zfb_new_config,
+                    zfb_old_config,
+                    wx_new_config,
+                    wx_old_config
+                  from tbl_pay_config_operation t order by create_date desc
+              ) t where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+          ) where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--新增操作记录-->
+    <insert id="insertOperationRecord" parameterType="java.util.Map">
+        insert into tbl_pay_config_operation
+        (
+          id,
+          creater_id,
+          create_date,
+          zfb_new_config,
+          zfb_old_config,
+          wx_new_config,
+          wx_old_config
+        )
+        values(
+          seq_pay_config_operation.nextval,
+          #{public_user_id, jdbcType=INTEGER},
+          sysdate,
+          #{zfb_new_config, jdbcType=VARCHAR},
+          #{zfb_old_config, jdbcType=VARCHAR},
+          #{wx_new_config, jdbcType=VARCHAR},
+          #{wx_old_config, jdbcType=VARCHAR}
+        )
+    </insert>
+
+</mapper>

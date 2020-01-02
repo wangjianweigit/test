@@ -1,0 +1,99 @@
+package com.tk.oms.notice.dao;
+
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Copyright (c), 2017, TongKu
+ * FileName : MessageCenterDao
+ * 消息中心管理数据库操作类
+ *
+ * @author zhenghui
+ * @version 1.00
+ * @date 2017/09/05
+ */
+@Repository
+public interface MessageCenterDao {
+
+    /**
+     * 查询消息提醒列表
+     * @param params
+     * @return
+     */
+    public List<Map<String,Object>> queryMessageRemindForList(Map<String,Object> params);
+
+    /**
+     * 查询消息提醒总数量
+     * @param params
+     * @return
+     */
+    public int queryMessageRemindForCount(Map<String,Object> params);
+
+    /**
+     * 通过类型查询提醒消息数量
+     * @param params
+     * @return
+     */
+    public int queryMessageRemindCountByType(Map<String,Object> params);
+
+    /**
+     * 更新消息提醒状态
+     * @param params
+     * @return
+     */
+    public int updateMessageRemindState(Map<String,Object> params);
+
+    /**
+     * 删除消息提醒数据
+     * @param params
+     * @return
+     */
+    public int deleteMessageRemind(Map<String,Object> params);
+
+    /**
+     * 通过商品货号查询sku列表
+     * @param params
+     * @return
+     */
+    public List<Map<String,Object>> querySkuListByNumber(Map<String,Object> params);
+    /**
+     * 获取有活动商品需要审批的数量
+     * @param params
+     * @return
+     */
+	public int queryActivityProductAuditRemindCount(Map<String, Object> params);
+	/**
+     * 获取有活动商品需要审批的分页数据
+     * @param params
+     * @return
+     */
+	public List<Map<String, Object>> queryActivityProductAuditRemindForList(Map<String, Object> params);
+	/**
+     * 查询会员反馈列表
+     * @param params
+     * @return
+     */
+    public List<Map<String,Object>> queryMemberFeedbackList(Map<String,Object> params);
+
+    /**
+     * 查询会员反馈列表总数量
+     * @param params
+     * @return
+     */
+    public int queryMemberFeedbackCount(Map<String,Object> params);
+    /**
+     * 获取会员反馈提醒数量
+     * @param params
+     * @return
+     */
+	public int queryMemberFeedbackRemindCount(Map<String, Object> params);
+	/**
+     * 更新反馈管理阅读状态
+     * @param params
+     * @return
+     */
+	public int updateMemberFeedbackRemindState(Map<String, Object> params);
+	
+}

@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.sysuser.dao.SysUserStoreDao">
+	
+	<!-- 配置用户门店权限信息 -->
+    <insert id="insert" parameterType="java.util.Map">
+        insert into tbl_sys_user_store(id,user_id,store_id)
+        select seq_sys_user_store.nextval,#{user_id,jdbcType=INTEGER},store_id from (
+	        <foreach collection="store_ids" open="(" close=")" item="item" separator="union all">
+	            select
+	            #{item.id,jdbcType=INTEGER} as store_id
+	            from dual
+	        </foreach>
+        )
+    </insert>
+    
+    <!-- 删除用户门店权限相关关联信息 -->
+    <delete id="delete"  parameterType="java.util.Map">
+         delete from tbl_sys_user_store 
+         <where>
+                user_id = #{user_id,jdbcType=INTEGER}
+         </where> 
+    </delete>
+
+	<resultMap id="userStoreMap" type="java.util.Map">
+		  <result column="id" property="id" />
+		  <result column="checked" property="checked" />
+	</resultMap>
+	<!-- 查询门店列表，如果有权限则选中 -->
+    <select id="queryUserStoreList" resultMap="userStoreMap" parameterType="java.util.Map">
+         select a.id,a.store_code,a.store_name,a.store_address,nvl(c.user_id,0) checked 
+           from tbl_store_info a,
+                (select user_id,store_id 
+                   from tbl_sys_user_store 
+                  where user_id = #{user_id,jdbcType=INTEGER}) c 
+          where  a.id = c.store_id(+)
+                 and a.state = 2
+         		 and exists(select 1 from tbl_site_info tsi where tsi.id=a.site_id and (tsi.stationed_user_id is null or tsi.stationed_user_id = 0)) 
+          order by a.store_code
+    </select>
+    <!-- 根据用户ID查询门店信息 -->
+	<select id="queryUserStoreInfo" parameterType="com.tk.oms.sysuser.entity.SysUserInfo" resultType="java.util.HashMap">
+		SELECT
+				TSI.ID,
+				TSI.STORE_CODE,
+				TSI.STORE_NAME,
+				TSI.STORE_ADDRESS,
+				TSI.STORE_PHONE,
+				TSI.STORE_LIMIT,
+				TSI.STORE_MOBILE_PHONE,
+				TSI.CREATE_USER_ID,
+				TO_CHAR(TSI.CREATE_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  CREATE_DATE,
+				TSI.STATE,
+				TO_CHAR(TSI.OFF_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  OFF_DATE,
+				TSI.ADDRESS_MAX,
+				TSI.ADDRESS_PROVINCE,
+				TSI.ADDRESS_CITY,
+				TSI.ADDRESS_COUNTY,
+				TO_CHAR(TSI.LAST_UPDATE_TIME,'YYYY-MM-DD HH24:MI:SS')  AS  LAST_UPDATE_TIME,
+				TSI.VERIFY_CODE,
+				TSI.SITE_ID,
+				TSI.SHOPKEEPER_USER_ID
+		FROM TBL_STORE_INFO TSI
+		WHERE EXISTS(SELECT 1 FROM TBL_STORE_USER_REL TSUR WHERE TSUR.USER_ID = #{id,jdbcType=INTEGER} AND TSUR.TYPE = #{user_type,jdbcType=INTEGER} AND TSUR.STORE_ID = TSI.ID)
+			  OR TSI.SHOPKEEPER_USER_ID = #{id,jdbcType=INTEGER}
+			  OR tsi.manager_user_id=#{id,jdbcType=INTEGER}
+	</select>
+	
+	<!-- 配置用户私有门店权限信息 -->
+    <insert id="insertUserPvtpStore" parameterType="java.util.Map">
+        insert into tbl_sys_user_pvtp_store(id,user_id,store_id)
+	    select seq_sys_user_pvtp_store.nextval,#{user_id,jdbcType=INTEGER},id
+		  from tbl_store_info t
+		 where exists(
+		        select 1
+		        from tbl_site_info si
+		        where si.id = t.site_id
+		        and si.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		        and rownum &lt;=1)
+    </insert>
+
+    <!-- 删除用户私有门店权限相关关联信息 -->
+    <delete id="deleteUserPvtpStore"  parameterType="java.util.Map">
+        delete from tbl_sys_user_pvtp_store t
+        <where>
+            user_id = #{user_id,jdbcType=INTEGER}
+            and exists (
+                select 1
+                from tbl_store_info a, tbl_site_info si
+                where si.id = a.site_id
+                  and si.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+                  and t.store_id = a.id)
+        </where>
+    </delete>
+    <!-- 查询门店列表，如果有权限则选中 -->
+    <select id="queryUserPvtpStoreList" parameterType="java.util.Map"  resultType="java.util.Map">
+    	select (select company_name from tbl_stationed_user_info where id = (select stationed_user_id from tbl_site_info b where a.site_id = id and rownum &lt;= 1)) stationed_user_name,
+                a.id,a.store_code,a.store_name,nvl(c.user_id,0) is_empower
+           from tbl_store_info a,
+                (select user_id,store_id 
+                   from tbl_sys_user_pvtp_store 
+                  where user_id = #{user_id,jdbcType=INTEGER}) c
+          where a.id = c.store_id(+)
+            and a.id in (select store_id 
+                   		   from tbl_sys_user_pvtp_store 
+                  		  where user_id = #{user_id,jdbcType=INTEGER})
+         	order by stationed_user_name
+    </select>
+</mapper>

@@ -1,0 +1,583 @@
+package com.tk.analysis.product.control;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import com.tk.analysis.product.service.ProductAnalysisOperationService;
+import com.tk.sys.util.Packet;
+import com.tk.sys.util.Transform;
+
+/**
+ * 
+ * Copyright (c), 2019, Tongku
+ * FileName : ProductAnalysisOperationControl.java
+ * 运营分析-商品
+ *
+ * @author yejingquan
+ * @version 1.00
+ * @date Mar 27, 2019
+ */
+@Controller
+@RequestMapping("/product_analysis_operation")
+public class ProductAnalysisOperationControl {
+	@Resource
+	private ProductAnalysisOperationService productAnalysisOperationService;
+	
+	/**
+	 * 商品概况
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/product_survey", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryProductSurvey(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryProductSurvey(request));
+    }
+	
+	/**
+	 * 核心数据分析-商品访客数
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/kernel_data_productVisitorCount", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryKernelData_ProductVisitorCount(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryKernelData_ProductVisitorCount(request));
+    }
+	
+	/**
+	 * 核心数据分析-浏览量
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/kernel_data_productPvCount", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryKernelData_ProductPvCount(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryKernelData_ProductPvCount(request));
+    }
+	
+	/**
+	 * 核心数据分析-下单买家数
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/kernel_data_oPurchaseNumber", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryKernelData_OPurchaseNumber(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryKernelData_OPurchaseNumber(request));
+    }
+	
+	/**
+	 * 核心数据分析-订单商品件数
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/kernel_data_oCount", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryKernelData_OCount(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryKernelData_OCount(request));
+    }
+	
+	/**
+	 * 核心数据分析-订单商品总额
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/kernel_data_oMoney", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryKernelData_OMoney(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryKernelData_OMoney(request));
+    }
+	
+	/**
+	 * 核心数据分析-下单转化率
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/kernel_data_oZhl", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryKernelData_OZhl(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryKernelData_OZhl(request));
+    }
+	
+	/**
+	 * 核心数据分析-支付买家数
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/kernel_data_payPurchaseNumber", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryKernelData_PayPurchaseNumber(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryKernelData_PayPurchaseNumber(request));
+    }
+	
+	/**
+	 * 核心数据分析-支付件数
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/kernel_data_payCount", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryKernelData_PayCount(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryKernelData_PayCount(request));
+    }
+	
+	/**
+	 * 核心数据分析-销售总额
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/kernel_data_payMoney", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryKernelData_PayMoney(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryKernelData_PayMoney(request));
+    }
+	
+	/**
+	 * 核心数据分析-支付转化率
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/kernel_data_payZhl", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryKernelData_PayZhl(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryKernelData_PayZhl(request));
+    }
+	
+	/**
+	 * 核心数据分析-退款商品金额
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/kernel_data_returnMoney", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryKernelData_ReturnMoney(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryKernelData_ReturnMoney(request));
+    }
+	
+	/**
+	 * 核心数据分析-退款商品数
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/kernel_data_returnCount", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryKernelData_ReturnCount(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryKernelData_ReturnCount(request));
+    }
+	
+	/**
+	 * 核心数据分析-客单价
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/kernel_data_kdj", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryKernelData_Kdj(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryKernelData_Kdj(request));
+    }
+	
+	/**
+	 * 核心数据分析-折线
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/kernel_data_chart", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryKernelDataChart(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryKernelDataChart(request));
+    }
+	
+	/**
+	 * 商品概况-商品汇总排行
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/product_rank", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryProductSummaryRank(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryProductSummaryRank(request));
+    }
+	
+	/**
+	 * 查询销售区域排行
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/sale_area_rank", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet querySaleAreaRank(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.querySaleAreaRank(request));
+    }
+	
+	/**
+	 * 查询销售区域明细
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/sale_area_detail", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet querySaleAreaDetail(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.querySaleAreaDetail(request));
+    }
+	
+	/**
+	 * 查询销售区域地图
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/sale_area_map", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet querySaleAreaMap(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.querySaleAreaMap(request));
+    }
+	
+	/**
+	 * 查询商品销售分析列表
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/product_sale_list", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryProductSaleListForPage(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryProductSaleListForPage(request));
+    }
+	
+	/**
+	 * 查询商品销售分析-折线
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/product_sale_chart", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryProductSaleChart(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryProductSaleChart(request));
+    }
+	
+	/**
+	 * 查询商品销售分析-库存明细
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/product_sale_stock_detail", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryProductSaleStockDetail(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryProductSaleStockDetail(request));
+    }
+	
+	/**
+	 * 查询商品退货分析
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/product_return", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryProductReturn(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryProductReturn(request));
+    }
+	
+	/**
+	 * 退货数据分析-成功退款笔数
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/return_data_ReturnNum", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryReturnData_ReturnNum(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryReturnData_ReturnNum(request));
+    }
+	/**
+	 * 退货数据分析-退款商品数
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/return_data_ReturnCount", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryReturnData_ReturnCount(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryReturnData_ReturnCount(request));
+    }
+	/**
+	 * 退货数据分析-驳回申请笔数
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/return_data_RejectNum", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryReturnData_RejectNum(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryReturnData_RejectNum(request));
+    }
+	/**
+	 * 退货数据分析-品质退换货率
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/return_data_Pzthhl", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryReturnData_Pzthhl(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryReturnData_Pzthhl(request));
+    }
+	/**
+	 * 退货数据分析-品质退换件数
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/return_data_QualityReturnCount", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryReturnData_QualityReturnCount(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryReturnData_QualityReturnCount(request));
+    }
+	/**
+	 * 退货数据分析-折线
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/return_data_chart", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryReturnDataChart(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryReturnDataChart(request));
+    }
+	
+	/**
+	 * 商品退货分析-商品列表
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/return_product_list", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryProductReturnListForPage(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryProductReturnListForPage(request));
+    }
+	/**
+	 * 商品退货分析-商品详情
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/return_product_detail", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryProductReturnDetail(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryProductReturnDetail(request));
+    }
+	/**
+	 * 商品退货分析-退货原因分析
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/return_reason", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryReturnReason(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryReturnReason(request));
+    }
+	
+	/**
+	 * 商品退货分析-品质退换货分析
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/return_quality", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryReturnQuality(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryReturnQuality(request));
+    }
+	
+	/**
+	 * 商品退货分析-退货商家排行
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/return_stationed_rank", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryReturnStationedRank(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryReturnStationedRank(request));
+    }
+	
+	/**
+	 * 商品退货分析-退货品牌排行
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/return_brand_rank", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryReturnBrandRank(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryReturnBrandRank(request));
+    }
+	/**
+	 * 单品分析搜索
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/single_search", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryProductSingleSearch(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryProductSingleSearch(request));
+    }
+	/**
+	 * 查询单品分析列表
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/single_List", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryProductSingleListForPage(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryProductSingleListForPage(request));
+    }
+	
+	/**
+	 * 单品分析-商品信息
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/single_product_info", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet querySingleProductInfo(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.querySingleProductInfo(request));
+    }
+	
+	/**
+	 * 查询单品分析详情
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/single_detail", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryProductSingleDetail(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryProductSingleDetail(request));
+    }
+	
+	/**
+	 * 查询单品分析-销量分析
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/single_sale_volume", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet querySingleSaleVolumeChart(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.querySingleSaleVolumeChart(request));
+    }
+	
+	/**
+	 * 查询单品分析-销售趋势
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/single_trend", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryProductSingleTrend(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryProductSingleTrend(request));
+    }
+	
+	/**
+	 * 查询单品分析-销售区域分析
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/single_sale_area", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryProductSingleSaleArea(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryProductSingleSaleArea(request));
+    }
+	
+	/**
+	 * 查询单品分析-销售区域地图
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/single_sale_area_map", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet querySingleSaleAreaMap(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.querySingleSaleAreaMap(request));
+    }
+	
+	/**
+	 * 查询单品分析-销售区域分析-sku销量明细
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/single_sale_detail", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryProductSingleSaleDetail(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryProductSingleSaleDetail(request));
+    }
+	
+	/**
+	 * 查询单品分析-售后分析
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/single_after_sale", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryProductSingleAfterSale(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryProductSingleAfterSale(request));
+    }
+	
+	/**
+	 * 异常商品-流量下跌
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/abnormal_flow", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryAbnormalFlowListForPage(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryAbnormalFlowListForPage(request));
+    }
+	
+	/**
+	 * 异常商品-支付转化率低
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/abnormal_zhl", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryAbnormalZhlListForPage(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryAbnormalZhlListForPage(request));
+    }
+	
+	/**
+	 * 异常商品-退款预警
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/abnormal_refund", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryAbnormalRefundListForPage(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryAbnormalRefundListForPage(request));
+    }
+	
+	/**
+	 * 异常商品-库存预警
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/abnormal_stock", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryAbnormalStockListForPage(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryAbnormalStockListForPage(request));
+    }
+	
+	/**
+	 * 异常商品-滞销商品
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/abnormal_unsalable", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryAbnormalUnsalableListForPage(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryAbnormalUnsalableListForPage(request));
+    }
+	
+	/**
+	 * 商品库存明细
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/product_stock_detail", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryProductStockDetail(HttpServletRequest request){
+        return Transform.GetResult(productAnalysisOperationService.queryProductStockDetail(request));
+    }
+	
+}

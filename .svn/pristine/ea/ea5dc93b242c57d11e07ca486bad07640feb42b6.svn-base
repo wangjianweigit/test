@@ -1,0 +1,301 @@
+package com.tk.oms.basicinfo.control;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import com.tk.oms.basicinfo.service.SiteInfoService;
+import com.tk.sys.util.Packet;
+import com.tk.sys.util.ProcessResult;
+import com.tk.sys.util.Transform;
+
+
+
+@Controller
+@RequestMapping("/site_info")
+public class SiteInfoControl {
+	@Resource
+    private SiteInfoService siteInfoService;
+	
+	/**
+     * @api{post} /{oms_server}/site_info/add 站点新增
+     * @apiGroup add
+     * @apiName add
+     * @apiDescription  新增站点信息
+     * @apiVersion 0.0.1
+     * @apiParam{number} id 主键
+     * @apiParam{String} name 站点名称
+     * @apiParam{number} discount 折扣率
+     * @apiParam{string} remark 描述
+     * @apiParam{date} create_date 创建时间
+     * @apiParam{string} state '1'（停用）'2'（启用）
+     * @apiParam{string} parent_warehouse_id 父级仓库id 用逗号分隔
+     * @apiParam{string} warehouse_id 仓库id 用逗号分隔
+     * @apiSuccess{boolean} state 接口获取数据是否成功.true:成功  false:失败
+     * @apiSuccess{string} message 接口返回信息
+     * @apiSuccess{object} obj 站点信息
+     */
+	    @RequestMapping(value = "/add", method = RequestMethod.POST)
+	    @ResponseBody
+	    public Packet add(HttpServletRequest request) {
+			ProcessResult pr = new ProcessResult();
+	    	try {
+	    		pr =  siteInfoService.addSiteInfo(request);
+			}catch (Exception e) {
+				pr.setState(false);
+				pr.setMessage(e.getMessage());
+			}
+	    	return Transform.GetResult(pr);
+	    }
+	    /**
+	     * @api{post} /{oms_server}/site_info/edit 站点修改
+	     * @apiGroup edit
+	     * @apiName edit
+	     * @apiDescription  修改站点信息
+	     * @apiVersion 0.0.1
+	     * @apiParam{number} id 主键
+         * @apiParam{String} name 站点名称
+         * @apiParam{number} discount 折扣率
+         * @apiParam{string} remark 描述
+         * @apiParam{string} state '1'（停用）'2'（启用）
+         * @apiParam{string} parent_warehouse_id 父级仓库id 用逗号分隔
+         * @apiParam{string} warehouse_id 仓库id 用逗号分隔
+         * @apiParam{number} site_id 站点id 用逗号分隔
+	     * @apiSuccess{boolean} state 接口获取数据是否成功.true:成功  false:失败
+	     * @apiSuccess{string} message 接口返回信息
+	     * @apiSuccess{object} obj 站点信息
+	     */
+	    @RequestMapping(value = "/edit", method = RequestMethod.POST)
+	    @ResponseBody
+	    public Packet edit(HttpServletRequest request) {
+	    	ProcessResult pr = new ProcessResult();
+	    	try {
+	    		pr =  siteInfoService.editSiteInfo(request);
+	    	}catch (Exception e) {
+	    		pr.setState(false);
+	    		pr.setMessage(e.getMessage());
+	    	}
+	    	return Transform.GetResult(pr);
+	    }
+	    /**
+	     * @api{post} /{oms_server}/site_info/list 站点信息查询
+	     * @apiGroup list
+	     * @apiName list
+	     * @apiDescription  分页查询品牌信息列表
+	     * @apiVersion 0.0.1
+	     * @apiParam{number} [pageIndex=1] 起始页
+	     * @apiParam{number} [pageSize=10] 分页大小
+	     * @apiSuccess{boolean} state 接口获取数据是否成功.true:成功  false:失败
+	     * @apiSuccess{string} message 接口返回信息
+	     * @apiSuccess{object} obj 站点信息查询
+	     * @apiSuccess{number} total 总条数
+	     */
+	    @RequestMapping(value = "/list", method = RequestMethod.POST)
+	    @ResponseBody
+	    public Packet list(HttpServletRequest request) {
+	        return Transform.GetResult(siteInfoService.queryList(request));
+	    }
+	    
+	    /**
+	     * @api{post} /{oms_server}/site_info/all_list 所有站点查询
+	     * @apiGroup all_list
+	     * @apiName all_list
+	     * @apiDescription  所有站点查询
+	     * @apiVersion 0.0.1
+	     * @apiParam{number} [pageIndex=1] 起始页
+	     * @apiParam{number} [pageSize=10] 分页大小
+	     * @apiSuccess{boolean} state 接口获取数据是否成功.true:成功  false:失败
+	     * @apiSuccess{string} message 接口返回信息
+	     * @apiSuccess{object} obj 所有站点查询
+	     */
+	    @RequestMapping(value = "/all_list", method = RequestMethod.POST)
+	    @ResponseBody
+	    public Packet allList(HttpServletRequest request) {
+	        return Transform.GetResult(siteInfoService.queryAllList(request));
+	    }
+	    
+	    /**
+	     * @api{post} /{oms_server}/site_info/detail 站点详情
+	     * @apiGroup detail
+	     * @apiName detail
+	     * @apiDescription  站点详情
+	     * @apiVersion 0.0.1
+	     * @apiParam{number} [pageIndex=1] 起始页
+	     * @apiParam{number} [pageSize=10] 分页大小
+	     * @apiSuccess{boolean} state 接口获取数据是否成功.true:成功  false:失败
+	     * @apiSuccess{string} message 接口返回信息
+	     * @apiSuccess{object} obj 站点信息
+	     */
+	    @RequestMapping(value = "/detail", method = RequestMethod.POST)
+	    @ResponseBody
+	    public Packet detail(HttpServletRequest request) {
+	        return Transform.GetResult(siteInfoService.queryDetail(request));
+	    }
+	    
+	    /**
+	     * @api{post} /{oms_server}/site_info/remove 站点删除
+	     * @apiGroup remove
+	     * @apiName site_remove
+	     * @apiDescription  站点删除
+	     * @apiVersion 0.0.1
+	     * @apiParam{number} id 主键
+	     * @apiParam{number} site_id 站点id
+	     * @apiSuccess{boolean} state 接口获取数据是否成功.true:成功  false:失败
+	     * @apiSuccess{string} message 接口返回信息
+	     * @apiSuccess{object} obj 站点信息
+	     */
+	    @RequestMapping(value = "/remove", method = RequestMethod.POST)
+	    @ResponseBody
+	    public Packet remove(HttpServletRequest request) {
+	    	ProcessResult pr = new ProcessResult();
+			try {
+				pr = siteInfoService.removeSiteInfo(request);
+			} catch (Exception e) {
+				pr.setState(false);
+				pr.setMessage(e.getMessage());
+				e.printStackTrace();
+			}
+			return Transform.GetResult(pr);
+	    }
+	    /**
+	     * @api{post} /{oms_server}/site_info/warehouse_list 查询所在站点的大仓以及关联的分仓
+	     * @apiGroup warehouse_list
+	     * @apiName warehouse_list
+	     * @apiDescription  查询站点所关联的仓库
+	     * @apiVersion 0.0.1
+	     * @apiParam{number} site_id 站点id
+	     * @apiSuccess{boolean} state 接口获取数据是否成功.true:成功  false:失败
+	     * @apiSuccess{string} message 接口返回信息
+	     * @apiSuccess{object} obj 站点信息
+	     */
+	    @RequestMapping(value = "/warehouse_list", method = RequestMethod.POST)
+	    @ResponseBody
+	    public Packet queryWarehouseList(HttpServletRequest request) {
+	        return Transform.GetResult(siteInfoService.queryWarehouseList(request));
+	    }
+	    /**
+	     * @api{post} /{oms_server}/site_info/site_warehouselist 查询站点所关联的仓库
+	     * @apiGroup site_warehouselist
+	     * @apiName site_warehouselist
+	     * @apiDescription  查询站点所关联的仓库
+	     * @apiVersion 0.0.1
+	     * @apiParam{number} site_id 站点id
+	     * @apiSuccess{boolean} state 接口获取数据是否成功.true:成功  false:失败
+	     * @apiSuccess{string} message 接口返回信息
+	     * @apiSuccess{object} obj 站点信息
+	     */
+	    @RequestMapping(value = "/site_warehouselist", method = RequestMethod.POST)
+	    @ResponseBody
+	    public Packet querySiteWarehouseList(HttpServletRequest request) {
+	        return Transform.GetResult(siteInfoService.querySiteWarehouseList(request));
+	    }
+	    
+	    /**
+	     * @api{post} /{oms_server}/site_info/platform_warehouse_list 查询所有平台可用仓库
+	     * @apiGroup platform_warehouse_list
+	     * @apiName platform_warehouse_list
+	     * @apiDescription  查询所有平台可用仓库
+	     * @apiVersion 0.0.1
+	     * @apiSuccess{boolean} state 接口获取数据是否成功.true:成功  false:失败
+	     * @apiSuccess{string} message 接口返回信息
+	     * @apiSuccess{object} obj 站点信息
+	     */
+		@RequestMapping(value = "/platform_warehouse_list", method = RequestMethod.POST)
+	    @ResponseBody
+	    public Packet queryPlatformWarehouseList(HttpServletRequest request) {
+	        return Transform.GetResult(siteInfoService.queryPlatformWarehouseList(request));
+	    }
+		
+		
+		 /**
+	     * @api{post} /{oms_server}/site_info/update_state 禁用启用站点
+	     * @apiGroup update_state
+	     * @apiName update_state
+	     * @apiDescription  禁用启用站点
+	     * @apiVersion 0.0.1
+	     * @apiParam{number} id 站点id
+	     * @apiParam{number} state 状态   1禁用 2启用
+	     * @apiSuccess{boolean} state 接口获取数据是否成功.true:成功  false:失败
+	     * @apiSuccess{string} message 接口返回信息
+	     * @apiSuccess{object} obj 站点信息
+	     */
+		@RequestMapping(value = "/update_state", method = RequestMethod.POST)
+	    @ResponseBody
+	    public Packet siteInfoUpdateState(HttpServletRequest request) {
+			ProcessResult pr = new ProcessResult();
+			try {
+				pr = siteInfoService.siteInfoUpdateState(request);
+			} catch (Exception e) {
+				pr.setState(false);
+				pr.setMessage(e.getMessage());
+				e.printStackTrace();
+			}
+			return Transform.GetResult(pr);
+	    }
+		
+		/**
+	     * @api{post} /{oms_server}/site_info/sort 站点仓库排序
+	     * @apiGroup sort
+	     * @apiName sort
+	     * @apiDescription  站点仓库排序
+	     * @apiVersion 0.0.1
+	     * @apiParam{number} [id] 需要排序的id
+	     * @apiParam{number} [toId]   需要排序的id
+	     * @apiSuccess{boolean} state 接口获取数据是否成功.true:成功  false:失败
+	     * @apiSuccess{string} message 接口返回信息
+	     * @apiSuccess{object} obj 站点仓库信息
+	     */
+	    @RequestMapping(value = "/sort", method = RequestMethod.POST)
+	    @ResponseBody
+	    public Packet sortSiteInfo(HttpServletRequest request) {
+	    	ProcessResult pr = new ProcessResult();
+			try {
+				pr = siteInfoService.sort(request);
+			} catch (Exception e) {
+				pr.setState(false);
+				pr.setMessage(e.getMessage());
+				e.printStackTrace();
+			}
+			return Transform.GetResult(pr);
+	    }
+	    
+	    /**
+	    *
+	    * @api {post} /{project_name}/site_info/all/warehouse 所有站点可展示的仓库列表
+	    * @apiGroup site_info
+	    * @apiName all/warehouse
+	    * @apiDescription  各个站点可展示的仓库列表汇总
+	    * @apiVersion 0.0.1
+	    * 
+	    * @apiParam {long} stationed_user_id 	商家主账号ID
+		*
+	    * @apiSuccess {boolean}    state 接口获取数据是否成功.true:成功  false:失败
+	    * @apiSuccess {string}     message 接口返回信息.
+	    * @apiSuccess {object[]}     obj 仓库列表
+	    * @apiSuccess {long}     	  obj.WAREHOUSE_ID 				小仓ID
+	    * @apiSuccess {long}     	  obj.PARENT_WAREHOUSE_ID 		大仓ID
+	    * @apiSuccess {string}       obj.PARENT_WAREHOUSE_NAME		大仓名称
+	    * @apiSuccess {int}          obj.SELECTED	  				当前商家是否已将当前仓库作为默认缺货订购仓库
+	    * 											 					<p>0：未作为缺货订购仓</p>			
+	    * 											 					<p>1：未选择作为缺货订购仓</p>			
+	    */
+	   @RequestMapping(value = "/all/warehouse", method = RequestMethod.POST)
+	   @ResponseBody
+	   public Packet queryAllSiteWarehouseList(HttpServletRequest request) {
+		   return Transform.GetResult(siteInfoService.queryAllSiteWarehouseList(request));
+	   }
+	   
+	   /**
+	    * 查询童库平台站点或私有平台站点
+	    * 
+	    */
+	   @RequestMapping(value = "platform_site_list", method = RequestMethod.POST)
+	   @ResponseBody
+	   public Packet queryPlatformSiteList(HttpServletRequest request) {
+		   return Transform.GetResult(siteInfoService.queryPlatformSiteList(request));
+	   }
+}

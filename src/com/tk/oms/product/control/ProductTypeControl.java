@@ -1,0 +1,232 @@
+package com.tk.oms.product.control;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import com.tk.oms.product.service.ProductTypeService;
+import com.tk.sys.util.Packet;
+import com.tk.sys.util.Transform;
+/**
+ * 
+ * Copyright (c), 2017, Tongku
+ * FileName : ProductTypeControl
+ * 商品分类
+ *
+ * @author yejingquan
+ * @version 1.00
+ * @date 2017-4-6
+ */
+@Controller
+@RequestMapping("/product_type")
+public class ProductTypeControl {
+
+    @Resource
+    private ProductTypeService productTypeService;
+
+    /**
+     * @api {post} /{project_name}/product_type/list 
+     * @apiName list
+     * @apiGroup product_type
+     * @apiDescription  查询商品分类信息
+     * @apiVersion 0.0.1
+     * 
+     * @apiParam {string} type_name 分类名称
+     * @apiParam {number} parent_id 分类父id
+     * 
+     * @apiSuccess {boolean}    state 接口获取数据是否成功.true:成功  false:失败
+     * @apiSuccess {string}     message 接口返回信息
+     * @apiSuccess {object[]}   obj 分类列表
+     * @apiSuccess {number}   	obj.id 分类id
+     * @apiSuccess {string}   	obj.type_name 分类名称
+     * @apiSuccess {number}   	obj.parent_id 分类父id
+     * @apiSuccess {date}     	obj.create_date 分类创建日期
+     * @apiSuccess {number}   	obj.sortid 排序id
+     */
+    @RequestMapping(value = "/list", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryProductTypeList(HttpServletRequest request) {
+        return Transform.GetResult(productTypeService.queryProductTypeList(request));
+    }
+    /**
+     * @api {post} /{project_name}/product_type/add 
+     * @apiName add
+     * @apiGroup product_type
+     * @apiDescription  新增商品分类信息
+     * @apiVersion 0.0.1
+     * 
+     * @apiParam {string} type_name 分类名称
+     * @apiParam {string} parent_id 分类父id
+     * 
+     * @apiSuccess {boolean}    state 接口获取数据是否成功.true:成功  false:失败
+     * @apiSuccess {string}     message 接口返回信息.
+     * @apiSuccess {object[]}   obj 
+     */
+    @RequestMapping(value = "/add", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet addProductType(HttpServletRequest request) {
+        return Transform.GetResult(productTypeService.addProductType(request));
+    }
+    /**
+     * @api {post} /{project_name}/product_type/edit 
+     * @apiName edit
+     * @apiGroup product_type
+     * @apiDescription  编辑商品分类信息
+     * @apiVersion 0.0.1
+     * 
+     * @apiParam {string} type_name 分类名称 (可为空)
+     * @apiParam {number} sortid	排序id(可为空)
+     * @apiParam {number} id 分类id
+     * 
+     * @apiSuccess {boolean}    state 接口获取数据是否成功.true:成功  false:失败
+     * @apiSuccess {string}     message 接口返回信息.
+     * @apiSuccess {object[]}   obj 
+     */
+    @RequestMapping(value = "/edit", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet editProductType(HttpServletRequest request) {
+        return Transform.GetResult(productTypeService.editProductType(request));
+    }
+    /**
+     * @api {post} /{project_name}/product_type/batch_edit
+     * @apiName batch_edit
+     * @apiGroup product_type
+     * @apiDescription  批量更新商品分类信息
+     * @apiVersion 0.0.1
+     * 
+     * @apiParam {string} type_name 分类名称
+     * @apiParam {number} id 分类id
+     * 
+     * @apiSuccess {boolean}    state 接口获取数据是否成功.true:成功  false:失败
+     * @apiSuccess {string}     message 接口返回信息.
+     * @apiSuccess {object[]}   obj 
+     */
+	@RequestMapping(value = "/batch_edit", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet batchEditProductType(HttpServletRequest request) {
+        return Transform.GetResult(productTypeService.batchEditProductType(request));
+    }
+    /**
+     * @api {post} /{project_name}/product_type/delete 
+     * @apiName delete
+     * @apiGroup product_type
+     * @apiDescription  删除商品分类信息
+     * @apiVersion 0.0.1
+     * 
+     * @apiParam {number} id 分类id
+     * 
+     * @apiSuccess {boolean}    state 接口获取数据是否成功.true:成功  false:失败
+     * @apiSuccess {string}     message 接口返回信息.
+     * @apiSuccess {object[]}   obj 
+     */
+    @RequestMapping(value = "/remove", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet removeProductType(HttpServletRequest request) {
+        return Transform.GetResult(productTypeService.removeProductType(request));
+    }
+    /**
+     * @api {post} /{project_name}/product_type/sort 
+     * @apiName sort
+     * @apiGroup product_type
+     * @apiDescription  排序
+     * @apiVersion 0.0.1
+     * 
+     * @apiParam {number} id1 第一个分类id
+     * @apiParam {number} id2 第二个分类id
+     * 
+     * @apiSuccess {boolean}    state 接口获取数据是否成功.true:成功  false:失败
+     * @apiSuccess {string}     message 接口返回信息.
+     * @apiSuccess {object[]}   obj 
+     */
+    @RequestMapping(value = "/sort", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet sortProductType(HttpServletRequest request) {
+        return Transform.GetResult(productTypeService.sortProductType(request));
+    }
+    
+    /**
+     * @api {post} /{project_name}/product_type/options 
+     * @apiName options
+     * @apiGroup product_type
+     * @apiDescription  分类下拉框列表
+     * @apiVersion 0.0.1
+     * 
+     * 
+     * @apiSuccess {boolean}    state 接口获取数据是否成功.true:成功  false:失败
+     * @apiSuccess {string}     message 接口返回信息.
+     * @apiSuccess {object[]}   obj 
+     * @apiSuccess {number}   	obj.id 		分类id
+     * @apiSuccess {string}   	obj.options 分类名称
+     */
+    @RequestMapping(value = "/options", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryTypeList(HttpServletRequest request) {
+        return Transform.GetResult(productTypeService.queryTypeList(request));
+    }
+    
+    /**
+     * @api {post} /{project_name}/product_type/main_type 
+     * @apiName main_type
+     * @apiGroup product_type
+     * @apiDescription  查询大类
+     * @apiVersion 0.0.1
+     * 
+     * 
+     * @apiSuccess {boolean}    state 接口获取数据是否成功.true:成功  false:失败
+     * @apiSuccess {string}     message 接口返回信息
+     * @apiSuccess {object[]}   obj 分类列表
+     * @apiSuccess {number}   	obj.id 分类id
+     * @apiSuccess {string}   	obj.type_name 分类名称
+     * @apiSuccess {number}   	obj.type 商品分类类型
+     */
+    @RequestMapping(value = "/main_type", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryMainTypeList(HttpServletRequest request) {
+        return Transform.GetResult(productTypeService.queryMainTypeList(request));
+    }
+
+    /**
+     * @api {post} /{project_name}/product_type/basic_data
+     * @apiName basic_data
+     * @apiGroup product_type
+     * @apiDescription  查询分类关联基本属性信息
+     * @apiVersion 0.0.1
+     *
+     * @apiParam {number} id 分类id
+     * @apiParam {number} parent_id 分类父级id
+     *
+     * @apiSuccess {boolean}    state 接口获取数据是否成功.true:成功  false:失败
+     * @apiSuccess {string}     message 接口返回信息.
+     * @apiSuccess {object[]}   obj
+     */
+    @RequestMapping(value = "/basic_data", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet queryBasicData(HttpServletRequest request) {
+        return Transform.GetResult(productTypeService.queryBasicData(request));
+    }
+
+
+    /**
+     * @api {post} /{project_name}/product_type/edit_basic_data
+     * @apiName edit_basic_data
+     * @apiGroup product_type
+     * @apiDescription  编辑分类关联的基础属性信息
+     * @apiVersion 0.0.1
+     *
+     * @apiParam {number} id 分类id
+     *
+     * @apiSuccess {boolean}    state 接口获取数据是否成功.true:成功  false:失败
+     * @apiSuccess {string}     message 接口返回信息.
+     * @apiSuccess {object[]}   obj
+     */
+    @RequestMapping(value = "/edit_basic_data", method = RequestMethod.POST)
+    @ResponseBody
+    public Packet editBasicData(HttpServletRequest request) {
+        return Transform.GetResult(productTypeService.editBasicData(request));
+    }
+
+}

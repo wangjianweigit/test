@@ -1,0 +1,650 @@
+package com.tk.oms.finance.service;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import com.tk.oms.finance.dao.FinanceStatisticsDao;
+import com.tk.sys.config.EsbConfig;
+import com.tk.sys.util.GridResult;
+import com.tk.sys.util.HttpClientUtil;
+import com.tk.sys.util.HttpUtil;
+import com.tk.sys.util.Jackson;
+import com.tk.sys.util.Packet;
+import com.tk.sys.util.PageUtil;
+import com.tk.sys.util.ProcessResult;
+import com.tk.sys.util.Transform;
+
+/**
+ * 
+ * Copyright (c), 2019, Tongku
+ * FileName : FinanceStatisticsControl
+ * 财务记账相关报表
+ *
+ * @author liujialong
+ * @version 1.00
+ * @date 2019-4-18
+ */
+@Service("FinanceStatisticsService")
+public class FinanceStatisticsService {
+	private Log logger = LogFactory.getLog(this.getClass());
+	@Resource
+	private FinanceStatisticsDao financeStatisticsDao;
+	
+	@Value("${retail_service_url}")
+    private String retail_service_url;
+	@Value("${retail_service_new_url}")
+    private String retail_service_new_url;
+	
+	/**
+	 * 查询支付统计报表
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryPayStatisticsReportList(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        	PageUtil.handlePageParams(paramMap);
+	        }
+	        
+            if(paramMap.size() == 0) {
+            	gr.setState(false);
+            	gr.setMessage("参数缺失");
+                return gr;
+            }
+            if(StringUtils.isEmpty(paramMap.get("received_date"))) {
+            	gr.setState(false);
+            	gr.setMessage("参数时间参数");
+                return gr;
+            }
+            if((!StringUtils.isEmpty(paramMap.get("state")))&&paramMap.get("state") instanceof String){
+            	paramMap.put("state",(paramMap.get("state")+"").split(","));
+			}
+            //查询支付统计报表数量
+			int total = financeStatisticsDao.queryPayStatisticsReportCount(paramMap);
+            //查询支付统计报表列表
+			List<Map<String, Object>> dataList = financeStatisticsDao.queryPayStatisticsReportList(paramMap);
+			if (dataList != null && dataList.size() > 0) {
+				gr.setState(true);
+				gr.setMessage("查询成功!");
+				gr.setObj(dataList);
+				gr.setTotal(total);
+			} else {
+				gr.setState(true);
+				gr.setMessage("无数据");
+			}
+			
+        } catch (Exception e) {
+        	gr.setState(false);
+        	gr.setMessage(e.getMessage());
+        	logger.error("查询失败："+e.getMessage());
+        }
+		return gr;
+	}
+	
+	/**
+	 * 查询支付统计报表数据配置
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryPayStatisticsReportDataConfig(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        }
+	        
+            if(paramMap.size() == 0) {
+            	gr.setState(false);
+            	gr.setMessage("参数缺失");
+                return gr;
+            }
+            //查询支付统计报表数据配置列表
+			List<Map<String, Object>> dataList = financeStatisticsDao.queryPayStatisticsReportDataConfig(paramMap);
+			if (dataList != null && dataList.size() > 0) {
+				gr.setState(true);
+				gr.setMessage("查询成功!");
+				gr.setObj(dataList);
+			} else {
+				gr.setState(true);
+				gr.setMessage("无数据");
+			}
+			
+        } catch (Exception e) {
+        	gr.setState(false);
+        	gr.setMessage(e.getMessage());
+        	logger.error("查询失败："+e.getMessage());
+        }
+		return gr;
+	}
+	
+	/**
+	 * 查询支付统计报表详情
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryPayStatisticsReportDetail(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		List<String> pay_platform_list = new ArrayList<String>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        	PageUtil.handlePageParams(paramMap);
+	        }
+	        
+            if(paramMap.size() == 0) {
+            	gr.setState(false);
+            	gr.setMessage("参数缺失");
+                return gr;
+            }
+            if(StringUtils.isEmpty(paramMap.get("pay_platform"))) {
+            	gr.setState(false);
+            	gr.setMessage("缺少渠道参数");
+                return gr;
+            }
+            if(StringUtils.isEmpty(paramMap.get("received_date"))) {
+            	gr.setState(false);
+            	gr.setMessage("缺少到账日期参数");
+                return gr;
+            }
+            if(StringUtils.isEmpty(paramMap.get("user_type"))) {
+            	gr.setState(false);
+            	gr.setMessage("缺少类型参数");
+                return gr;
+            }
+            if("现金".equals(paramMap.get("pay_platform"))){
+            	List<Map<String, Object>> list = financeStatisticsDao.queryPayStatisticsReportDetailCashList(paramMap);
+            	int count=financeStatisticsDao.queryPayStatisticsReportDetailCashCount(paramMap);
+            	gr.setState(true);
+            	gr.setObj(list);
+            	gr.setTotal(count);
+            	return gr;
+            }
+            //查询支付统计报表详情列表数量
+			int total = financeStatisticsDao.queryPayStatisticsReportDetailCount(paramMap);
+            //查询支付统计报表详情列表
+			List<Map<String, Object>> dataList = financeStatisticsDao.queryPayStatisticsReportDetailList(paramMap);
+			if (dataList != null && dataList.size() > 0) {
+				gr.setState(true);
+				gr.setMessage("查询成功!");
+				gr.setObj(dataList);
+				gr.setTotal(total);
+			} else {
+				gr.setState(true);
+				gr.setMessage("无数据");
+			}
+			
+        } catch (Exception e) {
+        	gr.setState(false);
+        	gr.setMessage(e.getMessage());
+        	logger.error("查询失败："+e.getMessage());
+        }
+		return gr;
+	}
+	
+	/**
+	 * 充值记录详情
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryPayStatisticsReportRechargeDetail(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        	PageUtil.handlePageParams(paramMap);
+	        }
+	        
+            if(paramMap.size() == 0) {
+            	gr.setState(false);
+            	gr.setMessage("参数缺失");
+                return gr;
+            }
+            if(StringUtils.isEmpty(paramMap.get("pay_platform"))) {
+            	gr.setState(false);
+            	gr.setMessage("缺少平台类型参数");
+                return gr;
+            }
+            if(StringUtils.isEmpty(paramMap.get("received_date"))) {
+            	gr.setState(false);
+            	gr.setMessage("缺少到账日期参数");
+                return gr;
+            }
+            if(StringUtils.isEmpty(paramMap.get("user_type"))) {
+            	gr.setState(false);
+            	gr.setMessage("缺少用户类型参数");
+                return gr;
+            }
+            //查询支付统计报表充值记录详情数量
+			int total = financeStatisticsDao.queryPayStatisticsReportRechargeDetailCount(paramMap);
+            //查询支付统计报表充值记录详情列表
+			List<Map<String, Object>> dataList = financeStatisticsDao.queryPayStatisticsReportRechargeDetailList(paramMap);
+			if (dataList != null && dataList.size() > 0) {
+				gr.setState(true);
+				gr.setMessage("查询成功!");
+				gr.setObj(dataList);
+				gr.setTotal(total);
+			} else {
+				gr.setState(true);
+				gr.setMessage("无数据");
+			}
+			
+        } catch (Exception e) {
+        	gr.setState(false);
+        	gr.setMessage(e.getMessage());
+        	logger.error("查询失败："+e.getMessage());
+        }
+		return gr;
+	}
+	
+	
+	/**
+	 * 支付统计报表查询合并支付订单详情
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryPayStatisticsReportMergeDetail(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		List<String> pay_platform_list = new ArrayList<String>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        }
+            if(paramMap.size() == 0) {
+            	gr.setState(false);
+            	gr.setMessage("参数缺失");
+                return gr;
+            }
+            if(StringUtils.isEmpty(paramMap.get("pay_trade_number"))) {
+            	gr.setState(false);
+            	gr.setMessage("缺少参数");
+                return gr;
+            }
+            //支付统计报表查询合并支付订单详情
+			List<Map<String, Object>> dataList = financeStatisticsDao.queryPayStatisticsReportMergeDetailList(paramMap);
+			if (dataList != null && dataList.size() > 0) {
+				gr.setState(true);
+				gr.setMessage("查询成功!");
+				gr.setObj(dataList);
+			} else {
+				gr.setState(true);
+				gr.setMessage("无数据");
+			}
+			
+        } catch (Exception e) {
+        	gr.setState(false);
+        	gr.setMessage(e.getMessage());
+        	logger.error("查询失败："+e.getMessage());
+        }
+		return gr;
+	}
+	
+	/**
+     * 支付统计报表核销
+     * @param request
+     * @return
+     */
+	@Transactional
+    @SuppressWarnings("unchecked")
+    public ProcessResult payStatisticsReportDeal(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            // 前台用户数据
+            Map<String, Object> map = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if (!map.containsKey("pay_platform") || StringUtils.isEmpty(map.get("pay_platform").toString())) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            if (!map.containsKey("received_date") || StringUtils.isEmpty(map.get("received_date").toString())) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            if (!map.containsKey("state") || StringUtils.isEmpty(map.get("state").toString())) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            financeStatisticsDao.insertOrUpdatePayReportStatisticsAprv(map);
+            pr.setMessage("支付统计报表核销成功");
+            pr.setState(true);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e);
+        }
+        return pr;
+    }
+	
+	/**
+	 * 商家客户资金查询汇总(按商家)
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryStationedFundSummaryList(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> resMap = new HashMap<String, Object>();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        	PageUtil.handlePageParams(paramMap);
+	        }
+	        
+            if(paramMap.size() == 0) {
+            	gr.setState(false);
+            	gr.setMessage("参数缺失");
+                return gr;
+            }
+            //商家客户资金查询汇总(按商家)数量
+			int total = financeStatisticsDao.queryStationedFundSummaryCount(paramMap);
+            //商家客户资金查询汇总(按商家)列表
+			List<Map<String, Object>> dataList = financeStatisticsDao.queryStationedFundSummaryList(paramMap);
+			resMap.put("list", dataList);
+			if (dataList != null && dataList.size() > 0) {
+				//商家客户资金查询汇总合计
+				Map<String, Object> totalData=financeStatisticsDao.queryStationedFundSummaryTotal(paramMap);
+				resMap.put("totalData", totalData);
+				gr.setState(true);
+				gr.setMessage("查询成功!");
+				gr.setObj(resMap);
+				gr.setTotal(total);
+			} else {
+				gr.setState(true);
+				gr.setMessage("无数据");
+			}
+			
+        } catch (Exception e) {
+        	gr.setState(false);
+        	gr.setMessage(e.getMessage());
+        	logger.error("查询失败："+e.getMessage());
+        }
+		return gr;
+	}
+	
+	/**
+	 * 商家客户资金查询汇总(按会员)
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryUserFundSummaryList(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> resMap = new HashMap<String, Object>();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        	PageUtil.handlePageParams(paramMap);
+	        }
+	        
+            if(paramMap.size() == 0) {
+            	gr.setState(false);
+            	gr.setMessage("参数缺失");
+                return gr;
+            }
+            //商家客户资金查询汇总(按会员)数量
+			int total = financeStatisticsDao.queryUserFundSummaryCount(paramMap);
+            //商家客户资金查询汇总(按会员)列表
+			List<Map<String, Object>> dataList = financeStatisticsDao.queryUserFundSummaryList(paramMap);
+			resMap.put("list", dataList);
+			if (dataList != null && dataList.size() > 0) {
+				//商家客户资金查询汇总合计
+				Map<String, Object> totalData=financeStatisticsDao.queryUserFundSummaryTotal(paramMap);
+				resMap.put("totalData", totalData);
+				gr.setState(true);
+				gr.setMessage("查询成功!");
+				gr.setObj(resMap);
+				gr.setTotal(total);
+			} else {
+				gr.setState(true);
+				gr.setMessage("无数据");
+			}
+			
+        } catch (Exception e) {
+        	gr.setState(false);
+        	gr.setMessage(e.getMessage());
+        	logger.error("查询失败："+e.getMessage());
+        }
+		return gr;
+	}
+	
+	/**
+     * 支付统计报表数据配置保存
+     * @param request
+     * @return
+     */
+	@Transactional
+    @SuppressWarnings("unchecked")
+    public ProcessResult payStatisticsReportSaveDataConfig(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            // 前台用户数据
+            Map<String, Object> map = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            List<Map<String,Object>> data_config_list=(List<Map<String,Object>>)map.get("data_config_list");
+            if (data_config_list==null || data_config_list.size()==0) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            map.put("data_config_list", data_config_list);
+            if(financeStatisticsDao.payStatisticsReportSaveDataConfig(map) <= 0){
+                throw new RuntimeException("支付统计报表数据配置保存失败");
+            }
+            pr.setMessage("支付统计报表数据配置保存成功");
+            pr.setState(true);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error(e);
+        }
+        return pr;
+    }
+	
+	/**
+	 * 支付统计报表详情(新零售交易充值详情老)
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryPayStatisticsReportDetailRetail(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                gr.setState(false);
+                gr.setMessage("缺少参数");
+                return gr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            if(StringUtils.isEmpty(params.get("pay_platform"))) {
+            	gr.setState(false);
+            	gr.setMessage("缺少平台类型参数");
+                return gr;
+            }
+            if(StringUtils.isEmpty(params.get("order_type"))) {
+            	gr.setState(false);
+            	gr.setMessage("缺少订单类型");
+                return gr;
+            }
+            Map<String, Object> sendMap = new HashMap<String, Object>();
+            sendMap.put("PAGE_SIZE",params.get("pageSize"));
+            sendMap.put("INDEX",params.get("pageIndex"));
+            sendMap.put("ORDER_TYPE",params.get("order_type"));
+            if("杉德".equals(params.get("pay_platform"))){
+            	sendMap.put("PAY_TYPE","15,16,18,19");
+            }else if("POS".equals(params.get("pay_platform"))){
+            	sendMap.put("PAY_TYPE","9");
+            }else if("银联".equals(params.get("pay_platform"))){
+            	sendMap.put("PAY_TYPE","17");
+            }else{
+            	gr.setState(true);
+                gr.setMessage("无数据");
+                gr.setObj("");
+                return gr;
+            }
+            if(params.containsKey("user_manage_name")&&!StringUtils.isEmpty(params.get("user_manage_name"))){
+                sendMap.put("USER_NAME",params.get("user_manage_name"));
+            }
+            if(params.containsKey("pay_start_date")&&!StringUtils.isEmpty(params.get("pay_start_date"))){
+                sendMap.put("MIN_PAY_TIME",params.get("pay_start_date"));
+            }
+            if(params.containsKey("pay_end_date")&&!StringUtils.isEmpty(params.get("pay_end_date"))){
+                sendMap.put("MAX_PAY_TIME",params.get("pay_end_date"));
+            }
+            if(params.containsKey("order_number_pay_seq")&&!StringUtils.isEmpty(params.get("order_number_pay_seq"))){
+                sendMap.put("ORDER_ID",params.get("order_number_pay_seq"));
+            }
+            Map<String, Object> resPr = (Map<String, Object>) this.queryForPost(sendMap, retail_service_url+"Order/allTypeOrderList");
+            if (Integer.parseInt(resPr.get("state").toString()) == 1) {
+                gr.setState(true);
+                gr.setMessage("获取数据列表成功");
+                Map<String, Object> data =  (Map<String, Object>)resPr.get("data");
+                List<Map<String, Object>> dataList=(List<Map<String, Object>>)data.get("data");
+                int total=Integer.parseInt(data.get("total").toString());
+                gr.setTotal(total);
+                gr.setObj(dataList);
+            }else{
+            	gr.setState(true);
+                gr.setMessage("无数据");
+                gr.setObj("");
+            }
+        } catch (Exception e) {
+        	gr.setState(false);
+        	gr.setMessage(e.getMessage());
+        	logger.error("查询失败："+e.getMessage());
+        }
+		return gr;
+	}
+	
+	/**
+	 * 支付统计报表详情(新零售交易充值详情新)
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryPayStatisticsReportRechargeDetailNew(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                gr.setState(false);
+                gr.setMessage("缺少参数");
+                return gr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, Map.class);
+            if(StringUtils.isEmpty(params.get("pay_platform"))) {
+            	gr.setState(false);
+            	gr.setMessage("缺少平台类型参数");
+                return gr;
+            }
+            if(StringUtils.isEmpty(params.get("order_type"))) {
+            	gr.setState(false);
+            	gr.setMessage("缺少订单类型");
+                return gr;
+            }
+            Map<String, Object> sendMap = new HashMap<String, Object>();
+            //查询所有经销商ID
+            String account_ids=financeStatisticsDao.queryAllAccountIds();
+            sendMap.put("PAGE_SIZE",params.get("pageSize"));
+            sendMap.put("INDEX",params.get("pageIndex"));
+            sendMap.put("ORDER_TYPE",params.get("order_type"));
+            sendMap.put("ACCOUNT",account_ids);
+            if("杉德".equals(params.get("pay_platform"))){
+            	sendMap.put("PAY_TYPE","15,16,18,19");
+            }else if("POS".equals(params.get("pay_platform"))){
+            	sendMap.put("PAY_TYPE","9");
+            }else if("银联".equals(params.get("pay_platform"))){
+            	sendMap.put("PAY_TYPE","17");
+            }else{
+            	gr.setState(true);
+                gr.setMessage("无数据");
+                gr.setObj("");
+                return gr;
+            }
+            if(params.containsKey("user_manage_name")&&!StringUtils.isEmpty(params.get("user_manage_name"))){
+                sendMap.put("USER_NAME",params.get("user_manage_name"));
+            }
+            if(params.containsKey("pay_start_date")&&!StringUtils.isEmpty(params.get("pay_start_date"))){
+                sendMap.put("MIN_PAY_TIME",params.get("pay_start_date"));
+            }
+            if(params.containsKey("pay_end_date")&&!StringUtils.isEmpty(params.get("pay_end_date"))){
+                sendMap.put("MAX_PAY_TIME",params.get("pay_end_date"));
+            }
+            if(params.containsKey("order_number_pay_seq")&&!StringUtils.isEmpty(params.get("order_number_pay_seq"))){
+                sendMap.put("ORDER_ID",params.get("order_number_pay_seq"));
+            }
+            Map<String, Object> resPr = (Map<String, Object>) this.queryForPost(sendMap, retail_service_new_url+"open/Order/allTypeOrderList");
+            if (Integer.parseInt(resPr.get("state").toString()) == 1) {
+                gr.setState(true);
+                gr.setMessage("获取数据列表成功");
+                Map<String, Object> data =  (Map<String, Object>)resPr.get("data");
+                List<Map<String, Object>> dataList=(List<Map<String, Object>>)data.get("data");
+                int total=Integer.parseInt(data.get("total").toString());
+                gr.setTotal(total);
+                gr.setObj(dataList);
+            }else{
+            	gr.setState(true);
+                gr.setMessage("无数据");
+                gr.setObj("");
+            }
+        } catch (Exception e) {
+        	gr.setState(false);
+        	gr.setMessage(e.getMessage());
+        	logger.error("查询失败："+e.getMessage());
+        }
+		return gr;
+	}
+	public Object queryForPost(Map<String,Object> obj,String url) throws Exception{
+        String params = "";
+        if(obj != null){
+            Packet packet = Transform.GetResult(obj, EsbConfig.ERP_FORWARD_KEY_NAME);//加密数据
+            params = Jackson.writeObject2Json(packet);//对象转json、字符串
+        }
+        //发送至服务端
+        String json = HttpClientUtil.post(url, params);
+        return Transform.GetPacketJzb(json,Map.class);
+    }
+
+}

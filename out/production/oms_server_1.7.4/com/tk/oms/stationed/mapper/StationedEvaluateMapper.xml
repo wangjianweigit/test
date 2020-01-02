@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.stationed.dao.StationedEvaluateDao">
+
+    <select id="queryCountForPage" parameterType="java.util.Map" resultType="int">
+        select count(1)
+        from tbl_stationed_user_info sui
+        where sui.stationed_user_type = 2 and sui.state = 2
+        and exists(
+            select 1
+            from tbl_merchants_type
+            where MERCHANTS_TYPE = 1 and sui.id = STATIONED_USER_ID
+        )
+        <if test="stationed_user_name != null and stationed_user_name != ''">
+            and sui.company_name like  '%'||#{stationed_user_name, jdbcType=VARCHAR}||'%'
+        </if>
+    </select>
+
+    <select id="queryListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select t.*,rownum as rn from (
+                select 
+                    sui.company_name stationed_user_name,
+                    sui.id,
+                    nvl(product_count,0) product_count,
+                    nvl(sku_count, 0) sku_count,
+                    nvl(instorage_count, 0 ) instorage_count,
+                    nvl(sale_count,0) sale_count,
+                    nvl(rpd_count,0) rpd_count,
+                    nvl(orp_count,0)orp_count,
+                    nvl(deliver_day,0) deliver_day,
+                    nvl(fqc_count,0) fqc_count,
+                    nvl(sale_return_num,0) sale_return_num
+                from tbl_stationed_user_info sui
+                left join (
+                    select stationed_user_id,
+                        count(distinct itemnumber) product_count,
+                        nvl(sum(sku_count), 0) sku_count,
+                        nvl(sum(instorage_count), 0 ) instorage_count,
+                        nvl(sum(sale_count),0) sale_count,
+                        nvl(sum(rpd_count),0) rpd_count,
+                        nvl(sum(orp_count),0)orp_count,
+                        decode(sum(deliver_count), 0, 0, round(nvl(sum(deliver_day) / sum(deliver_count),0),1)) deliver_day,
+                        nvl(sum(fqc_count),0) fqc_count,
+                        nvl(sum(sale_return_num),0) sale_return_num
+                    from ${jdbc_user}.MV_STATIONED_PRODUCT_DATA
+                    <where> 1=1
+                        <if test="product_itemnumber != null and product_itemnumber != ''">
+                            and itemnumber = #{product_itemnumber, jdbcType=VARCHAR}
+                        </if>
+                        <if test="year != null and year != ''">
+                            and year = #{year, jdbcType=INTEGER}
+                        </if>
+                        <if test="season_id != null and season_id != ''">
+                            and season_id = #{season_id, jdbcType=INTEGER}
+                        </if>
+                        <if test="brand_id != null and brand_id != ''">
+                            and brand_id = #{brand_id, jdbcType=INTEGER}
+                        </if>
+                    </where>
+                    group by stationed_user_id
+                ) spd on sui.id = spd.stationed_user_id
+                where sui.stationed_user_type = 2 and sui.state = 2
+                and exists(
+                    select 1
+                    from tbl_merchants_type 
+                    where MERCHANTS_TYPE = 1 and sui.id = STATIONED_USER_ID
+                )
+                <if test="stationed_user_name != null and stationed_user_name != ''">
+                    and sui.company_name like '%'||#{stationed_user_name, jdbcType=VARCHAR}||'%'
+                </if>
+                order by sui.id
+            ) t
+            where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        )
+	    where rn&gt;#{start_rownum,jdbcType=INTEGER}
+    </select>
+    
+    
+    <select id="queryDetailList" parameterType="java.util.Map" resultType="java.util.Map">
+        select
+            (
+                case when (select count(1) from tbl_stationed_user_info where id = supplier_id) > 0
+                    then (select company_name from tbl_stationed_user_info where id =supplier_id)
+                else (select fullname from ${jdbc_user}.V_MERCHANT_OR_SUPPLIER where id =supplier_id)
+                end
+            ) supplier_name,
+            A.*
+        from (
+            select t.*,rownum as rn from (
+                select
+                    sui.company_name stationed_user_name,
+                    d.supplier_id,
+                    d.product_itemnumber,
+                    d.year,
+                    d.season_id,
+                    d.brand_id,
+                    d.instorage_count,
+                    d.sale_count,
+                    d.fqc_count,
+                    d.sale_return_num,
+                    d.deliver_day
+                from tbl_stationed_user_info sui
+                left join ${jdbc_user}.MV_STA_SUPPLIER_PRODUCT_DATA d on sui.id = d.stationed_user_id
+                <where> sui.stationed_user_type = 2 and sui.state = 2
+                    and exists(
+                        select 1
+                        from tbl_merchants_type
+                        where sui.id = stationed_user_id
+                            and merchants_type = 1
+                    )
+                    <if test="stationed_user_id != null and stationed_user_id != ''">
+                        and d.stationed_user_id = #{stationed_user_id, jdbcType=INTEGER}
+                    </if>
+                    <if test="product_itemnumber != null and product_itemnumber != ''">
+                        and d.product_itemnumber = #{product_itemnumber, jdbcType=VARCHAR}
+                    </if>
+                    <if test="year != null and year != ''">
+                        and d.year = #{year, jdbcType=INTEGER}
+                    </if>
+                    <if test="season_id != null and season_id != ''">
+                        and d.season_id = #{season_id, jdbcType=INTEGER}
+                    </if>
+                    <if test="brand_id != null and brand_id != ''">
+                        and d.brand_id = #{brand_id, jdbcType=INTEGER}
+                    </if>
+                    <if test="stationed_user_name != null and stationed_user_name != ''">
+                        and sui.company_name like '%'||#{stationed_user_name, jdbcType=VARCHAR}||'%'
+                    </if>
+                </where>
+                order by d.stationed_user_id, d.supplier_id, d.product_itemnumber
+            ) t
+            where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+        ) A
+	    where rn&gt;#{start_rownum,jdbcType=INTEGER}
+    </select>
+
+
+    <select id="queryDetailCount" parameterType="java.util.Map" resultType="int">
+        select count(1)
+        from tbl_stationed_user_info sui
+        left join ${jdbc_user}.MV_STA_SUPPLIER_PRODUCT_DATA d on sui.id = d.stationed_user_id
+        <where> sui.stationed_user_type = 2 and sui.state = 2
+            and exists(
+                select 1
+                from tbl_merchants_type
+                where sui.id = stationed_user_id
+                and merchants_type = 1
+            )
+            <if test="stationed_user_id != null and stationed_user_id != ''">
+                and d.stationed_user_id = #{stationed_user_id, jdbcType=INTEGER}
+            </if>
+            <if test="product_itemnumber != null and product_itemnumber != ''">
+                and d.product_itemnumber = #{product_itemnumber, jdbcType=VARCHAR}
+            </if>
+            <if test="year != null and year != ''">
+                and d.year = #{year, jdbcType=INTEGER}
+            </if>
+            <if test="season_id != null and season_id != ''">
+                and d.season_id = #{season_id, jdbcType=INTEGER}
+            </if>
+            <if test="brand_id != null and brand_id != ''">
+                and d.brand_id = #{brand_id, jdbcType=INTEGER}
+            </if>
+            <if test="stationed_user_name != null and stationed_user_name != ''">
+                and sui.company_name like '%'||#{stationed_user_name, jdbcType=VARCHAR}||'%'
+            </if>
+        </where>
+    </select>
+    
+</mapper>

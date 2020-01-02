@@ -1,0 +1,393 @@
+package com.tk.oms.decoration.service;
+
+import com.tk.oms.decoration.dao.DecoratePlatformDao;
+import com.tk.oms.decoration.dao.DecorateTemplateDao;
+import com.tk.oms.platform.dao.FixedModuleDao;
+import com.tk.sys.util.*;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 平台装修管理
+ * @author zhenghui
+ */
+@Service("DecorateTemplateService")
+public class DecorateTemplateService {
+
+    @Resource
+    private DecorateTemplateDao decorateTemplateDao;
+
+    @Resource
+    private DecoratePlatformDao decoratePlatformDao;
+
+    @Resource
+    private FixedModuleDao fixedModuleDao;
+
+    /**
+     * 分页获取装修模板列表
+     * @param request
+     * @return
+     */
+    public GridResult queryDecorateTemplateListForPage(HttpServletRequest request) {
+        GridResult gr = new GridResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                gr.setState(false);
+                gr.setMessage("缺少参数 ");
+                return gr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            GridResult pageParamResult = PageUtil.handlePageParams(params);
+            if (pageParamResult != null) {
+                return pageParamResult;
+            }
+            if(StringUtils.isEmpty(params.get("public_user_site_id"))){
+                gr.setState(false);
+                gr.setMessage("当前功能需要站点授权，请联系管理员");
+                return gr;
+            }
+            if (params.containsKey("states")) {
+                String[] states = ((String) params.get("states")).split(",");
+                params.put("states", states);
+            }
+            int total = this.decorateTemplateDao.queryListForCount(params);
+            List<Map<String, Object>> list = this.decorateTemplateDao.queryListForPage(params);
+            if (list != null && list.size() > 0) {
+                gr.setMessage("获取装修模板列表成功");
+                gr.setObj(list);
+            } else {
+                gr.setMessage("无数据");
+            }
+            gr.setState(true);
+            gr.setTotal(total);
+        } catch (Exception e) {
+            gr.setState(false);
+            gr.setMessage(e.getMessage());
+            e.printStackTrace();
+        }
+        return gr;
+    }
+
+    /**
+     * 添加装修模板
+     * @param request
+     * @return
+     */
+    @Transactional
+    public ProcessResult addDecorateTemplate(HttpServletRequest request) throws Exception {
+        ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数 ");
+                return pr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if(StringUtils.isEmpty(params.get("template_name"))){
+                pr.setState(false);
+                pr.setMessage("缺少template_name参数 ");
+                return pr;
+            }
+            if(StringUtils.isEmpty(params.get("effective_start_date"))){
+                pr.setState(false);
+                pr.setMessage("缺少effective_start_date参数 ");
+                return pr;
+            }
+            if(StringUtils.isEmpty(params.get("site_id"))){
+                pr.setState(false);
+                pr.setMessage("当前功能需要站点授权，请联系管理员");
+                return pr;
+            }
+            //判断模板名称是否存在
+            if(this.decorateTemplateDao.queryCountByName(params) > 0){
+                pr.setState(false);
+                pr.setMessage("装修模板名称已存在");
+                return pr;
+            }
+            if (this.decorateTemplateDao.insert(params) > 0) {
+                //封装装修页面创建所需参数
+                Map<String, Object> paramMap = new HashMap<String, Object>();
+                /**系统首页*/
+                paramMap.put("page_id", decoratePlatformDao.queryPageId(params));
+                paramMap.put("public_user_site_id", Integer.parseInt(params.get("site_id").toString()));
+                paramMap.put("public_user_id", Integer.parseInt(params.get("public_user_id").toString()));
+                paramMap.put("support_flag", params.get("support_flag").toString());
+                paramMap.put("template_id", Integer.parseInt(params.get("id").toString()));
+                paramMap.put("page_name", "首页");
+                paramMap.put("page_state", "2");
+                paramMap.put("page_type", 2);
+                paramMap.put("home_page_flag", "1");
+                paramMap.put("remark", "自动创建系统首页");
+                decoratePlatformDao.insertPage(paramMap);
+                //复制首页固定模板
+                this.fixedModuleDao.insertInitPageFixedModule(paramMap);
+                //复制首页固定模板详细数据
+                this.fixedModuleDao.insertInitPageFixedModuleDetail(paramMap);
+                //复制首页布局数据
+                this.fixedModuleDao.insertInitPageLayout(paramMap);
+
+                /**新品首发*/
+                paramMap.put("page_id", decoratePlatformDao.queryPageId(params));
+                paramMap.put("page_name", "新品热卖");
+                paramMap.put("page_type", 3);
+                paramMap.put("remark", "自动创建新品热卖");
+                decoratePlatformDao.insertPage(paramMap);
+                //复制首页固定模板
+                this.fixedModuleDao.insertInitPageFixedModule(paramMap);
+                //复制首页固定模板详细数据
+                this.fixedModuleDao.insertInitPageFixedModuleDetail(paramMap);
+                //复制首页布局数据
+                this.fixedModuleDao.insertInitPageLayout(paramMap);
+
+                /**每周秒杀*/
+                paramMap.put("page_id", decoratePlatformDao.queryPageId(params));
+                paramMap.put("page_name", "每周秒杀");
+                paramMap.put("page_type", 4);
+                paramMap.put("remark", "自动创建每周秒杀");
+                decoratePlatformDao.insertPage(paramMap);
+                //复制首页固定模板
+                this.fixedModuleDao.insertInitPageFixedModule(paramMap);
+                //复制首页固定模板详细数据
+                this.fixedModuleDao.insertInitPageFixedModuleDetail(paramMap);
+                //复制首页布局数据
+                this.fixedModuleDao.insertInitPageLayout(paramMap);
+
+                /**爆款秒批*/
+                paramMap.put("page_id", decoratePlatformDao.queryPageId(params));
+                paramMap.put("page_name", "爆款秒批");
+                paramMap.put("page_type", 5);
+                paramMap.put("remark", "自动创建爆款秒批");
+                decoratePlatformDao.insertPage(paramMap);
+                //复制首页固定模板
+                this.fixedModuleDao.insertInitPageFixedModule(paramMap);
+                //复制首页固定模板详细数据
+                this.fixedModuleDao.insertInitPageFixedModuleDetail(paramMap);
+                //复制首页布局数据
+                this.fixedModuleDao.insertInitPageLayout(paramMap);
+
+//                /**预售抢先*/
+//                paramMap.put("page_id", decoratePlatformDao.queryPageId(params));
+//                paramMap.put("page_name", "预售抢先");
+//                paramMap.put("page_type", 6);
+//                paramMap.put("remark", "自动创建预售抢先");
+//                decoratePlatformDao.insertPage(paramMap);
+//                //复制首页固定模板
+//                this.fixedModuleDao.insertInitPageFixedModule(paramMap);
+//                //复制首页固定模板详细数据
+//                this.fixedModuleDao.insertInitPageFixedModuleDetail(paramMap);
+//                //复制首页布局数据
+//                this.fixedModuleDao.insertInitPageLayout(paramMap);
+//                /**潮童搭配*/
+//                paramMap.put("page_id", decoratePlatformDao.queryPageId(params));
+//                paramMap.put("page_name", "潮童搭配");
+//                paramMap.put("page_type", 7);
+//                paramMap.put("remark", "自动创建潮童搭配");
+//                decoratePlatformDao.insertPage(paramMap);
+//                //复制首页固定模板
+//                this.fixedModuleDao.insertInitPageFixedModule(paramMap);
+//                //复制首页固定模板详细数据
+//                this.fixedModuleDao.insertInitPageFixedModuleDetail(paramMap);
+//                //复制首页布局数据
+//                this.fixedModuleDao.insertInitPageLayout(paramMap);
+
+                pr.setState(true);
+                pr.setMessage("添加装修模板成功");
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            throw new RuntimeException(e.getMessage());
+        }
+        return pr;
+    }
+
+    /**
+     * 获取装修模板信息
+     * @param request
+     * @return
+     */
+    public ProcessResult queryDecorateTemplate(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数 ");
+                return pr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if(StringUtils.isEmpty(params.get("id"))){
+                pr.setState(false);
+                pr.setMessage("缺少id参数 ");
+                return pr;
+            }
+            if(StringUtils.isEmpty(params.get("public_user_site_id"))){
+                pr.setState(false);
+                pr.setMessage("当前功能需要站点授权，请联系管理员");
+                return pr;
+            }
+            Map<String, Object> decorate = this.decorateTemplateDao.queryById(Long.parseLong(params.get("id").toString()));
+            if(decorate != null){
+                pr.setMessage("获取装修模板成功");
+                pr.setObj(decorate);
+            }else{
+                pr.setMessage("装修模板不存在");
+            }
+            pr.setState(true);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            e.printStackTrace();
+        }
+        return pr;
+    }
+
+    /**
+     * 编辑装修模板
+     * @param request
+     * @return
+     */
+    public ProcessResult editDecorateTemplate(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数 ");
+                return pr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if(StringUtils.isEmpty(params.get("id"))){
+                pr.setState(false);
+                pr.setMessage("缺少id参数 ");
+                return pr;
+            }
+            if(StringUtils.isEmpty(params.get("site_id"))){
+                pr.setState(false);
+                pr.setMessage("当前功能需要站点授权，请联系管理员");
+                return pr;
+            }
+            Map<String, Object> decorate = this.decorateTemplateDao.queryById(Long.parseLong(params.get("id").toString()));
+            if(decorate == null){
+                pr.setState(false);
+                pr.setMessage("装修模板不存在");
+                return pr;
+            }
+            if(this.decorateTemplateDao.queryCountByName(params) > 0){
+                pr.setState(true);
+                pr.setMessage("装修模板名称已存在");
+                return pr;
+            }
+            if(this.decorateTemplateDao.update(params) > 0){
+                pr.setState(true);
+                pr.setMessage("编辑装修模板成功");
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            e.printStackTrace();
+        }
+        return pr;
+    }
+
+    /**
+     * 删除新装修模板
+     * @param request
+     * @return
+     */
+    public ProcessResult removeDecorateTemplate(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数 ");
+                return pr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if(StringUtils.isEmpty(params.get("id"))){
+                pr.setState(false);
+                pr.setMessage("缺少id参数");
+                return pr;
+            }
+            if(StringUtils.isEmpty(params.get("public_user_site_id"))){
+                pr.setState(false);
+                pr.setMessage("当前功能需要站点授权，请联系管理员");
+                return pr;
+            }
+            Map<String, Object> decorate = this.decorateTemplateDao.queryById(Long.parseLong(params.get("id").toString()));
+            if(decorate == null){
+                pr.setState(false);
+                pr.setMessage("装修模板不存在");
+                return pr;
+            }
+            if(this.decorateTemplateDao.deleted(params) > 0){
+                pr.setState(true);
+                pr.setMessage("删除装修模板成功");
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            e.printStackTrace();
+        }
+        return pr;
+    }
+
+    /**
+     * 装修模板传送
+     * @param request
+     * @return
+     */
+    public ProcessResult decorateTemplateTransfer(HttpServletRequest request) {
+        ProcessResult pr = new ProcessResult();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if (StringUtils.isEmpty(json)) {
+                pr.setState(false);
+                pr.setMessage("缺少参数");
+                return pr;
+            }
+            Map<String, Object> params = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+            if (StringUtils.isEmpty(params.get("template_id"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数template_id");
+                return pr;
+            }
+            if (StringUtils.isEmpty(params.get("site_id"))) {
+                pr.setState(false);
+                pr.setMessage("缺少参数site_id");
+                return pr;
+            }
+            String public_user_site_id = params.get("public_user_site_id").toString();  //获取当前站点
+            String site_id = params.get("site_id").toString();    //获取传送站点
+            if (public_user_site_id.equals(site_id)) {
+                pr.setState(false);
+                pr.setMessage("不允许传送到当前站点");
+                return pr;
+            }
+            this.decorateTemplateDao.decorateTemplateTransfer(params);
+            String output_status = String.valueOf(params.get("output_status"));
+            String output_msg = String.valueOf(params.get("output_msg"));
+            if ("1".equals(output_status)) {//成功
+                pr.setState(true);
+            } else {
+                pr.setState(false);
+            }
+            pr.setMessage(output_msg);
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+    }
+
+}

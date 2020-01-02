@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.oms.sys.dao.SysUpdateMsgDao">  
+    <!-- 系统更新消息列表信息查询 -->
+    <select id="querySysUpdateMsgList"  resultType="java.util.Map" parameterType="java.util.Map">
+		select * from (
+		    select t1.*,rownum rn from (
+          		SELECT ID,
+                	   case SYSTEM_NAME when '1' then '订货平台' when '2' then '商家管理后台' when '3' then '新零售联营系统' end SYSTEM_NAME ,
+                	   CONTEXT,
+                	   TO_CHAR(BEGIN_TIME,'YYYY-MM-DD HH24:MI:SS') BEGIN_TIME,
+               		   TO_CHAR(END_TIME,'YYYY-MM-DD HH24:MI:SS') END_TIME,STATE
+         		 FROM  TBL_SYS_UPDATEMSG
+         		 where 1=1
+	          <if test="system_name != null and system_name != ''">
+					and system_name = #{system_name,jdbcType=VARCHAR}
+			  </if>
+			  <if test="begin_time != null and begin_time != ''">
+					and begin_time &gt;= TO_DATE(#{begin_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			  </if>
+			  <if test="end_time != null and end_time != ''">
+					and end_time &lt;= TO_DATE(#{end_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			  </if>
+		    ) t1 where rownum &lt;= #{end_rownum,jdbcType=INTEGER}
+		) where rn &gt; #{start_rownum,jdbcType=INTEGER}
+          
+    </select>
+     <!-- 系统更新消息列表总条数 -->
+    <select id="querySysUpdateMsgCount"  resultType="int" parameterType="java.util.Map">
+	      select count(1)
+         		 from  tbl_sys_updatemsg
+         	  where 1=1
+          <if test="system_name != null and system_name != ''">
+				and system_name = #{system_name,jdbcType=VARCHAR}
+		  </if>
+		  <if test="begin_time != null and begin_time != ''">
+				and begin_time &gt;= TO_DATE(#{begin_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+		  </if>
+		  <if test="end_time != null and end_time != ''">
+				and end_time &lt;= TO_DATE(#{end_time,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+		  </if>
+    </select>
+    <!-- 系统更新消息详细信息查询 -->
+    <select id="querySysUpdateMsgDetail"  resultType="java.util.Map" parameterType="java.util.Map">
+    　　　　　 SELECT   ID,SYSTEM_NAME,CONTEXT,TO_CHAR(BEGIN_TIME,'YYYY-MM-DD HH24:MI:SS') BEGIN_TIME,TO_CHAR(END_TIME,'YYYY-MM-DD HH24:MI:SS') END_TIME,STATE
+         FROM  TBL_SYS_UPDATEMSG 　WHERE ID = #{id,jdbcType=INTEGER}
+    </select>
+    <!-- 系统更新消息详细信息编辑 -->
+    <update  id="editSysUpdateMsg"  parameterType="java.util.Map" >
+         UPDATE TBL_SYS_UPDATEMSG  
+         <set>
+	         <if test="SYSTEM_NAME != null and SYSTEM_NAME != ''">
+				 SYSTEM_NAME = #{SYSTEM_NAME,jdbcType=VARCHAR},
+			</if>
+			<if test="CONTEXT != null and CONTEXT != ''">
+				 CONTEXT = #{CONTEXT,jdbcType=VARCHAR},
+			</if>
+			<if test="BEGIN_TIME != null and BEGIN_TIME != ''">
+				 BEGIN_TIME = TO_DATE(#{BEGIN_TIME,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS'),
+			</if>
+			<if test="END_TIME != null and END_TIME != ''">
+				 END_TIME = TO_DATE(#{END_TIME,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS'),
+			</if>
+			<if test="STATE != null and STATE != ''">
+				STATE = #{STATE,jdbcType=INTEGER}
+			</if>
+		</set>
+		
+		　WHERE ID = #{id,jdbcType=INTEGER}
+    </update>
+    
+    
+     <!-- 系统更新消息状态修改-->
+    <update  id="editSysUpdateMsgState"  parameterType="java.util.Map" >
+         UPDATE TBL_SYS_UPDATEMSG  
+           set state=#{state,jdbcType=VARCHAR}
+		　WHERE ID = #{id,jdbcType=INTEGER}
+    </update>
+</mapper>

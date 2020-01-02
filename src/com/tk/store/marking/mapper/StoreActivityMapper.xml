@@ -1,0 +1,1206 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.store.marking.dao.StoreActivityDao">
+	<sql id="all_column">
+		temp.id,
+		temp.activity_name,
+		temp.begin_date,
+		temp.end_date,
+		temp.discount,
+		temp.fixed_price,
+		temp.purchase_restriction,
+		temp.state,
+		temp.start_state,
+		temp.reject_reason,
+		temp.activity_type,
+		temp.type,
+		temp.create_date,
+		temp.agent_activity_id,
+		temp.auto_multip,
+		temp.limit_charge_times
+	</sql>
+	<sql id="data_access">
+		<if test="public_user_type != null and public_user_type == 3">
+           	and 1=2
+        </if>
+        <if test="public_user_type != null and public_user_type == 4">
+            and tui.market_supervision_user_id = #{public_user_id,jdbcType=INTEGER}
+        </if>
+        <if test="public_user_type != null and public_user_type == 5">
+            and 1=2
+        </if>
+        <if test="public_user_type != null and public_user_type == 6">
+            and 1=2
+        </if>
+        <if test="public_user_type != null and public_user_type == 7">
+			and tui.supervisor_user_id = #{public_user_id,jdbcType=INTEGER}
+        </if>
+        <if test="public_user_type != null and public_user_type == 9">
+            and tui.partner_user_id = #{public_user_id,jdbcType=INTEGER}
+        </if>
+	</sql>
+    <!-- 活动列表总数量 -->
+    <select id="queryActivityListCount" parameterType="java.util.Map" resultType="int">
+    	select count(1)
+    	  from (select <include refid="all_column"/>,
+	  		   		case when temp.begin_date &gt; sysdate and temp.start_state = 1 then '1'
+  				   		when temp.end_date &lt; sysdate then '3'
+  				   		when temp.begin_date &lt;= sysdate and temp.end_date &gt;= sysdate and temp.start_state = 1 then '2' 
+						when temp.start_state = 2 and temp.begin_date &lt;= sysdate and temp.end_date &gt;= sysdate then '4' end as activity_state
+						from tbl_store_activity_info temp) t
+    	 <where>
+    	 	<if test="type != null and type != ''">
+    	 		and t.type = #{type,jdbcType=INTEGER}
+    	 	</if>
+    	 	<if test="activity_name != null and activity_name != ''">
+    	 		and t.activity_name like '%'||#{activity_name,jdbcType=VARCHAR}||'%'
+    	 	</if>
+    	 	<if test="store_id != null and store_id != ''">
+    	 		and exists (select 1 from tbl_store_activity_shop where store_id = #{store_id,jdbcType=INTEGER} and activity_id = t.id)
+    	 	</if>
+    	 	<if test="start_date != null and start_date != '' ">
+			    and	t.begin_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+			<if test="end_date != null and end_date != '' ">
+			    and	t.end_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+			<if test="state != null and state != ''">
+				and t.state in
+				<foreach item="item" collection="state" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+			</if>
+			<if test="start_state != null and start_state != ''">
+				and t.start_state in
+				<foreach item="item" collection="start_state" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+			</if>
+			<if test="activity_state != null and activity_state != ''">
+				and t.activity_state in
+				<foreach item="item" collection="activity_state" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+			</if>
+			and exists (select 1 from tbl_store_activity_shop tsas where activity_id = t.id
+                        and exists (select 1 from tbl_store_user_manage tsum where id = tsas.store_id
+                        and exists (select 1 from tbl_user_info tui where id = tsum.user_id
+                        <include refid="data_access"/>)))
+    	 </where>
+    </select>
+    
+    <!-- 活动列表数据 -->
+    <select id="queryActivityListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+    	select a.*,
+				case when a.type = 1 then to_char(a.discount*10,'fm9999990.0')||'折'
+					when a.type = 2 then 
+					(select to_char(wm_concat('满'||to_char(spend_money,'fm9999990.00')|| decode(tt.type,1,'减','打')|| decode(tt.type,1,to_char(discount,'fm9999990.00'),to_char(discount*10,'fm9999990.0'))|| decode(tt.type,1,'元','折'))) from (select spend_money,discount,activity_id,type from tbl_store_activity_preferent order by spend_money)tt where tt.activity_id=a.id)
+					when a.type = 3 then 
+					'￥'||to_char(a.fixed_price,'fm9999990.00')
+					when a.type=4 then
+					(select to_char(wm_concat('满'||to_char(spend_money,'fm9999990.00')||'送'||to_char(discount,'fm9999990.00')))from (select spend_money,discount,activity_id from tbl_store_activity_preferent order by spend_money)tt where tt.activity_id=a.id)
+					end
+				activity_info,
+				(select to_char(wm_concat(store_id)) from tbl_store_activity_shop tsas where activity_id=a.id ) as store_list,
+				(select to_char(wm_concat(store_name)) from tbl_store_user_manage t1 
+			          	where exists (select 1 from tbl_store_activity_shop where activity_id = a.id and store_id = t1.id)) store_name,
+			    (select to_char(wm_concat(user_manage_name)) from tbl_user_info tui where exists (select 1 from tbl_store_user_manage t1 where tui.id=user_id
+			    	and exists (select 1 from tbl_store_activity_shop where activity_id = a.id and store_id = t1.id))) agent_name
+    	 from (
+    		select b.*,rownum rn from (
+    		  select t.id,
+					 t.activity_name,
+					 to_char(t.begin_date, 'YYYY-MM-DD HH24:MI:SS') begin_date,
+					 to_char(t.end_date, 'YYYY-MM-DD HH24:MI:SS') end_date,
+					 t.discount,
+					 t.fixed_price,
+					 t.state,
+					 t.start_state,
+					 t.reject_reason,
+					 t.type,
+					 t.activity_state,
+					 t.flag,
+					 t.activity_type
+    			from (select <include refid="all_column"/>,
+	  		   		case when temp.begin_date &gt; sysdate and temp.start_state = 1 then '1'
+  				   		when temp.end_date &lt; sysdate then '3'
+  				   		when temp.begin_date &lt;= sysdate and temp.end_date &gt;= sysdate and temp.start_state = 1 then '2' 
+						when temp.start_state = 2 and temp.begin_date &lt;= sysdate and temp.end_date &gt;= sysdate then '4' end as activity_state,
+  				   		case when temp.begin_date &lt;= sysdate and temp.end_date &gt;= sysdate then 1
+						else 2 end flag
+						from tbl_store_activity_info temp) t
+		    	 <where>
+		    	 	<if test="type != null and type != ''">
+		    	 		and t.type = #{type,jdbcType=INTEGER}
+		    	 	</if>
+		    	 	<if test="activity_name != null and activity_name != ''">
+		    	 		and t.activity_name like '%'||#{activity_name,jdbcType=VARCHAR}||'%'
+		    	 	</if>
+		    	 	<if test="store_id != null and store_id != ''">
+		    	 		and exists (select 1 from tbl_store_activity_shop where store_id = #{store_id,jdbcType=INTEGER} and activity_id = t.id)
+		    	 	</if>
+		    	 	<if test="start_date != null and start_date != '' ">
+					    and	t.begin_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+					</if>
+					<if test="end_date != null and end_date != '' ">
+					    and	t.end_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+					</if>
+					<if test="state != null and state != ''">
+						and t.state in
+						<foreach item="item" collection="state" open="(" separator="," close=")">
+							#{item}
+						</foreach>
+					</if>
+					<if test="start_state != null and start_state != ''">
+						and t.start_state in
+						<foreach item="item" collection="start_state" open="(" separator="," close=")">
+							#{item}
+						</foreach>
+					</if>
+					<if test="activity_state != null and activity_state != ''">
+						and t.activity_state in
+						<foreach item="item" collection="activity_state" open="(" separator="," close=")">
+							#{item}
+						</foreach>
+					</if>
+					and exists (select 1 from tbl_store_activity_shop tsas where activity_id = t.id
+                        and exists (select 1 from tbl_store_user_manage tsum where id = tsas.store_id
+                        and exists (select 1 from tbl_user_info tui where id = tsum.user_id
+                        <include refid="data_access"/>)))
+		    	 </where>
+		    	 order by t.state asc,t.create_date desc) b
+    			where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) a
+    		where rn &gt; #{start_rownum,jdbcType=INTEGER} 
+    </select>
+    
+    <!-- 是否启用 -->
+    <update id="updateActivityState" parameterType="java.util.Map">
+    	update tbl_store_activity_info
+    	   set start_state = #{start_state,jdbcType=INTEGER}
+    	 where id = #{activity_id,jdbcType=INTEGER}
+    </update>
+    <!-- 删除活动 -->
+    <delete id="deleteActivityInfo" parameterType="java.util.Map">
+    	delete from tbl_store_activity_info where id = #{activity_id,jdbcType=INTEGER}
+    </delete>
+    <!-- 删除活满减满折信息-->
+    <delete id="deleteStoreActivityPreferential" parameterType="java.util.Map">
+    	delete from tbl_store_activity_preferent where activity_id = #{activity_id,jdbcType=INTEGER}
+    </delete>
+    <!-- 删除活动门店 -->
+    <delete id="deleteStoreActivity" parameterType="java.util.Map">
+    	delete from tbl_store_activity_shop where activity_id = #{activity_id,jdbcType=INTEGER}
+    </delete>
+    <!-- 删除活动商品 -->
+    <delete id="deleteStoreActivityProduct" parameterType="java.util.Map">
+    	delete from tbl_store_activity_product 
+    	 <where>
+    	 	<if test="id != null and id !=''">
+    	 		id = #{id,jdbcType=INTEGER}
+    	 	</if>
+    	 	<if test="activity_id != null and activity_id != ''">
+    	 		activity_id = #{activity_id,jdbcType=INTEGER}
+    	 	</if>
+    	 </where>
+    </delete>
+    
+    <!-- 商品库数量 -->
+	<select id="queryProductLibraryCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from tbl_product_info tpi
+		 where exists (select 1 from tbl_product_store tps 
+	 						<where>
+	 							1=1
+	 							<if test="store_list != null">
+									and tps.user_id in (select user_id from tbl_store_user_manage where 
+															id in<foreach item="item" collection="store_list" open="(" separator="," close=")">
+																  	#{item}
+																  </foreach>)
+								</if>
+								and product_itemnumber = tpi.itemnumber
+								and exists(
+							   	   	select 1 from tbl_user_info tui 
+							   	   	<where>
+						   	  		    1=1
+						   	  		    and exists (select 1 from tbl_product_store where user_id = tui.id and product_itemnumber = tps.product_itemnumber)
+								        <include refid="data_access"/>
+							   	   	</where>)
+	 						</where>)
+		 		  and tpi.itemnumber not in (select product_itemnumber from tmp_product_itemnumber)
+		  <if test="itemnumber != null and itemnumber !=''">
+	 		  and tpi.itemnumber = #{itemnumber,jdbcType=VARCHAR}
+	 	  </if>
+	 	  <if test="product_type_id != null and product_type_id !=''">
+	 		  and (tpi.product_type_id = #{product_type_id,jdbcType=INTEGER}
+	  		  or tpi.product_type_id in (select id from tbl_dic_product_type t start with parent_id = #{product_type_id,jdbcType=INTEGER} connect by prior id=parent_id))
+	 	  </if>
+	 	  <if test="season_id != null and season_id !=''">
+	 		  and tpi.season_id = #{season_id,jdbcType=INTEGER}
+	 	  </if>
+	 	  <if test="brand_id != null and brand_id !=''">
+	 		  and tpi.brand_id = #{brand_id,jdbcType=INTEGER}
+	 	  </if>
+	 	  <if test="year != null and year !=''">
+	 		  and tpi.year = #{year,jdbcType=INTEGER}
+	 	  </if>
+	 	  <if test="product_itemnumbers != null and product_itemnumbers != ''">
+	 	  	  and tpi.itemnumber not in
+	 	  	  <foreach collection="product_itemnumbers" item="item" open="(" separator="," close=")">
+	 	  	  	#{item}
+	 	  	  </foreach>
+	 	  </if>
+	</select>
+	<!-- 商品库列表 -->
+    <select id="queryProductLibraryListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+    	select * from (
+			select a.*,
+				(select brand_name from tbl_dic_product_brand tdpb where tdpb.id = a.brand_id)  as brand,
+		        (select type_name from tbl_dic_product_type tdpt where tdpt.id = a.product_type_id)  as product_type,
+		        (select name from tbl_dic_product_season tdps where tdps.id = a.season_id)  as season,
+				rownum rn from (
+					select tpi.itemnumber,
+					       tpi.product_name,
+					       tpi.year,
+					       tpi.brand_id,
+					       tpi.product_type_id,
+					       tpi.season_id,
+					       tpi.product_img_url
+					  from tbl_product_info tpi
+					 where exists (select 1 from tbl_product_store tps 
+			 						<where>
+			 							1=1
+			 							<if test="store_list != null">
+											and tps.user_id in (select user_id from tbl_store_user_manage where 
+																	id in<foreach item="item" collection="store_list" open="(" separator="," close=")">
+																		  	#{item}
+																		  </foreach>)
+										</if>
+										and product_itemnumber = tpi.itemnumber
+										and exists(
+									   	   	select 1 from tbl_user_info tui 
+									   	   	<where>
+								   	  		    1=1
+								   	  		    and exists (select 1 from tbl_product_store where user_id = tui.id and product_itemnumber = tps.product_itemnumber)
+										        <include refid="data_access"/>
+									   	   	</where>)
+			 						</where>)
+					   	and tpi.itemnumber not in (select product_itemnumber from tmp_product_itemnumber)  	
+					  <if test="itemnumber != null and itemnumber !=''">
+				 		  and tpi.itemnumber = #{itemnumber,jdbcType=VARCHAR}
+				 	  </if>
+				 	  <if test="product_type_id != null and product_type_id !=''">
+				 		  and (tpi.product_type_id = #{product_type_id,jdbcType=INTEGER}
+				  		  or tpi.product_type_id in (select id from tbl_dic_product_type t start with parent_id = #{product_type_id,jdbcType=INTEGER} connect by prior id=parent_id))
+				 	  </if>
+				 	  <if test="season_id != null and season_id !=''">
+				 		  and tpi.season_id = #{season_id,jdbcType=INTEGER}
+				 	  </if>
+				 	  <if test="brand_id != null and brand_id !=''">
+				 		  and tpi.brand_id = #{brand_id,jdbcType=INTEGER}
+				 	  </if>
+				 	  <if test="year != null and year !=''">
+				 		  and tpi.year = #{year,jdbcType=INTEGER}
+				 	  </if>
+				 	  <if test="product_itemnumbers != null and product_itemnumbers != ''">
+				 	  	  and tpi.itemnumber not in
+				 	  	  <foreach collection="product_itemnumbers" item="item" open="(" separator="," close=")">
+				 	  	  	#{item}
+				 	  	  </foreach>
+				 	  </if>
+			 	  ) a
+		 	where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+    <!-- 将需要过滤的商品货号插入到临时表-->
+	<insert id="insertTempProductItemnumber" parameterType="java.util.Map">
+		insert into tmp_product_itemnumber(
+			product_itemnumber
+		)
+		select product_itemnumber from tbl_store_activity_product tsad
+			 where tsad.state in(0,1)
+			 and exists(select 1 from tbl_store_activity_info tsai 
+			 					where tsai.id=tsad.activity_id and tsai.end_date &gt;=sysdate
+			 					and tsai.state&lt;&gt;3
+			 					<if test="activity_type != null and activity_type != ''">
+								and tsai.activity_type = #{activity_type,jdbcType=INTEGER}
+								</if>
+			 					)
+			 and exists(select 1 from tbl_store_activity_shop tsas where tsas.activity_id=tsad.activity_id
+			 				and tsas.store_id in 
+			 								<foreach item="item" collection="store_list" open="(" separator="," close=")">
+								  	#{item}
+								</foreach>)
+	</insert>
+    <!--查询需要过滤的商品货号-->
+	<select id="queryFilterProductList" parameterType="java.util.Map"  resultType="string">
+		select product_itemnumber from tbl_store_activity_product tsad
+			 where tsad.state in(0,1)
+			 and exists(select 1 from tbl_store_activity_info tsai 
+			 					where tsai.id=tsad.activity_id and tsai.end_date &gt;=sysdate
+			 					and tsai.state&lt;&gt;3)
+			 and exists(select 1 from tbl_store_activity_shop tsas where tsas.activity_id=tsad.activity_id
+			 				and tsas.store_id in 
+			 								<foreach item="item" collection="store_list" open="(" separator="," close=")">
+								  	#{item}
+								</foreach>)
+	</select>
+    
+    <!-- 门店库 -->
+    <select id="queryStoreLibraryCount" parameterType="java.util.Map" resultType="int">
+    	select count(1)
+    	  from tbl_store_user_manage t
+    	 where t.approval_state=1
+    	 and exists (
+    	 	select 1 from tbl_user_info tui
+    	 	 where id = t.user_id
+    	 	 and tui.user_state = 1
+    	 	 <include refid="data_access"/>)
+    	 	<if test="store_name != null and store_name != ''">
+	   	    	and t.store_name like '%'||#{store_name,jdbcType=VARCHAR}||'%'
+	   	    </if>
+	   	    <if test="store_mobilephone != null and store_mobilephone != ''">
+	   	    	and t.store_mobilephone like '%'||#{store_mobilephone,jdbcType=VARCHAR}||'%'
+	   	    </if>
+	   	    <if test="user_manage_name != null and user_manage_name != ''">
+	   	    	and exists (select 1 from tbl_user_info where id = t.user_id and user_manage_name like '%'||#{user_manage_name,jdbcType=VARCHAR}||'%')
+	   	    </if>
+	   	    <if test="user_realname != null and user_realname != ''">
+	   	    	and exists (select 1 from tbl_sys_user_info where id = t.create_user_id and user_realname like '%'||#{user_realname,jdbcType=VARCHAR}||'%')
+	   	    </if>
+    </select>
+    
+    <!-- 门店库列表 -->
+    <select id="queryStoreLibraryListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+    	select temp.*,
+    		(select user_realname from tbl_sys_user_info where id = temp.create_user_id) user_realname,
+    		(select user_manage_name from tbl_user_info where id = temp.user_id) user_manage_name,
+    		(select name from tbl_dic_region where id =temp.province)||
+    		(select name from tbl_dic_region where id =temp.city)||
+    		(select name from tbl_dic_region where id =temp.county)||temp.store_detail_address as store_address
+    	 from (
+	    	select a.*,rownum rn from (
+				   select t.id,
+				   		  t.store_name,
+				   		  t.user_id,
+				   		  t.store_mobilephone,
+				   		  t.province,
+				   		  t.city,
+				   		  t.county,
+				   		  t.store_detail_address,
+				   		  to_char(t.create_date,'YYYY-MM-DD HH24:MI:SS') create_date,
+				   		  t.create_user_id
+				     from tbl_store_user_manage t
+		    	    where t.approval_state=1
+		    	    and exists (
+		    	 	   select 1 from tbl_user_info tui
+		    	 	    where id = t.user_id
+		    	 	      and tui.user_state = 1
+		    	 	    <include refid="data_access"/>)
+			    	    <if test="store_name != null and store_name != ''">
+			    	    	and t.store_name like '%'||#{store_name,jdbcType=VARCHAR}||'%'
+			    	    </if>
+			    	    <if test="store_mobilephone != null and store_mobilephone != ''">
+			    	    	and t.store_mobilephone like '%'||#{store_mobilephone,jdbcType=VARCHAR}||'%'
+			    	    </if>
+			    	    <if test="user_manage_name != null and user_manage_name != ''">
+			    	    	and exists (select 1 from tbl_user_info where id = t.user_id and user_manage_name like '%'||#{user_manage_name,jdbcType=VARCHAR}||'%')
+			    	    </if>
+			    	    <if test="user_realname != null and user_realname != ''">
+			    	    	and exists (select 1 from tbl_sys_user_info where id = t.create_user_id and user_realname like '%'||#{user_realname,jdbcType=VARCHAR}||'%')
+			    	    </if>
+					   order by t.create_date desc) a
+		 		where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) temp
+		where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+    
+    <!-- 新增活动信息 -->
+    <insert id="insertStoreActivityInfo" parameterType="java.util.Map">
+    	<selectKey keyProperty="id" resultType="int" order="BEFORE">
+			select seq_store_activity_info.nextval from dual
+		</selectKey>
+		insert into tbl_store_activity_info
+		(
+			id,
+			activity_name,
+			begin_date,
+			end_date,
+			<if test="discount != null and discount != ''">discount,</if>
+			<if test="fixed_price != null and fixed_price != ''">fixed_price,</if>
+			purchase_restriction,
+			<if test="activity_type != null and activity_type != ''">activity_type,</if>
+			<if test="auto_multip != null and auto_multip != ''">auto_multip,</if>
+			limit_charge_times,
+			create_user_id,
+			type
+			) values (
+			#{id,jdbcType=INTEGER},
+			#{activity_name,jdbcType=VARCHAR},
+			to_date(#{begin_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss'),
+			to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss'),
+			<if test="discount != null and discount != ''">(#{discount,jdbcType=INTEGER}/10),</if>
+			<if test="fixed_price != null and fixed_price != ''">#{fixed_price,jdbcType=INTEGER},</if>
+			#{purchase_restriction,jdbcType=INTEGER},
+			<if test="activity_type != null and activity_type != ''">#{activity_type,jdbcType=INTEGER},</if>
+			<if test="auto_multip != null and auto_multip != ''">#{auto_multip,jdbcType=INTEGER},</if>
+			#{limit_charge_times,jdbcType=INTEGER},
+			#{public_user_id,jdbcType=INTEGER},
+			#{type,jdbcType=INTEGER}
+			)
+    </insert>
+    <!-- 新增活动关联门店信息 -->
+    <insert id="insertStoreActivity" parameterType="java.util.Map">
+    	insert into tbl_store_activity_shop
+    		(
+    			id,
+    			activity_id,
+    			store_id,
+    			create_user_id
+    		) values (
+    			seq_store_activity_shop.nextVal,
+    			#{id,jdbcType=INTEGER},
+    			#{store_id,jdbcType=INTEGER},
+    			#{public_user_id,jdbcType=INTEGER}
+    		)
+    </insert>
+    
+    <!-- 新增活动关联商品信息 -->
+    <insert id="insertStoreActivityProduct" parameterType="java.util.Map">
+    	insert into tbl_store_activity_product
+    		(
+    			id,
+    			activity_id,
+    			product_itemnumber,
+    			state,
+    			create_user_id,
+    			type,
+    			user_id
+    		) values (
+    			seq_store_activity_product.nextVal,
+    			#{id,jdbcType=INTEGER},
+    			#{product_itemnumber,jdbcType=VARCHAR},
+    			0,
+    			#{public_user_id,jdbcType=INTEGER},
+    			#{type,jdbcType=INTEGER},
+    			#{user_id,jdbcType=INTEGER}
+    		)
+    </insert>
+    
+    <!--查询活动主表信息-->
+	<select id="queryStoreActivityInfo" parameterType="java.util.Map"  resultType="java.util.Map">
+		select  t.id,
+				t.activity_name,
+				t.type,
+				to_char(t.begin_date, 'YYYY-MM-DD HH24:MI:SS') begin_date,
+				to_char(t.end_date, 'YYYY-MM-DD HH24:MI:SS') end_date,
+				t.discount,
+				t.fixed_price,
+				t.purchase_restriction,
+				t.start_state,
+				t.activity_type,
+				t.agent_activity_id,
+				t.state,
+				t.limit_charge_times,
+				t.auto_multip,
+				decode(t.auto_multip,1,'开启',2,'关闭') auto_multip_desc,
+				case when t.limit_charge_times=0 then '不限制'
+					else '限制'||t.limit_charge_times||'次'
+				end limit_charge_times_desc,
+				case when t.begin_date &gt; sysdate and t.start_state = 1 then '1'
+  				   		when t.end_date &lt; sysdate then '3'
+  				   		when t.begin_date &lt;= sysdate and t.end_date &gt;= sysdate and t.start_state = 1 then '2' 
+						when t.start_state = 2 and t.begin_date &lt;= sysdate and t.end_date &gt;= sysdate then '4' end as activity_state,
+		 	case when t.type = 1 then '【'||to_char(t.discount*10,'fm9999990.0')||'】折'
+					when t.type = 2 then 
+					(select to_char(wm_concat('满【'||to_char(spend_money,'fm9999990.00')|| decode(tt.type,1,'】减【','】打【')|| decode(tt.type,1,to_char(discount,'fm9999990.00'),to_char(discount*10,'fm9999990.0'))|| decode(tt.type,1,'】元','】折'))) from (select spend_money,discount,type from tbl_store_activity_preferent where activity_id=#{activity_id,jdbcType=INTEGER} order by spend_money)tt)
+					when t.type = 3 then 
+					'【'||to_char(t.fixed_price,'fm9999990.00')||'】元'
+					when t.type=4 then
+					 (select TO_CHAR ( wm_concat ( '满'
+                             || TO_CHAR (spend_money, 'fm9999990.00')
+                             || '送'
+                             || TO_CHAR (discount, 'fm9999990.00')))
+                  	from (select spend_money,discount from tbl_store_activity_preferent where activity_id=#{activity_id,jdbcType=INTEGER} order by spend_money))
+					end state_info
+		  from (
+			select <include refid="all_column"/>
+					from tbl_store_activity_info temp
+			where id=#{activity_id,jdbcType=INTEGER}) t
+	</select> 
+	
+	<!--活动商品列表-->
+	<select id="queryActivityProductList" parameterType="java.util.Map"  resultType="java.util.Map">
+		select tsap.id,
+		       tsap.state,
+		       tsap.rejected_reason,
+		       tsap.type,
+		       tsap.user_id,
+			   tsap.product_itemnumber as itemnumber,
+			   tpi.product_name,
+			   tpi.product_img_url,
+			   tpi.year,
+			   (select user_manage_name from tbl_user_info where id=tsap.user_id) as user_manage_name,
+			   (select name from tbl_dic_product_season where id=season_id) as season_name,
+			   (select brand_name from tbl_dic_product_brand tdpb where tdpb.id = tpi.brand_id)  as brand,
+		       (select type_name from tbl_dic_product_type tdpt where tdpt.id = tpi.product_type_id)  as product_type,
+		       (select name from tbl_dic_product_season tdps where tdps.id = tpi.season_id)  as season,
+			   tpi.year,
+			   (select (discount*100)||'%' from tbl_store_activity_info where id=tsap.activity_id) as discount,
+			   (select discount from tbl_store_activity_info where id=tsap.activity_id) as act_discount,
+			   (select to_char(wm_concat('满'||to_char(SPEND_MONEY,'fm9999990.00')|| decode(type,1,'减','打')|| decode(type,1,to_char(discount,'fm9999990.00'),to_char(discount*10,'fm9999990.0'))|| decode(type,1,'元','折'))) from tbl_store_activity_preferent  where activity_id=tsap.activity_id) as pre_activity_type,
+			   (select fixed_price from tbl_store_activity_info where id=tsap.activity_id) as fixed_price,
+               (select user_realname from tbl_sys_user_info where id=tsap.approval_user_id) as approval_user_realname,
+               to_char(tsap.approval_date, 'yyyy-mm-dd hh24:mi:ss') approval_date,
+               (select to_char(begin_date, 'yyyy-mm-dd hh24:mi:ss') from tbl_store_activity_info where id=tsap.activity_id) as begin_date,
+               (select to_char(end_date, 'yyyy-mm-dd hh24:mi:ss') from tbl_store_activity_info where id=tsap.activity_id) as end_date,
+               nvl((select min(retail_price)
+   					from tbl_product_store_detail tpsd,tbl_product_store tps
+ 				where tpsd.product_store_id = tps.id
+        		and tps.user_id in
+               		(select user_id
+                  		from tbl_store_user_manage tsum
+                 	 where exists
+                          (select 1
+                             from tbl_store_activity_shop tsas
+                            where tsum.id = tsas.store_id
+                                  and tsas.activity_id = #{activity_id,jdbcType=INTEGER}))
+        		and tps.product_itemnumber = tsap.product_itemnumber),0) as min_retail_price,
+              nvl((select max(retail_price)
+   					from tbl_product_store_detail tpsd,tbl_product_store tps
+ 				where tpsd.product_store_id = tps.id
+        		and tps.user_id in
+               		(select user_id
+                  		from tbl_store_user_manage tsum
+                 	 where exists
+                          (select 1
+                             from tbl_store_activity_shop tsas
+                            where tsum.id = tsas.store_id
+                                  and tsas.activity_id = #{activity_id,jdbcType=INTEGER}))
+        		and tps.product_itemnumber = tsap.product_itemnumber),0) as max_retail_price    
+		from tbl_store_activity_product tsap
+			 left join tbl_product_info tpi 
+			 on tsap.product_itemnumber=tpi.itemnumber
+		where tsap.activity_id=#{activity_id,jdbcType=INTEGER}
+		<if test="type != null and type != ''">
+   	    	and tsap.type= #{type,jdbcType=INTEGER}
+   	    </if>
+		<if test="product_itemnumber != null and product_itemnumber != ''">
+   	    	and tsap.product_itemnumber= #{product_itemnumber,jdbcType=INTEGER}
+   	    </if>
+   	    <if test="approval_user_realname != null and approval_user_realname != ''">
+   	    	and exists
+   	    		(select 1 
+   	    			from tbl_sys_user_info tsui
+   	    		where tsui.id=tsap.approval_user_id
+   	    		and tsui.user_realname like '%'||#{approval_user_realname,jdbcType=VARCHAR}||'%' )
+   	    </if>
+   	    <if test="product_type_id != null and product_type_id != '' ">
+			and	(tpi.product_type_id = #{product_type_id,jdbcType=INTEGER}
+			or tpi.product_type_id in (select id from tbl_dic_product_type t start with parent_id = #{product_type_id,jdbcType=INTEGER} connect by prior id=parent_id))
+		</if>
+		<if test="approval_begin_date != null and approval_begin_date != ''">
+            and tsap.approval_date &gt; to_date(#{approval_begin_date},'YYYY-MM-DD HH24:MI:SS')
+        </if>
+        <if test="approval_end_date != null and approval_end_date != ''">
+            and tsap.approval_date &lt;= to_date(#{approval_end_date},'YYYY-MM-DD HH24:MI:SS')
+        </if>
+   	    <if test="state != null">
+			and tsap.state IN
+                <foreach item="item" collection="state" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+		</if>
+		<if test="year != null and year != '' ">
+			and	tpi.year = #{year,jdbcType=INTEGER}
+		</if>
+		<if test="season_id != null and season_id != '' ">
+			and	tpi.season_id = #{season_id,jdbcType=INTEGER}
+		</if>
+		order by tsap.state,tsap.create_date desc
+	</select> 
+	
+	<!--活动商品列表总数-->
+	<select id="queryActivityProductCount" parameterType="java.util.Map"  resultType="int">
+		select count(1)
+			from tbl_store_activity_product tsap
+			left join tbl_product_info tpi 
+			on tsap.product_itemnumber=tpi.itemnumber
+		where tsap.activity_id=#{activity_id,jdbcType=INTEGER}
+		<if test="product_itemnumber != null and product_itemnumber != ''">
+   	    	and tsap.product_itemnumber =#{product_itemnumber,jdbcType=INTEGER}
+   	    </if>
+   	    <if test="approval_user_realname != null and approval_user_realname != ''">
+   	    	and exists
+   	    		(select 1 
+   	    			from tbl_sys_user_info tsui
+   	    		where tsui.id=tsap.approval_user_id
+   	    		and tsui.user_realname like '%'||#{approval_user_realname,jdbcType=VARCHAR}||'%' )
+   	    </if>
+   	    <if test="product_type_id != null and product_type_id != '' ">
+			and	(tpi.product_type_id = #{product_type_id,jdbcType=INTEGER}
+			or tpi.product_type_id in (select id from tbl_dic_product_type t start with parent_id = #{product_type_id,jdbcType=INTEGER} connect by prior id=parent_id))
+		</if>
+		<if test="approval_begin_date != null and approval_begin_date != ''">
+            and tsap.approval_date &gt; to_date(#{approval_begin_date},'YYYY-MM-DD HH24:MI:SS')
+        </if>
+        <if test="approval_end_date != null and approval_end_date != ''">
+            and tsap.approval_date &lt;= to_date(#{approval_end_date},'YYYY-MM-DD HH24:MI:SS')
+        </if>
+   	    <if test="state != null">
+			and tsap.state IN
+                <foreach item="item" collection="state" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+		</if>
+		<if test="year != null and year != '' ">
+			and	tpi.year = #{year,jdbcType=INTEGER}
+		</if>
+		<if test="season_id != null and season_id != '' ">
+			and	tpi.season_id = #{season_id,jdbcType=INTEGER}
+		</if>
+	</select> 
+	
+	<!--活动店铺列表-->
+	<select id="queryActivityStoreList" parameterType="java.util.Map"  resultType="java.util.Map">
+		select tsum.id,
+			   tsum.store_name,
+			   tsum.store_mobilephone,
+			   (select name from tbl_dic_region where id = tsum.province)
+		          		||(select name from tbl_dic_region where id = tsum.city )
+		           		||(select name from tbl_dic_region where id = tsum.county)
+		           		||tsum.store_detail_address as store_address,
+			   (select user_manage_name from tbl_user_info tui where tui.id=tsum.user_id) as user_manage_name,
+			   to_char(tsum.create_date, 'yyyy-mm-dd hh24:mi:ss') create_date,
+			   (select user_realname from tbl_sys_user_info where id=tsum.create_user_id) as user_realname
+		from tbl_store_activity_shop tsa
+			 left join tbl_store_user_manage tsum 
+			 on tsa.store_id=tsum.id
+		where tsa.activity_id=#{activity_id,jdbcType=INTEGER}
+	</select>
+	
+	<!--查询满减满折信息-->
+	<select id="queryActivityPreferentList" parameterType="java.util.Map"  resultType="java.util.Map">
+		select tsap.id,
+			   tsap.spend_money,
+			   tsap.discount
+		from tbl_store_activity_preferent tsap
+		where tsap.activity_id=#{activity_id,jdbcType=INTEGER}
+		order by spend_money
+	</select> 
+    
+    <!-- 修改活动时间 -->
+    <update id="updateActivityDate" parameterType="java.util.Map">
+    	update tbl_store_activity_info
+    	   set begin_date = to_date(#{begin_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS'),
+    	   	   end_date=to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+    	 where id = #{activity_id,jdbcType=INTEGER}
+    </update>
+    
+    <!-- 新增满减满折数据-->
+	<insert id="insertStoreActivityPreferential" parameterType="java.util.List">
+		insert into tbl_store_activity_preferent(
+				id,
+				activity_id,
+				type,
+				spend_money,
+				discount
+				)
+		select seq_store_activity_preferent.nextval,
+		A.activity_id,
+		A.type,
+		A.spend_money,
+		A.discount 
+		from(
+		        <foreach collection="list" item="item" index="index" separator="UNION">
+		            SELECT  #{item.activity_id,jdbcType=INTEGER} as activity_id,
+		            		#{item.type,jdbcType=INTEGER} as type,
+		            		#{item.spend_money,jdbcType=INTEGER} as spend_money,
+		            		#{item.discount,jdbcType=INTEGER} as discount
+		            FROM DUAL
+		        </foreach>
+        	   ) A
+		
+	</insert>
+	<!-- 获取活动审核数量 -->
+	<select id="queryActivityApprovalListCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+    	  from (select <include refid="all_column"/>,
+	  		   		case when temp.begin_date &gt; sysdate and temp.start_state = 1 then '1'
+  				   		when temp.end_date &lt; sysdate then '3'
+  				   		when temp.begin_date &lt;= sysdate and temp.end_date &gt;= sysdate and temp.start_state = 1 then '2' 
+						when temp.start_state = 2 and temp.begin_date &lt;= sysdate and temp.end_date &gt;= sysdate then '4' end as activity_state
+						from tbl_store_activity_info temp) t
+		  <where>
+    	 	<if test="type != null and type != ''">
+    	 		and t.type = #{type,jdbcType=INTEGER}
+    	 	</if>
+    	 	<if test="activity_name != null and activity_name != ''">
+    	 		and t.activity_name like '%'||#{activity_name,jdbcType=VARCHAR}||'%'
+    	 	</if>
+    	 	<if test="create_user_name != null and create_user_name != ''">
+    	 		and exists (select 1 from tbl_sys_user_info where id = t.create_user_id and user_realname like '%'||#{create_user_name,jdbcType=VARCHAR}||'%')
+    	 	</if>
+    	 	<if test="approval_user_name != null and approval_user_name != ''">
+    	 		and exists (select 1 from tbl_sys_user_info where id = t.approval_user_id and user_realname like '%'||#{approval_user_name,jdbcType=VARCHAR}||'%')
+    	 	</if>
+    	 	<if test="start_date != null and start_date != '' ">
+			    and	t.create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+			<if test="end_date != null and end_date != '' ">
+			    and	t.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+			<if test="app_start_date != null and app_start_date != '' ">
+			    and	t.approval_date &gt;= to_date(#{app_start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+			<if test="app_end_date != null and app_end_date != '' ">
+			    and	t.approval_date &lt;= to_date(#{app_end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+			<if test="state != null and state != ''">
+				and t.state in
+				<foreach item="item" collection="state" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+			</if>
+			<if test="activity_state != null and activity_state != ''">
+				and t.activity_state in
+				<foreach item="item" collection="activity_state" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+			</if>
+			<if test="agent_id != null and agent_id != ''">
+				and exists (select 1 from tbl_store_activity_shop tsas where activity_id = t.id 
+					and exists (select 1 from tbl_store_user_manage where id = tsas.store_id and user_id = #{agent_id,jdbcType=INTEGER}))
+			</if>
+			<if test="store_id != null and store_id != ''">
+				and exists (select 1 from tbl_store_activity_shop tsas where activity_id = t.id 
+					and store_id = #{store_id,jdbcType=INTEGER})
+			</if>
+			and exists (select 1 from tbl_store_activity_shop tsas where activity_id = t.id
+                        and exists (select 1 from tbl_store_user_manage tsum where id = tsas.store_id
+                        and exists (select 1 from tbl_user_info tui where id = tsum.user_id
+                        <include refid="data_access"/>)))
+    	 </where>
+	</select>
+	<!-- 获取活动审核列表 -->
+	<select id="queryActivityApprovalListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+		select a.*,
+				(select user_realname from tbl_sys_user_info where id = a.create_user_id) create_user_name,
+				(select user_realname from tbl_sys_user_info where id = a.approval_user_id) approval_user_name,
+				a.activity_state,
+				case when a.type = 1 then to_char(a.discount*10,'fm9999990.0')||'折'
+					when a.type = 2 then 
+					(select to_char(wm_concat('满'||to_char(spend_money,'fm9999990.00')|| decode(tt.type,1,'减','打')|| decode(tt.type,1,to_char(discount,'fm9999990.00'),to_char(discount*10,'fm9999990.0'))|| decode(tt.type,1,'元','折'))) from (select spend_money,discount,activity_id,type from tbl_store_activity_preferent order by spend_money)tt where tt.activity_id=a.id)
+					when a.type = 3 then 
+					'￥'||to_char(a.fixed_price,'fm9999990.00')
+					when a.type=4 then
+					(select to_char(wm_concat('满'||to_char(spend_money,'fm9999990.00')||'送'||to_char(discount,'fm9999990.00')))from (select spend_money,discount,activity_id from tbl_store_activity_preferent order by spend_money)tt where tt.activity_id=a.id)
+					end
+				state_info,
+				(select to_char(wm_concat(store_name)) from tbl_store_user_manage t1 
+			          	where exists (select 1 from tbl_store_activity_shop where activity_id = a.id and store_id = t1.id)) store_name,
+			    (select to_char(wm_concat(user_manage_name)) from tbl_user_info tui where exists (select 1 from tbl_store_user_manage t1 where tui.id=user_id
+			    	and exists (select 1 from tbl_store_activity_shop where activity_id = a.id and store_id = t1.id))) agent_name
+			 from (
+    		select b.*,rownum rn from (
+    		  select t.id,
+					 t.activity_name,
+					 t.create_date,
+					 t.approval_date,
+					 t.create_user_id,
+					 t.approval_user_id,
+					 t.discount,
+					 t.fixed_price,
+					 t.state,
+					 t.reject_reason,
+					 t.type,
+					 t.activity_state
+					 from (select temp.id,
+							 temp.activity_name,
+							 to_char(temp.create_date, 'YYYY-MM-DD HH24:MI:SS') create_date,
+							 to_char(temp.approval_date, 'YYYY-MM-DD HH24:MI:SS') approval_date,
+							 temp.create_user_id,
+							 temp.approval_user_id,
+							 temp.discount,
+							 temp.fixed_price,
+							 temp.state,
+							 temp.reject_reason,
+							 temp.type,
+	  		   		case when temp.begin_date &gt; sysdate and temp.start_state = 1 then '1'
+  				   		when temp.end_date &lt; sysdate then '3'
+  				   		when temp.begin_date &lt;= sysdate and temp.end_date &gt;= sysdate and temp.start_state = 1 then '2' 
+						when temp.start_state = 2 and temp.begin_date &lt;= sysdate and temp.end_date &gt;= sysdate then '4' end as activity_state,
+  				   		case when temp.begin_date &lt;= sysdate and temp.end_date &gt;= sysdate then 1
+						else 2 end flag
+						from tbl_store_activity_info temp) t
+		    	 <where>
+		    	 	<if test="type != null and type != ''">
+		    	 		and t.type = #{type,jdbcType=INTEGER}
+		    	 	</if>
+		    	 	<if test="activity_name != null and activity_name != ''">
+		    	 		and t.activity_name like '%'||#{activity_name,jdbcType=VARCHAR}||'%'
+		    	 	</if>
+		    	 	<if test="create_user_name != null and create_user_name != ''">
+		    	 		and exists (select 1 from tbl_sys_user_info where id = t.create_user_id and user_realname like '%'||#{create_user_name,jdbcType=VARCHAR}||'%')
+		    	 	</if>
+		    	 	<if test="approval_user_name != null and approval_user_name != ''">
+		    	 		and exists (select 1 from tbl_sys_user_info where id = t.approval_user_id and user_realname like '%'||#{approval_user_name,jdbcType=VARCHAR}||'%')
+		    	 	</if>
+		    	 	<if test="start_date != null and start_date != '' ">
+					    and	t.create_date &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+					</if>
+					<if test="end_date != null and end_date != '' ">
+					    and	t.create_date &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+					</if>
+					<if test="app_start_date != null and app_start_date != '' ">
+					    and	t.approval_date &gt;= to_date(#{app_start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+					</if>
+					<if test="app_end_date != null and app_end_date != '' ">
+					    and	t.approval_date &lt;= to_date(#{app_end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+					</if>
+					<if test="state != null and state != ''">
+						and t.state in
+						<foreach item="item" collection="state" open="(" separator="," close=")">
+							#{item}
+						</foreach>
+					</if>
+					<if test="activity_state != null and activity_state != ''">
+						and t.activity_state in
+						<foreach item="item" collection="activity_state" open="(" separator="," close=")">
+							#{item}
+						</foreach>
+					</if>
+					<if test="agent_id != null and agent_id != ''">
+						and exists (select 1 from tbl_store_activity_shop tsas where activity_id = t.id 
+							and exists (select 1 from tbl_store_user_manage where id = tsas.store_id and user_id = #{agent_id,jdbcType=INTEGER}))
+					</if>
+					<if test="store_id != null and store_id != ''">
+						and exists (select 1 from tbl_store_activity_shop tsas where activity_id = t.id 
+							and store_id = #{store_id,jdbcType=INTEGER})
+					</if>
+					and exists (select 1 from tbl_store_activity_shop tsas where activity_id = t.id
+                        and exists (select 1 from tbl_store_user_manage tsum where id = tsas.store_id
+                        and exists (select 1 from tbl_user_info tui where id = tsum.user_id
+                        <include refid="data_access"/>)))
+		    	 </where>
+		    	 order by state asc,create_date desc) b
+    			where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) a
+    		where rn &gt; #{start_rownum,jdbcType=INTEGER} 
+	</select>
+	 <!-- 撤出活动商品(支持单个和多个商品撤出) -->
+    <delete id="removeProduct" parameterType="java.util.Map">
+    	delete from tbl_store_activity_product where activity_id = #{activity_id,jdbcType=INTEGER}
+    	<if test="ids != null and ids.size()>0">
+			and id in
+			<foreach collection="ids" item="id" open="(" close=")" separator=",">
+				#{id,jdbcType=VARCHAR}
+			</foreach>
+		</if>
+    </delete>
+    <!-- 活动是否存在 -->
+    <select id="queryActivityIsExists" parameterType="java.util.Map" resultType="int">
+    	select count(1) from tbl_store_activity_info where id =#{activity_id,jdbcType=INTEGER} and state = 1
+    </select>
+    <!-- 更新审批信息 -->
+    <update id="updateActivityApprovalInfo" parameterType="java.util.Map">
+    	update tbl_store_activity_info
+    	   set approval_user_id = #{public_user_id,jdbcType=INTEGER},
+    	   	   approval_date = sysdate,
+    	   	   <if test="reject_reason != null and reject_reason != ''">reject_reason = #{reject_reason,jdbcType=VARCHAR},</if>
+    	   	   state = #{state,jdbcType=INTEGER}
+		 where id = #{activity_id,jdbcType=INTEGER}
+    </update>
+    <!-- 更新活动信息 -->
+    <update id="updateStoreActivityInfo" parameterType="java.util.Map">
+    	update tbl_store_activity_info
+    	   set activity_name = #{activity_name,jdbcType=VARCHAR},
+    	   	   <if test="discount != null and discount != ''">discount=(#{discount,jdbcType=INTEGER}/10),</if>
+			   <if test="fixed_price != null and fixed_price != ''">fixed_price=#{fixed_price,jdbcType=INTEGER},</if>
+			   <if test="activity_type != null and activity_type != ''">activity_type=#{activity_type,jdbcType=INTEGER},</if>
+			   <if test="auto_multip != null and auto_multip != ''">auto_multip=#{auto_multip,jdbcType=INTEGER},</if>
+			   purchase_restriction=#{purchase_restriction,jdbcType=INTEGER},
+			   limit_charge_times=#{limit_charge_times,jdbcType=INTEGER},
+    	   	   begin_date=to_date(#{begin_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss'),
+			   end_date=to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss'),
+			   approval_date = '',
+			   approval_user_id = '',
+			   state = 1
+    	 where id = #{activity_id,jdbcType=INTEGER}
+    </update>
+    <!-- 获取活动商家id -->
+    <select id="queryPartnerUserList" parameterType="java.util.Map" resultType="string">
+    	select user_id from tbl_store_user_manage tsum 
+    	 where  exists (select 1 from tbl_store_activity_shop where store_id = tsum.id and activity_id = #{activity_id,jdbcType=INTEGER})
+    	 group by user_id
+    </select>
+    <!-- 获取活动门店id -->
+    <select id="queryStoreList" parameterType="java.util.Map" resultType="string">
+    	select store_id from 
+    		tbl_store_activity_shop tsas,tbl_store_user_manage tsum
+    	where tsas.store_id=tsum.id
+    	and tsas.activity_id= #{activity_id,jdbcType=INTEGER}
+    	and tsum.user_id=#{user_id,jdbcType=INTEGER}
+    </select>
+    <!--查询活动商品信息-->
+	<select id="queryStoreActivityProductInfo" parameterType="java.util.Map"  resultType="java.util.Map">
+		select id,
+			activity_id,
+			product_itemnumber,
+			state,
+			rejected_reason,
+			(select agent_activity_id from tbl_store_activity_info where id=activity_id) as agent_activity_id
+		from tbl_store_activity_product
+		where id= #{product_id,jdbcType=INTEGER}
+	</select> 
+	 <!-- 店铺商品审批 -->
+    <update id="updateStoreActivityProductState" parameterType="java.util.Map">
+    	update tbl_store_activity_product
+    		<set>
+    			<if test="state != null and state != ''">
+	    	 		state = #{state,jdbcType=INTEGER},
+	    	 	</if>
+	    	 	<if test="rejected_reason != null and rejected_reason != ''">
+	    	 		rejected_reason = #{rejected_reason,jdbcType=VARCHAR},
+	    	 	</if>
+	    	 	approval_date=sysdate,
+	    	 	approval_user_id=#{public_user_id,jdbcType=INTEGER}
+    		</set>
+    	 where id in
+			<foreach collection="ids" item="id" open="(" close=")" separator=",">
+				#{id,jdbcType=INTEGER}
+			</foreach>
+    </update>
+    <!-- 更新新零售活动ID -->
+    <update id="updateAgentActivityId" parameterType="java.util.Map">
+    	update tbl_store_activity_info
+    	   set agent_activity_id = #{agent_activity_id,jdbcType=VARCHAR}
+    	 where id = #{activity_id,jdbcType=INTEGER}
+    </update>
+     <!--查询当前活动商品是否在活动中-->
+	<select id="queryActivingProductInfo" parameterType="String"  resultType="java.util.Map">
+		SELECT *
+		  FROM tbl_store_activity_product tsap
+		 WHERE product_itemnumber IN 
+		 			(SELECT product_itemnumber
+		                  FROM tbl_store_activity_product tsap1
+		              WHERE id = #{id,jdbcType=INTEGER})
+		  AND id &lt;&gt; #{id,jdbcType=INTEGER}
+		  AND tsap.state IN (0, 1)
+		  AND EXISTS
+	              (SELECT 1
+	                 FROM TBL_STORE_ACTIVITY_info tsai
+	                WHERE tsap.activity_id = tsai.id
+	                      AND tsai.state &lt;&gt; 3
+	                      AND tsai.end_date &gt;= SYSDATE)
+          
+	</select> 
+	 <!--判断当前商品所在门店进行的数量-->
+	<select id="checkActivityStoreCount" parameterType="String"  resultType="int">
+		SELECT count(1)
+		  FROM tbl_store_user_manage tsum
+		 WHERE tsum.user_id IN
+	              (SELECT user_id
+	                 FROM tbl_product_store
+	                WHERE product_itemnumber = (SELECT product_itemnumber
+	                                              FROM tbl_store_activity_product
+	                                             WHERE id = #{product_id,jdbcType=INTEGER}))
+		       AND tsum.id IN (SELECT store_id
+		                         FROM TBL_STORE_ACTIVITY_SHOP
+		                        WHERE activity_id = #{activity_id,jdbcType=INTEGER})
+		       AND tsum.id NOT IN (SELECT store_id
+                 FROM TBL_STORE_ACTIVITY_SHOP tsas
+                      LEFT JOIN tbl_store_activity_info tsai
+                         ON tsas.activity_id = tsai.id
+                WHERE activity_id = #{activity_id,jdbcType=INTEGER} AND tsai.end_date &gt;= SYSDATE)
+          
+	</select> 
+	<!--查询满减满折信息-->
+	<select id="queryActivityPreferentInfo" parameterType="java.util.Map"  resultType="java.util.Map">
+		select to_char(wm_concat(tsap.spend_money)) as spend_money,
+			case when (max(type)=1 or max(type)=4) then
+    				to_char(wm_concat(tsap.discount))
+    			when max(type)=2 then
+         			to_char(wm_concat(tsap.discount*100)) end  as discount
+         from tbl_store_activity_preferent tsap
+		where tsap.activity_id=#{activity_id,jdbcType=INTEGER}
+		order by id
+	</select> 
+	<!--查询当前活动所有已经审批的和当前审批的商品-->
+	<select id="queryProductItemnumberByActivityId" parameterType="java.util.Map"  resultType="string">
+		SELECT product_itemnumber
+  			FROM tbl_store_activity_product
+ 		WHERE TYPE = 2 AND state = 1 AND activity_id = #{activity_id,jdbcType=INTEGER} AND user_id = #{user_id,jdbcType=INTEGER}
+		UNION ALL
+		SELECT t.product_itemnumber
+  			FROM tbl_store_activity_product t
+       LEFT JOIN tbl_product_store t1
+          ON t.product_itemnumber = t1.product_itemnumber
+ 		WHERE t.state = 1 AND T.TYPE=1 AND t.activity_id = #{activity_id,jdbcType=INTEGER} AND t1.user_id = #{user_id,jdbcType=INTEGER}
+	</select>
+	<!--查询当前货号是否已存在-->
+	<select id="queryProductCountByItemnumber" parameterType="java.util.Map"  resultType="int">
+		select count(1) from tbl_store_activity_product
+		where activity_id=#{id,jdbcType=INTEGER}
+		and product_itemnumber=#{product_itemnumber,jdbcType=VARCHAR}
+		<if test="type != null and type != ''">
+   	 		and type = #{type,jdbcType=INTEGER}
+   	 	</if>
+	</select>
+	<!-- 更新当前商品状态-->
+	<update id="updateStoreActivityProduct" parameterType="java.util.Map">
+    	update tbl_store_activity_product
+    	   set state = 0
+    	 where activity_id=#{id,jdbcType=INTEGER}
+		and product_itemnumber=#{product_itemnumber,jdbcType=VARCHAR}
+		<if test="user_id != null and user_id != ''">
+   	 		and user_id = #{user_id,jdbcType=INTEGER}
+   	 	</if>
+    </update>
+    <!--查询未撤出活动商品的并且是审批通过的商品货号-->
+	<select id="queryNotRemoveApprovalProduct" parameterType="java.util.Map"  resultType="string">
+		SELECT product_itemnumber
+	  			FROM tbl_store_activity_product
+	 		WHERE TYPE = 2 AND state = 1 AND activity_id = #{activity_id,jdbcType=INTEGER} AND user_id = #{user_id,jdbcType=INTEGER}
+	 		AND ID NOT IN
+			<foreach collection="ids" item="id" open="(" close=")" separator=",">
+				#{id,jdbcType=INTEGER}
+			</foreach>
+			UNION ALL
+			SELECT t.product_itemnumber
+	  			FROM tbl_store_activity_product t
+	       LEFT JOIN tbl_product_store t1
+	          ON t.product_itemnumber = t1.product_itemnumber
+	 		WHERE t.state = 1 AND T.TYPE=1 AND t.activity_id = #{activity_id,jdbcType=INTEGER} AND t1.user_id = #{user_id,jdbcType=INTEGER}
+			AND T.ID NOT IN
+			<foreach collection="ids" item="id" open="(" close=")" separator=",">
+				#{id,jdbcType=INTEGER}
+			</foreach>
+	</select>
+	<!-- 查询未撤销的经销商id-->
+    <select id="queryNotRemovePartnerUserList" parameterType="java.util.Map" resultType="string">
+    	select user_id from tbl_store_user_manage where id in(
+			select store_id from tbl_store_activity_shop where activity_id in(
+			select activity_id from tbl_store_activity_product
+			        where activity_id=#{activity_id,jdbcType=INTEGER}
+			          and id not in
+						<foreach collection="ids" item="id" open="(" close=")" separator=",">
+							#{id,jdbcType=INTEGER}
+						</foreach>
+			        and state=1))
+    </select>
+    <!-- 查询新零售活动ID -->
+    <select id="qeuryDiscountId" parameterType="java.util.Map" resultType="string">
+    	select agent_activity_id 
+    	  from tbl_store_activity_info
+    	 where id = #{activity_id,jdbcType=INTEGER}
+    </select>
+    <!--查询经销商ID-->
+	<select id="queryAgentId" parameterType="java.util.Map"  resultType="string">
+		select agent_id from tbl_user_info
+			where id in
+			(select user_id from tbl_store_user_manage where id in
+				<foreach collection="store_list" item="id" open="(" close=")" separator=",">
+					#{id,jdbcType=INTEGER}
+				</foreach> group by user_id)
+			
+	</select>
+	<!--查询商家名称-->
+	<select id="queryUserManageNameByAgentId" parameterType="java.util.Map"  resultType="java.util.Map">
+		SELECT * FROM TBL_USER_INFO 
+			WHERE 1=1
+			<if test="AGENT_ID != null and AGENT_ID != ''">
+    	 		AND AGENT_ID=#{AGENT_ID,jdbcType=INTEGER}
+    	 	</if>
+    	 	<if test="user_id != null and user_id != ''">
+    	 		AND id=#{user_id,jdbcType=INTEGER}
+    	 	</if>
+	</select>
+	<!--查询商品分类-->
+	<select id="queryProductTypeByTypeId" parameterType="java.util.Map"  resultType="java.util.Map">
+		SELECT * FROM TBL_DIC_PRODUCT_TYPE WHERE ID=#{SECOND_TYPE,jdbcType=INTEGER}
+	</select>
+	<!-- 查询指定商家下拉数据-->
+	<select id="queryUserOption" parameterType="java.util.Map"  resultMap="getUserOption">
+		select id,user_manage_name from tbl_user_info  where user_type=2
+		and id in
+		(select user_id from tbl_store_user_manage where id in
+				<foreach collection="store_list" item="id" open="(" close=")" separator=",">
+					#{id,jdbcType=INTEGER}
+				</foreach> group by user_id)
+	</select>
+	<resultMap id="getUserOption" type="java.util.Map">
+	  <result column="id" property="id"/>
+      <result column="user_manage_name" property="option"/>
+	</resultMap>
+	<!--转换经销商ID-->
+	<select id="queryActivityAgentID" parameterType="java.util.Map"  resultType="string">
+		SELECT AGENT_ID FROM TBL_USER_INFO WHERE ID IN(
+			SELECT USER_ID FROM TBL_STORE_ACTIVITY_PRODUCT 
+				WHERE ACTIVITY_ID=#{activity_id,jdbcType=INTEGER}
+			AND TYPE=2
+		)
+	</select>
+	<!--封装货号-->
+	<select id="queryActivityItemnumber" parameterType="java.util.Map"  resultType="string">
+		SELECT PRODUCT_ITEMNUMBER FROM TBL_STORE_ACTIVITY_PRODUCT 
+			WHERE ACTIVITY_ID=#{activity_id,jdbcType=INTEGER}
+		AND TYPE=2 AND USER_ID=#{user_id,jdbcType=INTEGER}
+		<if test="ids != null and ids != ''">
+   	 		AND ID IN
+   	 		<foreach collection="ids" item="id" open="(" close=")" separator=",">
+				#{id,jdbcType=INTEGER}
+			</foreach>
+   	 	</if>
+	</select>
+	<!--查询正在活动中的自营商品-->
+	<select id="queryActivingZyProductList" parameterType="java.util.Map"  resultType="java.util.Map">
+		SELECT TSAP.*,
+			(SELECT AGENT_ID FROM TBL_USER_INFO WHERE ID= TSAP.USER_ID) AS AGENT_ID
+		  FROM TBL_STORE_ACTIVITY_PRODUCT tsap
+		 WHERE TYPE = 2
+		       AND state IN (0, 1)
+		       		<choose>
+						<when test="agent_id_u !=null and agent_id_u !=''">
+							AND user_id=#{agent_id_u,jdbcType=INTEGER}
+						</when>
+						<when test="agent_id_s !=null and agent_id_s !=''">
+							and user_id in(select user_id from tbl_store_user_manage where id in
+								<foreach collection="agent_id_s" item="id" open="(" close=")" separator=",">
+									#{id,jdbcType=INTEGER}
+								</foreach>
+							)
+						</when>
+					</choose>
+		       		
+		       AND EXISTS
+		              (SELECT 1
+		                 FROM tbl_store_activity_info tsai
+		                WHERE tsai.id = tsap.activity_id
+		                      AND tsai.end_date &gt;= SYSDATE
+		                      AND tsai.state &lt;&gt; 3
+		                      <if test="activity_type != null and activity_type != ''">
+								and tsai.activity_type = #{activity_type,jdbcType=INTEGER}
+							  </if>)
+	</select>
+	<!--查询是否已存在活动中的门店-->
+	<select id="queryIsExistsActivingStore" parameterType="java.util.Map"  resultType="int">
+		SELECT COUNT (1)
+		  FROM TBL_STORE_ACTIVITY_SHOP TSAS
+		 WHERE     EXISTS
+		              (SELECT 1
+		                 FROM TBL_STORE_ACTIVITY_INFO TSAI
+		                WHERE     TSAI.ID = TSAS.ACTIVITY_ID
+		                      AND NOT (TSAI.END_DATE &lt;to_date(#{begin_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+                                        OR  (TSAI.BEGIN_DATE &gt;to_date(#{end_date,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss'))
+                               )
+		                      AND TSAI.TYPE = 4
+		                      AND TSAI.STATE = 2
+		                      AND TSAI.END_DATE>SYSDATE)
+		       AND EXISTS
+		              (SELECT 1
+		                 FROM TBL_STORE_ACTIVITY_SHOP TSAS1
+		                WHERE     TSAS1.ACTIVITY_ID = #{activity_id,jdbcType=INTEGER}
+		                      AND TSAS1.STORE_ID = TSAS.STORE_ID)
+		      AND TSAS.ACTIVITY_ID &lt;&gt;#{activity_id,jdbcType=INTEGER}
+	</select>
+</mapper>

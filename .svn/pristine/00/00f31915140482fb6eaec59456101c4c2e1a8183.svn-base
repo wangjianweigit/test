@@ -1,0 +1,74 @@
+package com.tk.oms.basicinfo.dao;
+
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface AfterSaleAddressDao {
+	
+	/**
+	 * 查询售后地址列表
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> queryAfterSaleAddressList(Map<String, Object> paramMap);
+	/**
+	 * 查询售后地址总数量
+	 * @param paramMap
+	 * @return
+	 */
+	public int queryAfterSaleAddressCount(Map<String, Object> paramMap);
+	/**
+	 * 查询售后地址详情
+	 * @param paramMap
+	 * @return
+	 */
+	public Map<String, Object> queryAfterSaleAddressDetail(Map<String, Object> paramMap);
+	/**
+	 * 新增售后地址
+	 * @param paramMap
+	 * @return
+	 */
+	public int addAfterSaleAddress(Map<String, Object> paramMap);
+	/**
+	 * 编辑售后地址
+	 * @param paramMap
+	 * @return
+	 */
+	public int editAfterSaleAddress(Map<String, Object> paramMap);
+
+	/**
+	 * 删除商家售后地址
+	 * @param paramMap
+	 * @return
+	 */
+	public int deleteStationedAfterAddress(Map<String, Object> paramMap);
+
+	/**
+	 * 新增商家售后地址
+	 * @param paramMap
+	 * @return
+	 */
+	public int insertStationedAfterAddress(Map<String, Object> paramMap);
+	/**
+	 * 删除售后地址
+	 * @param paramMap
+	 * @return
+	 */
+	public int removeAfterSaleAddress(Map<String, Object> paramMap);
+	/**
+	 * 启用禁用售后地址
+	 * @param paramMap
+	 * @return
+	 */
+	public int editAfterSaleAddressState(Map<String, Object> paramMap);
+
+	/**
+	 * 查询入驻商下拉列表
+	 * @param paramMap
+	 * @return
+	 */
+	public List<Map<String, Object>> listStationedUser(Map<String, Object> paramMap);
+}

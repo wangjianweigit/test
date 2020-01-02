@@ -1,0 +1,16 @@
+2019-10-23 14:55:43 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-10-23 14:55:45 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-10-23 14:55:48 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-10-23 14:55:50 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-10-23 15:06:33 ERROR [com.tk.oms.stationed.service.StationedService] 审核失败：同步入驻商信息至OA失败
+2019-10-23 15:07:32 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-10-23 15:07:34 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-10-23 15:07:35 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-10-23 15:07:36 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-10-23 15:08:13 ERROR [com.tk.oms.stationed.service.StationedService] 审核失败：同步入驻商信息至OA失败
+2019-10-23 15:09:56 ERROR [com.tk.oms.stationed.service.StationedService] 审核失败：同步入驻商信息至OA失败
+2019-10-23 15:10:41 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-10-23 15:10:43 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-10-23 15:10:44 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-10-23 15:10:45 ERROR [com.alibaba.druid.pool.DruidAbstractDataSource] oracle.jdbc.driver.OracleDriver is deprecated.
+2019-10-23 15:11:20 ERROR [com.tk.oms.stationed.service.StationedService] 审核失败：同步入驻商信息至OA失败

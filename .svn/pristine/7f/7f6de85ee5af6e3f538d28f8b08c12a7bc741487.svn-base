@@ -1,0 +1,2490 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tk.analysis.stationed.dao.StationedAnalysisDao">
+	<!-- DW:平台的权限条件 -->
+	<sql id="dw_public_ds_where">
+	   <!-- 童库平台 -->
+	   <if test="public_user_platform_type ==1">
+	   		and ds.merchants_type like concat('%',concat(1,'%'))
+	   </if>
+	   <!-- 私有平台 -->
+	   <if test="public_user_platform_type ==2">
+	   		and ds.stationed_user_id = #{public_user_stationed_user_id,jdbcType=INTEGER}
+	   </if>
+	   <!-- 全部 -->
+	   <if test="public_user_platform_type ==9">
+	   		and (ds.merchants_type like concat('%',concat(1,'%'))
+	   		or ds.merchants_type like concat('%',concat(4,'%')))
+	   </if>
+	</sql>
+	<!-- DW:平台的权限条件 -->
+	<sql id="dw_public_dp_where">
+	   <!-- 童库平台 -->
+	   <if test="public_user_platform_type ==1">
+	   		and dp.stationed_user_id in (select stationed_user_id from dim_stationed where merchants_type like concat('%',concat(1,'%')))
+	   </if>
+	   <!-- 私有平台 -->
+	   <if test="public_user_platform_type ==2">
+	   		and dp.stationed_user_id = #{public_user_stationed_user_id,jdbcType=INTEGER}
+	   </if>
+	   <!-- 全部 -->
+	   <if test="public_user_platform_type ==9">
+	   		and dp.stationed_user_id in (select stationed_user_id from dim_stationed where (merchants_type like concat('%',concat(1,'%')) or merchants_type like concat('%',concat(4,'%'))))
+	   </if>
+	</sql>
+							<!-- #################        公用         ################ -->
+	<!-- 商家总数 -->
+	<select id="r_queryStationedCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from dim_stationed ds
+         where 1=1
+         <include refid="dw_public_ds_where"/>
+         <if test="province_id != null and province_id != ''">
+           and ds.address_province = #{province_id,jdbcType=INTEGER}
+         </if>
+         <if test="city_id != null and city_id != ''">
+           and ds.address_city = #{city_id,jdbcType=INTEGER}
+         </if>
+	</select>
+	<!-- 商家列表 -->
+	<select id="r_queryStationedList" parameterType="java.util.Map" resultType="java.util.Map">
+		select stationed_user_id,
+			   company_name as stationed_user_name
+		  from dim_stationed ds
+		 where ds.stationed_user_id in
+		 <foreach collection="stationedList" item="item" open="(" close=")" separator=",">
+		 	#{item,jdbcType=INTEGER}
+		 </foreach>
+		 order by decode(ds.stationed_user_id
+		 <foreach collection="stationedList" item="item" index="_index" open="," close="" separator=",">
+            #{item},${_index}
+         </foreach>)
+	</select>
+							<!-- #################        商家今日实时销量         ################ -->
+	<!-- 实时 商家销售额 -->
+	<select id="r_queryRealTime_StationedPayMoneyList" parameterType="java.util.Map" resultType="java.util.Map">
+		select ds.company_name as page_name,nvl(sum(t1.pay_money+t1.pre_first_money),0) cnt
+  		  from dim_stationed ds,
+  		  ( select dp.stationed_user_id,nvl(t1.pay_money,0) pay_money,0 pre_first_money
+			  from fact_order_product t1,dim_date dt,dim_product dp
+			 where t1.payment_date_key = dt.date_key
+	           and t1.product_key = dp.product_key
+	           and dt.date_short = #{date_short,jdbcType=VARCHAR}
+	           <include refid="dw_public_dp_where"/>
+ 			union all 
+			select dp.stationed_user_id,0 pay_money,nvl(t1.product_money*(t2.earnest_money/t2.product_money),0) pre_first_money
+			  from fact_pre_order_product t1 ,fact_pre_order t2,dim_date dt,dim_product dp
+			 where t1.order_key = t2.order_key
+			   and t1.payment_date_key = dt.date_key
+			   and t1.product_key = dp.product_key
+			   and dt.date_short = #{date_short,jdbcType=VARCHAR}
+			   <include refid="dw_public_dp_where"/>) t1
+		 where ds.stationed_user_id = t1.stationed_user_id(+)
+		   <include refid="dw_public_ds_where"/>
+ 		 group by ds.company_name
+ 		 order by cnt desc
+	</select>
+	<!-- 实时 商家销量 -->
+	<select id="r_queryRealTime_StationedPayCountList" parameterType="java.util.Map" resultType="java.util.Map">
+		select ds.company_name as page_name,nvl(t1.pay_count,0) cnt
+		  from dim_stationed ds,
+		(select dp.stationed_user_id,nvl(sum(t1.product_count),0) pay_count
+		  from fact_order_product t1,dim_date dt,dim_product dp
+		 where t1.payment_date_key = dt.date_key
+           and t1.product_key = dp.product_key
+           and dt.date_short = #{date_short,jdbcType=VARCHAR}
+		   <include refid="dw_public_dp_where"/>
+		   group by dp.stationed_user_id) t1
+		   where ds.stationed_user_id = t1.stationed_user_id(+)
+		   <include refid="dw_public_ds_where"/>
+		   order by cnt desc
+	</select>
+	
+	<!-- 排序获取某一页的商家排行-商品销量 -->
+	<select id="r_queryStationed_PayCount_Stationed" parameterType="java.util.Map" resultType="string">
+		select stationed_user_id
+		  from (
+		select a.*,rownum rn
+		  from (
+		select ds.stationed_user_id,nvl(t1.pay_count,0) pay_count
+		  from dim_stationed ds,
+			  	(select dp.stationed_user_id,nvl(sum(t1.product_count),0) pay_count
+				  from fact_order_product t1,dim_date dt,dim_product dp
+				 where t1.payment_date_key = dt.date_key
+				   and t1.product_key = dp.product_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <include refid="dw_public_dp_where"/>
+				   group by dp.stationed_user_id) t1
+		   where ds.stationed_user_id = t1.stationed_user_id(+)
+		     <include refid="dw_public_ds_where"/>
+		   order by ${sort} ${sort_by}) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	
+	<!-- 排序获取某一页的商家排行-商品销售总额 -->
+	<select id="r_queryStationed_PayMoney_Stationed" parameterType="java.util.Map" resultType="string">
+		select stationed_user_id
+		  from (
+		select a.*,rownum rn
+		  from (
+		select ds.stationed_user_id,nvl(t1.pay_money,0)+nvl(t2.pre_first_money,0) pay_money
+		  from dim_stationed ds,
+			  	(select dp.stationed_user_id,nvl(sum(t1.pay_money),0) pay_money
+				  from fact_order_product t1,dim_date dt,dim_product dp
+				 where t1.payment_date_key = dt.date_key
+				   and t1.product_key = dp.product_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <include refid="dw_public_dp_where"/>
+				   group by dp.stationed_user_id) t1,
+				(select dp.stationed_user_id,nvl(sum(t1.product_money*(t2.earnest_money/t2.product_money)),0) pre_first_money
+				  from fact_pre_order_product t1 ,fact_pre_order t2,dim_date dt,dim_product dp
+		 	     where t1.order_key = t2.order_key
+		   		   and t1.payment_date_key = dt.date_key
+				   and t1.product_key = dp.product_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <include refid="dw_public_dp_where"/>
+				   group by dp.stationed_user_id) t2
+		   where ds.stationed_user_id = t1.stationed_user_id(+)
+		     and ds.stationed_user_id = t2.stationed_user_id(+)
+		     <include refid="dw_public_ds_where"/>
+		   order by ${sort} ${sort_by}) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 排序获取某一页的商家排行-支付买家数 -->
+	<select id="r_queryStationed_PurchaseNumber_Stationed" parameterType="java.util.Map" resultType="string">
+		select stationed_user_id
+		  from (
+		select a.*,rownum rn
+		  from (
+		select ds.stationed_user_id,nvl(t1.purchase_number,0) purchase_number
+		  from dim_stationed ds,
+			  	(select dp.stationed_user_id,count(distinct t1.member_key) purchase_number
+				  from fact_order_product t1,dim_date dt,dim_product dp
+				 where t1.payment_date_key = dt.date_key
+				   and t1.product_key = dp.product_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <include refid="dw_public_dp_where"/>
+				   group by dp.stationed_user_id) t1
+		   where ds.stationed_user_id = t1.stationed_user_id(+)
+		   	<include refid="dw_public_ds_where"/>
+		   order by ${sort} ${sort_by}) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 查询默认排序的商家列表 -->
+	<select id="r_queryRealTimeSaleStationedListBy_Default" parameterType="java.util.Map" resultType="string">
+		<choose>
+			<when test="query_type == 'other'">
+				select stationed_user_id
+				  from (
+				select a.*,rownum rn
+				  from (
+				select ds.stationed_user_id,nvl(t1.pay_money,0) pay_money
+				  from dim_stationed ds,
+					  	(select ds.stationed_user_id,nvl(sum(t1.pay_money),0) pay_money
+						  from fact_stationed_summary_d t1,dim_date dt,dim_stationed ds
+						 where t1.date_key = dt.date_key
+						   and t1.stationed_user_key = ds.stationed_user_key
+				           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+						   <include refid="dw_public_ds_where"/>
+						   group by ds.stationed_user_id) t1
+				   where ds.stationed_user_id = t1.stationed_user_id(+)
+				   	<include refid="dw_public_ds_where"/>
+				   order by pay_money desc) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+			</when>
+			<otherwise>
+				select stationed_user_id
+				  from (
+				select a.*,rownum rn
+				  from (
+				select ds.stationed_user_id,nvl(t1.pay_money,0)+nvl(t2.pre_first_money,0) pay_money
+				  from dim_stationed ds,
+					  	(select dp.stationed_user_id,nvl(sum(t1.pay_money),0) pay_money
+						  from fact_order_product t1,dim_date dt,dim_product dp
+						 where t1.payment_date_key = dt.date_key
+						   and t1.product_key = dp.product_key
+				           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+						   <include refid="dw_public_dp_where"/>
+						   group by dp.stationed_user_id) t1,
+						(select dp.stationed_user_id,nvl(sum(t1.product_money*(t2.earnest_money/t2.product_money)),0) pre_first_money
+						  from fact_pre_order_product t1 ,fact_pre_order t2,dim_date dt,dim_product dp
+				 	     where t1.order_key = t2.order_key
+				   		   and t1.payment_date_key = dt.date_key
+						   and t1.product_key = dp.product_key
+				           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+						   <include refid="dw_public_dp_where"/>
+						   group by dp.stationed_user_id) t2
+				   where ds.stationed_user_id = t1.stationed_user_id(+)
+				     and ds.stationed_user_id = t2.stationed_user_id(+)
+				     <include refid="dw_public_ds_where"/>
+				   order by pay_money desc) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+			</otherwise>
+		</choose>
+	</select>
+	<!-- 查询商家的商品销量，商品销售总额，支付买家数 -->
+	<select id="r_queryRealTimeSale_PayPurchaseNumberCountMoney" parameterType="java.util.Map" resultType="java.util.Map">
+		select dp.stationed_user_id,nvl(sum(t1.product_count),0) pay_count,nvl(sum(t1.pay_money),0) pay_money,count(distinct t1.member_key) purchase_number
+		  from fact_order_product t1,dim_date dt,dim_product dp
+		 where t1.payment_date_key = dt.date_key
+		   and t1.product_key = dp.product_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id in
+		   <foreach collection="stationedList" item="item" open="(" close=")" separator=",">
+            #{item,jdbcType=INTEGER}
+           </foreach>
+		   group by dp.stationed_user_id
+	</select>
+	<!-- 查询商家的预定订单的定金 -->
+	<select id="r_queryRealTimeSale_PreFirstMoney" parameterType="java.util.Map" resultType="java.util.Map">
+		select dp.stationed_user_id,nvl(sum(t1.product_money*(t2.earnest_money/t2.product_money)),0) pre_first_money
+		  from fact_pre_order_product t1 ,fact_pre_order t2,dim_date dt,dim_product dp
+ 	     where t1.order_key = t2.order_key
+   		   and t1.payment_date_key = dt.date_key
+		   and t1.product_key = dp.product_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id in
+		   <foreach collection="stationedList" item="item" open="(" close=")" separator=",">
+            #{item,jdbcType=INTEGER}
+           </foreach>
+		   group by dp.stationed_user_id
+	</select>
+							<!-- #################        商家分布         ################ -->
+	<resultMap type="java.util.Map" id="saleAreaMap">
+  		<result column="id" property="id" />
+  		<result column="name" property="name" />
+  		<result column="value" property="value" />
+  	</resultMap>
+	<!-- 商家分布图 -->
+	<select id="r_queryDistributionMap" parameterType="java.util.Map" resultMap="saleAreaMap">
+		select t.region_id as id,
+  			   t.name,
+  			   nvl(t1.stationed_count,0) as value
+  		  from dim_dic_region t,(select address_province as province_id,count(1) stationed_count
+								   from dim_stationed ds
+								  where 1=1
+								  <include refid="dw_public_ds_where"/>
+								  group by address_province) t1
+				where t.parent_id in (select region_id from dim_dic_region where parent_id = 0)
+			      and t.region_id = t1.province_id(+)
+		
+	</select>
+	<!-- 按省份 商家数量 -->
+	<select id="r_queryStationedCountToProvince" parameterType="java.util.Map" resultType="java.util.Map">
+		select t.province_id,
+			   (select name from dim_dic_region where region_id = t.province_id) province_name,
+			   stationed_count
+		  from 
+		(select province_id,stationed_count
+		   from 
+		(select address_province as province_id,count(1) stationed_count
+		   from dim_stationed ds
+		  where 1=1
+		  <include refid="dw_public_ds_where"/>
+		  group by address_province) 
+		  order by stationed_count desc) t
+		  where rownum &lt;=#{num,jdbcType=INTEGER}
+	</select>
+	<!-- 按城市 商家数量 -->
+	<select id="r_queryStationedCountToCity" parameterType="java.util.Map" resultType="java.util.Map">
+		select t.city_id,
+			   (select name from dim_dic_region where region_id = t.city_id) city_name,
+			   stationed_count
+		  from 
+		(select city_id,stationed_count
+		   from 
+		(select address_city as city_id,count(1) stationed_count
+		   from dim_stationed ds
+		  where 1=1
+		  <include refid="dw_public_ds_where"/>
+		  group by address_city)
+		  order by stationed_count desc) t
+		  where rownum &lt;=#{num,jdbcType=INTEGER}
+	</select>
+	<!-- 按省份或城市 查询商家 -->
+	<select id="r_queryDistributionAreaDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		 select *
+		   from (select a.*,rownum rn from 
+		        (select stationed_user_id,
+			    	    company_name as stationed_user_name
+			       from dim_stationed ds
+			      where 1=1
+			  	  <include refid="dw_public_ds_where"/>
+				  <if test="province_id != null and province_id != ''">
+		           and ds.address_province = #{province_id,jdbcType=INTEGER}
+		         </if>
+		         <if test="city_id != null and city_id != ''">
+		           and ds.address_city = #{city_id,jdbcType=INTEGER}
+		         </if>) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+			where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+							<!-- #################        在售商品数量排行         ################ -->
+	<!-- 在售商品-饼图 -->
+	<select id="r_queryOnSaleProductChart" parameterType="java.util.Map" resultType="java.util.Map">
+		select stationed_user_name as page_name,
+			   count(1) cnt
+		  from dim_product dp
+		 where dp.state = '上架'
+		 <include refid="dw_public_dp_where"/>
+		 <if test="product_first_classify != null and product_first_classify != ''">
+		  and dp.product_first_classify = #{product_first_classify,jdbcType=INTEGER}
+		 </if>
+		 group by dp.stationed_user_name
+		 order by cnt desc
+	</select>
+	<!-- 排序获取某一页的商家排行-货号数 -->
+	<select id="r_queryStationed_ItemCount_Stationed" parameterType="java.util.Map" resultType="string">
+		select stationed_user_id
+				  from (
+				select a.*,rownum rn
+				  from (
+				select ds.stationed_user_id,nvl(t1.item_count,0) item_count
+				  from dim_stationed ds,
+					  	(select dp.stationed_user_id,count(1) item_count
+						  from dim_product dp
+						 where dp.state = '上架'
+						 <include refid="dw_public_dp_where"/>
+						 <if test="product_first_classify != null and product_first_classify != ''">
+						  and dp.product_first_classify = #{product_first_classify,jdbcType=INTEGER}
+						 </if>
+						 group by dp.stationed_user_id) t1
+				   where ds.stationed_user_id = t1.stationed_user_id(+)
+				   	<include refid="dw_public_ds_where"/>
+				   order by ${sort} ${sort_by}) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 排序获取某一页的商家排行-sku数 -->
+	<select id="r_queryStationed_SkuCount_Stationed" parameterType="java.util.Map" resultType="string">
+		select stationed_user_id
+				  from (
+				select a.*,rownum rn
+				  from (
+				select ds.stationed_user_id,nvl(t1.sku_count,0) sku_count
+				  from dim_stationed ds,
+					  	(select t1.stationed_user_id,count(1) sku_count
+						  from dim_product_sku t1,dim_product dp
+						 where t1.itemnumber = dp.itemnumber
+						   and t1.state = '上架'
+						 <include refid="dw_public_dp_where"/>
+						 <if test="product_first_classify != null and product_first_classify != ''">
+						  and dp.product_first_classify = #{product_first_classify,jdbcType=INTEGER}
+						 </if>
+						 group by t1.stationed_user_id) t1
+				   where ds.stationed_user_id = t1.stationed_user_id(+)
+				   	<include refid="dw_public_ds_where"/>
+				   order by ${sort} ${sort_by}) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 查询默认排序的商家列表<货号数> -->
+	<select id="r_queryOnSaleProductStationedListBy_Default" parameterType="java.util.Map" resultType="string">
+		select stationed_user_id
+				  from (
+				select a.*,rownum rn
+				  from (
+				select ds.stationed_user_id,nvl(t1.item_count,0) item_count
+				  from dim_stationed ds,
+					  	(select dp.stationed_user_id,count(1) item_count
+						  from dim_product dp
+						 where dp.state = '上架'
+						 <include refid="dw_public_dp_where"/>
+						 <if test="product_first_classify != null and product_first_classify != ''">
+						  and dp.product_first_classify = #{product_first_classify,jdbcType=INTEGER}
+						 </if>
+						 group by dp.stationed_user_id) t1
+				   where ds.stationed_user_id = t1.stationed_user_id(+)
+				   	<include refid="dw_public_ds_where"/>
+				   order by item_count desc) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 在售商品-货号数 -->
+	<select id="r_queryOnSaleProduct_ItemCount" parameterType="java.util.Map" resultType="java.util.Map">
+		select stationed_user_id,count(1) item_count
+		  from dim_product dp
+		 where state = '上架'
+		   and dp.stationed_user_id in
+		   <foreach collection="stationedList" item="item" open="(" close=")" separator=",">
+            #{item,jdbcType=INTEGER}
+           </foreach>
+           <if test="product_first_classify != null and product_first_classify != ''">
+			  and dp.product_first_classify = #{product_first_classify,jdbcType=INTEGER}
+		   </if>
+		   group by stationed_user_id
+	</select>
+	<!-- 在售商品-sku数 -->
+	<select id="r_queryOnSaleProduct_SkuCount" parameterType="java.util.Map" resultType="java.util.Map">
+		select t1.stationed_user_id,count(1) sku_count
+		  from dim_product_sku t1,dim_product dp
+		 where t1.itemnumber = dp.itemnumber
+		   and t1.state = '上架'
+		   and t1.stationed_user_id in
+		   <foreach collection="stationedList" item="item" open="(" close=")" separator=",">
+            #{item,jdbcType=INTEGER}
+           </foreach>
+           <if test="product_first_classify != null and product_first_classify != ''">
+			  and dp.product_first_classify = #{product_first_classify,jdbcType=INTEGER}
+		   </if>
+		   group by t1.stationed_user_id
+	</select>
+							<!-- #################        注册资本         ################ -->
+	<!-- 商家注册资本 -->
+	<select id="r_queryRegisteredCapitalStationedCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(1)
+		  from dim_stationed ds
+		 where 1=1
+		  <include refid="dw_public_ds_where"/>
+		  <if test="start != null">
+		    and registration_capital > #{start,jdbcType=INTEGER}
+		  </if>
+		  <if test="end != null">
+		    and registration_capital &lt;= #{end,jdbcType=INTEGER}
+		  </if>
+	</select>
+							<!-- #################        商家成立年数         ################ -->
+	<!-- 商家成立年数 -->
+	<select id="r_queryEstablishYearStationedCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(1)
+		  from (
+		select stationed_user_id,trunc(months_between(sysdate,established_date)/12) year
+	      from dim_stationed ds
+	     where 1=1
+	      <include refid="dw_public_ds_where"/>)
+	     where 1=1
+	     <if test="start != null">
+		   and year > #{start,jdbcType=INTEGER}
+		 </if>
+		 <if test="end != null">
+		   and year &lt;= #{end,jdbcType=INTEGER}
+		 </if>
+	</select>
+							<!-- #################        在售商品过季情况         ################ -->
+	<!-- 过季/过时-货号数 -->
+	<select id="r_queryOutSeasonDateItemCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(1)
+		  from dim_product dp
+		 where year &lt;= #{year,jdbcType=INTEGER}
+		   and season_id &lt; #{season_id,jdbcType=INTEGER}
+		   and state = '上架'
+		   <include refid="dw_public_dp_where"/>
+	</select>
+	<!-- 应季-货号数 -->
+	<select id="r_querySeasonalItemCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(1)
+		  from dim_product dp
+		 where year = #{year,jdbcType=INTEGER}
+		   and (season_id = #{season_id,jdbcType=INTEGER} or season_id = 5)
+		   and state = '上架'
+		   <include refid="dw_public_dp_where"/>
+	</select>
+	<!-- 排序获取某一页的商家排行-过季/过时货号数 -->
+	<select id="r_queryStationed_OuteSeasonCount_Stationed" parameterType="java.util.Map" resultType="string">
+		select stationed_user_id
+				  from (
+				select a.*,rownum rn
+				  from (
+				select ds.stationed_user_id,nvl(t1.out_season_count,0) out_season_count
+				  from dim_stationed ds,
+					  	(select dp.stationed_user_id,count(1) out_season_count
+						  from dim_product dp
+						 where dp.year &lt;= #{year,jdbcType=INTEGER}
+		   				   and dp.season_id &lt; #{season_id,jdbcType=INTEGER}
+		                   and dp.state = '上架'
+						 <include refid="dw_public_dp_where"/>
+						 group by dp.stationed_user_id) t1
+				   where ds.stationed_user_id = t1.stationed_user_id(+)
+				   	<include refid="dw_public_ds_where"/>
+				   order by ${sort} ${sort_by}) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+		           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 在售商品-过季/过时货号数 -->
+	<select id="r_queryStationed_OutSeasonCount" parameterType="java.util.Map" resultType="java.util.Map">
+		select dp.stationed_user_id,count(1) out_season_count
+		  from dim_product dp
+		 where dp.year &lt;= #{year,jdbcType=INTEGER}
+ 		   and dp.season_id &lt; #{season_id,jdbcType=INTEGER}
+           and dp.state = '上架'
+		   and dp.stationed_user_id in
+		   <foreach collection="stationedList" item="item" open="(" close=")" separator=",">
+            #{item,jdbcType=INTEGER}
+           </foreach>
+		 group by dp.stationed_user_id
+	</select>
+							<!-- #################        用户复购排行         ################ -->
+	<!-- 复购人数 -->
+	<select id="r_queryStationed_RepeatPurchaseNumber" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(distinct member_key)
+		  from 
+		(select stationed_user_id,member_key
+		  from 
+		(select dp.stationed_user_id, t1.order_key, t1.member_key
+		  from fact_order_product t1,dim_date dt,dim_product dp
+		 where t1.payment_date_key = dt.date_key
+		   and t1.product_key = dp.product_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <include refid="dw_public_dp_where"/>
+		   <if test="stationed_user_id != null and stationed_user_id != ''">
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   </if>)
+		  group by stationed_user_id,member_key having count(order_key)>2)
+	</select>
+	<!-- 支付买家数 -->
+	<select id="r_queryStationed_PurchaseNumber" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(distinct t1.member_key)
+		  from fact_order_product t1,dim_date dt,dim_product dp
+		 where t1.payment_date_key = dt.date_key
+		   and t1.product_key = dp.product_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <include refid="dw_public_dp_where"/>
+		   <if test="stationed_user_id != null and stationed_user_id != ''">
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   </if>
+	</select>
+	<!-- 排序获取某一页的商家排行-复购用户数 -->
+	<select id="r_queryStationed_RepeatPurchaseNumber_Stationed" parameterType="java.util.Map" resultType="string">
+		select stationed_user_id
+		  from (
+		select a.*,rownum rn
+		  from (
+		select ds.stationed_user_id,nvl(t1.repeat_purchase_number,0) repeat_purchase_number
+		  from dim_stationed ds,
+			  	(select stationed_user_id,count(distinct member_key) repeat_purchase_number
+				  from 
+				(select stationed_user_id,member_key
+				  from 
+				(select dp.stationed_user_id, t1.order_key, t1.member_key
+				  from fact_order_product t1,dim_date dt,dim_product dp
+				 where t1.payment_date_key = dt.date_key
+				   and t1.product_key = dp.product_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <include refid="dw_public_dp_where"/>
+				   <if test="stationed_user_id != null and stationed_user_id != ''">
+				   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+				   </if>)
+				  group by stationed_user_id,member_key having count(order_key)>2)
+				  group by stationed_user_id) t1
+		   where ds.stationed_user_id = t1.stationed_user_id(+)
+		   	<include refid="dw_public_ds_where"/>
+		   order by ${sort} ${sort_by}) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 查询默认排序的商家列表<支付买家数> -->
+	<select id="r_queryRepeatPurchaseStationedListBy_Default" parameterType="java.util.Map" resultType="string">
+		select stationed_user_id
+		  from (
+		select a.*,rownum rn
+		  from (
+		select ds.stationed_user_id,nvl(t1.purchase_number,0) purchase_number
+		  from dim_stationed ds,
+			  	(select dp.stationed_user_id,count(distinct t1.member_key) purchase_number
+				  from fact_order_product t1,dim_date dt,dim_product dp
+				 where t1.payment_date_key = dt.date_key
+				   and t1.product_key = dp.product_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <include refid="dw_public_dp_where"/>
+				   group by dp.stationed_user_id) t1
+		   where ds.stationed_user_id = t1.stationed_user_id(+)
+		   	<include refid="dw_public_ds_where"/>
+		   order by purchase_number desc) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 用户复购-支付买家数 -->
+	<select id="r_queryRepeatPurchase_PurchaseNumber" parameterType="java.util.Map" resultType="java.util.Map">
+		select dp.stationed_user_id,count(distinct t1.member_key) purchase_number
+		  from fact_order_product t1,dim_date dt,dim_product dp
+		 where t1.payment_date_key = dt.date_key
+		   and t1.product_key = dp.product_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <include refid="dw_public_dp_where"/>
+		   and dp.stationed_user_id in
+		   <foreach collection="stationedList" item="item" open="(" close=")" separator=",">
+            #{item,jdbcType=INTEGER}
+           </foreach>
+           group by dp.stationed_user_id
+	</select>
+	<!-- 用户复购-复购用户数 -->
+	<select id="r_queryRepeatPurchase_RepeatPurchaseNumber" parameterType="java.util.Map" resultType="java.util.Map">
+		select stationed_user_id,count(distinct member_key) repeat_purchase_number
+		  from 
+		(select stationed_user_id,member_key
+		  from 
+		(select dp.stationed_user_id, t1.order_key, t1.member_key
+		  from fact_order_product t1,dim_date dt,dim_product dp
+		 where t1.payment_date_key = dt.date_key
+		   and t1.product_key = dp.product_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <include refid="dw_public_dp_where"/>
+		   <if test="stationed_user_id != null and stationed_user_id != ''">
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   </if>)
+		  group by stationed_user_id,member_key having count(order_key)>2)
+		  where stationed_user_id in
+		   <foreach collection="stationedList" item="item" open="(" close=")" separator=",">
+            #{item,jdbcType=INTEGER}
+           </foreach>
+		  group by stationed_user_id
+	</select>
+							<!-- #################        销售/品质排行         ################ -->
+	<!-- 商品销量 -->
+	<select id="r_queryStationedTr_PayCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t1.pay_count),0) pay_count
+		  from fact_stationed_summary_d t1,dim_date dt,dim_stationed ds
+		 where t1.date_key = dt.date_key
+		   and t1.stationed_user_key = ds.stationed_user_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <include refid="dw_public_ds_where"/>
+		   <if test="stationed_user_id != null and stationed_user_id != ''">
+		   and ds.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   </if>
+	</select>
+	<!-- 商品销售总额 -->
+	<select id="r_queryStationedTr_PayMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t1.pay_money),0) pay_money
+		  from fact_stationed_summary_d t1,dim_date dt,dim_stationed ds
+		 where t1.date_key = dt.date_key
+		   and t1.stationed_user_key = ds.stationed_user_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <include refid="dw_public_ds_where"/>
+		   <if test="stationed_user_id != null and stationed_user_id != ''">
+		   and ds.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   </if>
+	</select>
+	<!-- 未发退货数 -->
+	<select id="r_queryStationedTr_UnsentReturnCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t1.unsent_return_count),0) unsent_return_count
+		  from fact_stationed_summary_d t1,dim_date dt,dim_stationed ds
+		 where t1.date_key = dt.date_key
+		   and t1.stationed_user_key = ds.stationed_user_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <include refid="dw_public_ds_where"/>
+		   <if test="stationed_user_id != null and stationed_user_id != ''">
+		   and ds.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   </if>
+	</select>
+	<!-- 已发退货数 -->
+	<select id="r_queryStationedTr_SentReturnCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t1.sent_return_count),0) sent_return_count
+		  from fact_stationed_summary_d t1,dim_date dt,dim_stationed ds
+		 where t1.date_key = dt.date_key
+		   and t1.stationed_user_key = ds.stationed_user_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <include refid="dw_public_ds_where"/>
+		   <if test="stationed_user_id != null and stationed_user_id != ''">
+		   and ds.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   </if>
+	</select>
+	<!-- 终检异常 -->
+	<select id="r_queryStationedTr_FqcCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t1.fqc_count),0) fqc_count
+		  from fact_stationed_summary_d t1,dim_date dt,dim_stationed ds
+		 where t1.date_key = dt.date_key
+		   and t1.stationed_user_key = ds.stationed_user_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <include refid="dw_public_ds_where"/>
+		   <if test="stationed_user_id != null and stationed_user_id != ''">
+		   and ds.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   </if>
+	</select>
+	<!-- 售后异常 -->
+	<select id="r_queryStationedTr_SaleReturnCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t1.sale_return_count),0) sale_return_count
+		  from fact_stationed_summary_d t1,dim_date dt,dim_stationed ds
+		 where t1.date_key = dt.date_key
+		   and t1.stationed_user_key = ds.stationed_user_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <include refid="dw_public_ds_where"/>
+		   <if test="stationed_user_id != null and stationed_user_id != ''">
+		   and ds.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   </if>
+	</select>
+	<!-- 商家交易-商品销量、商品销售总额<天> -->
+	<select id="r_queryStationedTr_PayCountMoneyD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_value as create_date,nvl(sum(a.product_count),0) pay_count,nvl(sum(a.pay_money),0) pay_money,count(distinct a.member_key) purchase_number
+		  from (select t1.payment_date_time_key,t1.product_count,t1.pay_money,t1.member_key
+				  from fact_order_product t1,dim_date dt,dim_product dp
+				 where t1.payment_date_key = dt.date_key
+				   and t1.product_key = dp.product_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <include refid="dw_public_dp_where"/>
+				   <if test="stationed_user_id != null and stationed_user_id != ''">
+				   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+				   </if>) a,dim_time dt
+		   where a.payment_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+	</select>
+	<!-- 商家交易-预定订单的定金<天> -->
+	<select id="r_queryStationedTr_PreFirstMoneyD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_value as create_date,nvl(sum(a.pre_first_money),0) pre_first_money
+		  from (select t1.payment_date_time_key,nvl(t1.product_money*(t2.earnest_money/t2.product_money),0) pre_first_money
+				  from fact_pre_order_product t1 ,fact_pre_order t2,dim_date dt,dim_product dp
+				 where t1.order_key = t2.order_key
+				   and t1.payment_date_key = dt.date_key
+				   and t1.product_key = dp.product_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <include refid="dw_public_dp_where"/>
+				   <if test="stationed_user_id != null and stationed_user_id != ''">
+				   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+				   </if>) a,dim_time dt
+           where a.payment_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+	</select>
+	<!-- 商家交易-未发退货数<天> -->
+	<select id="r_queryStationedTr_UnsentReturnCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_value as create_date,nvl(sum(a.product_count),0) unsent_return_count
+		  from (select t1.aso_refund_date_time_key,t1.product_count
+				  from fact_aso_refund_product t1,(select after_sales_order_key
+				                            from dim_after_sales_order
+				                           where after_sales_order_type = 1
+				                             and refund_state = 2) t2,dim_date dt,dim_product dp
+				 where t1.after_sales_order_key = t2.after_sales_order_key
+				   and t1.aso_refund_date_key = dt.date_key
+				   and t1.product_key = dp.product_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <include refid="dw_public_dp_where"/>
+				   <if test="stationed_user_id != null and stationed_user_id != ''">
+				   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+				   </if>) a,dim_time dt
+		   where a.aso_refund_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+	</select>
+	<!-- 商家交易-已发退货数<天> -->
+	<select id="r_queryStationedTr_SentReturnCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_value as create_date,nvl(sum(a.product_count),0) sent_return_count
+		  from (select t1.aso_refund_date_time_key,t1.product_count
+				  from fact_aso_refund_product t1,(select after_sales_order_key 
+				                            from dim_after_sales_order
+				                           where after_sales_order_type = 2
+				                               and return_state = 8) t2,dim_date dt,dim_product dp
+				 where t1.after_sales_order_key = t2.after_sales_order_key
+				   and t1.aso_refund_date_key = dt.date_key
+				   and t1.product_key = dp.product_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <include refid="dw_public_dp_where"/>
+				   <if test="stationed_user_id != null and stationed_user_id != ''">
+				   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+				   </if>) a,dim_time dt
+		   where a.aso_refund_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+	</select>
+	<!-- 商家交易-终检异常<天> -->
+	<select id="r_queryStationedTr_FqcCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_value as create_date,nvl(sum(a.fqc_count),0) fqc_count
+		  from (select t1.approval_date_time_key,t1.fqc_count
+				  from fact_fqc t1,dim_date dt,dim_stationed ds
+				 where t1.approval_date_key = dt.date_key
+				   and t1.stationed_user_key = ds.stationed_user_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <include refid="dw_public_ds_where"/>
+				   <if test="stationed_user_id != null and stationed_user_id != ''">
+				   and ds.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+				   </if>) a,dim_time dt
+		   where a.approval_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+	</select>
+	<!-- 商家交易-售后异常<天> -->
+	<select id="r_queryStationedTr_SaleReturnCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_value as create_date,nvl(sum(a.sale_return_count),0) sale_return_count
+		  from (select t1.refund_date_time_key,t1.sale_return_count
+				  from fact_sale_return t1,dim_date dt,dim_stationed ds
+ 				 where t1.refund_date_key = dt.date_key
+				   and t1.stationed_user_key = ds.stationed_user_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <include refid="dw_public_ds_where"/>
+				   <if test="stationed_user_id != null and stationed_user_id != ''">
+				   and ds.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+				   </if>) a,dim_time dt
+		   where a.refund_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+	</select>
+	<!-- 商家交易-商家汇总信息 -->
+	<select id="r_queryStationedSummary_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.date_values as create_date,
+			   nvl(sum(t1.pay_count),0) pay_count,
+			   nvl(sum(t1.pay_money),0) pay_money,
+			   nvl(sum(t1.unsent_return_count),0) unsent_return_count,
+			   nvl(sum(t1.sent_return_count),0) sent_return_count,
+			   nvl(sum(t1.fqc_count),0) fqc_count,
+			   nvl(sum(t1.sale_return_count),0) sale_return_count
+		  from fact_stationed_summary_d t1,dim_date dt,dim_stationed ds
+		 where t1.date_key = dt.date_key
+		   and t1.stationed_user_key = ds.stationed_user_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <include refid="dw_public_ds_where"/>
+		   <if test="stationed_user_id != null and stationed_user_id != ''">
+		   and ds.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   </if>
+           group by dt.date_values
+	</select>
+	<!-- 商家汇总信息列表 -->
+	<select id="r_queryStationedSummaryList" parameterType="java.util.Map" resultType="java.util.Map">
+		select *
+		  from (
+		select a.*,rownum rn
+		  from (
+		select ds.stationed_user_id,
+		 	   ds.company_name as stationed_user_name,
+			   nvl(t1.pay_count,0) pay_count,
+			   nvl(t1.pay_money,0) pay_money,
+			   nvl(t1.unsent_return_count,0) unsent_return_count,
+			   nvl(t1.sent_return_count,0) sent_return_count,
+			   nvl(t1.fqc_count,0) fqc_count,
+			   nvl(t1.sale_return_count,0) sale_return_count
+		  from dim_stationed ds,
+			  	(select ds.stationed_user_id,
+			  		   nvl(sum(t1.pay_count),0) pay_count,
+					   nvl(sum(t1.pay_money),0) pay_money,
+					   nvl(sum(t1.unsent_return_count),0) unsent_return_count,
+					   nvl(sum(t1.sent_return_count),0) sent_return_count,
+					   nvl(sum(t1.fqc_count),0) fqc_count,
+					   nvl(sum(t1.sale_return_count),0) sale_return_count
+				  from fact_stationed_summary_d t1,dim_date dt,dim_stationed ds
+				 where t1.date_key = dt.date_key
+				   and t1.stationed_user_key = ds.stationed_user_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <include refid="dw_public_ds_where"/>
+				   group by ds.stationed_user_id) t1
+		   where ds.stationed_user_id = t1.stationed_user_id(+)
+		     <include refid="dw_public_ds_where"/>
+		   <choose>
+				<when test="sort != null and sort != ''">
+					order by ${sort} ${sort_by}
+				</when>
+				<otherwise>
+					order by pay_money desc
+				</otherwise>
+			</choose>) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+							<!-- #################        商家配合度         ################ -->
+	<!-- 默认商家排序 -->
+	<select id="r_queryStationedCooperationDegreeListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+		select *
+		  from (
+		select a.*,rownum rn
+		  from (
+		select ds.stationed_user_id,
+		 	   ds.company_name as stationed_user_name,
+			   nvl(t1.new_product_count,0) new_product_count,
+			   nvl(t1.production_count,0) production_count,
+			   nvl(t1.instorage_count,0) instorage_count
+		  from dim_stationed ds,
+			  	(select ds.stationed_user_id,
+			  		   nvl(sum(t1.new_product_count),0) new_product_count,
+					   nvl(sum(t1.production_count),0) production_count,
+					   nvl(sum(t1.instorage_count),0) instorage_count
+				  from fact_stationed_summary_d t1,dim_date dt,dim_stationed ds
+				 where t1.date_key = dt.date_key
+				   and t1.stationed_user_key = ds.stationed_user_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <include refid="dw_public_ds_where"/>
+				   group by ds.stationed_user_id) t1
+		   where ds.stationed_user_id = t1.stationed_user_id(+)
+		   	<include refid="dw_public_ds_where"/>
+		   <choose>
+				<when test="sort != null and sort != ''">
+					order by ${sort} ${sort_by}
+				</when>
+				<otherwise>
+					order by instorage_count desc
+				</otherwise>
+			</choose>) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 商品配合度-活动商品数 -->
+	<select id="r_queryStationedCooperationDegree_ActivityProductCount" parameterType="java.util.Map" resultType="java.util.Map">
+		select dp.stationed_user_id,count(distinct t1.product_key) activity_product_count
+		  from fact_activity_product t1,dim_date dt,dim_product dp
+		 where t1.approval_date_key = dt.date_key
+		   and t1.product_key = dp.product_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id in
+		 <foreach collection="stationedList" item="item" open="(" close=")" separator=",">
+		 	#{item,jdbcType=INTEGER}
+		 </foreach>
+		 group by dp.stationed_user_id
+	</select>
+	<!-- 按活动商品数排序 -->
+	<select id="r_queryActivityProductCountListForPage" parameterType="java.util.Map" resultType="java.util.Map">
+		select *
+		  from (
+		select a.*,rownum rn
+		  from (
+		select ds.stationed_user_id,
+		 	   ds.company_name as stationed_user_name,
+			   nvl(t1.activity_product_count) activity_product_count
+		  from dim_stationed ds,
+			  	(select dp.stationed_user_id,count(distinct t1.product_key) activity_product_count
+				  from fact_activity_product t1,dim_date dt,dim_product dp
+				 where t1.approval_date_key = dt.date_key
+				   and t1.product_key = dp.product_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <include refid="dw_public_dp_where"/>
+				   group by dp.stationed_user_id) t1
+		   where ds.stationed_user_id = t1.stationed_user_id(+)
+		   	<include refid="dw_public_ds_where"/>
+		   order by activity_product_count desc) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 商家配合度列表 -->
+	<select id="r_queryStationedCooperationDegreeList" parameterType="java.util.Map" resultType="java.util.Map">
+		select dp.stationed_user_id,
+	  		   nvl(sum(t1.new_product_count),0) new_product_count,
+			   nvl(sum(t1.production_count),0) production_count,
+			   nvl(sum(t1.instorage_count),0) instorage_count
+		  from fact_stationed_summary_d t1,dim_date dt,dim_product dp
+		 where t1.date_key = dt.date_key
+		   and t1.product_key = dp.product_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id in
+		   <foreach collection="stationedList" item="item" open="(" close=")" separator=",">
+			 #{item,jdbcType=INTEGER}
+		   </foreach>
+		   group by dp.stationed_user_id
+	</select>
+							<!-- #################        商家分析-基本信息         ################ -->
+	<!-- 基本信息 -->
+	<select id="r_queryStationedAnalysisDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select stationed_user_id,
+			   company_name as stationed_user_name,
+			   to_char(established_date,'yyyy-mm-dd') established_date,
+			   to_char(approval_date,'yyyy-mm-dd') approval_date,
+			   registration_capital,
+			   (select name from dim_dic_region where region_id = ds.address_province)||
+			   (select name from dim_dic_region where region_id = ds.address_city)||
+			   (select name from dim_dic_region where region_id = ds.address_county)||ds.ADDRESS as address
+		  from dim_stationed ds
+		 where stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+	</select>
+							<!-- #################        商家分析-今日实时销售         ################ -->
+	<!-- 折线图 商品销售总额 -->
+	<select id="r_queryStationed_PayMoney_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_value as create_date,nvl(sum(a.pay_money),0) pay_money
+		  from
+		(select t1.payment_date_time_key,t1.pay_money
+		  from fact_order_product t1,dim_date dt,dim_product dp
+		 where t1.payment_date_key = dt.date_key
+		   and t1.product_key = dp.product_key
+           and dt.date_short = #{date_short,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}) a,dim_time dt
+           where a.payment_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+	</select>
+	<!-- 折线图 商品销售总额 -->
+	<select id="r_queryStationed_PreFirstMoney_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.date_values as create_date,nvl(sum(t1.product_money*(t2.earnest_money/t2.product_money)),0) pre_first_money
+		  from fact_pre_order_product t1 ,fact_pre_order t2,dim_date dt,dim_product dp
+		 where t1.order_key = t2.order_key
+		   and t1.payment_date_key = dt.date_key
+		   and t1.product_key = dp.product_key
+		   and dt.date_short = #{date_short,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+           group by dt.date_values
+	</select>
+	<!-- 查询商品分类列表 -->
+	<select id="r_queryProductTypeList" parameterType="java.util.Map" resultType="java.util.Map">
+		select id as type_id,type_name
+		 from qx_dic_product_type
+		 where parent_id = 0
+		 order by id 
+	</select>
+	<!-- 商品分类销量 -->
+	<select id="r_queryStationedAnalysis_ProductType" parameterType="java.util.Map" resultType="java.util.Map">
+		select t.type_name as page_name,nvl(t1.cnt,0) cnt
+		  from (
+		  	<foreach collection="typeList" item="item" separator="union all">
+		  	select #{item.TYPE_ID,jdbcType=INTEGER} as type_id,
+		  		   #{item.TYPE_NAME,jdbcType=VARCHAR} as type_name
+		  	  from dual
+		  	</foreach>) t,
+		(select dp.product_first_classify as type_id,nvl(sum(t1.product_count),0) cnt
+		  from fact_order_product t1,dim_date dt,dim_product dp
+		 where t1.payment_date_key = dt.date_key
+		   and t1.product_key = dp.product_key
+           and dt.date_short = #{date_short,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   group by dp.product_first_classify) t1
+		  where t.type_id = t1.type_id(+)
+		   order by cnt desc
+	</select>
+	<!-- 商品销售总额 -->
+	<select id="r_queryStationed_PayMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t1.pay_money),0)
+		  from fact_order_product t1,dim_date dt,dim_product dp
+		 where t1.payment_date_key = dt.date_key
+		   and t1.product_key = dp.product_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 预定订单的定金 -->
+	<select id="r_queryStationed_PreFirstMoney" parameterType="java.util.Map" resultType="java.lang.Float">
+		select nvl(sum(t1.product_money*(t2.earnest_money/t2.product_money)),0)
+		  from fact_pre_order_product t1 ,fact_pre_order t2,dim_date dt,dim_product dp
+		 where t1.order_key = t2.order_key
+		   and t1.payment_date_key = dt.date_key
+		   and t1.product_key = dp.product_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 商品浏览量 -->
+	<select id="r_queryStationed_PvCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(*)
+		  from fact_user_log_product t1,dim_date dt,dim_product dp
+		 where t1.log_date_key = dt.date_key
+		   and t1.product_key = dp.product_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+   		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 商品访客量 -->
+	<select id="r_queryStationed_VisitorCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(distinct t1.member_key) 
+		  from fact_user_log_product t1,dim_date dt,dim_product dp
+		 where t1.log_date_key = dt.date_key
+		   and t1.product_key = dp.product_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+   		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+	</select>
+							<!-- #################        商家分析-在售商品基本情况         ################ -->
+	<!-- 查询商家货号数,sku数,品牌数 -->
+	<select id="r_queryStationed_ItemSkuBrandCount" parameterType="java.util.Map" resultType="java.util.Map">
+		select count(distinct t1.itemnumber) item_count,count(*) sku_count,count(distinct t1.brand_id) brand_count
+		  from dim_product_sku t1,dim_product dp
+		 where t1.itemnumber = dp.itemnumber
+		   and t1.state = '上架'
+		   and t1.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 过时/过季-货号数 -->
+	<select id="r_queryStationed_OutSeasonDateItemCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(1)
+		  from dim_product dp
+		 where year &lt;= #{year,jdbcType=INTEGER}
+		   and season_id &lt; #{season_id,jdbcType=INTEGER}
+		   and state = '上架'
+		   and stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+	</select>
+							<!-- #################        商家分析-商品结构         ################ -->
+	<!-- 累计货号数 -->
+	<select id="r_queryStationed_Cumulative_ItemCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(1)
+		  from fact_product t1,dim_date dt,dim_product dp
+		 where t1.product_key = dp.product_key
+		   and t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 累计SKU数 -->
+	<select id="r_queryStationed_Cumulative_SkuCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(1)
+		  from fact_product_sku t1,dim_date dt,dim_product dp
+		 where t1.product_key = dp.product_key
+		   and t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 累计品牌数 -->
+	<select id="r_queryStationed_Cumulative_BrandCount" parameterType="java.util.Map" resultType="java.lang.Float">
+		select count(distinct dp.brand_id)
+		  from fact_product t1,dim_date dt,dim_product dp
+		 where t1.product_key = dp.product_key
+		   and t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 查询商家所有货号数 -->
+	<select id="r_queryStationed_ItemCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from fact_product t1,dim_date dt,dim_product dp
+		 where t1.product_key = dp.product_key
+		   and t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   <if test="product_type_id != null and product_type_id != ''">
+		   and dp.product_first_classify = #{product_type_id,jdbcType=INTEGER}
+		   </if>
+	</select>
+	<!-- 折线图 商品分类货号数 -->
+	<select id="r_queryStationed_ProductType_ItemCount_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dp.product_first_classify_name as page_name,count(1) cnt
+		  from fact_product t1,dim_date dt,dim_product dp
+		 where t1.product_key = dp.product_key
+		   and t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   group by product_first_classify_name
+		   order by cnt desc
+	</select>
+	<!-- 查询商品分类货号数 -->
+	<select id="r_queryStationed_ProductType_ItemCount" parameterType="java.util.Map" resultType="java.util.Map">
+		select dp.product_first_classify_name as product_type_name,count(1) item_count
+		  from fact_product t1,dim_date dt,dim_product dp
+		 where t1.product_key = dp.product_key
+		   and t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   group by product_first_classify_name
+		   order by item_count desc
+	</select>
+	<!-- 商品结构-年份占比 -->
+	<select id="r_queryStationed_ProductType_Year_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dp.year as page_name,count(1) cnt
+		  from fact_product t1,dim_date dt,dim_product dp
+		 where t1.product_key = dp.product_key
+		   and t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   <if test="product_type_id != null and product_type_id != ''">
+		   and dp.product_first_classify = #{product_type_id,jdbcType=INTEGER}
+		   </if>
+		   group by dp.year
+		   order by dp.year desc
+	</select>
+	<!-- 商品结构-品牌占比 -->
+	<select id="r_queryStationed_ProductType_Brand_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+        select case when dp.brand_name is null then '其他'
+               else dp.brand_name end page_name,count(1) cnt
+		  from fact_product t1,dim_date dt,dim_product dp
+		 where t1.product_key = dp.product_key
+		   and t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   <if test="product_type_id != null and product_type_id != ''">
+		   and dp.product_first_classify = #{product_type_id,jdbcType=INTEGER}
+		   </if>
+		   group by dp.brand_name
+           order by dp.brand_name nulls last
+	</select>
+	<!-- 商品结构-季节占比 -->
+	<select id="r_queryStationed_ProductType_Season_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dp.season_name as page_name,count(1) cnt
+		  from fact_product t1,dim_date dt,dim_product dp
+		 where t1.product_key = dp.product_key
+		   and t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   <if test="product_type_id != null and product_type_id != ''">
+		   and dp.product_first_classify = #{product_type_id,jdbcType=INTEGER}
+		   </if>
+		   group by dp.season_id,dp.season_name
+		   order by dp.season_id
+	</select>
+	<!-- 商品结构-分类占比 -->
+	<select id="r_queryStationed_ProductType_Classify_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dp.product_classify_name as page_name,count(1) cnt
+		  from fact_product t1,dim_date dt,dim_product dp
+		 where t1.product_key = dp.product_key
+		   and t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   <if test="product_type_id != null and product_type_id != ''">
+		   and dp.product_first_classify = #{product_type_id,jdbcType=INTEGER}
+		   </if>
+		   group by dp.product_classify,dp.product_classify_name
+		   order by dp.product_classify
+	</select>
+	<!-- 商品结构-性别占比 -->
+	<select id="r_queryStationed_ProductType_Gender_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dp.sex as page_name,count(1) cnt
+		  from fact_product t1,dim_date dt,dim_product dp
+		 where t1.product_key = dp.product_key
+		   and t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   <if test="product_type_id != null and product_type_id != ''">
+		   and dp.product_first_classify = #{product_type_id,jdbcType=INTEGER}
+		   </if>
+		   group by dp.sex
+		   order by dp.sex
+	</select>
+	<!-- 商品结构-风格款式占比 -->
+	<select id="r_queryStationed_ProductType_Style_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select case when dp.product_style is null then '其他'
+			   else dp.product_style end page_name,count(1) cnt
+		  from fact_product t1,dim_date dt,dim_product dp
+		 where t1.product_key = dp.product_key
+		   and t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   <if test="product_type_id != null and product_type_id != ''">
+		   and dp.product_first_classify = #{product_type_id,jdbcType=INTEGER}
+		   </if>
+		   group by dp.product_style
+		   order by dp.product_style nulls last
+	</select>
+	<!-- 商品结构-年份占比总数 -->
+	<select id="r_queryStationed_ProductType_YearCount" parameterType="java.util.Map" resultType="int">
+		select count(distinct dp.year) 
+		  from fact_product t1,dim_date dt,dim_product dp
+		 where t1.product_key = dp.product_key
+		   and t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   <if test="product_type_id != null and product_type_id != ''">
+		   and dp.product_first_classify = #{product_type_id,jdbcType=INTEGER}
+		   </if>
+	</select>
+	<!-- 商品结构-年份占比列表 -->
+	<select id="r_queryStationed_ProductType_YearList" parameterType="java.util.Map" resultType="java.util.Map">
+		select *
+		  from (
+		select a.*,rownum rn
+		  from (
+		select dp.year as page_name,dp.year as public_value,count(1) item_count
+		  from fact_product t1,dim_date dt,dim_product dp
+		 where t1.product_key = dp.product_key
+		   and t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   <if test="product_type_id != null and product_type_id != ''">
+		   and dp.product_first_classify = #{product_type_id,jdbcType=INTEGER}
+		   </if>
+		   group by dp.year
+		   <if test="sort != null and sort != ''">
+			   order by ${sort} ${sort_by}
+		   </if>) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 商品结构-品牌占比总数 -->
+	<select id="r_queryStationed_ProductType_BrandCount" parameterType="java.util.Map" resultType="int">
+		select count(distinct brand_name)
+		  from (
+		select case when dp.brand_name is null then '其他'
+               else dp.brand_name end brand_name
+		  from fact_product t1,dim_date dt,dim_product dp
+		 where t1.product_key = dp.product_key
+		   and t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   <if test="product_type_id != null and product_type_id != ''">
+		   and dp.product_first_classify = #{product_type_id,jdbcType=INTEGER}
+		   </if>
+		   group by dp.brand_name)
+	</select>
+	<!-- 商品结构-品牌占比列表 -->
+	<select id="r_queryStationed_ProductType_BrandList" parameterType="java.util.Map" resultType="java.util.Map">
+		select *
+		  from (
+		select a.*,rownum rn
+		  from (
+		select page_name,public_value,sum(item_count) item_count
+          from (
+		select case when dp.brand_name is null then '其他'
+               else dp.brand_name end page_name,
+               case when dp.brand_name is null then 0
+               else dp.brand_id end public_value,
+               count(1) item_count
+		  from fact_product t1,dim_date dt,dim_product dp
+		 where t1.product_key = dp.product_key
+		   and t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   <if test="product_type_id != null and product_type_id != ''">
+		   and dp.product_first_classify = #{product_type_id,jdbcType=INTEGER}
+		   </if>
+		   group by dp.brand_name,dp.brand_id
+		   <if test="sort != null and sort != ''">
+			   order by ${sort} ${sort_by}
+		   </if>)
+		   group by page_name,public_value) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 商品结构-季节占比总数 -->
+	<select id="r_queryStationed_ProductType_SeasonCount" parameterType="java.util.Map" resultType="int">
+		select count(distinct dp.season_id)
+		  from fact_product t1,dim_date dt,dim_product dp
+		 where t1.product_key = dp.product_key
+		   and t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   <if test="product_type_id != null and product_type_id != ''">
+		   and dp.product_first_classify = #{product_type_id,jdbcType=INTEGER}
+		   </if>
+	</select>
+	<!-- 商品结构-季节占比列表 -->
+	<select id="r_queryStationed_ProductType_SeasonList" parameterType="java.util.Map" resultType="java.util.Map">
+		select *
+		  from (
+		select a.*,rownum rn
+		  from (
+		select dp.season_name as page_name,dp.season_id as public_value,count(1) item_count
+		  from fact_product t1,dim_date dt,dim_product dp
+		 where t1.product_key = dp.product_key
+		   and t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   <if test="product_type_id != null and product_type_id != ''">
+		   and dp.product_first_classify = #{product_type_id,jdbcType=INTEGER}
+		   </if>
+		   group by dp.season_id,dp.season_name
+		   <if test="sort != null and sort != ''">
+			   order by ${sort} ${sort_by}
+		   </if>) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 商品结构-分类占比总数 -->
+	<select id="r_queryStationed_ProductType_ClassifyCount" parameterType="java.util.Map" resultType="int">
+		select count(distinct dp.product_classify)
+		  from fact_product t1,dim_date dt,dim_product dp
+		 where t1.product_key = dp.product_key
+		   and t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   <if test="product_type_id != null and product_type_id != ''">
+		   and dp.product_first_classify = #{product_type_id,jdbcType=INTEGER}
+		   </if>
+	</select>
+	<!-- 商品结构-分类占比列表 -->
+	<select id="r_queryStationed_ProductType_ClassifyList" parameterType="java.util.Map" resultType="java.util.Map">
+		select *
+		  from (
+		select a.*,rownum rn
+		  from (
+		select dp.product_classify_name as page_name,dp.product_classify as public_value,count(1) item_count
+		  from fact_product t1,dim_date dt,dim_product dp
+		 where t1.product_key = dp.product_key
+		   and t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   <if test="product_type_id != null and product_type_id != ''">
+		   and dp.product_first_classify = #{product_type_id,jdbcType=INTEGER}
+		   </if>
+		   group by dp.product_classify,dp.product_classify_name
+		   <if test="sort != null and sort != ''">
+			   order by ${sort} ${sort_by}
+		   </if>) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 商品结构-性别占比总数 -->
+	<select id="r_queryStationed_ProductType_GenderCount" parameterType="java.util.Map" resultType="int">
+		select count(distinct dp.sex)
+		  from fact_product t1,dim_date dt,dim_product dp
+		 where t1.product_key = dp.product_key
+		   and t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   <if test="product_type_id != null and product_type_id != ''">
+		   and dp.product_first_classify = #{product_type_id,jdbcType=INTEGER}
+		   </if>
+	</select>
+	<!-- 商品结构-性别占比列表 -->
+	<select id="r_queryStationed_ProductType_GenderList" parameterType="java.util.Map" resultType="java.util.Map">
+		select *
+		  from (
+		select a.*,rownum rn
+		  from (
+		select dp.sex as page_name,dp.sex as public_value,count(1) item_count
+		  from fact_product t1,dim_date dt,dim_product dp
+		 where t1.product_key = dp.product_key
+		   and t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   <if test="product_type_id != null and product_type_id != ''">
+		   and dp.product_first_classify = #{product_type_id,jdbcType=INTEGER}
+		   </if>
+		   group by dp.sex
+		   <if test="sort != null and sort != ''">
+			   order by ${sort} ${sort_by}
+		   </if>) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 商品结构-风格款式占比总数 -->
+	<select id="r_queryStationed_ProductType_StyleCount" parameterType="java.util.Map" resultType="int">
+		select count(distinct product_style)
+		  from (
+		select case when dp.product_style is null then '其他'
+               else dp.product_style end product_style
+		  from fact_product t1,dim_date dt,dim_product dp
+		 where t1.product_key = dp.product_key
+		   and t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   <if test="product_type_id != null and product_type_id != ''">
+		   and dp.product_first_classify = #{product_type_id,jdbcType=INTEGER}
+		   </if>
+		   group by dp.product_style)
+	</select>
+	<!-- 商品结构-风格款式占比列表 -->
+	<select id="r_queryStationed_ProductType_StyleList" parameterType="java.util.Map" resultType="java.util.Map">
+		select *
+		  from (
+		select a.*,rownum rn
+		  from (
+		select page_name,page_name as public_value,sum(item_count) item_count
+          from (
+		select case when dp.product_style is null then '其他'
+               else dp.product_style end page_name,
+               count(1) item_count
+		  from fact_product t1,dim_date dt,dim_product dp
+		 where t1.product_key = dp.product_key
+		   and t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   <if test="product_type_id != null and product_type_id != ''">
+		   and dp.product_first_classify = #{product_type_id,jdbcType=INTEGER}
+		   </if>
+		   group by dp.product_style
+		   <if test="sort != null and sort != ''">
+			   order by ${sort} ${sort_by}
+		   </if>)
+		   group by page_name) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 商品结构-商品总数 -->
+	<select id="r_queryStationed_ProductStructure_ProductCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from fact_product t1,dim_date dt,dim_product dp
+		 where t1.product_key = dp.product_key
+		   and t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		 <if test="product_type_id != null and product_type_id != ''">
+		   and dp.product_first_classify = #{product_type_id,jdbcType=INTEGER}
+		 </if>
+		 <if test="type == 1">
+		 	and dp.year = #{public_value,jdbcType=INTEGER}
+		 </if>
+		 <if test="type == 2">
+		 	<choose>
+		 		<when test="public_value >0">
+		 			and dp.brand_id = #{public_value,jdbcType=INTEGER}
+		 		</when>
+		 		<otherwise>
+		 			and dp.brand_name is null
+		 		</otherwise>
+		 	</choose>
+		 </if>
+		 <if test="type == 3">
+		 	and dp.season_id = #{public_value,jdbcType=INTEGER}
+		 </if>
+		 <if test="type == 4">
+		 	and dp.product_classify = #{public_value,jdbcType=INTEGER}
+		 </if>
+		 <if test="type == 5">
+		 	and dp.sex = #{public_value,jdbcType=VARCHAR}
+		 </if>
+		 <if test="type == 6">
+		 	<choose>
+		 		<when test="public_value == '其他'">
+		 			and dp.product_style is null
+		 		</when>
+		 		<otherwise>
+		 			and dp.product_style = #{public_value,jdbcType=VARCHAR}
+		 		</otherwise>
+		 	</choose>
+		 </if>
+	</select>
+	<!-- 商品结构-商品列表 -->
+	<select id="r_queryStationed_ProductStructure_ProductList" parameterType="java.util.Map" resultType="java.util.Map">
+		select *
+		  from (
+		select a.*,rownum rn
+		  from (
+		select dp.itemnumber,dp.product_name,dp.product_img_url
+		  from fact_product t1,dim_date dt,dim_product dp
+		 where t1.product_key = dp.product_key
+		   and t1.create_date_key = dt.date_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		 <if test="product_type_id != null and product_type_id != ''">
+		   and dp.product_first_classify = #{product_type_id,jdbcType=INTEGER}
+		 </if>
+		 <if test="type == 1">
+		 	and dp.year = #{public_value,jdbcType=INTEGER}
+		 </if>
+		 <if test="type == 2">
+		 	<choose>
+		 		<when test="public_value >0">
+		 			and dp.brand_id = #{public_value,jdbcType=INTEGER}
+		 		</when>
+		 		<otherwise>
+		 			and dp.brand_name is null
+		 		</otherwise>
+		 	</choose>
+		 </if>
+		 <if test="type == 3">
+		 	and dp.season_id = #{public_value,jdbcType=INTEGER}
+		 </if>
+		 <if test="type == 4">
+		 	and dp.product_classify = #{public_value,jdbcType=INTEGER}
+		 </if>
+		 <if test="type == 5">
+		 	and dp.sex = #{public_value,jdbcType=VARCHAR}
+		 </if>
+		 <if test="type == 6">
+		 	<choose>
+		 		<when test="public_value == '其他'">
+		 			and dp.product_style is null
+		 		</when>
+		 		<otherwise>
+		 			and dp.product_style = #{public_value,jdbcType=VARCHAR}
+		 		</otherwise>
+		 	</choose>
+		 </if>) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 获取 平均值和标准差 -->
+	<select id="r_queryProductStddevAvg" parameterType="java.util.Map" resultType="java.util.Map" >
+		select avg(t.product_price_cost) avg_value,stddev(t.product_price_cost) as stddev_value
+          from dim_product_sku t,fact_product_sku t1,dim_date dt,dim_product dp
+         where t1.create_date_key = dt.date_key
+           and t.product_sku_key = t1.product_sku_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+	   	   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+	   	   and t.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+           and t.product_group = '尺码'
+           and t.product_price_cost > 0
+           and t1.product_key = dp.product_key
+           <if test="product_type_id != null and product_type_id != ''">
+	   	   and dp.product_first_classify = #{product_type_id,jdbcType=INTEGER}
+	 	   </if>
+	</select>
+	<!-- 码段结构 -->
+	<select id="r_queryCodeSegmentList" parameterType="java.util.Map" resultType="java.util.Map">
+           select t.product_group_member as page_name,count(1) cnt
+             from dim_product_sku t
+            where  t.product_group = '尺码'
+              and itemnumber in (select dp.itemnumber
+                from fact_product t1,dim_date dt,dim_product dp
+             where t1.product_key = dp.product_key
+               and t1.create_date_key = dt.date_key
+               and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   	   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   	   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+               and dp.product_first_classify = #{product_type_id,jdbcType=INTEGER})
+             group by t.product_group_member
+             order by t.product_group_member
+	</select>
+							<!-- #################        商家分析-销售品质         ################ -->
+	<!-- 新品数量 -->
+	<select id="r_queryStationed_NewProductCount" parameterType="java.util.Map"  resultType="java.lang.Float">
+		select nvl(sum(t1.new_product_count),0) new_product_count
+		  from fact_stationed_summary_d t1,dim_date dt,dim_stationed ds
+		 where t1.date_key = dt.date_key
+		   and t1.stationed_user_key = ds.stationed_user_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <if test="stationed_user_id != null and stationed_user_id != ''">
+		   and ds.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   </if>
+	</select>
+	<!-- 活动商品数 -->
+	<select id="r_queryStationed_ActivityProductCount" parameterType="java.util.Map"  resultType="java.lang.Float">
+		select count(distinct t1.product_key) activity_product_count
+		  from fact_activity_product t1,dim_date dt,dim_product dp
+		 where t1.approval_date_key = dt.date_key
+		   and t1.product_key = dp.product_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <if test="stationed_user_id != null and stationed_user_id != ''">
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   </if>
+	</select>
+	<!-- 折线图 新品数量<天> -->
+	<select id="r_queryStationed_NewProductCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_value as create_date,count(distinct a.product_key) new_product_count
+		  from (select t1.create_date_time_key,t1.product_key
+				  from fact_product t1,dim_date dt,dim_stationed ds
+				 where t1.create_date_key = dt.date_key
+				   and t1.stationed_user_key = ds.stationed_user_key
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <if test="stationed_user_id != null and stationed_user_id != ''">
+				   and ds.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+				   </if>) a,dim_time dt
+		   where a.create_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+	</select>
+	<!-- 折线图 活动商品数<天> -->
+	<select id="r_queryStationed_ActivityProductCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.hours24_value as create_date,count(distinct a.product_key) activity_product_count
+		  from (select t1.approval_date_time_key,t1.product_key
+				  from fact_activity_product t1,dim_date dt,dim_product dp
+				 where t1.approval_date_key = dt.date_key
+				   and t1.product_key = dp.product_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   <if test="stationed_user_id != null and stationed_user_id != ''">
+				   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+				   </if>) a,dim_time dt
+		   where a.approval_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+	</select>
+	<!-- 折线图 支付买家数 -->
+	<select id="r_queryStationed_PurchaseNumber_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.date_values as create_date,count(distinct t1.member_key) purchase_number
+		  from fact_order_product t1,dim_date dt,dim_product dp
+		 where t1.payment_date_key = dt.date_key
+		   and t1.product_key = dp.product_key
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <if test="stationed_user_id != null and stationed_user_id != ''">
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   </if>
+		   group by dt.date_values
+	</select>
+	<!-- 折线图 新品数量 -->
+	<select id="r_queryStationed_NewProductCount_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.date_values as create_date,nvl(sum(t1.new_product_count),0) new_product_count
+		  from fact_stationed_summary_d t1,dim_date dt,dim_stationed ds
+		 where t1.date_key = dt.date_key
+		   and t1.stationed_user_key = ds.stationed_user_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+   		   <if test="stationed_user_id != null and stationed_user_id != ''">
+		   and ds.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   </if>
+		   group by dt.date_values
+	</select>
+	<!-- 折线图 活动商品数 -->
+	<select id="r_queryStationed_ActivityProductCount_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+		select dt.date_values as create_date,count(distinct t1.product_key) activity_product_count
+		  from fact_activity_product t1,dim_date dt,dim_product dp
+		 where t1.approval_date_key = dt.date_key
+		   and t1.product_key = dp.product_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   <if test="stationed_user_id != null and stationed_user_id != ''">
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   </if>
+		   group by dt.date_values
+	</select>
+	<!-- 商家-商品总数 -->
+	<select id="r_queryStationedProductCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from dim_product dp
+		 where stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 商家-商品列表 -->
+	<select id="r_queryStationedProductList" parameterType="java.util.Map" resultType="java.util.Map">
+		select *
+		  from 
+		(select a.*,rownum rn
+		  from
+		(select dp.itemnumber,
+			    dp.product_name,
+			    dp.product_img_url,
+			    nvl(t1.pay_count,0) pay_count,
+			    nvl(t1.pay_money,0) pay_money,
+			    nvl(t1.unsent_return_count,0) unsent_return_count,
+			    nvl(t1.sent_return_count,0) sent_return_count,
+			    nvl(t1.fqc_count,0) fqc_count,
+			    nvl(t1.sale_return_count,0) sale_return_count
+		   from dim_product dp,
+		 (select t1.product_key,
+			    nvl(sum(t1.pay_count),0) pay_count,
+			    nvl(sum(t1.pay_money),0) pay_money,
+			    nvl(sum(t1.unsent_return_count),0) unsent_return_count,
+			    nvl(sum(t1.sent_return_count),0) sent_return_count,
+			    nvl(sum(t1.fqc_count),0) fqc_count,
+			    nvl(sum(t1.sale_return_count),0) sale_return_count
+		   from fact_business_pro_summary_d t1,dim_date dt,dim_product dp
+		  where t1.date_key = dt.date_key
+		    and t1.product_key = dp.product_key
+		    and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		    and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		    and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		    group by t1.product_key) t1
+		    where dp.product_key = t1.product_key(+)
+		      and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		    <choose>
+				<when test="sort != null and sort != ''">
+					order by ${sort} ${sort_by}
+				</when>
+				<otherwise>
+					order by pay_money desc
+				</otherwise>
+			</choose>) a
+		    where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 商品-供应商总数 -->
+	<select id="r_queryProductSupplierCount" parameterType="java.util.Map" resultType="int">
+		select count(distinct t1.supplier_key)
+		  from fact_business_pro_summary_d t1,dim_date dt,dim_product dp,dim_supplier ds
+		  where t1.date_key = dt.date_key
+		    and t1.product_key = dp.product_key
+		    and t1.supplier_key = ds.supplier_key
+		    and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		    and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		    and dp.itemnumber = #{itemnumber,jdbcType=VARCHAR}
+	</select>
+	<!-- 商品-供应商列表 -->
+	<select id="r_queryProductSupplierList" parameterType="java.util.Map" resultType="java.util.Map">
+		select *
+		  from (
+		select a.*,rownum rn
+		  from (
+		select ds.fullname as supplier_name,nvl(sum(t1.instorage_count),0) instorage_count,
+			   nvl(sum(t1.out_product_count),0) out_product_count,
+			   nvl(sum(t1.fqc_count),0) fqc_count,
+			   nvl(sum(t1.sale_return_count),0) sale_return_count
+		  from fact_business_pro_summary_d t1,dim_date dt,dim_product dp,dim_supplier ds
+		  where t1.date_key = dt.date_key
+		    and t1.product_key = dp.product_key
+		    and t1.supplier_key = ds.supplier_key
+		    and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		    and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		    and dp.itemnumber = #{itemnumber,jdbcType=VARCHAR}
+		    group by ds.fullname) a
+		    where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 按省份 销售数量  -->
+	<select id="r_queryStationed_PayCountToProvince" parameterType="java.util.Map" resultType="java.util.Map">
+		select a.province_id,case when a.province_id = 0 then '其他' 
+		   		else (select name from dim_dic_region where region_id = a.province_id) end province_name,a.pay_count
+  		    from (select dm.user_company_address_province as province_id,nvl(sum(t1.pay_count),0) pay_count
+				  from fact_product_sale_d t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+			   	   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+			   	   and t1.product_key = dp.product_key
+			   	   and t1.member_key = dm.member_key
+			   	   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+			   	   group by dm.user_company_address_province
+			   	   order by pay_count desc) a
+			  where rownum &lt;=#{num,jdbcType=INTEGER}
+	</select>
+	<!-- 按城市 销售数量  -->
+	<select id="r_queryStationed_PayCountToCity" parameterType="java.util.Map" resultType="java.util.Map">
+		select a.city_id,case when a.city_id = 0 then '其他' 
+		   		else (select name from dim_dic_region where region_id = a.city_id) end city_name,a.pay_count
+  		    from (select dm.user_company_address_city as city_id,nvl(sum(t1.pay_count),0) pay_count
+				  from fact_product_sale_d t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+			   	   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+			   	   and t1.product_key = dp.product_key
+			   	   and t1.member_key = dm.member_key
+			   	   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+			   	   group by dm.user_company_address_city
+			   	   order by pay_count desc) a
+			  where rownum &lt;=#{num,jdbcType=INTEGER}
+	</select>
+	<!-- 区域销售-商品总数 -->
+	<select id="r_queryStationed_ProductCount" parameterType="java.util.Map" resultType="int">
+		select count(1)
+		  from dim_product dp
+		 where dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 区域销售-商品列表 -->
+	<select id="r_queryStationed_ProductList" parameterType="java.util.Map" resultType="java.util.Map">
+		select *
+		  from (
+		select a.*,rownum rn
+		  from (
+		select dp.itemnumber,dp.product_name,dp.product_img_url,
+			   nvl(t1.pay_count,0) pay_count,
+			   nvl(t1.pay_money,0) pay_money
+		  from dim_product dp,
+			  	(select t1.product_key,nvl(sum(t1.pay_count),0) pay_count,nvl(sum(t1.pay_money),0) pay_money
+				  from fact_product_sale_d t1,dim_date dt,dim_product dp,dim_member dm
+				 where t1.date_key = dt.date_key
+		           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and t1.product_key = dp.product_key
+		   		   and t1.member_key = dm.member_key
+		   		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   		   <if test="province_id != null and province_id != ''">
+		           	and dm.user_company_address_province = #{province_id,jdbcType=INTEGER}
+		           </if>
+		           <if test="city_id != null and city_id != ''">
+		           	and dm.user_company_address_city = #{city_id,jdbcType=INTEGER}
+		           </if>
+				   group by t1.product_key) t1
+		   where dp.product_key = t1.product_key(+)
+		   	 and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   <choose>
+				<when test="sort != null and sort != ''">
+					order by ${sort} ${sort_by}
+				</when>
+				<otherwise>
+					order by pay_money desc
+				</otherwise>
+			</choose>) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+	</select>
+	<!-- 区域销售分析地图 -->
+	<select id="r_querySaleAreaMap" parameterType="java.util.Map" resultMap="saleAreaMap">
+		select t.region_id as id,
+  			   t.name,
+  			   nvl(t1.pay_count,0) as value
+  		  from dim_dic_region t,(select dm.user_company_address_province as province_id,nvl(sum(t1.pay_count),0) pay_count
+								  from fact_product_sale_d t1,dim_date dt,dim_product dp,dim_member dm
+								 where t1.date_key = dt.date_key
+						           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+							   	   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+							   	   and t1.product_key = dp.product_key
+							   	   and t1.member_key = dm.member_key
+							   	   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+							   	   group by dm.user_company_address_province) t1
+				where t.parent_id in (select region_id from dim_dic_region where parent_id = 0)
+			      and t.region_id = t1.province_id(+)
+	</select>
+	<!-- 折线图 售后/品质问题分析 -->
+	<select id="r_queryReturnQualityChart" parameterType="java.util.Map" resultType="java.util.Map">
+		select nvl(sum(t1.unsent_return_count),0) unsent_return_count,
+			   nvl(sum(t1.fqc_count),0) fqc_count,
+			   nvl(sum(t1.policy_return_count),0) policy_return_count,
+			   nvl(sum(t1.quality_return_count),0) quality_return_count
+		  from fact_stationed_summary_d t1,dim_date dt,dim_stationed ds
+		 where t1.date_key = dt.date_key
+		   and t1.stationed_user_key = ds.stationed_user_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+	   	   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+	   	   and ds.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+	</select>
+	<!-- 其他 品质退换货商品总数 -->
+  	<select id="r_queryReturnQualityProductCount" parameterType="java.util.Map" resultType="java.lang.Float">
+  		select nvl(sum(t1.product_count),0)
+		  from fact_returns_product_reason_d t1,dim_date dt,dim_product dp
+		  where t1.refund_date_key = dt.date_key
+		    and t1.product_key = dp.product_key
+		    and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		    and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		    and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+  	</select>
+	<!-- 其他 品质退换货总数 -->
+  	<select id="r_queryReturnQualityCount" parameterType="java.util.Map" resultType="int">
+  		select count(distinct t.aso_reason)
+		  from dim_aso_reason t,fact_returns_product_reason_d t1,dim_date dt,dim_product dp
+		  where t.aso_reason_key = t1.aso_reason_key
+		    and t1.refund_date_key = dt.date_key
+		    and t1.product_key = dp.product_key
+		    and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		    and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		    and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+  	</select>
+  	<!-- 其他 商品退货分析-品质退换货分析 -->
+  	<select id="r_queryReturnQualityList" parameterType="java.util.Map" resultType="java.util.Map">
+  		select * from (
+  		select a.*,rownum rn from (
+  		select aso_reason,product_count from
+  		(select t.aso_reason,nvl(sum(t1.product_count),0) product_count
+		  from dim_aso_reason t,fact_returns_product_reason_d t1,dim_date dt,dim_product dp
+		  where t.aso_reason_key = t1.aso_reason_key
+		    and t1.refund_date_key = dt.date_key
+		    and t1.product_key = dp.product_key
+		    and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		    and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		    and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		    group by t.aso_reason)
+		    order by product_count desc) a where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+           where rn &gt;#{start_rownum,jdbcType=INTEGER}
+  	</select>
+  							<!-- #################        商家分析-供应商         ################ -->
+  	<!-- 生产计划数 -->
+  	<select id="r_querySupplier_ProductionCount" parameterType="java.util.Map" resultType="java.lang.Float">
+  		select nvl(sum(t1.production_count),0)
+  		  from fact_business_pro_summary_d t1,dim_date dt,dim_stationed ds
+  		 where t1.date_key = dt.date_key
+  		   and t1.stationed_user_key = ds.stationed_user_key
+  		   and t1.supplier_key > 0
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and ds.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+  	</select>
+  	<!-- 入库数 -->
+  	<select id="r_querySupplier_InstorageCount" parameterType="java.util.Map" resultType="java.lang.Float">
+  		select nvl(sum(t1.instorage_count),0)
+  		  from fact_business_pro_summary_d t1,dim_date dt,dim_stationed ds
+  		 where t1.date_key = dt.date_key
+  		   and t1.stationed_user_key = ds.stationed_user_key
+  		   and t1.supplier_key > 0
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and ds.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+  	</select>
+  	<!-- 出货数 -->
+  	<select id="r_querySupplier_OutProductCount" parameterType="java.util.Map" resultType="java.lang.Float">
+  		select nvl(sum(t1.out_product_count),0)
+  		  from fact_business_pro_summary_d t1,dim_date dt,dim_stationed ds
+  		 where t1.date_key = dt.date_key
+  		   and t1.stationed_user_key = ds.stationed_user_key
+  		   and t1.supplier_key > 0
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and ds.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+  	</select>
+  	<!-- 终检异常 -->
+  	<select id="r_querySupplier_FqcCount" parameterType="java.util.Map" resultType="java.lang.Float">
+  		select nvl(sum(t1.fqc_count),0)
+  		  from fact_business_pro_summary_d t1,dim_date dt,dim_stationed ds
+  		 where t1.date_key = dt.date_key
+  		   and t1.stationed_user_key = ds.stationed_user_key
+  		   and t1.supplier_key > 0
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and ds.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+  	</select>
+  	<!-- 售后异常 -->
+  	<select id="r_querySupplier_SaleReturnCount" parameterType="java.util.Map" resultType="java.lang.Float">
+  		select nvl(sum(t1.sale_return_count),0)
+  		  from fact_business_pro_summary_d t1,dim_date dt,dim_stationed ds
+  		 where t1.date_key = dt.date_key
+  		   and t1.stationed_user_key = ds.stationed_user_key
+  		   and t1.supplier_key > 0
+		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and ds.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+  	</select>
+  	<!-- 折线图 生产计划数<天> -->
+  	<select id="r_querySupplier_ProductionCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+  		select dt.hours24_value as create_date,nvl(sum(a.purchase_num),0) production_count
+		  from (select t1.reviewers_date_time_key,t1.purchase_num
+				  from fact_production t1,dim_date dt,dim_stationed ds
+				 where t1.reviewers_date_key = dt.date_key
+				   and t1.stationed_user_key = ds.stationed_user_key
+				   and t1.supplier_key > 0
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and ds.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}) a,dim_time dt
+		   where a.reviewers_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+  	</select>
+  	<!-- 折线图 入库数<天> -->
+  	<select id="r_querySupplier_InstorageCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+  		select dt.hours24_value as create_date,nvl(sum(a.instorage_count),0) instorage_count
+		  from (select t1.approval_date_time_key,t1.instorage_count
+				  from fact_instorage t1,dim_date dt,dim_stationed ds
+				 where t1.approval_date_key = dt.date_key
+				   and t1.stationed_user_key = ds.stationed_user_key
+				   and t1.supplier_key > 0
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and ds.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}) a,dim_time dt
+		   where a.approval_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+  	</select>
+  	<!-- 折线图 出货数<天> -->
+  	<select id="r_querySupplier_OutProductCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+  		select dt.hours24_value as create_date,nvl(sum(a.out_product_count),0) out_product_count
+		  from (select t1.out_date_time_key,t1.out_product_count
+				  from fact_out_product t1,dim_date dt,dim_stationed ds
+				 where t1.out_date_key = dt.date_key
+				   and t1.stationed_user_key = ds.stationed_user_key
+				   and t1.supplier_key > 0
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and ds.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}) a,dim_time dt
+		   where a.out_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+  	</select>
+  	<!-- 折线图 终检异常<天> -->
+  	<select id="r_querySupplier_FqcCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+  		select dt.hours24_value as create_date,nvl(sum(a.fqc_count),0) fqc_count
+		  from (select t1.approval_date_time_key,t1.fqc_count
+				  from fact_fqc t1,dim_date dt,dim_stationed ds
+				 where t1.approval_date_key = dt.date_key
+				   and t1.stationed_user_key = ds.stationed_user_key
+				   and t1.supplier_key > 0
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and ds.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}) a,dim_time dt
+		   where a.approval_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+  	</select>
+  	<!-- 折线图 售后异常<天> -->
+  	<select id="r_querySupplier_SaleReturnCountD_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+  		select dt.hours24_value as create_date,nvl(sum(a.sale_return_count),0) sale_return_count
+		  from (select t1.refund_date_time_key,t1.sale_return_count
+				  from fact_sale_return t1,dim_date dt,dim_stationed ds
+ 				 where t1.refund_date_key = dt.date_key
+				   and t1.stationed_user_key = ds.stationed_user_key
+				   and t1.supplier_key > 0
+				   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+   		   		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+				   and ds.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}) a,dim_time dt
+		   where a.refund_date_time_key = dt.time_key
+           group by dt.hours24_value
+           order by dt.hours24_value
+  	</select>
+  	<!-- 折线图 供应商汇总 -->
+  	<select id="r_querySupplierSummary_Chart" parameterType="java.util.Map" resultType="java.util.Map">
+  		select dt.date_values as create_date,
+			   nvl(sum(t1.production_count),0) production_count,
+			   nvl(sum(t1.instorage_count),0) instorage_count,
+			   nvl(sum(t1.out_product_count),0) out_product_count,
+			   nvl(sum(t1.fqc_count),0) fqc_count,
+			   nvl(sum(t1.sale_return_count),0) sale_return_count
+		  from fact_business_pro_summary_d t1,dim_date dt,dim_stationed ds
+		 where t1.date_key = dt.date_key
+		   and t1.stationed_user_key = ds.stationed_user_key
+		   and t1.supplier_key > 0
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and ds.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+           group by dt.date_values
+  	</select>
+  	<!-- 供应商总数 -->
+  	<select id="r_querySupplierCount" parameterType="java.util.Map" resultType="int">
+  		select count(distinct t1.supplier_key)
+  		  from fact_business_pro_summary_d t1, dim_date dt,dim_stationed ds
+  		 where t1.date_key = dt.date_key
+		   and t1.stationed_user_key = ds.stationed_user_key
+		   and t1.supplier_key > 0
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and ds.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+  	</select>
+  	<!-- 供应商列表 -->
+  	<select id="r_querySupplierList" parameterType="java.util.Map" resultType="java.util.Map">
+  		select *
+  		  from (
+  		select a.*,rownum rn 
+  		  from (
+  		select ds.supplier_id,
+  			   ds.fullname as supplier_name,
+  			   nvl(sum(t1.instorage_count),0) instorage_count,
+  			   nvl(sum(t1.out_product_count),0) out_product_count,
+  			   nvl(sum(t1.fqc_count),0) fqc_count,
+  			   nvl(sum(t1.sale_return_count),0) sale_return_count,
+  			   nvl(sum(t1.production_count),0) production_count
+  		  from fact_business_pro_summary_d t1, dim_date dt,dim_product dp,dim_supplier ds
+  		 where t1.date_key = dt.date_key
+		   and t1.product_key = dp.product_key
+		   and t1.supplier_key > 0
+		   and t1.supplier_key = ds.supplier_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		   group by ds.supplier_id,ds.fullname
+		   <choose>
+				<when test="sort != null and sort != ''">
+					order by ${sort} ${sort_by}
+				</when>
+				<otherwise>
+					order by production_count desc
+				</otherwise>
+			</choose>) a 
+		  where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) t
+		  where rn &gt;#{start_rownum,jdbcType=INTEGER}
+  	</select>
+  	<!-- 供应商入库商品总数 -->
+  	<select id="r_querySupplierInstorageProductCount" parameterType="java.util.Map" resultType="int">
+  		select count(distinct t1.product_key)
+  		  from fact_instorage t1,dim_date dt,dim_product dp,dim_supplier ds
+  		 where t1.approval_date_key = dt.date_key
+  		   and t1.supplier_key = ds.supplier_key
+  		   and t1.product_key = dp.product_key
+  		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+  		   and ds.supplier_id = #{supplier_id,jdbcType=INTEGER}
+  		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+  	</select>
+  	<!-- 供应商入库商品列表 -->
+  	<select id="r_querySupplierInstorageList" parameterType="java.util.Map" resultType="java.util.Map">
+  		select *
+  		  from (
+  		select a.*,rownum rn 
+  		  from (
+  		select dp.itemnumber,dp.product_name,dp.product_img_url,
+  			   nvl(sum(t1.instorage_count),0) instorage_count,
+  			   nvl(sum(t1.out_product_count),0) out_product_count,
+  			   nvl(sum(t1.fqc_count),0) fqc_count,
+  			   nvl(sum(t1.sale_return_count),0) sale_return_count
+  		  from fact_business_pro_summary_d t1, 
+  		  	   (select t1.stationed_user_key,t1.supplier_key,t1.product_key
+		  		  from fact_instorage t1,dim_date dt,dim_product dp,dim_supplier ds
+		  		 where t1.approval_date_key = dt.date_key
+		  		   and t1.supplier_key = ds.supplier_key
+		  		   and t1.product_key = dp.product_key
+		  		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		  		   and ds.supplier_id = #{supplier_id,jdbcType=INTEGER}
+		  		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		  		   group by t1.stationed_user_key,t1.supplier_key,t1.product_key) t2,dim_date dt,dim_product dp
+  		 where t1.date_key = dt.date_key
+		   and t1.product_key = dp.product_key
+		   and t1.supplier_key = t2.supplier_key
+		   and t1.product_key = t2.product_key
+		   and t1.stationed_user_key = t2.stationed_user_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   group by dp.itemnumber,dp.product_name,dp.product_img_url
+		   <choose>
+				<when test="sort != null and sort != ''">
+					order by ${sort} ${sort_by}
+				</when>
+				<otherwise>
+					order by instorage_count desc
+				</otherwise>
+			</choose>) a 
+		  where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) t
+		  where rn &gt;#{start_rownum,jdbcType=INTEGER}
+  	</select>
+  	<!-- 供应商出货商品总数 -->
+  	<select id="r_querySupplierOutProductProductCount" parameterType="java.util.Map" resultType="int">
+  		select count(distinct t1.product_key)
+  		  from fact_out_product t1,dim_date dt,dim_product dp,dim_supplier ds
+  		 where t1.out_date_key = dt.date_key
+  		   and t1.supplier_key = ds.supplier_key
+  		   and t1.product_key = dp.product_key
+  		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+  		   and ds.supplier_id = #{supplier_id,jdbcType=INTEGER}
+  		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+  	</select>
+  	<!-- 供应商出货商品列表 -->
+  	<select id="r_querySupplierOutProductList" parameterType="java.util.Map" resultType="java.util.Map">
+  		select *
+  		  from (
+  		select a.*,rownum rn 
+  		  from (
+  		select dp.itemnumber,dp.product_name,dp.product_img_url,
+  			   nvl(sum(t1.instorage_count),0) instorage_count,
+  			   nvl(sum(t1.out_product_count),0) out_product_count,
+  			   nvl(sum(t1.fqc_count),0) fqc_count,
+  			   nvl(sum(t1.sale_return_count),0) sale_return_count
+  		  from fact_business_pro_summary_d t1, 
+  		  	   (select t1.stationed_user_key,t1.supplier_key,t1.product_key
+		  		  from fact_out_product t1,dim_date dt,dim_product dp,dim_supplier ds
+		  		 where t1.out_date_key = dt.date_key
+		  		   and t1.supplier_key = ds.supplier_key
+		  		   and t1.product_key = dp.product_key
+		  		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		  		   and ds.supplier_id = #{supplier_id,jdbcType=INTEGER}
+		  		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		  		   group by t1.stationed_user_key,t1.supplier_key,t1.product_key) t2,dim_date dt,dim_product dp
+  		 where t1.date_key = dt.date_key
+		   and t1.product_key = dp.product_key
+		   and t1.supplier_key = t2.supplier_key
+		   and t1.product_key = t2.product_key
+		   and t1.stationed_user_key = t2.stationed_user_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   group by dp.itemnumber,dp.product_name,dp.product_img_url
+		   <choose>
+				<when test="sort != null and sort != ''">
+					order by ${sort} ${sort_by}
+				</when>
+				<otherwise>
+					order by out_product_count desc
+				</otherwise>
+			</choose>) a 
+		  where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) t
+		  where rn &gt;#{start_rownum,jdbcType=INTEGER}
+  	</select>
+  	<!-- 供应商终检商品总数 -->
+  	<select id="r_querySupplierFqcProductCount" parameterType="java.util.Map" resultType="int">
+  		select count(distinct t1.product_key)
+  		  from fact_fqc t1,dim_date dt,dim_product dp,dim_supplier ds
+  		 where t1.approval_date_key = dt.date_key
+  		   and t1.supplier_key = ds.supplier_key
+  		   and t1.product_key = dp.product_key
+  		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+  		   and ds.supplier_id = #{supplier_id,jdbcType=INTEGER}
+  		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+  	</select>
+  	<!-- 供应商终检列表 -->
+  	<select id="r_querySupplierFqcList" parameterType="java.util.Map" resultType="java.util.Map">
+  		select *
+  		  from (
+  		select a.*,rownum rn 
+  		  from (
+  		select dp.itemnumber,dp.product_name,dp.product_img_url,
+  			   nvl(sum(t1.instorage_count),0) instorage_count,
+  			   nvl(sum(t1.out_product_count),0) out_product_count,
+  			   nvl(sum(t1.fqc_count),0) fqc_count,
+  			   nvl(sum(t1.sale_return_count),0) sale_return_count
+  		  from fact_business_pro_summary_d t1, 
+  		  	   (select t1.stationed_user_key,t1.supplier_key,t1.product_key
+		  		  from fact_fqc t1,dim_date dt,dim_product dp,dim_supplier ds
+		  		 where t1.approval_date_key = dt.date_key
+		  		   and t1.supplier_key = ds.supplier_key
+		  		   and t1.product_key = dp.product_key
+		  		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		  		   and ds.supplier_id = #{supplier_id,jdbcType=INTEGER}
+		  		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		  		   group by t1.stationed_user_key,t1.supplier_key,t1.product_key) t2,dim_date dt,dim_product dp
+  		 where t1.date_key = dt.date_key
+		   and t1.product_key = dp.product_key
+		   and t1.supplier_key = t2.supplier_key
+		   and t1.product_key = t2.product_key
+		   and t1.stationed_user_key = t2.stationed_user_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   group by dp.itemnumber,dp.product_name,dp.product_img_url
+		   <choose>
+				<when test="sort != null and sort != ''">
+					order by ${sort} ${sort_by}
+				</when>
+				<otherwise>
+					order by out_product_count desc
+				</otherwise>
+			</choose>) a 
+		  where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) t
+		  where rn &gt;#{start_rownum,jdbcType=INTEGER}
+  	</select>
+  	<!-- 供应商售后商品总数 -->
+  	<select id="r_querySupplierSaleReturnProductCount" parameterType="java.util.Map" resultType="int">
+  		select count(distinct t1.product_key)
+  		  from fact_sale_return t1,dim_date dt,dim_product dp,dim_supplier ds
+  		 where t1.refund_date_key = dt.date_key
+  		   and t1.supplier_key = ds.supplier_key
+  		   and t1.product_key = dp.product_key
+  		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+  		   and ds.supplier_id = #{supplier_id,jdbcType=INTEGER}
+  		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+  	</select>
+  	<!-- 供应商售后列表 -->
+  	<select id="r_querySupplierSaleReturnList" parameterType="java.util.Map" resultType="java.util.Map">
+  		select *
+  		  from (
+  		select a.*,rownum rn 
+  		  from (
+  		select dp.itemnumber,dp.product_name,dp.product_img_url,
+  			   nvl(sum(t1.instorage_count),0) instorage_count,
+  			   nvl(sum(t1.out_product_count),0) out_product_count,
+  			   nvl(sum(t1.fqc_count),0) fqc_count,
+  			   nvl(sum(t1.sale_return_count),0) sale_return_count
+  		  from fact_business_pro_summary_d t1, 
+  		  	   (select t1.stationed_user_key,t1.supplier_key,t1.product_key
+		  		  from fact_sale_return t1,dim_date dt,dim_product dp,dim_supplier ds
+		  		 where t1.refund_date_key = dt.date_key
+		  		   and t1.supplier_key = ds.supplier_key
+		  		   and t1.product_key = dp.product_key
+		  		   and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+				   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		  		   and ds.supplier_id = #{supplier_id,jdbcType=INTEGER}
+		  		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+		  		   group by t1.stationed_user_key,t1.supplier_key,t1.product_key) t2,dim_date dt,dim_product dp
+  		 where t1.date_key = dt.date_key
+		   and t1.product_key = dp.product_key
+		   and t1.supplier_key = t2.supplier_key
+		   and t1.product_key = t2.product_key
+		   and t1.stationed_user_key = t2.stationed_user_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+		   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+		   group by dp.itemnumber,dp.product_name,dp.product_img_url
+		   <choose>
+				<when test="sort != null and sort != ''">
+					order by ${sort} ${sort_by}
+				</when>
+				<otherwise>
+					order by out_product_count desc
+				</otherwise>
+			</choose>) a 
+		  where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) t
+		  where rn &gt;#{start_rownum,jdbcType=INTEGER}
+  	</select>
+  	<!-- 获取商品库存 -->
+    <select id="queryProductStockCount" parameterType="java.util.List" resultType="java.util.Map">
+    	select itemnumber,
+    		   getProductItemnumber_stocks(t.itemnumber) stock_count
+    	  from tbl_product_info t
+    	 where itemnumber in
+    	 <foreach collection="list" item="item" open="(" separator="," close=")">
+    	 	#{item}
+    	 </foreach>
+    </select>
+    <!-- 近30天销量 -->
+  	<select id="r_queryProductSaleList" parameterType="java.util.Map" resultType="java.util.Map">
+  		select dp.itemnumber,nvl(sum(t1.pay_count),0) pay_count
+		  from fact_product_sale_d t1,dim_date dt,dim_product dp
+		 where t1.date_key = dt.date_key
+           and dt.date_short >= #{start_date,jdbcType=VARCHAR}
+	   	   and dt.date_short &lt;= #{end_date,jdbcType=VARCHAR}
+	   	   and t1.product_key = dp.product_key
+	   	   and dp.itemnumber in
+	    	 <foreach collection="list" item="item" open="(" separator="," close=")">
+	    	 	#{item}
+	    	 </foreach>
+	   	   group by dp.itemnumber
+  	</select>
+  	<!-- 供应商商品总数 -->
+  	<select id="r_querySupplierProductCount" parameterType="java.util.Map" resultType="int">
+  		select count(1)
+  		  from (
+  		select dp.itemnumber,dp.product_name,dp.product_img_url
+  		  from fact_instorage t1,dim_product dp,dim_supplier ds
+  		 where t1.supplier_key = ds.supplier_key
+  		   and t1.product_key = dp.product_key
+  		   and ds.supplier_id = #{supplier_id,jdbcType=INTEGER}
+  		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+  		   group by dp.itemnumber,dp.product_name,dp.product_img_url
+  		   union all
+  		select dp.itemnumber,dp.product_name,dp.product_img_url
+  		  from fact_out_product t1,dim_product dp,dim_supplier ds
+  		 where t1.supplier_key = ds.supplier_key
+  		   and t1.product_key = dp.product_key
+  		   and ds.supplier_id = #{supplier_id,jdbcType=INTEGER}
+  		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+  		   group by dp.itemnumber,dp.product_name,dp.product_img_url
+  		   union all
+  		select dp.itemnumber,dp.product_name,dp.product_img_url
+  		  from fact_fqc t1,dim_product dp,dim_supplier ds
+  		 where t1.supplier_key = ds.supplier_key
+  		   and t1.product_key = dp.product_key
+  		   and ds.supplier_id = #{supplier_id,jdbcType=INTEGER}
+  		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+  		   group by dp.itemnumber,dp.product_name,dp.product_img_url
+  		   union all
+  		select dp.itemnumber,dp.product_name,dp.product_img_url
+  		  from fact_sale_return t1,dim_product dp,dim_supplier ds
+  		 where t1.supplier_key = ds.supplier_key
+  		   and t1.product_key = dp.product_key
+  		   and ds.supplier_id = #{supplier_id,jdbcType=INTEGER}
+  		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+  		   group by dp.itemnumber,dp.product_name,dp.product_img_url)
+  	</select>
+  	<!-- 供应商商品列表 -->
+  	<select id="r_querySupplierProductList" parameterType="java.util.Map" resultType="java.util.Map">
+  		select *
+  		  from (
+  		select a.*,rownum rn 
+  		  from (
+  		select itemnumber,product_name,product_img_url,
+  			   nvl(sum(instorage_count),0) instorage_count,
+  			   nvl(sum(out_product_count),0) out_product_count,
+  			   nvl(sum(fqc_count),0) fqc_count,
+  			   nvl(sum(sale_return_count),0) sale_return_count
+  		  from (
+  		select dp.itemnumber,dp.product_name,dp.product_img_url,
+  			   nvl(sum(t1.instorage_count),0) instorage_count,
+  			   0 out_product_count,
+  			   0 fqc_count,
+  			   0 sale_return_count
+  		  from fact_instorage t1,dim_product dp,dim_supplier ds
+  		 where t1.supplier_key = ds.supplier_key
+  		   and t1.product_key = dp.product_key
+  		   and ds.supplier_id = #{supplier_id,jdbcType=INTEGER}
+  		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+  		   group by dp.itemnumber,dp.product_name,dp.product_img_url
+  		   union all
+  		select dp.itemnumber,dp.product_name,dp.product_img_url,
+  			   0 instorage_count,
+  			   nvl(sum(t1.out_product_count),0) out_product_count,
+  			   0 fqc_count,
+  			   0 sale_return_count
+  		  from fact_out_product t1,dim_product dp,dim_supplier ds
+  		 where t1.supplier_key = ds.supplier_key
+  		   and t1.product_key = dp.product_key
+  		   and ds.supplier_id = #{supplier_id,jdbcType=INTEGER}
+  		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+  		   group by dp.itemnumber,dp.product_name,dp.product_img_url
+  		   union all
+  		select dp.itemnumber,dp.product_name,dp.product_img_url,
+  			   0 instorage_count,
+  			   0 out_product_count,
+  			   nvl(sum(t1.fqc_count),0) fqc_count,
+  			   0 sale_return_count
+  		  from fact_fqc t1,dim_product dp,dim_supplier ds
+  		 where t1.supplier_key = ds.supplier_key
+  		   and t1.product_key = dp.product_key
+  		   and ds.supplier_id = #{supplier_id,jdbcType=INTEGER}
+  		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+  		   group by dp.itemnumber,dp.product_name,dp.product_img_url
+  		   union all
+  		select dp.itemnumber,dp.product_name,dp.product_img_url,
+  			   0 instorage_count,
+  			   0 out_product_count,
+  			   0 fqc_count,
+  			   nvl(sum(t1.sale_return_count),0) sale_return_count
+  		  from fact_sale_return t1,dim_product dp,dim_supplier ds
+  		 where t1.supplier_key = ds.supplier_key
+  		   and t1.product_key = dp.product_key
+  		   and ds.supplier_id = #{supplier_id,jdbcType=INTEGER}
+  		   and dp.stationed_user_id = #{stationed_user_id,jdbcType=INTEGER}
+  		   group by dp.itemnumber,dp.product_name,dp.product_img_url)
+		   group by itemnumber,product_name,product_img_url
+		   <choose>
+				<when test="sort != null and sort != ''">
+					order by ${sort} ${sort_by}
+				</when>
+				<otherwise>
+					order by instorage_count desc
+				</otherwise>
+			</choose>) a 
+		  where rownum &lt;= #{end_rownum,jdbcType=INTEGER}) t
+		  where rn &gt;#{start_rownum,jdbcType=INTEGER}
+  	</select>
+  	<resultMap type="java.util.Map" id="productTypeMap">
+  		 <result column="id" property="id"/>
+         <result column="type_name" property="name"/>
+  	</resultMap>
+  	<!-- 商品分类 下拉 -->
+  	<select id="r_queryProductTypeOption" parameterType="java.util.Map" resultMap="productTypeMap">
+  		select id,type_name
+		 from qx_dic_product_type
+		 where parent_id = 0
+		 order by sortid desc
+  	</select>
+</mapper>

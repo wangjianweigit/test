@@ -1,0 +1,319 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tk.store.order.dao.StoreOrderApplyDao">
+	<sql id="all_column">
+			TSOA.ID,
+			TSOA.ORDER_NUMBER,
+			TSOA.STORE_ID,
+			TSOA.STATE,
+			TSOA.TYPE,
+			TSOA.CREATE_USER_ID,
+			TO_CHAR(TSOA.CREATE_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  CREATE_DATE,
+			TSOA.APPROVAL_USER_ID,
+			TO_CHAR(TSOA.APPROVAL_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  APPROVAL_DATE,
+			TSOA.REJECTED_REASON,
+			TO_CHAR(TSOA.CLOSE_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  CLOSE_DATE,
+			TO_CHAR(TSOA.END_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  END_DATE,
+			CLOSE_REASON
+	</sql>	
+	<sql id="all_column_detail">
+			TOI.ID,
+			TOI.ORDER_NUMBER,
+			TO_CHAR(TOI.CREATE_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  CREATE_DATE,
+			TOI.USER_NAME,
+			TOI.USER_MANAGE_NAME,
+			TOI.ORDER_TYPE,
+			TOI.ORDER_STATE,
+			TOI.ORDER_REMARK,
+			TOI.RECEIVING_NAME,
+			TOI.RECEIVING_ADDRESS,
+			TOI.RECEIVING_PHONE,
+			TOI.LOGISTICS_COMPANY_CODE,
+			TOI.LOGISTICS_COMPANY_NAME,
+			TOI.LOGISTICS_NUMBER,
+			TOI.LOGISTICS_MONEY,
+			TOI.CANCEL_REASON,
+			TO_CHAR(TOI.CANCEL_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  CANCEL_DATE,
+			TOI.PAYMENT_STATE,
+			TO_CHAR(TOI.PAYMENT_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  PAYMENT_DATE,
+			TOI.PAYMENT_TYPE,
+			TOI.PAYMENT_MONEY,
+			TOI.PAYMENT_NUMBER,
+			TOI.CHECK_USER_NAME,
+			TOI.CHECK_USER_REALNAME,
+			TO_CHAR(TOI.CHECK_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  CHECK_DATE,
+			TOI.CHECK_CANCLE_REASON,
+			TOI.PRODUCT_MONEY,
+			TOI.PRODUCT_COUNT,
+			TOI.DISCOUNT_MONEY,
+			TOI.UPDATE_REASON,
+			TO_CHAR(TOI.CONFIRM_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  CONFIRM_DATE,
+			TOI.ORDER_SOURCE,
+			TOI.CANCEL_USER_NAME,
+			TOI.CANCEL_USER_REALNAME,
+			TOI.CHECK_STATE,
+			TOI.REFUND_STATE,
+			TO_CHAR(TOI.LAST_UPDATE_TIME,'YYYY-MM-DD HH24:MI:SS')  AS  LAST_UPDATE_TIME,
+			TOI.DF_MONEY,
+			TOI.YWJL_USER_NAME,
+			TOI.YWY_USER_NAME,
+			(SELECT STORE_NAME FROM TBL_STORE_INFO WHERE ID=TOI.MD_ID) AS STORE_NAME,
+			TOI.XDR_USER_TYPE,
+			TOI.XDR_USER_NAME,
+			TOI.PAYMENT_METHOD,
+			TOI.TRANSFER_VOUCHER_URL,
+			TOI.PAYMENT_SEND_STATE,
+			TOI.PAYMENT_TRANSFER_USER_NAME,
+			TOI.PAYMENT_TRANSFER_USER_REALNAME,
+			TO_CHAR(TOI.PAYMENT_TRANSFER_DATE,'YYYY-MM-DD HH24:MI:SS')  AS  PAYMENT_TRANSFER_DATE,
+			TOI.USER_PAY_STATE,
+			TOI.USER_VOUCHER_URL,
+			TOI.WAREHOUSE_ID,
+			TOI.PARTNER_USER_NAME,
+			TOI.SUPERVISOR_USER_NAME
+	</sql>
+	
+	<!-- 获取要货单、退款单列表 -->
+    <select id="queryStoreOrderApplyList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT  A.*,
+    			 (SELECT TSUM.STORE_NAME FROM TBL_STORE_USER_MANAGE TSUM WHERE TSUM.ID = A.STORE_ID) AS STORE_NAME,
+    			 NVL((SELECT SUM(COUNT) FROM TBL_STORE_ORDER_APPLY_DETAIL TSOAD WHERE TSOAD.ORDER_NUMBER=A.ORDER_NUMBER),0) AS PRODUCT_COUNT
+    	  FROM (SELECT T.*,ROWNUM AS RN
+				  FROM (SELECT <include refid="all_column"/> 
+				  		  FROM TBL_STORE_ORDER_APPLY TSOA
+					    <where>
+							    TSOA.TYPE = #{type,jdbcType=INTEGER}
+							<if test="state != null">
+								AND TSOA.STATE IN
+				                <foreach item="item" collection="state" open="(" separator="," close=")">
+									#{item}
+								</foreach>
+							</if>
+							<if test="order_number != null and order_number != '' ">
+							    AND	TSOA.ORDER_NUMBER = #{order_number,jdbcType=VARCHAR}
+							</if>
+							<if test="store_id != null and store_id != '' ">
+							    AND	TSOA.STORE_ID = #{store_id,jdbcType=INTEGER}
+							</if>
+							<if test="start_date != null and start_date != '' ">
+							    AND	TSOA.CREATE_DATE &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+							</if>
+							<if test="end_date != null and end_date != '' ">
+							    AND	TSOA.CREATE_DATE &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+							</if>
+					        <if test="public_user_type != null and public_user_type == 3">
+					            and 1=2
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 4">
+					              AND EXISTS
+									(SELECT 1 FROM TBL_STORE_USER_MANAGE TSUM WHERE TSUM.ID=TSOA.STORE_ID
+									 	AND EXISTS(SELECT 1 FROM TBL_USER_INFO TUI WHERE TSUM.USER_ID=TUI.ID
+									 					AND TUI.MARKET_SUPERVISION_USER_ID = #{public_user_id,jdbcType=INTEGER}) 
+									 	)
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 5">
+					            and 1=2
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 6">
+					            and 1=2
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 7">
+					            AND EXISTS
+									(SELECT 1 FROM TBL_STORE_USER_MANAGE TSUM WHERE TSUM.ID=TSOA.STORE_ID
+									 	AND EXISTS(SELECT 1 FROM TBL_USER_INFO TUI WHERE TSUM.USER_ID=TUI.ID
+									 					AND TUI.SUPERVISOR_USER_ID = #{public_user_id,jdbcType=INTEGER}) 
+									 	)
+					        </if>
+					        <if test="public_user_type != null and public_user_type == 9">
+								AND EXISTS
+									(SELECT 1 FROM TBL_STORE_USER_MANAGE TSUM WHERE TSUM.ID=TSOA.STORE_ID
+									 	AND EXISTS(SELECT 1 FROM TBL_USER_INFO TUI WHERE TSUM.USER_ID=TUI.ID
+									 					AND TUI.PARTNER_USER_ID = #{public_user_id,jdbcType=INTEGER}) 
+									 	)
+					        </if>
+					    </where>
+					    ORDER BY TSOA.STATE ASC,TSOA.CREATE_DATE DESC) T
+		 		 WHERE ROWNUM &lt;= #{end_rownum,jdbcType=INTEGER}) A
+		 WHERE RN &gt; #{start_rownum,jdbcType=INTEGER} 
+	</select>
+	
+	<!-- 获取要货单、退款单总数 -->
+    <select id="queryStoreOrderApplyCount" parameterType="java.util.HashMap" resultType="int">
+    	SELECT count(1) 
+		  FROM TBL_STORE_ORDER_APPLY TSOA
+		<where>
+			    TSOA.TYPE = #{type,jdbcType=INTEGER}
+			<if test="state != null">
+				AND TSOA.STATE IN
+                <foreach item="item" collection="state" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+			</if>
+			<if test="order_number != null and order_number != '' ">
+			    AND	TSOA.ORDER_NUMBER = #{order_number,jdbcType=VARCHAR}
+			</if>
+			<if test="store_id != null and store_id != '' ">
+			    AND	TSOA.STORE_ID = #{store_id,jdbcType=INTEGER}
+			</if>
+			<if test="start_date != null and start_date != '' ">
+			    AND	TSOA.CREATE_DATE &gt;= to_date(#{start_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+			<if test="end_date != null and end_date != '' ">
+			    AND	TSOA.CREATE_DATE &lt;= to_date(#{end_date,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')
+			</if>
+	        <if test="public_user_type != null and public_user_type == 3">
+	            and 1=2
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 4">
+	              AND EXISTS
+					(SELECT 1 FROM TBL_STORE_USER_MANAGE TSUM WHERE TSUM.ID=TSOA.STORE_ID
+					 	AND EXISTS(SELECT 1 FROM TBL_USER_INFO TUI WHERE TSUM.USER_ID=TUI.ID
+					 					AND TUI.MARKET_SUPERVISION_USER_ID = #{public_user_id,jdbcType=INTEGER}) 
+					 	)
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 5">
+	            and 1=2
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 6">
+	            and 1=2
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 7">
+	            AND EXISTS
+					(SELECT 1 FROM TBL_STORE_USER_MANAGE TSUM WHERE TSUM.ID=TSOA.STORE_ID
+					 	AND EXISTS(SELECT 1 FROM TBL_USER_INFO TUI WHERE TSUM.USER_ID=TUI.ID
+					 					AND TUI.SUPERVISOR_USER_ID = #{public_user_id,jdbcType=INTEGER}) 
+					 	)
+	        </if>
+	        <if test="public_user_type != null and public_user_type == 9">
+				AND EXISTS
+					(SELECT 1 FROM TBL_STORE_USER_MANAGE TSUM WHERE TSUM.ID=TSOA.STORE_ID
+					 	AND EXISTS(SELECT 1 FROM TBL_USER_INFO TUI WHERE TSUM.USER_ID=TUI.ID
+					 					AND TUI.PARTNER_USER_ID = #{public_user_id,jdbcType=INTEGER}) 
+					 	)
+	        </if>
+		</where>
+	</select>	
+	<!-- 获取要货单、退款单详情 -->
+    <select id="queryStoreOrderApplyDetail" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT <include refid="all_column"/>,
+                (SELECT TUI.USER_MANAGE_NAME FROM TBL_USER_INFO TUI WHERE TUI.ID = TSOA.CREATE_USER_ID) AS USER_REALNAME,
+                (SELECT TSUM.STORE_NAME FROM TBL_STORE_USER_MANAGE TSUM WHERE TSUM.ID = TSOA.STORE_ID) AS STORE_NAME,
+                (SELECT USER_MANAGE_NAME FROM TBL_USER_INFO TUI
+                	WHERE EXISTS(SELECT 1 FROM TBL_STORE_USER_MANAGE TSUM WHERE TUI.ID=TSUM.USER_ID
+                					AND TSUM.ID=TSOA.STORE_ID)) AS USER_MANAGE_NAME,
+                NVL((SELECT SUM(COUNT) FROM TBL_STORE_ORDER_APPLY_DETAIL TSOAD WHERE TSOAD.ORDER_NUMBER=TSOA.ORDER_NUMBER),0) AS PRODUCT_COUNT
+		  FROM TBL_STORE_ORDER_APPLY TSOA
+		<where>
+				TSOA.TYPE=#{type,jdbcType=INTEGER}
+			<if test="order_number != null and order_number != '' ">
+			    AND	TSOA.ORDER_NUMBER = #{order_number,jdbcType=VARCHAR}
+			</if>
+		</where> 
+	</select>
+	<!-- 获取要货单、退款单商品SKU信息列表 -->
+    <select id="queryOrderProductSkuList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+    	SELECT  TSOAD.ID,
+				TSOAD.ORDER_NUMBER,
+				TSOAD.PRODUCT_SKU,
+				TSOAD.PRODUCT_ITEMNUMBER,
+				TSOAD.PRODUCT_COLOR,
+				TSOAD.CODENUMBER,
+				TSOAD.COUNT,
+				(SELECT PRODUCT_NAME FROM TBL_PRODUCT_INFO TPI WHERE TPI.ITEMNUMBER=TSOAD.PRODUCT_ITEMNUMBER) AS PRODUCT_NAME,
+				(SELECT PRODUCT_IMG_URL FROM TBL_PRODUCT_INFO TPI WHERE TPI.ITEMNUMBER=TSOAD.PRODUCT_ITEMNUMBER) AS PRODUCT_IMG_URL,
+				NVL((SELECT RETAIL_PRICE FROM TBL_PRODUCT_STORE_DETAIL TPSD 
+					WHERE TPSD.PRODUCT_ITEMNUMBER=TSOAD.PRODUCT_ITEMNUMBER AND TPSD.PRODUCT_SKU=TSOAD.PRODUCT_SKU
+					AND EXISTS(SELECT 1 FROM TBL_PRODUCT_STORE TPS 
+									WHERE TPSD.PRODUCT_STORE_ID=TPS.ID 
+									AND TPS.USER_ID=(SELECT USER_ID FROM TBL_STORE_USER_MANAGE TSUM 
+														WHERE TSUM.ID=TSOA.STORE_ID))),0) AS RETAIL_PRICE
+		  FROM TBL_STORE_ORDER_APPLY_DETAIL TSOAD
+		   LEFT JOIN TBL_STORE_ORDER_APPLY TSOA ON TSOAD.ORDER_NUMBER=TSOA.ORDER_NUMBER
+		<where>
+			    TSOA.TYPE=#{type,jdbcType=INTEGER}
+			  <if test="order_number != null and order_number != '' ">
+				AND	TSOAD.ORDER_NUMBER = #{order_number,jdbcType=VARCHAR}
+			  </if>
+		</where>
+		ORDER BY TSOAD.PRODUCT_ITEMNUMBER,TSOAD.PRODUCT_COLOR,TSOAD.CODENUMBER ASC
+	</select>
+	<!-- 查询要货单、退款单商品总金额 -->
+    <select id="queryProductTotalMoney" parameterType="java.util.HashMap" resultType="float">
+	    SELECT NVL(SUM(T.COUNT*T.RETAIL_PRICE),0)
+	    	 FROM (
+		    	SELECT  TSOAD.COUNT,
+						(SELECT RETAIL_PRICE FROM TBL_PRODUCT_STORE_DETAIL TPSD 
+							WHERE TPSD.PRODUCT_ITEMNUMBER=TSOAD.PRODUCT_ITEMNUMBER AND TPSD.PRODUCT_SKU=TSOAD.PRODUCT_SKU
+							AND EXISTS(SELECT 1 FROM TBL_PRODUCT_STORE TPS 
+											WHERE TPSD.PRODUCT_STORE_ID=TPS.ID 
+											AND TPS.USER_ID=(SELECT USER_ID FROM TBL_STORE_USER_MANAGE TSUM 
+																WHERE TSUM.ID=TSOA.STORE_ID))) AS RETAIL_PRICE
+				  FROM TBL_STORE_ORDER_APPLY_DETAIL TSOAD
+				   LEFT JOIN TBL_STORE_ORDER_APPLY TSOA ON TSOAD.ORDER_NUMBER=TSOA.ORDER_NUMBER
+				<where>
+					    TSOA.TYPE=#{type,jdbcType=INTEGER}
+					  <if test="order_number != null and order_number != '' ">
+						AND	TSOAD.ORDER_NUMBER = #{order_number,jdbcType=VARCHAR}
+					  </if>
+				</where>)T
+	</select>
+	<!-- 要货单、退款单确认 -->
+	<update id="storeOrderApplyConfirm" parameterType="java.util.Map">
+		update tbl_store_order_apply
+		   set state = 4,
+		   end_date=sysdate
+		 where order_number = #{order_number,jdbcType=VARCHAR}
+		 and type=#{type,jdbcType=INTEGER}
+	</update>
+	<!-- 要货单、退款单确审批-->
+	<update id="storeOrderApplyApproval" parameterType="java.util.Map">
+		update tbl_store_order_apply
+		   <set>
+		   		<if test="state != null and state != '' ">
+					state = #{state,jdbcType=VARCHAR},
+			  	</if>	
+		   		<if test="rejected_reason != null and rejected_reason != '' ">
+					rejected_reason = #{rejected_reason,jdbcType=VARCHAR},
+			  	</if>
+			  	approval_user_id=#{public_user_id,jdbcType=INTEGER},
+			  	approval_date=sysdate
+		   </set> 
+		 where order_number = #{order_number,jdbcType=VARCHAR}
+		 and type=#{type,jdbcType=INTEGER}
+	</update>
+	<!-- 按照登入用户查询门店列表-->
+    <select id="queryStoreList" parameterType="java.util.HashMap" resultMap="storeListMap">
+    	SELECT ID,STORE_NAME FROM TBL_STORE_USER_MANAGE TSUM
+    		<where>
+    			 <if test="public_user_type != null and public_user_type == 3">
+		            and 1=2
+		        </if>
+		        <if test="public_user_type != null and public_user_type == 4">
+				 	AND EXISTS(SELECT 1 FROM TBL_USER_INFO TUI WHERE TSUM.USER_ID=TUI.ID
+				 					AND TUI.MARKET_SUPERVISION_USER_ID = #{public_user_id,jdbcType=INTEGER}) 
+		        </if>
+		        <if test="public_user_type != null and public_user_type == 5">
+		            and 1=2
+		        </if>
+		        <if test="public_user_type != null and public_user_type == 6">
+		            and 1=2
+		        </if>
+		        <if test="public_user_type != null and public_user_type == 7">
+				 	AND EXISTS(SELECT 1 FROM TBL_USER_INFO TUI WHERE TSUM.USER_ID=TUI.ID
+				 					AND TUI.SUPERVISOR_USER_ID = #{public_user_id,jdbcType=INTEGER}) 
+		        </if>
+		        <if test="public_user_type != null and public_user_type == 9">
+				 	AND EXISTS(SELECT 1 FROM TBL_USER_INFO TUI WHERE TSUM.USER_ID=TUI.ID
+				 					AND TUI.PARTNER_USER_ID = #{public_user_id,jdbcType=INTEGER}) 
+		        </if>
+    		</where>
+	   
+	</select>
+	 <resultMap id="storeListMap" type="java.util.Map">
+        <result column="id" property="id"/>
+        <result column="store_name" property="option"/>
+    </resultMap>
+	
+</mapper>

@@ -1,0 +1,112 @@
+﻿﻿﻿#（内网测试）远程调用见证宝接口
+pay_service_url=http://16.16.16.188:9090/
+oss_service_url = http://16.16.16.188:8088/
+sms_service_url=http://push.tk61.cn:9086/Home/noticeSend
+retail_service_url=http://16.16.16.188:9095/
+store_service_url=http://16.16.16.188:9601/
+erp_service_url=http://16.16.16.188:8010/
+#oa_server项目地址
+oa_service_url=http://16.16.16.188:8210/
+
+#读取ERP数据库用户名
+jdbc_user=TKERP
+
+#（外网测试）远程调用见证宝接口
+#pay_service_url=http://www.tkvip.com:9090/
+#oss_service_url = http://www.tkvip.com:8088/
+#oss_service_url = http://www.tk61.cn:8088/
+#读取ERP数据库用户名
+#jdbc_user=TKERP
+
+##################################################以下为通用配置################################################
+
+#会员充值
+tran_rechange =tran/rechange
+#资金冻结
+tran_capital_unfreeze =tran/capital/unfreeze
+#会员或入驻商提现
+bank_withdraw =bank/withdraw
+#获取子账户余额
+bank_balance = bank/balance
+#获取会员银行交易明细
+bank_transaction_detail =bank/reconciliation/tran/list
+#获取见证宝充值提现明细
+withdraw_deposit_detail = bank/reconciliation/liquidation/list
+#获取(衫徳)见证宝账户余额
+sd_pay_balance = sandpay/balance
+#(衫徳)见证宝账户余额提现
+sd_pay_balance_withdrawal = sandpay/agentpay
+#获取(衫徳)见证宝账户余额提现单条记录明细
+sd_pay_balance_withdrawal_detail = sd/pay/withdrawal_detail
+#获取见证宝账户可提现余额
+bank_withdraw_balance =bank/withdraw_balance
+#见证宝绑定银行卡
+bankAccount_bind = bankAccount/bind
+#验证绑定银行卡 -- 短信
+bankAccount_check_note = bankAccount/check
+#验证绑定银行卡 -- 小额鉴权
+bankAccount_check_driblet = bankAccount/check_driblet
+#见证宝解绑银行卡
+bank_unbind_card =bankAccount/unbind
+#见证宝会员间交易
+tran_directpay =tran/directpay
+#见证宝会员资金支付
+bank_batch_liquidation=bank/batch_liquidation
+#见证宝资金冻结
+tran_capital_frozen=tran/capital/frozen
+
+##################################################以下为OSS接口################################################
+#校验文件模板是否被使用
+file_directory_used = file/directory_used
+#商品通过审批后，复制商品主图至分享目录
+file_copy_product_main_img =file/copy_product_main_img
+#根据文件夹的完整路径，获取当前文件夹下的文件数量
+file_directory_virtual_count =file/directory_virtual_count
+#上传oss接口
+file_upload=file/upload_oss
+##################################################以下为联营门店接口################################################
+#导入商品(店铺)
+ly_product_import = product/Product/lyProductImport
+#商品是否销售(店铺)
+product_info_update = product/Product/productInfoUpdate
+#设置零售价
+ly_sku_update = product/Product/lySkuUpdate
+#联营活动新增
+ly_activity_insert = marketing/Discount/discountInsert
+#联营活动编辑
+ly_activity_edit = marketing/Discount/discountEdit
+##################################################以下为库存调拨接口################################################
+#商品库存
+product_stock_list = product/Product/productList
+#联营商品库存明细查询
+ly_stock_detail = stock/Stock/lyStockDetail
+#生成调拨单号
+get_allot_commandOrder = allot/Allot/getAllotCommandOrder
+#调拨指令单详情
+allot_commandDetail = allot/Allot/allotCommandDetail
+#调拨基本信息
+allot_basicsMes = allot/Allot/allotBasicsMes
+#调拨单增加
+allot_commandAdd = allot/Allot/allotCommandAdd
+##################################################以下为库存查询接口################################################
+#库存查询
+stock_list =stock/Stock/lyStockList
+##################################################以下为店铺缴款接口################################################
+#审批接口
+agent_esbPaymentCheck =agent/Finance/esbPaymentCheck
+##################################################以下为数据统计接口################################################
+#销售动态
+goods_gather_list =order/Summary/goodsGatherList
+#商品销售排行榜
+goods_sales =order/Summary/goodsSales
+##################################################以下为联营会员管理接口################################################
+#会员列表
+member_list = user/User/getUserList
+#会员详情
+member_detail = user/User/getUserInfo
+#成交记录
+member_trad_record = user/User/getTradeInfo
+#积分记录
+member_integral_record =user/User/getIntegralInfo
+#解冻/冻结
+member_status=user/User/setUserStatus

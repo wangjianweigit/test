@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tk.oms.basicinfo.dao.MemberLogisticsTemplateDao">
+
+    <!--分页查询会员物流模板列表-->
+    <select id="queryMemberLogisticsTemplateList" parameterType="java.util.Map" resultType="java.util.Map">
+        select * from (
+            select rownum rn, tt.* from (
+                select
+                    id,
+                    template_name,
+                    create_user_id,
+                    to_char(create_date,'yyyy-mm-dd hh24:mi:ss') create_date,
+                    (select user_realname from tbl_sys_user_info where id = tmlt.create_user_id) as create_user_realname,
+                    (select to_char(wm_concat (tlc.name|| '_'|| (select name from tbl_warehouse_info where id = twi.parent_id)))
+					   from tbl_user_logistics_tmpl_detail tultd
+					        left join tbl_logistics_company tlc on tultd.logistics_id = tlc.id
+					        left join tbl_warehouse_info twi on tultd.warehouse_id = twi.id
+					  where tultd.template_id = tmlt.id and tlc.type = 1)as logistics_warehouse,
+                    (select to_char(wm_concat(tlc.name||'_'||(select name from tbl_warehouse_info where id=twi.parent_id))) 
+                    	from tbl_user_logistics_tmpl_detail tultd
+                    		left join tbl_logistics_company tlc on tultd.logistics_id=tlc.id
+                    		left join tbl_warehouse_info twi on tultd.warehouse_id=twi.id
+                        where tultd.template_id=tmlt.id and tlc.type=2)as df_logistics_warehouse
+                from
+                    tbl_user_logistics_template tmlt
+                <where>
+                    <if test="template_name != null and template_name != ''">
+                        and template_name like concat(concat('%', #{template_name,jdbcType=VARCHAR}),'%')
+                    </if>
+                    <if test="create_user_realname != null and create_user_realname != ''">
+                        and exists(select 1 from tbl_sys_user_info where id=tmlt.create_user_id and user_realname like concat(concat('%', #{create_user_realname,jdbcType=VARCHAR}),'%'))
+                    </if>
+                    <if test="create_start_time != null and create_start_time != ''">
+                        and create_date &gt;= to_date(#{create_start_time},'YYYY-MM-DD HH24:MI:SS')
+                    </if>
+                    <if test="create_end_time != null and create_end_time != ''">
+                        and create_date &lt;= to_date(#{create_end_time},'YYYY-MM-DD HH24:MI:SS')
+                    </if>
+                </where>
+                    order by create_date desc
+            ) tt where rownum &lt;= #{end_rownum,jdbcType=INTEGER})
+        where rn &gt; #{start_rownum,jdbcType=INTEGER}
+    </select>
+
+    <!--查询会员物流模板总数量-->
+    <select id="queryMemberLogisticsTemplateCount" parameterType="java.util.Map" resultType="int">
+        select
+            count(1)
+        from
+            tbl_user_logistics_template
+        <where>
+           <if test="template_name != null and template_name != ''">
+               and template_name like concat(concat('%', #{template_name,jdbcType=VARCHAR}),'%')
+           </if>
+           <if test="create_user_realname != null and create_user_realname != ''">
+               and exists(select 1 from tbl_sys_user_info where id=tmlt.create_user_id and user_realname like concat(concat('%', #{create_user_realname,jdbcType=VARCHAR}),'%'))
+           </if>
+           <if test="create_start_time != null and create_start_time != ''">
+               and create_date &gt;= to_date(#{create_start_time},'YYYY-MM-DD HH24:MI:SS')
+           </if>
+           <if test="create_end_time != null and create_end_time != ''">
+               and create_date &lt;= to_date(#{create_end_time},'YYYY-MM-DD HH24:MI:SS')
+           </if>
+       </where>
+    </select>
+
+ 	<!-- 查询平台仓库列表-->
+    <select id="queryPlatformWarehouseList" parameterType="java.util.Map" resultType="java.util.Map">
+		select warehouse_id,
+		       (select name
+		          from tbl_warehouse_info
+		         where id = (select parent_id
+		                       from tbl_warehouse_info
+		                      where id = tpw.warehouse_id)) as warehouse_name
+		  from tbl_platform_warehouse tpw
+		  order by warehouse_id
+    </select>
+    
+    <!-- 查询普通物流信息-->
+    <select id="queryLogisticsCompanyByType" parameterType="java.util.Map" resultType="java.util.Map">
+		select id,
+		       name,
+		       state
+		  from tbl_logistics_company 
+		  where type=#{type,jdbcType=INTEGER}
+    </select>
+    
+    <!-- 新增会员物流模板主表信息-->
+    <insert id="insertUserLogisticsTemplate" parameterType="java.util.Map">
+    	<selectKey keyProperty="id" resultType="int" order="BEFORE">
+			select seq_user_logistics_template.nextval from dual
+		</selectKey> 
+    	insert into tbl_user_logistics_template
+	      	(
+		      	 id, 
+		      	 template_name, 
+		      	 create_user_id, 
+		      	 create_date
+	      	 )
+	    	values
+	      	(
+		      	#{id,jdbcType=INTEGER},
+		      	#{template_name,jdbcType=VARCHAR}, 
+				#{public_user_id,jdbcType=INTEGER}, 
+				sysdate
+			)
+    </insert>
+    
+    <!-- 新增会员物流模板详表信息-->
+    <insert id="insertUserLogisticsTemplateDetail" parameterType="java.util.Map">
+    	insert into TBL_USER_LOGISTICS_TMPL_DETAIL
+	      	(
+		      	 id, 
+		      	 template_id, 
+		      	 warehouse_id, 
+		      	 logistics_id
+	      	 )
+	    	select seq_user_logistics_tmpl_detail.nextval,
+              #{template_id,jdbcType=INTEGER},
+              #{warehouse_id,jdbcType=INTEGER},
+              a.logistics_id
+         from (
+	        <foreach collection="logistics_id" item="item" index="index" separator="UNION">
+	            select  #{item} as logistics_id from dual
+	        </foreach>
+       	   )a
+    </insert>
+    
+     <!-- 会员物流模板详情-->
+    <select id="queryMemberLogisticsTemplateDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select id,template_name,
+			(select to_char(wm_concat (tlc.name|| '_'|| (select name from tbl_warehouse_info where id = twi.parent_id)))
+		   		from tbl_user_logistics_tmpl_detail tultd
+		        	left join tbl_logistics_company tlc on tultd.logistics_id = tlc.id
+		        	left join tbl_warehouse_info twi on tultd.warehouse_id = twi.id
+		  		where tultd.template_id = tmlt.id and tlc.type = 1)as logistics_warehouse,
+            (select to_char(wm_concat(tlc.name||'_'||(select name from tbl_warehouse_info where id=twi.parent_id))) 
+                 from tbl_user_logistics_tmpl_detail tultd
+                 		left join tbl_logistics_company tlc on tultd.logistics_id=tlc.id
+                 		left join tbl_warehouse_info twi on tultd.warehouse_id=twi.id
+                 where tultd.template_id=tmlt.id and tlc.type=2)as df_logistics_warehouse
+		 from tbl_user_logistics_template tmlt where id= #{template_id,jdbcType=INTEGER}
+    </select>
+    
+    <!-- 会员物流模板详情列表-->
+    <select id="queryMemberLogisticsTemplateDetailList" parameterType="java.util.Map" resultType="java.util.Map">
+		select warehouse_id,to_char(wm_concat(logistics_id)) as logistics_id from 
+		tbl_user_logistics_tmpl_detail where template_id=#{template_id,jdbcType=INTEGER} group by warehouse_id
+    </select>
+    
+    <!-- 编辑会员物流模板主表信息 -->
+	<update id="updateUserLogisticsTemplate" parameterType="java.util.Map">
+		update tbl_user_logistics_template
+		<set>
+			<if test="template_name !=null and TEMPLATE_NAME !=''">
+				template_name=#{template_name,jdbcType=VARCHAR},
+			</if>
+			edit_user_id=#{public_user_id,jdbcType=INTEGER},
+			edit_date=sysdate
+		</set>
+		where id = #{template_id,jdbcType=INTEGER}
+	</update>
+	
+	<!-- 查询当前模板名称数量-->
+    <select id="queryUserLogisticsTemplateNameCount" parameterType="java.util.Map" resultType="int">
+		select count(1) from tbl_user_logistics_template 
+		<where>
+			<if test="template_name !=null and template_name !=''">
+				and template_name=#{template_name,jdbcType=VARCHAR}
+			</if>
+			<if test="template_id !=null and template_id !=''">
+				and id &lt;&gt; #{template_id,jdbcType=VARCHAR}
+			</if>
+		</where>
+    </select>
+    
+     <!--删除会员物流模板详情-->
+	<delete id="deleteUserLogisticsTemplateDetail" parameterType="java.util.Map">
+		delete from tbl_user_logistics_tmpl_detail where template_id = #{template_id,jdbcType=INTEGER}
+	</delete>
+	
+	<!--删除会员物流模板主表信息-->
+	<delete id="deleteUserLogisticsTemplate" parameterType="java.util.Map">
+		delete from tbl_user_logistics_template where id = #{template_id,jdbcType=INTEGER}
+	</delete>
+	
+	<!-- 判断当前模板名称是否被关联-->
+    <select id="queryIsRelatedByUser" parameterType="java.util.Map" resultType="int">
+    	SELECT (
+            SELECT
+            COUNT(1)
+            FROM TBL_USER_INFO
+            WHERE user_logistics_template_id = #{template_id,jdbcType=INTEGER}
+        )
+        +
+        (
+            SELECT
+            COUNT(1)
+            FROM TBL_USER_INFO_APPLY
+            WHERE user_logistics_template_id = #{template_id,jdbcType=INTEGER}
+        )
+        FROM DUAL
+    </select>
+    
+    <!-- 会员物流模板下拉数据-->
+    <select id="queryMemberLogisticsTemplateOption" parameterType="java.util.Map" resultMap="getTemplateOption">
+		select id,template_name from tbl_user_logistics_template order by create_date asc
+    </select>
+    
+    <resultMap id="getTemplateOption" type="java.util.Map">
+	  <result column="id" property="id"/>
+      <result column="template_name" property="option"/>
+	</resultMap>
+
+    <select id="queryLogisticsIsUsedByTmpl" parameterType="java.util.Map" resultType="int">
+        select count(1)
+        from tbl_user_logistics_tmpl_detail
+        where logistics_id = #{id, jdbcType=INTEGER}
+    </select>
+
+</mapper>

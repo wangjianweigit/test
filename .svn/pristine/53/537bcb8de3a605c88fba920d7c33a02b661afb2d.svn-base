@@ -1,0 +1,442 @@
+package com.tk.oms.basicinfo.service;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import com.tk.oms.basicinfo.dao.LogisticsCompanyDao;
+import com.tk.sys.util.GridResult;
+import com.tk.sys.util.HttpUtil;
+import com.tk.sys.util.PageUtil;
+import com.tk.sys.util.ProcessResult;
+import com.tk.sys.util.Transform;
+/**
+ * 
+ * Copyright (c), 2017, Tongku
+ * FileName : LogisticsCompanyService
+ * 物流公司管理
+ *
+ * @author yejingquan
+ * @version 1.00
+ * @date 2017-4-14
+ */
+@Service("LogisticsCompanyService")
+public class LogisticsCompanyService {
+	private Log logger = LogFactory.getLog(this.getClass());
+	@Resource
+	private LogisticsCompanyDao logisticsCompanyDao;
+	/**
+	 * 查询物流公司列表
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public GridResult queryLogisticsCompanyList(HttpServletRequest request) {
+		GridResult gr = new GridResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        	GridResult pageParamResult = PageUtil.handlePageParams(paramMap);
+				if(pageParamResult!=null){
+					return pageParamResult;
+				}
+	        }
+			if(paramMap.size() == 0) {
+            	gr.setState(false);
+            	gr.setMessage("参数缺失");
+                return gr;
+            }
+			List<String> type_list = null;
+			if(paramMap.get("type") instanceof List<?>){
+				type_list = (List<String>) paramMap.get("type");
+			}else if(paramMap.get("type") instanceof String){
+				type_list = new ArrayList<String>();
+				type_list.add(paramMap.get("type").toString());
+			}
+			paramMap.put("type", type_list);
+			//查询物流公司总数量
+			int total = logisticsCompanyDao.queryLogisticsCompanyCount(paramMap);
+			//查询物流公司列表
+			List<Map<String, Object>> dataList = logisticsCompanyDao.queryLogisticsCompanyList(paramMap);
+			
+			if (dataList != null && dataList.size() > 0) {
+				gr.setState(true);
+				gr.setMessage("查询成功!");
+				gr.setObj(dataList);
+				gr.setTotal(total);
+			} else {
+				gr.setState(true);
+				gr.setMessage("无数据");
+			}
+			
+		} catch (Exception e) {
+			gr.setState(false);
+			gr.setMessage(e.getMessage());
+			logger.error("查询失败："+e.getMessage());
+		}
+		return gr;
+	}
+	/**
+	 * 查询物流公司详情
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryLogisticsCompanyDetail(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        }
+	        if(paramMap.size() == 0) {
+	        	pr.setState(false);
+	        	pr.setMessage("参数缺失");
+                return pr;
+            }
+            // 查询物流公司详情
+        	Map<String, Object>  retMap = logisticsCompanyDao.queryLogisticsCompanyDetail(paramMap);
+            pr.setState(true);
+            pr.setMessage("查询成功");
+            pr.setObj(retMap);
+
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error("查询失败："+e.getMessage());
+        }
+
+        return pr;
+	}
+	/**
+	 * 添加物流公司信息
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult addLogisticsCompany(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        }
+	        if(paramMap.size() == 0) {
+	        	pr.setState(false);
+	        	pr.setMessage("参数缺失");
+                return pr;
+            }
+	        if(paramMap.get("code").equals("") ||paramMap.get("name").equals("")){
+      		  	pr.setMessage("物流公司代码和名称均不能为空！");
+	            return pr;
+	      	}
+	      	if(paramMap.get("type").equals("") ){
+	      		pr.setMessage("请选择物流公司类型！");
+		        return pr;
+	      	}
+			if(StringUtils.isEmpty(paramMap.get("standard_logistics_id"))){
+				pr.setMessage("请选择所属物流公司");
+				return pr;
+			}
+	      	//1.物流公司代码是否重复
+            if(logisticsCompanyDao.queryLogisticsByCode(paramMap)>0){
+            	pr.setState(false);
+                pr.setMessage("代码重复，请修改代码后，再次提交！");
+                return pr;
+            }
+            //2.物流公司名称是否重复
+            if(logisticsCompanyDao.queryLogisticsByName(paramMap)>0){
+            	pr.setState(false);
+                pr.setMessage("名称重复，请修改名称后，再次提交！");
+                return pr;
+            }
+    		//3.新增
+    		if(logisticsCompanyDao.insert(paramMap)>0){
+    			pr.setState(true);
+                pr.setMessage("新增成功！");
+    		}else{
+    			pr.setState(false);
+                pr.setMessage("新增失败！");
+    		}
+            
+	        
+		} catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error("新增失败："+e.getMessage());
+            throw new RuntimeException(e.getMessage());
+        }
+
+		return pr;
+	}
+	/**
+	 * 删除物流公司信息
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult removeLogisticsCompany(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        }
+	        if(paramMap.size() == 0) {
+	        	pr.setState(false);
+	        	pr.setMessage("参数缺失");
+                return pr;
+            }
+	        if(StringUtils.isEmpty(paramMap.get("id"))){
+	        	pr.setState(false);
+	        	pr.setMessage("缺少参数，物流ID");
+                return pr;
+	        }
+	      	
+    		//删除
+	        logisticsCompanyDao.delete(paramMap);
+	        logisticsCompanyDao.deleteLogisticsForUser(paramMap);//删除物流公司为用户可用记录
+    		pr.setState(true);
+            pr.setMessage("删除成功！");
+	      	
+		} catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error("删除失败："+e.getMessage());
+            throw new RuntimeException(e.getMessage());
+        }
+
+		return pr;
+	}
+	/**
+	 * 编辑物流公司信息
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult editLogisticsCompany(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        }
+	        if(paramMap.size() == 0) {
+	        	pr.setState(false);
+	        	pr.setMessage("参数缺失");
+                return pr;
+            }
+	        if(paramMap.get("code").equals("") ||paramMap.get("name").equals("")){
+      		  	pr.setMessage("物流公司代码和名称均不能为空！");
+	            return pr;
+	      	}
+	      	if(paramMap.get("type").equals("") ){
+	      		pr.setMessage("请选择物流公司类型！");
+		        return pr;
+	      	}
+			if(StringUtils.isEmpty(paramMap.get("standard_logistics_id"))){
+				pr.setMessage("请选择所属物流公司");
+				return pr;
+			}
+    		
+    		if(logisticsCompanyDao.update(paramMap)>0){
+    			pr.setState(true);
+                pr.setMessage("更新成功！");
+    		}else{
+    			pr.setState(false);
+                pr.setMessage("更新失败！");
+    		}
+	      	
+		} catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error("更新失败："+e.getMessage());
+            throw new RuntimeException(e.getMessage());
+        }
+
+		return pr;
+	}
+	/**
+	 * 物流公司排序
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ProcessResult logisticsCompanySort(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+        Map<String,Object> paramMap = new HashMap<String,Object>();
+        try {
+            String json = HttpUtil.getRequestInputStream(request);
+            if(!StringUtils.isEmpty(json))
+                //参数实体
+            	paramMap = (Map<String,Object>) Transform.GetPacket(json, Map.class);
+            
+            if(StringUtils.isEmpty(paramMap.get("type"))){
+            	if(StringUtils.isEmpty(paramMap.get("id1"))||StringUtils.isEmpty(paramMap.get("id2"))){
+                    pr.setState(false);
+                    pr.setMessage("参数错误，需要两个交换的id（id1、id2）");
+                    return pr;
+                }
+	            Map<String,Object> t1 = logisticsCompanyDao.queryById(Long.parseLong(paramMap.get("id1").toString()));
+	            Map<String,Object> t2 = logisticsCompanyDao.queryById(Long.parseLong(paramMap.get("id2").toString()));
+	            t1.put("id", paramMap.get("id1"));
+	            t1.put("sort_id",t2.get("SORT_ID"));
+	            t2.put("id", paramMap.get("id2"));
+	            t2.put("sort_id",t1.get("SORT_ID"));
+	            if(logisticsCompanyDao.update(t1)>0&&logisticsCompanyDao.update(t2)>0){
+	                pr.setState(true);
+	                pr.setMessage("排序字段修改成功");
+	                pr.setObj(null);
+	            } else {
+	                pr.setState(false);
+	                pr.setMessage("排序字段修改失败");
+	            }
+            }else{
+            	if(StringUtils.isEmpty(paramMap.get("id"))){
+                    pr.setState(false);
+                    pr.setMessage("参数缺失，参数ID为空");
+                    return pr;
+                }
+            	if(logisticsCompanyDao.updateSort(paramMap)>0){
+            		pr.setState(true);
+                    pr.setMessage("排序字段修改成功");
+            	}else{
+            		pr.setState(false);
+                    pr.setMessage("排序字段修改失败");
+            	}
+            }
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+        }
+        return pr;
+	}
+	/**
+     *  查看物流公司关联用户数量
+     * @param request
+     * @return
+     */
+	@SuppressWarnings("unchecked")
+	public ProcessResult queryLogisticsForUser(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        }
+	        if(paramMap.size() == 0) {
+	        	pr.setState(false);
+	        	pr.setMessage("参数缺失");
+                return pr;
+            }
+	            // 查看物流公司关联用户数量
+	            Map<String, Object> retMap= logisticsCompanyDao.queryLogisticsForUser(paramMap);
+	            pr.setState(true);
+	            pr.setMessage("查询成功");
+	            pr.setObj(retMap);
+
+	        } catch (Exception e) {
+	            pr.setState(false);
+	            pr.setMessage(e.getMessage());
+	            logger.error("查询失败："+e.getMessage());
+	        }
+
+	        return pr;
+	}
+	/**
+	 * 分类返回物流公司
+	 * @param request
+	 * @return
+	 */
+	public ProcessResult queryLogisticsList(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+        try {
+            Map<String, Object> template = new HashMap<String, Object>();
+
+            Map<String, Object> paramMap = new HashMap<String, Object>();
+            paramMap.put("type",'1');
+            List<Map<String, Object>> list_logistics = logisticsCompanyDao.queryLogisticsList(paramMap);
+            template.put("logistics_detail", list_logistics);
+            paramMap.put("type",'2');
+            List<Map<String, Object>> list_issuing = logisticsCompanyDao.queryLogisticsList(paramMap);
+            template.put("issuing_detail", list_issuing);
+
+            pr.setState(true);
+            pr.setMessage("查询成功");
+            pr.setObj(template);
+
+        } catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error("查询失败："+e.getMessage());
+        }
+        return pr;
+	}
+	
+	/**
+	 * 是否启用
+	 * @param request
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@Transactional
+	public ProcessResult editLogisticsCompanyState(HttpServletRequest request) {
+		ProcessResult pr = new ProcessResult();
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		try {
+	        String json = HttpUtil.getRequestInputStream(request);
+
+	        if(!StringUtils.isEmpty(json)) {
+	        	paramMap = (Map<String, Object>) Transform.GetPacket(json, HashMap.class);
+	        }
+	        if(paramMap.size() == 0) {
+	        	pr.setState(false);
+	        	pr.setMessage("参数缺失");
+                return pr;
+            }
+    		//更新状态
+    		if(logisticsCompanyDao.update(paramMap)>0){
+    			pr.setState(true);
+                pr.setMessage("状态修改成功");
+    		}else{
+    			pr.setState(false);
+                pr.setMessage("状态修改失败");
+    		}
+	      	
+		} catch (Exception e) {
+            pr.setState(false);
+            pr.setMessage(e.getMessage());
+            logger.error("状态修改失败："+e.getMessage());
+            throw new RuntimeException(e.getMessage());
+        }
+
+		return pr;
+	}
+
+}
